@@ -64,7 +64,7 @@ export default function OrdersPage() {
         
         let storedOrders = '[]';
         try {
-          const url = `http://localhost:5000/api/orders?userId=${buyerUserId}`;
+          const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${buyerUserId}`;
           const res = await fetch(url);
           const data = await res.json();
           if (data.success && data.orders) {
@@ -237,7 +237,7 @@ export default function OrdersPage() {
   const syncOrderStatus = async (orderId, nextStatus) => {
     try {
       // 1. Sync to database
-      await fetch(`http://localhost:5000/api/orders/${orderId}`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'

@@ -3,7 +3,7 @@
  * Coordinates client-side fetch requests to the secure backend JWT API on Port 5000.
  */
 
-const API_BASE_URL = 'http://localhost:5000/api/auth';
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth`;
 
 /**
  * Helper to get default fetch headers

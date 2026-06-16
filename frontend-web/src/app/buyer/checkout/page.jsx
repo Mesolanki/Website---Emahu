@@ -30,7 +30,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const loadCheckoutData = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/products');
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
         const data = await res.json();
         let formattedList = [];
         if (data.success) {
@@ -272,7 +272,7 @@ export default function CheckoutPage() {
         (async () => {
           try {
             for (const orderData of orderObjects) {
-              const res = await fetch('http://localhost:5000/api/orders', {
+              const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json'

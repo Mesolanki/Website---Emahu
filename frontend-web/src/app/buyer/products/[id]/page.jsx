@@ -94,7 +94,7 @@ export default function ProductDetailPage() {
         let orders = [];
         if (buyerUserId) {
           try {
-            const res = await fetch(`http://localhost:5000/api/orders?userId=${buyerUserId}`);
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${buyerUserId}`);
             const data = await res.json();
             if (data.success && data.orders) orders = data.orders;
           } catch (_) {}
@@ -177,7 +177,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     const fetchDbProduct = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/products/${id}`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/${id}`);
         const data = await res.json();
         if (data.success && data.product) {
           const p = data.product;

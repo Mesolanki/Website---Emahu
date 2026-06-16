@@ -97,7 +97,7 @@ function TrackOrderContent() {
     const fetchOrders = async () => {
       if (!buyerUserId) return;
       try {
-        const url = `http://localhost:5000/api/orders?userId=${buyerUserId}`;
+        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${buyerUserId}`;
         const res = await fetch(url);
         const data = await res.json();
         if (data.success && data.orders) {
@@ -122,7 +122,7 @@ function TrackOrderContent() {
 
     const fetchTrackedOrder = async () => {
       try {
-        const url = `http://localhost:5000/api/orders?orderId=${queryId.trim()}`;
+        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?orderId=${queryId.trim()}`;
         const res = await fetch(url);
         const data = await res.json();
         if (data.success && data.orders && data.orders.length > 0) {

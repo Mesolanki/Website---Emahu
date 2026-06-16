@@ -15,7 +15,7 @@ export async function logAnalyticsEvent({ type, productId, sellerId }) {
       }
     }
 
-    await fetch('http://localhost:5000/api/analytics/events', {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/analytics/events', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

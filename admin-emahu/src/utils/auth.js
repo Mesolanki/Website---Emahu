@@ -2,7 +2,7 @@
  * Authentication and Session Management Utility for Standalone Admin Panel
  */
 
-const API_BASE_URL = 'http://localhost:5000/api/auth';
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth`;
 
 const getHeaders = (token = null) => {
   const headers = {
