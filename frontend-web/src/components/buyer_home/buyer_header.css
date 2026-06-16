@@ -1,0 +1,349 @@
+/* 
+  Emahu Pro-Level Buyer Header CSS
+  Theme: Monochrome + Royal Blue (Using Design System Variables)
+*/
+
+.bh-header {
+  background-color: #ffffff; /* Solid premium white background */
+  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06)); /* Clean bottom border */
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  height: 76px;
+  display: flex;
+  align-items: center;
+  animation: headerEntry 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.bh-header--scrolled {
+  background-color: #ffffff;
+  height: 64px; /* Beautiful shrink on scroll */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06); /* Gorgeous shadow on scroll */
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
+@keyframes headerEntry {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bh-header__container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+/* ── 1. Logo Style ── */
+.bh-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.bh-logo__icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: var(--accent-primary, #4169e1); /* Logo icon uses Royal Blue */
+}
+
+.bh-logo:hover .bh-logo__icon-wrap {
+  transform: rotate(10deg) scale(1.05);
+  color: var(--accent-secondary, #2b4594);
+}
+
+.bh-logo__text {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--accent-primary, #4169e1); /* High-end Royal Blue theme */
+  letter-spacing: 0.5px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: color 0.2s ease;
+}
+
+.bh-logo:hover .bh-logo__text {
+  color: var(--accent-secondary, #2b4594);
+}
+
+/* ── 2. Center Button ── */
+.bh-header__center {
+  flex: 1;
+  max-width: 640px;
+  display: flex;
+  justify-content: center;
+}
+
+.bh-start-buying-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background-color: var(--bg-secondary, #f8f8f8);
+  color: var(--text-primary, #0a0a0a);
+  padding: 10px 28px;
+  border-radius: 30px; /* Fully rounded elegant capsule shape */
+  font-size: 0.925rem;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.05));
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.bh-start-buying-btn__icon {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: var(--accent-primary, #4169e1); /* Royal Blue icon tint */
+}
+
+.bh-start-buying-btn:hover {
+  background-color: var(--accent-primary, #4169e1);
+  color: #ffffff;
+  border-color: var(--accent-primary, #4169e1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(65, 105, 225, 0.25);
+}
+
+.bh-start-buying-btn:hover .bh-start-buying-btn__icon {
+  color: #ffffff;
+  transform: scale(1.15) rotate(-8deg);
+}
+
+/* ── 3. Right Action Panel ── */
+.bh-header__right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.bh-action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary, #0a0a0a);
+  transition: all 0.2s ease;
+  padding: 4px;
+  border-radius: 50%;
+  text-decoration: none;
+}
+
+.bh-action-icon:hover {
+  color: var(--accent-primary, #4169e1);
+  transform: scale(1.08);
+}
+
+.bh-action-icon__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: #ef4444;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+  pointer-events: none;
+}
+
+.bh-action-icon__badge--cart {
+  background-color: var(--accent-primary, #4169e1);
+  box-shadow: 0 2px 4px rgba(65, 105, 225, 0.3);
+}
+
+/* ── 4. Royal Blue Premium Gradient Login Button ── */
+.bh-login-btn {
+  background: linear-gradient(135deg, var(--accent-primary, #4169e1) 0%, var(--accent-secondary, #2b4594) 100%);
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 10px 32px; /* Thick rectangular padding precisely like screenshot */
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.2px;
+  box-shadow: 0 4px 14px rgba(65, 105, 225, 0.2);
+}
+
+.bh-login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(65, 105, 225, 0.35);
+  filter: brightness(1.08);
+}
+
+/* ── 5. Logged In User Avatar & Dropdown ── */
+.bh-profile {
+  position: relative;
+}
+
+.bh-profile__btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 20px;
+  transition: background-color 0.2s ease;
+}
+
+.bh-profile__btn:hover {
+  background-color: var(--bg-secondary, #f8f8f8);
+}
+
+.bh-profile__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--accent-primary, #4169e1);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.bh-profile__name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary, #0a0a0a);
+}
+
+.bh-profile__dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background-color: var(--bg-primary, #ffffff);
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.05));
+  box-shadow: var(--shadow-md, 0 4px 20px rgba(65, 105, 225, 0.1));
+  border-radius: 12px;
+  width: 220px;
+  padding: 8px 0;
+  animation: bhDropdownFade 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes bhDropdownFade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.bh-profile__dropdown-header {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bh-profile__dropdown-header strong {
+  font-size: 0.875rem;
+  color: var(--text-primary, #0a0a0a);
+}
+
+.bh-profile__dropdown-header span {
+  font-size: 0.75rem;
+  color: var(--text-muted, #888888);
+  margin-top: 2px;
+}
+
+.bh-profile__dropdown-divider {
+  height: 1px;
+  background-color: var(--border-subtle, rgba(0, 0, 0, 0.05));
+  margin: 6px 0;
+}
+
+.bh-profile__dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  color: var(--text-secondary, #555555);
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.bh-profile__dropdown-item:hover {
+  background-color: var(--bg-secondary, #f8f8f8);
+  color: var(--accent-primary, #4169e1);
+}
+
+.bh-profile__dropdown-item--logout:hover {
+  color: #ef4444;
+  background-color: #fef2f2;
+}
+
+/* ── 6. Mobile Responsiveness ── */
+@media (max-width: 768px) {
+  .bh-header {
+    height: 68px;
+    padding: 0;
+  }
+
+  .bh-header__container {
+    flex-wrap: nowrap;
+    gap: 16px;
+    padding: 0 16px;
+  }
+  
+  .bh-header__center {
+    flex: unset;
+    max-width: unset;
+    display: flex;
+    justify-content: center;
+  }
+  
+  .bh-start-buying-btn {
+    padding: 10px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .bh-start-buying-btn__text {
+    display: none; /* Collapses text elegantly on mobile */
+  }
+  
+  .bh-login-btn {
+    padding: 8px 16px;
+    font-size: 0.8rem;
+  }
+
+  .bh-logo__text {
+    font-size: 1.15rem; /* Smaller font on mobile for elite alignment */
+  }
+}

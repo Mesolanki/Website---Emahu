@@ -1,0 +1,734 @@
+/* ==========================================================================
+   EMAHU SELLER HERO — Elite Enterprise Two-Column SaaS Layout (Premium Dark)
+   ========================================================================== */
+
+.sh-hero {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background: #030712; /* Premium pitch-black/dark navy background */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 160px 24px 100px 24px;
+  font-family: 'Inter', sans-serif;
+  opacity: 1; /* Show instantly to prevent layout flashes and hydration delays */
+}
+
+/* ==========================================================================
+   BACKGROUND LAYERS (Grid & Mesh Glows)
+   ========================================================================== */
+
+.sh-hero__bg-container {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url('/images/seller_hero.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Premium gradient mask to fade image down and provide maximum readability */
+.sh-hero__bg-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(3, 7, 18, 0.98) 0%,      /* Near pitch-black blend on the left for maximum text contrast */
+    rgba(3, 7, 18, 0.90) 50%,     /* Deeper intermediate dark layer */
+    rgba(3, 7, 18, 0.85) 100%     /* Elegant dark glow on the right letting the abstract visual blend in */
+  );
+  z-index: 1;
+}
+
+.sh-hero__bg-grid {
+  display: none;
+}
+
+.sh-hero__bg-glow {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(140px);
+  z-index: 3;
+}
+
+.sh-hero__bg-glow--top {
+  width: 800px;
+  height: 500px;
+  top: -150px;
+  left: 30%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.18) 0%, transparent 70%);
+  animation: glowPulse 10s ease-in-out infinite alternate;
+}
+
+.sh-hero__bg-glow--center {
+  width: 600px;
+  height: 600px;
+  top: 30%;
+  right: 5%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 75%);
+  animation: glowPulse 14s ease-in-out infinite alternate-reverse;
+}
+
+.sh-hero__bg-glow--right {
+  width: 450px;
+  height: 450px;
+  bottom: -100px;
+  left: 10%;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.08) 0%, transparent 70%);
+}
+
+@keyframes glowPulse {
+  0% { opacity: 0.6; transform: translate(0, 0) scale(0.95); }
+  100% { opacity: 1; transform: translate(20px, -20px) scale(1.1); }
+}
+
+
+/* ==========================================================================
+   MAIN LAYOUT CONTAINER & GRID
+   ========================================================================== */
+
+.sh-hero__container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.sh-hero__grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 64px;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+}
+
+
+/* ==========================================================================
+   LEFT COLUMN: VALUE PROPOSITIONS & ACTIONS
+   ========================================================================== */
+
+.sh-hero__left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  min-width: 0;
+  width: 100%;
+}
+
+/* Trust Badge */
+.sh-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  margin-bottom: 28px;
+  letter-spacing: 0.2px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.05);
+  animation: slideInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sh-badge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+  animation: beaconPulse 1.8s infinite;
+}
+
+/* Headline */
+.sh-hero__headline {
+  font-size: clamp(34px, 5.2vw, 60px);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -2px;
+  color: #ffffff;
+  margin-bottom: 24px;
+  animation: slideInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+.sh-hero__headline-gradient {
+  background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 50%, #38bdf8 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shineGradient 6s linear infinite;
+}
+
+@keyframes shineGradient {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Body description text */
+.sh-hero__desc {
+  font-size: 17px;
+  color: #94a3b8; /* Reading friendly soft gray */
+  line-height: 1.65;
+  margin-bottom: 40px;
+  max-width: 580px;
+  animation: slideInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+}
+
+/* CTA Action Buttons */
+.sh-hero__actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 48px;
+  animation: slideInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+
+.sh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15px 34px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+}
+
+.sh-hero .sh-btn--primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.4) !important;
+}
+
+.sh-hero .sh-btn--primary:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 15px 35px -5px rgba(37, 99, 235, 0.6) !important;
+}
+
+.sh-btn--secondary {
+  background: rgba(255, 255, 255, 0.03);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.sh-btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-3px);
+}
+
+/* Bullet list props */
+.sh-hero__props {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 32px;
+  width: 100%;
+  animation: slideInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+
+.sh-prop-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sh-prop-icon {
+  font-size: 16px;
+}
+
+.sh-prop-txt {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+
+/* ==========================================================================
+   RIGHT COLUMN: INTERACTIVE SaaS WIDGET STACK
+   ========================================================================== */
+
+.sh-hero__right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+  position: relative;
+}
+
+.sh-mockup-stack {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  height: 380px;
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+/* Base Widget Styling */
+.sh-widget {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  box-shadow: 
+    0 30px 60px -15px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  position: absolute;
+}
+
+/* Card 1: Revenue Metric Widget */
+.sh-widget--revenue {
+  width: 100%;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  transform: rotateX(8deg) rotateY(-8deg) rotateZ(1deg);
+  animation: floatWidgetRevenue 6s ease-in-out infinite alternate;
+}
+
+.sh-widget__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.sh-widget__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.sh-widget__lbl {
+  font-size: 9px;
+  font-weight: 850;
+  color: #60a5fa;
+  letter-spacing: 1px;
+}
+
+.sh-widget__title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+}
+
+.sh-widget__trend {
+  font-size: 10.5px;
+  font-weight: 850;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+.sh-widget__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.sh-widget__amt {
+  font-size: 28px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+}
+
+.sh-widget__sub {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* Live chart render */
+.sh-widget__chart {
+  width: 100%;
+  height: 80px;
+  position: relative;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.sh-chart-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.sh-chart-path {
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+  animation: drawLine 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.sh-chart-dot {
+  opacity: 0;
+  animation: drawDot 0.5s ease-out 2.2s forwards;
+}
+
+@keyframes drawLine {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes drawDot {
+  to { opacity: 1; }
+}
+
+/* Card 2: Payout Escrow Verified Badge */
+.sh-widget--escrow {
+  width: 280px;
+  bottom: 40px;
+  left: -40px;
+  z-index: 3;
+  padding: 16px;
+  transform: translateZ(30px) rotateX(8deg) rotateY(-8deg);
+  animation: floatWidgetEscrow 5s ease-in-out infinite alternate 1s;
+}
+
+.sh-escrow-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sh-escrow-badge__circle {
+  width: 32px;
+  height: 32px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1.5px solid #10b981;
+  color: #10b981;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
+.sh-escrow-badge__txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.sh-escrow-badge__title {
+  font-size: 10px;
+  font-weight: 850;
+  color: #10b981;
+  letter-spacing: 0.5px;
+}
+
+.sh-escrow-badge__sub {
+  font-size: 9.5px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Card 3: Transit HUD Progress Bar */
+.sh-widget--delivery {
+  width: 320px;
+  bottom: -20px;
+  right: -30px;
+  z-index: 4;
+  padding: 14px 18px;
+  transform: translateZ(50px) rotateX(8deg) rotateY(-8deg);
+  animation: floatWidgetDelivery 7s ease-in-out infinite alternate 0.5s;
+}
+
+.sh-delivery-hud {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sh-delivery-hud__indicator {
+  width: 8px;
+  height: 8px;
+  background: #3b82f6;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  flex-shrink: 0;
+  animation: beaconPulse 1.5s infinite;
+}
+
+.sh-delivery-hud__details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.sh-delivery-hud__awb {
+  font-size: 9px;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+
+.sh-delivery-hud__status {
+  font-size: 10px;
+  font-weight: 750;
+  color: #ffffff;
+}
+
+/* Float Animations for Widgets Stack */
+@keyframes floatWidgetRevenue {
+  0% { transform: rotateX(8deg) rotateY(-8deg) rotateZ(1deg) translateY(0); }
+  100% { transform: rotateX(9deg) rotateY(-6deg) rotateZ(1deg) translateY(-8px); }
+}
+
+@keyframes floatWidgetEscrow {
+  0% { transform: translateZ(30px) rotateX(8deg) rotateY(-8deg) translateY(0); }
+  100% { transform: translateZ(30px) rotateX(7deg) rotateY(-10deg) translateY(-6px); }
+}
+
+@keyframes floatWidgetDelivery {
+  0% { transform: translateZ(50px) rotateX(8deg) rotateY(-8deg) translateY(0); }
+  100% { transform: translateZ(50px) rotateX(9deg) rotateY(-6deg) translateY(-10px); }
+}
+
+@keyframes beaconPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.4; }
+}
+
+/* Entrance Animations */
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(-24px); filter: blur(8px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0px); }
+}
+
+
+/* ==========================================================================
+   RESPONSIVE LAYOUT BREAKPOINTS
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .sh-hero {
+    padding-top: 140px;
+  }
+  
+  .sh-hero__grid {
+    grid-template-columns: 1fr;
+    gap: 64px;
+    text-align: center;
+  }
+  
+  .sh-hero__left {
+    align-items: center;
+    text-align: center;
+  }
+
+  .sh-hero__desc {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  .sh-hero__actions {
+    justify-content: center;
+  }
+
+  .sh-hero__props {
+    justify-content: center;
+  }
+
+  .sh-hero__right {
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sh-hero {
+    padding-top: 110px;
+    padding-bottom: 80px;
+  }
+
+  .sh-hero__badge {
+    font-size: 12px;
+    padding: 5px 14px;
+    margin-bottom: 24px;
+  }
+
+  .sh-hero__headline {
+    font-size: clamp(28px, 7.5vw, 42px);
+    line-height: 1.15;
+    letter-spacing: -1px;
+    margin-bottom: 32px;
+  }
+
+  .sh-hero__actions {
+    flex-direction: column;
+    width: 100%;
+    max-width: 320px;
+    gap: 12px;
+    margin-bottom: 40px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .sh-btn {
+    width: 100%;
+    padding: 14px 24px;
+  }
+
+  .sh-hero__props {
+    gap: 16px;
+    justify-content: center;
+    padding-top: 24px;
+  }
+
+  .sh-prop-txt {
+    font-size: 12.5px;
+  }
+
+  /* Shrink widget coordinates inside tablet/mobile layouts to prevent clipping */
+  .sh-mockup-stack {
+    max-width: 360px;
+    height: 320px;
+    margin: 0 auto;
+  }
+
+  .sh-widget--revenue {
+    padding: 16px;
+  }
+
+  .sh-widget__amt {
+    font-size: 24px;
+  }
+
+  .sh-widget--escrow {
+    width: 240px;
+    bottom: 30px;
+    left: -20px;
+  }
+
+  .sh-widget--delivery {
+    width: 260px;
+    bottom: -15px;
+    right: -15px;
+  }
+
+  .sh-delivery-hud__status {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sh-hero {
+    padding-top: 96px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .sh-hero__badge {
+    font-size: 11px;
+    padding: 4px 12px;
+  }
+
+  .sh-hero__headline {
+    font-size: 26px;
+  }
+
+  .sh-hero__desc {
+    font-size: 14.5px;
+    line-height: 1.6;
+    margin-bottom: 32px;
+  }
+
+  .sh-hero__actions {
+    max-width: 280px;
+  }
+
+  .sh-hero__props {
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+
+  /* Shrink stack further on small viewports */
+  .sh-mockup-stack {
+    max-width: 290px;
+    height: 270px;
+  }
+
+  .sh-widget--revenue {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .sh-widget__amt {
+    font-size: 20px;
+  }
+
+  .sh-widget--escrow {
+    width: 210px;
+    bottom: 20px;
+    left: -10px;
+    padding: 10px;
+  }
+
+  .sh-escrow-badge {
+    gap: 8px;
+  }
+
+  .sh-escrow-badge__circle {
+    width: 26px;
+    height: 26px;
+  }
+
+  .sh-escrow-badge__title {
+    font-size: 8.5px;
+  }
+
+  .sh-escrow-badge__sub {
+    font-size: 8px;
+  }
+
+  .sh-widget--delivery {
+    width: 220px;
+    bottom: -10px;
+    right: -10px;
+    padding: 8px 12px;
+  }
+
+  .sh-delivery-hud {
+    gap: 8px;
+  }
+
+  .sh-delivery-hud__status {
+    font-size: 8px;
+  }
+}

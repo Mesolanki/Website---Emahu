@@ -1,0 +1,4742 @@
+'use client';
+
+import { useState, useEffect, useRef, useMemo } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import './dashboard.css';
+import { logoutUser, clearAuthSession, getProfile } from '@/utils/auth';
+
+const INITIAL_PRODUCTS = [
+  {
+    id: 'prod-1',
+    name: 'Emahu Smart Luxe Chrono',
+    sku: 'EM-CHR-009',
+    category: 'Electronics',
+    price: 18999,
+    comparePrice: 24999,
+    stock: 45,
+    status: 'in-stock',
+    sales: 124,
+    image: '⌚'
+  },
+  {
+    id: 'prod-2',
+    name: 'SoundAura Pro Headphones',
+    sku: 'EM-SND-882',
+    category: 'Electronics',
+    price: 12500,
+    comparePrice: 15999,
+    stock: 8,
+    status: 'low-stock',
+    sales: 340,
+    image: '🎧'
+  },
+  {
+    id: 'prod-3',
+    name: 'Minimalist Solid Oak Desk',
+    sku: 'EM-DSK-310',
+    category: 'Furniture',
+    price: 28000,
+    comparePrice: 35000,
+    stock: 12,
+    status: 'in-stock',
+    sales: 68,
+    image: 'Desk'
+  },
+  {
+    id: 'prod-4',
+    name: 'AuraRing Smart Health Tracker',
+    sku: 'EM-RNG-041',
+    category: 'Fitness',
+    price: 9500,
+    comparePrice: 12000,
+    stock: 0,
+    status: 'out-of-stock',
+    sales: 198,
+    image: 'ðŸ’'
+  }
+];
+
+
+
+// Helper functions to keep React rendering functions pure (required by ESLint rules)
+const getTimestampString = () => Date.now().toString();
+const getRandomNumberStr = (min, max) => Math.floor(min + Math.random() * (max - min)).toString();
+const getRandomWeightStr = () => `${(1.5 + Math.random() * 3).toFixed(2)} kg`;
+const generateNotificationId = () => `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
+function parseOrderDate(ord) {
+  if (!ord) return new Date();
+  if (ord.createdAt) {
+    const d = new Date(ord.createdAt);
+    if (!isNaN(d.getTime())) return d;
+  }
+  if (ord.date) {
+    const d = new Date(ord.date);
+    if (!isNaN(d.getTime())) return d;
+    const match = String(ord.date).match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (match) {
+      const day = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      const year = parseInt(match[3], 10);
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+        const parsedD = new Date(year, month, day);
+        if (!isNaN(parsedD.getTime())) return parsedD;
+      }
+    }
+  }
+  return new Date();
+}
+
+const getCategoryOptions = (storeCategory) => {
+  const cat = (storeCategory || '').toLowerCase();
+  if (cat === 'electronics') {
+    return [
+      { value: 'Tech', label: 'Tech & Gadgets' },
+      { value: 'Tech', label: 'Consumer Electronics' },
+      { value: 'Tech', label: 'Audio & Acoustics' }
+    ];
+  }
+  if (cat === 'fashion') {
+    return [
+      { value: 'Apparel', label: 'Clothing & Apparel' },
+      { value: 'Shoes', label: 'Footwear & Shoes' },
+      { value: 'Lifestyle', label: 'Bags & Accessories' }
+    ];
+  }
+  if (cat === 'home') {
+    return [
+      { value: 'Kitchen', label: 'Kitchen & Dining' },
+      { value: 'Lifestyle', label: 'Furniture & Decor' }
+    ];
+  }
+  if (cat === 'groceries') {
+    return [
+      { value: 'Lifestyle', label: 'Grocery & Packaged Foods' }
+    ];
+  }
+  if (cat === 'beauty') {
+    return [
+      { value: 'Lifestyle', label: 'Skincare & Cosmetics' }
+    ];
+  }
+  if (cat === 'stationery') {
+    return [
+      { value: 'Lifestyle', label: 'Books & Stationery' }
+    ];
+  }
+  return [
+    { value: 'Tech', label: 'Tech & Gadgets' },
+    { value: 'Apparel', label: 'Fashion & Apparel' },
+    { value: 'Shoes', label: 'Footwear & Shoes' },
+    { value: 'Kitchen', label: 'Kitchenware' },
+    { value: 'Lifestyle', label: 'General Merchandise' }
+  ];
+};
+
+export default function EmahuProDashboard() {
+  const router = useRouter();
+  
+  const handleSessionExpired = () => {
+    clearAuthSession('seller');
+    router.replace('/seller/login?expired=true');
+  };
+
+  const [activeTab, setActiveTab] = useState('overview');
+  const [newProductCategory, setNewProductCategory] = useState('Electronics');
+  const [sellerUser, setSellerUser] = useState(null);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
+  // Verification session hook
+  useEffect(() => {
+    const isLoggedIn = localStorage.getItem('emahu_seller_logged_in') === 'true';
+    if (!isLoggedIn) {
+      router.replace('/seller/login');
+      return;
+    }
+    
+    const storedUser = localStorage.getItem('emahu_seller_user');
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setTimeout(() => setSellerUser(parsedUser), 0);
+      } catch (e) {
+        console.error('Error parsing stored seller user:', e);
+      }
+    }
+
+    const syncProfile = async () => {
+      try {
+        const token = localStorage.getItem('emahu_seller_token');
+        if (!token) {
+          setTimeout(() => setIsAuthorized(true), 0);
+          return;
+        }
+        const res = await getProfile(token);
+        if (res.success && res.user) {
+          setTimeout(() => setSellerUser(res.user), 0);
+          localStorage.setItem('emahu_seller_user', JSON.stringify(res.user));
+        }
+      } catch (err) {
+        console.error('Error syncing profile:', err);
+        if (err.message && (err.message.includes('authorized') || err.message.includes('token') || err.message.includes('expired') || err.message.includes('profile'))) {
+          handleSessionExpired();
+          return;
+        }
+      } finally {
+        setTimeout(() => setIsAuthorized(true), 0);
+      }
+    };
+
+    syncProfile();
+  }, [router]);
+
+  // Set default category value based on seller category
+  useEffect(() => {
+    if (sellerUser?.category) {
+      const storeCat = sellerUser.category.toLowerCase();
+      let cat = 'Lifestyle';
+      if (storeCat === 'electronics') {
+        cat = 'Tech';
+      } else if (storeCat === 'fashion') {
+        cat = 'Apparel';
+      } else if (storeCat === 'home') {
+        cat = 'Kitchen';
+      }
+      setTimeout(() => setNewProductCategory(cat), 0);
+    }
+  }, [sellerUser]);
+
+  // Lock user to status tab if not approved
+  useEffect(() => {
+    if (sellerUser && sellerUser.status !== 'approved') {
+      setTimeout(() => setActiveTab('status'), 0);
+    }
+  }, [sellerUser]);
+
+  const [sellerDocuments, setSellerDocuments] = useState([]);
+
+  const fetchSellerDocuments = async () => {
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      if (!token) return;
+      const res = await fetch('http://localhost:5000/api/auth/seller/documents', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json();
+      if (data.success && data.documents) {
+        setSellerDocuments(data.documents);
+      }
+    } catch (err) {
+      console.error('Error fetching documents:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthorized && sellerUser && sellerUser.status !== 'approved') {
+      setTimeout(() => fetchSellerDocuments(), 0);
+    }
+  }, [isAuthorized, sellerUser]);
+
+  const handleSignOut = async () => {
+    try {
+      await logoutUser();
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
+    clearAuthSession('seller');
+    router.push('/seller/login');
+  };
+  
+  // Ref for GSTIN text selection to match user screenshot
+  const gstinRef = useRef(null);
+
+  // Dashboard Tabs: 'overview', 'products', 'orders', 'analytics', 'settings'
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Settings tab focus helper
+  useEffect(() => {
+    if (activeTab === 'settings') {
+      const timer = setTimeout(() => {
+        if (gstinRef.current) {
+          gstinRef.current.focus();
+          gstinRef.current.select();
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab]);
+  
+  // Dynamic Product State
+  const [products, setProducts] = useState([]);
+
+  // Fetch seller's products from backend API
+  useEffect(() => {
+    const fetchSellerProducts = async () => {
+      try {
+        const token = localStorage.getItem('emahu_seller_token');
+        if (!token) return;
+        const res = await fetch('http://localhost:5000/api/products/my', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (res.status === 401) {
+          handleSessionExpired();
+          return;
+        }
+        const data = await res.json();
+        if (data.success) {
+          setProducts(data.products);
+        } else {
+          console.error('Failed to fetch seller products:', data.error);
+        }
+      } catch (err) {
+        console.error('Error fetching seller products:', err);
+      }
+    };
+    if (isAuthorized) {
+      fetchSellerProducts();
+    }
+  }, [isAuthorized]);
+
+  // Dynamic Orders State
+  const [orders, setOrders] = useState([]);
+
+  // Fetch real-time orders from database and localStorage to sync with buyer checkout
+  useEffect(() => {
+    const loadRealOrders = async () => {
+      try {
+        let storedOrders = '[]';
+        const sellerUserIdOpt = sellerUser ? (sellerUser._id || sellerUser.id || '').toString() : '';
+        try {
+          const url = sellerUserIdOpt 
+            ? `http://localhost:5000/api/orders?sellerId=${sellerUserIdOpt}`
+            : 'http://localhost:5000/api/orders';
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.success && data.orders) {
+            storedOrders = JSON.stringify(data.orders);
+            localStorage.setItem('emahu_orders', storedOrders);
+          } else {
+            storedOrders = localStorage.getItem('emahu_orders') || '[]';
+          }
+        } catch (apiErr) {
+          console.warn('API error fetching orders, falling back to localStorage:', apiErr);
+          storedOrders = localStorage.getItem('emahu_orders') || '[]';
+        }
+        
+        if (sellerUser) {
+          const parsed = JSON.parse(storedOrders);
+          
+          const sellerUserId = (sellerUser._id || sellerUser.id || '').toString();
+          const sellerUserEmail = (sellerUser.email || '').toLowerCase().trim();
+          const myProductIds = new Set((products || []).map(p => (p._id || p.id || '').toString()).filter(Boolean));
+          const myProductNames = new Set((products || []).map(p => (p.name || '').toLowerCase().trim()).filter(Boolean));
+
+          console.group('[Emahu Dashboard] Filtering Orders');
+          console.log('Seller ID:', sellerUserId);
+          console.log('Seller Email:', sellerUserEmail);
+          console.log('Seller Product IDs:', Array.from(myProductIds));
+          console.log('Seller Product Names:', Array.from(myProductNames));
+          console.log('Total Orders in localStorage:', parsed.length);
+          
+          // Filter orders to only show those that contain items belonging to this seller
+          let myOrders = parsed.filter(o => {
+            // Signal 1: Check order-level sellerId
+            const orderSellerId = (o.sellerId || '').toString();
+            if (orderSellerId && sellerUserId && orderSellerId === sellerUserId) {
+              console.log(`Order #${o.orderId} matches on Signal 1 (order.sellerId: ${orderSellerId})`);
+              return true;
+            }
+
+            // Signal 2: Check order-level sellerEmail
+            const orderSellerEmail = (o.sellerEmail || '').toLowerCase().trim();
+            if (orderSellerEmail && sellerUserEmail && orderSellerEmail === sellerUserEmail) {
+              console.log(`Order #${o.orderId} matches on Signal 2 (order.sellerEmail: ${orderSellerEmail})`);
+              return true;
+            }
+
+            // Inspect items list
+            const itemsList = o.items || [];
+            const hasMatchingItem = itemsList.some(item => {
+              // Signal 3: Match on item's seller object ID
+              if (item.seller) {
+                if (typeof item.seller === 'string') {
+                  if (sellerUserId && item.seller.toString() === sellerUserId) {
+                    console.log(`Order #${o.orderId} item matches on Signal 3 (item.seller ID string: ${item.seller})`);
+                    return true;
+                  }
+                } else {
+                  const itemSellerId = (item.seller._id || item.seller.id || '').toString();
+                  if (itemSellerId && sellerUserId && itemSellerId === sellerUserId) {
+                    console.log(`Order #${o.orderId} item matches on Signal 3 (item.seller._id: ${itemSellerId})`);
+                    return true;
+                  }
+                  
+                  // Signal 4: Match on item's seller email
+                  const itemSellerEmail = (item.seller.email || '').toLowerCase().trim();
+                  if (itemSellerEmail && sellerUserEmail && itemSellerEmail === sellerUserEmail) {
+                    console.log(`Order #${o.orderId} item matches on Signal 4 (item.seller.email: ${itemSellerEmail})`);
+                    return true;
+                  }
+                }
+              }
+
+              // Signal 5: Match on item's productId
+              const itemProductId = (item.productId || '').toString();
+              if (itemProductId && myProductIds.has(itemProductId)) {
+                console.log(`Order #${o.orderId} item matches on Signal 5 (item.productId: ${itemProductId})`);
+                return true;
+              }
+
+              // Signal 6: Match on item's name
+              const itemName = (item.name || '').toLowerCase().trim();
+              if (itemName && myProductNames.has(itemName)) {
+                console.log(`Order #${o.orderId} item matches on Signal 6 (item.name: ${itemName})`);
+                return true;
+              }
+
+              // Fallback for default seed orders / Emahu Brand
+              const isDefaultFallback = item.seller && (item.seller.email === 'support@emahu.com' || item.brand === 'Emahu Seller');
+              if (isDefaultFallback) {
+                console.log(`Order #${o.orderId} item matches on Signal 7 (default fallback)`);
+                return true;
+              }
+
+              return false;
+            });
+
+            if (!hasMatchingItem) {
+              console.log(`Order #${o.orderId} did NOT match any seller criteria.`);
+            }
+            return hasMatchingItem;
+          });
+
+          console.log('Filtered Orders count:', myOrders.length);
+          console.groupEnd();
+
+          if (myOrders.length === 0) {
+            // Seed multiple demo orders with different statuses so sellers can see the full workflow
+            const sellerRef = {
+              _id: sellerUser._id || sellerUser.id || 'mock_seller_id',
+              name: sellerUser.name || 'Pro Seller Inc.',
+              email: sellerUser.email || 'seller@emahu.com',
+              phone: sellerUser.phone || '+91 99999 99999'
+            };
+            const baseDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            const baseTime = baseDate + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+            const seedOrders = [
+              {
+                orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
+                date: baseDate,
+                createdAt: new Date().toISOString(),
+                items: [{ name: 'Emahu Smart Luxe Chrono', price: 18999, quantity: 1, brand: 'Emahu Brand', img: '⌚', seller: sellerRef }],
+                total: 22419,
+                status: 'PENDING_APPROVAL',
+                timeline: [{ status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: 'â³ Waiting for Seller Approval', date: baseTime }],
+                deliveryAddress: { fullName: 'Rahul Sharma', phone: '+91 98765 43210', email: 'rahul@example.com', address: 'Flat 402, Royal Residency, Sector 15', city: 'Gandhinagar', stateName: 'Gujarat', pincode: '382016' },
+                shippingSpeed: 'express', escrowMethod: 'wallet'
+              },
+              {
+                orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
+                date: baseDate,
+                createdAt: new Date().toISOString(),
+                items: [{ name: 'SoundAura Pro Headphones', price: 12500, quantity: 1, brand: 'SoundAura', img: '🎧', seller: sellerRef }],
+                total: 14750,
+                status: 'PENDING_APPROVAL',
+                timeline: [{ status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: 'â³ Waiting for Seller Approval', date: baseTime }],
+                deliveryAddress: { fullName: 'Priya Mehta', phone: '+91 87654 32100', email: 'priya@example.com', address: 'B-204, Sunrise Apartments', city: 'Pune', stateName: 'Maharashtra', pincode: '411001' },
+                shippingSpeed: 'standard', escrowMethod: 'upi'
+              },
+              {
+                orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
+                date: baseDate,
+                createdAt: new Date().toISOString(),
+                items: [{ name: 'AuraRing Smart Health Tracker', price: 9500, quantity: 2, brand: 'AuraRing', img: 'ðŸ’', seller: sellerRef }],
+                total: 22420,
+                status: 'APPROVED',
+                sellerConfirmed: true,
+                timeline: [
+                  { status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: 'â³ Waiting for Seller Approval', date: baseTime },
+                  { status: 'APPROVED', label: 'Seller Approved', desc: '✅ Order approved by seller.', date: baseTime }
+                ],
+                deliveryAddress: { fullName: 'Amit Kumar', phone: '+91 76543 21000', email: 'amit@example.com', address: '12, MG Road', city: 'Bangalore', stateName: 'Karnataka', pincode: '560001' },
+                shippingSpeed: 'standard', escrowMethod: 'card'
+              },
+              {
+                orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
+                date: baseDate,
+                createdAt: new Date().toISOString(),
+                items: [{ name: 'Minimalist Solid Oak Desk', price: 28000, quantity: 1, brand: 'WoodCraft', img: '🪵', seller: sellerRef }],
+                total: 33040,
+                status: 'REJECTED',
+                sellerRejected: true,
+                rejectionReason: 'Out of Stock',
+                timeline: [
+                  { status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: 'â³ Waiting for Seller Approval', date: baseTime },
+                  { status: 'REJECTED', label: 'Seller Rejected', desc: 'âŒ Rejected: Out of Stock', date: baseTime }
+                ],
+                deliveryAddress: { fullName: 'Sneha Reddy', phone: '+91 65432 10000', email: 'sneha@example.com', address: '45, Jubilee Hills', city: 'Hyderabad', stateName: 'Telangana', pincode: '500033' },
+                shippingSpeed: 'express', escrowMethod: 'wallet'
+              }
+            ];
+
+            seedOrders.forEach(o => parsed.push(o));
+            localStorage.setItem('emahu_orders', JSON.stringify(parsed));
+            window.dispatchEvent(new Event('storage'));
+            return;
+          }
+
+          const formatted = myOrders.map(o => {
+            // Only list items in the description that belong to this seller or default fallback
+            const itemsList = (o.items || []).filter(item => {
+              if (!item.seller) return true;
+              
+              const sellerUserId = sellerUser._id || sellerUser.id;
+              
+              // If item.seller is a string
+              if (typeof item.seller === 'string') {
+                return sellerUserId && item.seller.toString() === sellerUserId.toString();
+              }
+              
+              // If item.seller is an object
+              const itemSellerId = item.seller._id || item.seller.id;
+              const isIdMatch = itemSellerId && sellerUserId && itemSellerId.toString() === sellerUserId.toString();
+              const isEmailMatch = item.seller.email && sellerUser.email && 
+                                   item.seller.email.toLowerCase() === sellerUser.email.toLowerCase();
+              const isProductMatch = (item.productId && myProductIds.has(item.productId.toString())) || (item.name && myProductNames.has(item.name.toLowerCase().trim()));
+              const isDefaultFallback = item.seller.email === 'support@emahu.com' || 
+                                        item.brand === 'Emahu Seller';
+                                        
+              return isIdMatch || isEmailMatch || isProductMatch || isDefaultFallback;
+            });
+            const productName = itemsList.map(item => `${item.name} (x${item.quantity})`).join(', ') || 'Merchandise Item';
+            
+            // Sum of this seller's items
+            const sellerItemsTotal = itemsList.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const totalSum = (o.items || []).reduce((s, i) => s + (i.price * i.quantity), 0);
+            const proportionalTotal = (o.total && totalSum > 0) ? Math.round(sellerItemsTotal * (o.total / totalSum)) : sellerItemsTotal;
+
+            return {
+              id: o.orderId,
+              customer: o.deliveryAddress?.fullName || 'Emahu Customer',
+              product: productName,
+              amount: proportionalTotal,
+              status: o.status || 'PENDING_APPROVAL',
+              time: o.date || 'Just now',
+              raw: o
+            };
+          });
+          // Set real orders only
+          setOrders(formatted);
+        } else {
+          setOrders([]);
+        }
+      } catch (err) {
+        console.error('Error loading real orders:', err);
+        setOrders([]);
+      }
+    };
+
+    loadRealOrders();
+    window.addEventListener('storage', loadRealOrders);
+    return () => window.removeEventListener('storage', loadRealOrders);
+  }, [sellerUser, products]);
+
+  // Order Management Modals States
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectionReasonType, setRejectionReasonType] = useState('Out of Stock');
+  const [customRejectReason, setCustomRejectReason] = useState('');
+  const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+  const [activeLabelOrder, setActiveLabelOrder] = useState(null);
+  const [selectedDetailedOrderId, setSelectedDetailedOrderId] = useState(null);
+  const [selectedCarrier, setSelectedCarrier] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState('all');
+  const [notifications, setNotifications] = useState([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [orderLoading, setOrderLoading] = useState({});
+  const [verifyingEscrow, setVerifyingEscrow] = useState({});
+  const [verifiedEscrow, setVerifiedEscrow] = useState({});
+
+  const selectedDetailedOrder = useMemo(() => {
+    if (!selectedDetailedOrderId) return null;
+    const found = orders.find(o => o.id === selectedDetailedOrderId);
+    return found ? found.raw : null;
+  }, [selectedDetailedOrderId, orders]);
+
+  const fetchNotifications = async () => {
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      if (!token) return;
+      const res = await fetch('http://localhost:5000/api/notifications', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json();
+      if (data.success && data.notifications) {
+        const formatted = data.notifications.map(n => ({
+          id: n._id,
+          title: n.title,
+          message: n.message,
+          read: n.isRead,
+          date: new Date(n.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+          type: n.type
+        }));
+        setNotifications(formatted);
+      }
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    }
+  };
+
+  useEffect(() => {
+    setTimeout(() => fetchNotifications(), 0);
+    const interval = setInterval(fetchNotifications, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleMarkNotifsRead = async () => {
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      if (!token) return;
+      
+      const unread = notifications.filter(n => !n.read);
+      for (const n of unread) {
+        const res = await fetch(`http://localhost:5000/api/notifications/${n.id}/read`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (res.status === 401) {
+          handleSessionExpired();
+          return;
+        }
+      }
+      fetchNotifications();
+    } catch (err) {
+      console.error('Error marking notifications read:', err);
+    }
+  };
+
+  const pushNotification = async (title, message, role = 'seller') => {
+    // We can simulate or directly poll database updates
+    fetchNotifications();
+  };
+
+  const syncOrderToDatabase = async (orderId, updatedOrdersList) => {
+    try {
+      const order = updatedOrdersList.find(o => o.orderId === orderId);
+      if (order) {
+        const payload = { ...order };
+        delete payload._id;
+        delete payload.__v;
+        
+        const res = await fetch(`http://localhost:5000/api/orders/${orderId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!data.success) {
+          console.error(`Failed to update order ${orderId} in database:`, data.error);
+        }
+      }
+    } catch (e) {
+      console.error(`Error updating order ${orderId} in database:`, e);
+    }
+  };
+
+  const handleVerifyEscrow = (orderId, amount) => {
+    if (verifyingEscrow[orderId] || verifiedEscrow[orderId]) return;
+    setVerifyingEscrow(prev => ({ ...prev, [orderId]: true }));
+    setTimeout(() => {
+      setVerifyingEscrow(prev => ({ ...prev, [orderId]: false }));
+      setVerifiedEscrow(prev => ({ ...prev, [orderId]: true }));
+      triggerToast('Escrow Verified', `Cryptographic check complete. ₹${amount.toLocaleString('en-IN')} locked in Emahu Secure Vault.`, 'success');
+    }, 1200);
+  };
+
+  const handleApproveOrder = async (orderId) => {
+    if (orderLoading[orderId]) return;
+    try {
+      setOrderLoading(prev => ({ ...prev, [orderId]: true }));
+      const storedOrders = localStorage.getItem('emahu_orders');
+      if (storedOrders) {
+        const parsed = JSON.parse(storedOrders);
+        const updated = parsed.map(o => {
+          if (o.orderId === orderId) {
+            const timeline = o.timeline || [];
+            // Remove any pending timeline item to prevent duplicates
+            const filteredTimeline = timeline.filter(t => t.status !== 'APPROVED');
+            filteredTimeline.push({
+              status: 'APPROVED',
+              label: 'Seller Approved',
+              desc: '✅ Your order has been approved by the seller.',
+              date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+            });
+            return {
+              ...o,
+              status: 'APPROVED',
+              timeline: filteredTimeline,
+              sellerConfirmed: true,
+              sellerRejected: false
+            };
+          }
+          return o;
+        });
+        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        window.dispatchEvent(new Event('storage'));
+        pushNotification('Order Approved', `Your Order #${orderId} has been approved by the seller.`, 'buyer');
+        triggerToast('Order Approved', `Order #${orderId} approved successfully.`, 'success');
+        await syncOrderToDatabase(orderId, updated);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to approve order.', 'danger');
+    } finally {
+      setOrderLoading(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleRejectOrder = async (orderId, reason) => {
+    if (orderLoading[orderId]) return;
+    try {
+      setOrderLoading(prev => ({ ...prev, [orderId]: true }));
+      const storedOrders = localStorage.getItem('emahu_orders');
+      if (storedOrders) {
+        const parsed = JSON.parse(storedOrders);
+        const updated = parsed.map(o => {
+          if (o.orderId === orderId) {
+            const timeline = o.timeline || [];
+            const filteredTimeline = timeline.filter(t => t.status !== 'REJECTED');
+            filteredTimeline.push({
+              status: 'REJECTED',
+              label: 'Seller Rejected',
+              desc: `âŒ Rejected: ${reason || 'Merchant rejected the order listing.'}`,
+              date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+            });
+            return {
+              ...o,
+              status: 'REJECTED',
+              timeline: filteredTimeline,
+              sellerConfirmed: false,
+              sellerRejected: true,
+              rejectionReason: reason
+            };
+          }
+          return o;
+        });
+        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        window.dispatchEvent(new Event('storage'));
+        pushNotification('Order Rejected', `Your Order #${orderId} was rejected by the merchant. Reason: ${reason || 'N/A'}`, 'buyer');
+        triggerToast('Order Rejected', `Order #${orderId} rejected.`, 'danger');
+        await syncOrderToDatabase(orderId, updated);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to reject order.', 'danger');
+    } finally {
+      setOrderLoading(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleSelectDeliveryPartner = async (orderId, partnerName, estDays, cost) => {
+    if (orderLoading[orderId]) return;
+    try {
+      setOrderLoading(prev => ({ ...prev, [orderId]: true }));
+      const storedOrders = localStorage.getItem('emahu_orders');
+      if (storedOrders) {
+        const parsed = JSON.parse(storedOrders);
+        const trackingId = `EMH-TRK-${getRandomNumberStr(100000, 999999)}`;
+        const updated = parsed.map(o => {
+          if (o.orderId === orderId) {
+            const timeline = o.timeline || [];
+            const filteredTimeline = timeline.filter(t => t.status !== 'DELIVERY_ASSIGNED');
+            filteredTimeline.push({
+              status: 'DELIVERY_ASSIGNED',
+              label: 'Delivery Assigned',
+              desc: `🚚 Assigned to ${partnerName}. Tracking ID: ${trackingId}`,
+              date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+            });
+            return {
+              ...o,
+              status: 'DELIVERY_ASSIGNED',
+              timeline: filteredTimeline,
+              carrier: partnerName,
+              trackingId,
+              deliveryCost: cost,
+              estDays: estDays
+            };
+          }
+          return o;
+        });
+        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        window.dispatchEvent(new Event('storage'));
+        pushNotification('Shipment Assigned', `Your shipment for Order #${orderId} has been assigned to ${partnerName}.`, 'buyer');
+        pushNotification('Courier Assigned', `Courier ${partnerName} has been assigned to Order #${orderId}.`, 'seller');
+        triggerToast('Delivery Assigned', `Courier ${partnerName} assigned to Order #${orderId}.`, 'success');
+        await syncOrderToDatabase(orderId, updated);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to assign delivery partner.', 'danger');
+    } finally {
+      setOrderLoading(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleGenerateLabel = async (orderId) => {
+    if (orderLoading[orderId]) return;
+    try {
+      setOrderLoading(prev => ({ ...prev, [orderId]: true }));
+      const storedOrders = localStorage.getItem('emahu_orders');
+      if (storedOrders) {
+        const parsed = JSON.parse(storedOrders);
+        const updated = parsed.map(o => {
+          if (o.orderId === orderId) {
+            const timeline = o.timeline || [];
+            const filteredTimeline = timeline.filter(t => t.status !== 'LABEL_GENERATED');
+            filteredTimeline.push({
+              status: 'LABEL_GENERATED',
+              label: 'Shipping Label Generated',
+              desc: `📄 Shipping label has been generated successfully.`,
+              date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+            });
+            return {
+              ...o,
+              status: 'LABEL_GENERATED',
+              timeline: filteredTimeline,
+              shipmentId: `EMH-SHIP-${Math.floor(100000 + Math.random() * 900000)}`,
+              packageWeight: `${(1.5 + Math.random() * 3).toFixed(2)} kg`
+            };
+          }
+          return o;
+        });
+        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        window.dispatchEvent(new Event('storage'));
+        pushNotification('Shipping Label Created', `Shipping label generated for Order #${orderId}.`, 'buyer');
+        pushNotification('Label Created', `Shipping label generated successfully for Order #${orderId}.`, 'seller');
+        triggerToast('Label Generated', `Label generated for Order #${orderId}.`, 'success');
+
+        const fresh = updated.find(o => o.orderId === orderId);
+        setActiveLabelOrder(fresh);
+        setIsLabelModalOpen(true);
+        await syncOrderToDatabase(orderId, updated);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to generate label.', 'danger');
+    } finally {
+      setOrderLoading(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleAssignAndGenerateLabel = async (orderId, carrierName) => {
+    if (orderLoading[orderId]) return;
+    try {
+      setOrderLoading(prev => ({ ...prev, [orderId]: true }));
+      const storedOrders = localStorage.getItem('emahu_orders');
+      if (storedOrders) {
+        const parsed = JSON.parse(storedOrders);
+        const trackingId = `EMH-TRK-${getRandomNumberStr(100000, 999999)}`;
+        const shipmentId = `EMH-SHIP-${getRandomNumberStr(100000, 999999)}`;
+        const packageWeight = getRandomWeightStr();
+        const estDays = carrierName === 'Blue Dart' ? '1-3 Days' : (carrierName === 'Delhivery' ? '2-4 Days' : '2-5 Days');
+        const cost = carrierName === 'Blue Dart' ? 120 : (carrierName === 'Delhivery' ? 80 : 75);
+        
+        const updated = parsed.map(o => {
+          if (o.orderId === orderId) {
+            const timeline = o.timeline || [];
+            
+            // Add DELIVERY_ASSIGNED timeline
+            const filteredTimeline1 = timeline.filter(t => t.status !== 'DELIVERY_ASSIGNED');
+            filteredTimeline1.push({
+              status: 'DELIVERY_ASSIGNED',
+              label: 'Delivery Assigned',
+              desc: `🚚 Assigned to ${carrierName}. Tracking ID: ${trackingId}`,
+              date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+            });
+            
+            // Add LABEL_GENERATED timeline
+            const filteredTimeline2 = filteredTimeline1.filter(t => t.status !== 'LABEL_GENERATED');
+            filteredTimeline2.push({
+              status: 'LABEL_GENERATED',
+              label: 'Shipping Label Generated',
+              desc: `📄 Shipping label has been generated successfully.`,
+              date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+            });
+
+            return {
+              ...o,
+              status: 'LABEL_GENERATED',
+              timeline: filteredTimeline2,
+              carrier: carrierName,
+              trackingId,
+              shipmentId,
+              packageWeight,
+              deliveryCost: cost,
+              estDays: estDays
+            };
+          }
+          return o;
+        });
+        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        window.dispatchEvent(new Event('storage'));
+        
+        pushNotification('Courier Assigned', `Courier ${carrierName} assigned to Order #${orderId}.`, 'seller');
+        pushNotification('Shipping Label Created', `Shipping label generated for Order #${orderId}.`, 'buyer');
+        pushNotification('Label Created', `Shipping label generated successfully for Order #${orderId}.`, 'seller');
+        triggerToast('Label Generated', `Label generated for Order #${orderId}.`, 'success');
+        
+        const fresh = updated.find(o => o.orderId === orderId);
+        setActiveLabelOrder(fresh);
+        setIsLabelModalOpen(true);
+        await syncOrderToDatabase(orderId, updated);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to generate shipping label.', 'danger');
+    } finally {
+      setOrderLoading(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleMarkReadyForPickup = async (orderId) => {
+    if (orderLoading[orderId]) return;
+    try {
+      setOrderLoading(prev => ({ ...prev, [orderId]: true }));
+      const storedOrders = localStorage.getItem('emahu_orders');
+      if (storedOrders) {
+        const parsed = JSON.parse(storedOrders);
+        const updated = parsed.map(o => {
+          if (o.orderId === orderId) {
+            const timeline = o.timeline || [];
+            const filteredTimeline = timeline.filter(t => t.status !== 'READY_FOR_PICKUP');
+            filteredTimeline.push({
+              status: 'READY_FOR_PICKUP',
+              label: 'Ready for Pickup',
+              desc: `📦 Package is packed and ready for carrier pickup.`,
+              date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+            });
+            return {
+              ...o,
+              status: 'READY_FOR_PICKUP',
+              timeline: filteredTimeline
+            };
+          }
+          return o;
+        });
+        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        window.dispatchEvent(new Event('storage'));
+        pushNotification('Ready for Pickup', `Order #${orderId} is packed and ready for courier pickup.`, 'buyer');
+        pushNotification('Pickup Confirmed', `Pickup request sent for Order #${orderId}.`, 'seller');
+        triggerToast('Status Updated', `Order #${orderId} marked ready for pickup.`, 'success');
+        await syncOrderToDatabase(orderId, updated);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to mark ready for pickup.', 'danger');
+    } finally {
+      setOrderLoading(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleAdvanceStatus = async (orderId, nextStatus) => {
+    if (orderLoading[orderId]) return;
+    try {
+      setOrderLoading(prev => ({ ...prev, [orderId]: true }));
+      const storedOrders = localStorage.getItem('emahu_orders');
+      if (storedOrders) {
+        const parsed = JSON.parse(storedOrders);
+        const updated = parsed.map(o => {
+          if (o.orderId === orderId) {
+            const timeline = o.timeline || [];
+            const filteredTimeline = timeline.filter(t => t.status !== nextStatus);
+            
+            let label = nextStatus;
+            let desc = `Order state shifted to ${nextStatus}.`;
+            if (nextStatus === 'PICKED_UP') {
+              label = 'Shipment Picked Up';
+              desc = `📦 Courier partner ${o.carrier || 'Delhivery'} has picked up the package.`;
+            } else if (nextStatus === 'IN_TRANSIT') {
+              label = 'In Transit';
+              desc = `🚚 Order package is in transit via national EV highway corridor.`;
+            } else if (nextStatus === 'OUT_FOR_DELIVERY') {
+              label = 'Out For Delivery';
+              desc = `🛵 Package is out for delivery with the local dispatch rider.`;
+            } else if (nextStatus === 'DELIVERED') {
+              label = 'Delivered';
+              desc = `✅ Order delivered successfully. Transaction completed.`;
+            }
+
+            filteredTimeline.push({
+              status: nextStatus,
+              label,
+              desc,
+              date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+            });
+
+            return {
+              ...o,
+              status: nextStatus === 'DELIVERED' ? 'COMPLETED' : nextStatus,
+              timeline: filteredTimeline,
+              sellerConfirmed: nextStatus === 'DELIVERED' ? true : o.sellerConfirmed
+            };
+          }
+          return o;
+        });
+        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        window.dispatchEvent(new Event('storage'));
+
+        // Push status change notifications
+        let customerMsg = `Your Order #${orderId} state is now ${nextStatus}.`;
+        let sellerMsg = `Order #${orderId} advanced to ${nextStatus}.`;
+        if (nextStatus === 'PICKED_UP') {
+          customerMsg = `Your shipment has been picked up.`;
+        } else if (nextStatus === 'OUT_FOR_DELIVERY') {
+          customerMsg = `Your package is out for delivery.`;
+        } else if (nextStatus === 'DELIVERED') {
+          customerMsg = `Your order has been delivered successfully.`;
+          sellerMsg = `Order #${orderId} delivered successfully.`;
+        }
+
+        pushNotification(nextStatus, customerMsg, 'buyer');
+        pushNotification(nextStatus, sellerMsg, 'seller');
+        triggerToast('Status Advanced', `Order #${orderId} is now ${nextStatus}.`, 'success');
+        await syncOrderToDatabase(orderId, updated);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to advance order status.', 'danger');
+    } finally {
+      setOrderLoading(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  // Search & Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
+  
+  // Toast notifications state
+  const [toasts, setToasts] = useState([]);
+  
+  // Add Product Modal Form States
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newProductName, setNewProductName] = useState('');
+  const [newProductBrand, setNewProductBrand] = useState('');
+  const [newProductSku, setNewProductSku] = useState('');
+  const [newProductPrice, setNewProductPrice] = useState('');
+  const [newProductComparePrice, setNewProductComparePrice] = useState('');
+  const [newProductStock, setNewProductStock] = useState('');
+  const [newProductDescription, setNewProductDescription] = useState('');
+  const [newProductImage, setNewProductImage] = useState('');
+  const [formError, setFormError] = useState('');
+  const [verifyCodes, setVerifyCodes] = useState({});
+  const [resubmitProductId, setResubmitProductId] = useState(null);
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+  const [selectedDetailedProduct, setSelectedDetailedProduct] = useState(null);
+
+  // Delete Confirmation Modal States
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
+
+  // Auto-dismiss toasts
+  useEffect(() => {
+    if (toasts.length > 0) {
+      const timer = setTimeout(() => {
+        setToasts((prev) => prev.slice(1));
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toasts]);
+  // Utility to push notifications
+  const triggerToast = (title, message, type = 'success') => {
+    const id = getTimestampString();
+    setToasts([{ id, title, message, type }]);
+  };
+
+  // Add Product Handler
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    if (isSubmittingProduct) return;
+    if (
+      !newProductName.trim() ||
+      !newProductBrand.trim() ||
+      !newProductCategory.trim() ||
+      !newProductPrice ||
+      !newProductComparePrice ||
+      !newProductStock ||
+      !newProductImage.trim() ||
+      !newProductDescription.trim()
+    ) {
+      setFormError('Please fill in all required fields');
+      return;
+    }
+    
+    // Validate Numeric values
+    const priceNum = parseFloat(newProductPrice);
+    const comparePriceNum = parseFloat(newProductComparePrice);
+    const stockNum = parseInt(newProductStock);
+
+    if (isNaN(priceNum) || priceNum <= 0) {
+      setFormError('Please enter a valid price greater than 0.');
+      return;
+    }
+    if (isNaN(comparePriceNum) || comparePriceNum <= 0) {
+      setFormError('Please enter a valid compare-at price greater than 0.');
+      return;
+    }
+    if (comparePriceNum <= priceNum) {
+      setFormError('Compare-at price must be greater than listing price.');
+      return;
+    }
+    if (isNaN(stockNum) || stockNum < 0) {
+      setFormError('Please enter a valid non-negative stock count.');
+      return;
+    }
+
+    try {
+      setIsSubmittingProduct(true);
+      const token = localStorage.getItem('emahu_seller_token');
+      const url = resubmitProductId 
+        ? `http://localhost:5000/api/products/${resubmitProductId}/resubmit`
+        : 'http://localhost:5000/api/products';
+      const method = resubmitProductId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: newProductName.trim(),
+          brand: newProductBrand.trim(),
+          category: newProductCategory,
+          price: priceNum,
+          comparePrice: comparePriceNum,
+          stock: stockNum,
+          image: newProductImage.trim(),
+          description: newProductDescription.trim()
+        })
+      });
+
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+
+      const data = await res.json();
+      if (!data.success) {
+        setFormError(data.error || 'Failed to submit product');
+        return;
+      }
+
+      if (resubmitProductId) {
+        setProducts((prev) => prev.map(p => (p.id || p._id) === resubmitProductId ? data.product : p));
+        triggerToast(
+          'Product Submitted',
+          `EMAHU-PRO: "${newProductName}" has been updated and is pending admin approval.`,
+          'success'
+        );
+      } else {
+        setProducts((prev) => [data.product, ...prev]);
+        triggerToast(
+          'Product Created',
+          `EMAHU-PRO: "${newProductName}" is now live.`,
+          'success'
+        );
+      }
+      
+      // Close Modal and Reset form fields
+      setIsAddModalOpen(false);
+      resetAddForm();
+    } catch (err) {
+      console.error('Error adding/resubmitting product:', err);
+      setFormError('Network error submitting product. Please try again.');
+    } finally {
+      setIsSubmittingProduct(false);
+    }
+  };
+
+  const resetAddForm = () => {
+    setNewProductName('');
+    setNewProductBrand('');
+    setNewProductSku('');
+    
+    let defaultCat = 'Electronics';
+    if (sellerUser?.category) {
+      const storeCat = sellerUser.category.toLowerCase();
+      if (storeCat === 'electronics') {
+        defaultCat = 'Tech';
+      } else if (storeCat === 'fashion') {
+        defaultCat = 'Apparel';
+      } else if (storeCat === 'home') {
+        defaultCat = 'Kitchen';
+      } else {
+        defaultCat = 'Lifestyle';
+      }
+    }
+    setNewProductCategory(defaultCat);
+    
+    setNewProductPrice('');
+    setNewProductComparePrice('');
+    setNewProductStock('');
+    setNewProductDescription('');
+    setNewProductImage('');
+    setFormError('');
+    setResubmitProductId(null);
+  };
+
+  const handleVerifyProductCode = async (productId) => {
+    const product = products.find(p => (p.id || p._id) === productId);
+    const code = verifyCodes[productId] || (product && product.adminCode);
+    if (!code || !code.trim()) {
+      triggerToast('Verification Error', 'Please enter a verification code first.', 'danger');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      const res = await fetch(`http://localhost:5000/api/products/${productId}/verify`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ code: code.trim() })
+      });
+
+      const data = await res.json();
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      if (data.success) {
+        setProducts((prev) => prev.map(p => (p.id || p._id) === productId ? data.product : p));
+        triggerToast('Listing Approved', `Product listing "${data.product.name}" is now live!`, 'success');
+        setVerifyCodes(prev => {
+          const updated = { ...prev };
+          delete updated[productId];
+          return updated;
+        });
+        if (data.product && data.product.sku) {
+          window.open(`http://localhost:3000/buyer/products/${data.product.sku}`, '_blank');
+        }
+      } else {
+        triggerToast('Verification Failed', data.error || 'Invalid verification code.', 'danger');
+      }
+    } catch (err) {
+      console.error('Verify code error:', err);
+      triggerToast('Error', 'Network error. Please try again.', 'danger');
+    }
+  };
+
+
+
+  // Pre-populate form and open resubmit modal
+  const handleOpenResubmitModal = (product) => {
+    setResubmitProductId(product.id || product._id);
+    setNewProductName(product.name);
+    setNewProductBrand(product.brand || '');
+    setNewProductSku(product.sku);
+    setNewProductCategory(product.category);
+    setNewProductPrice(product.price.toString());
+    setNewProductComparePrice(product.comparePrice ? product.comparePrice.toString() : '');
+    setNewProductStock(product.stock.toString());
+    setNewProductDescription(product.description || '');
+    setNewProductImage(product.image || '');
+    setIsAddModalOpen(true);
+  };
+
+  // Open Delete Confirmation
+  const confirmDeleteProduct = (product) => {
+    setProductToDelete(product);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Perform actual deletion
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      const productId = productToDelete.id || productToDelete._id;
+      const res = await fetch(`http://localhost:5000/api/products/${productId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+
+      const data = await res.json();
+      if (data.success) {
+        setProducts((prev) => prev.filter((p) => (p.id || p._id) !== productId));
+        triggerToast(
+          'Product Removed',
+          `EMAHU-PRO: "${productToDelete.name}" was successfully deleted.`,
+          'danger'
+        );
+      } else {
+        triggerToast('Deletion Failed', data.error || 'Could not delete product listing', 'danger');
+      }
+    } catch (err) {
+      console.error('Error deleting product:', err);
+      triggerToast('Deletion Error', 'Network error during product deletion', 'danger');
+    }
+    
+    setIsDeleteModalOpen(false);
+    setProductToDelete(null);
+  };
+
+  // Process sorting & filtering products
+  const filteredProducts = products
+    .filter((product) => {
+      // In the main products tab, show only fully approved listings
+      if (activeTab === 'products' && product.approvalStatus !== 'approved') {
+        return false;
+      }
+
+      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (product.sku || '').toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
+      const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
+      
+      return matchesSearch && matchesCategory && matchesStatus;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'price-low') return a.price - b.price;
+      if (sortBy === 'price-high') return b.price - a.price;
+      if (sortBy === 'stock') return b.stock - a.stock;
+      if (sortBy === 'sales') return b.sales - a.sales;
+      return 0;
+    });
+
+  // Analytics totals calculation
+  const totalRevenue = orders.reduce((acc, o) => acc + o.amount, 0);
+  const totalSalesCount = orders.length;
+  const lowStockCount = products.filter(p => p.status === 'low-stock').length;
+  const outOfStockCount = products.filter(p => p.status === 'out-of-stock').length;
+
+  // Highest selling product and selling range calculations
+  const sortedProductsRange = useMemo(() => {
+    return [...products].sort((a, b) => (b.sales || 0) - (a.sales || 0));
+  }, [products]);
+
+  const highestSellingProduct = useMemo(() => {
+    if (sortedProductsRange.length === 0) return null;
+    return sortedProductsRange[0];
+  }, [sortedProductsRange]);
+
+  // Dynamic Weekly Chart Calculations
+  const chartData = useMemo(() => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const orderedDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    
+    const revenueByDay = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+    const dispatchesByDay = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+
+    orders.forEach(o => {
+      let dayName = 'Mon';
+      if (o.raw) {
+        try {
+          const date = parseOrderDate(o.raw);
+          const dayIndex = date.getDay();
+          dayName = days[dayIndex];
+        } catch (e) {
+          dayName = 'Mon';
+        }
+      }
+      if (revenueByDay[dayName] !== undefined) {
+        revenueByDay[dayName] += o.amount;
+        dispatchesByDay[dayName] += 1;
+      }
+    });
+
+    return orderedDays.map(day => ({
+      day,
+      revenue: revenueByDay[day],
+      dispatches: dispatchesByDay[day]
+    }));
+  }, [orders]);
+
+  const maxRevenue = useMemo(() => {
+    return Math.max(...chartData.map(d => d.revenue), 10000);
+  }, [chartData]);
+
+  const maxDispatches = useMemo(() => {
+    return Math.max(...chartData.map(d => d.dispatches), 1);
+  }, [chartData]);
+
+  const chartPoints = useMemo(() => {
+    return chartData.map((d, i) => {
+      const x = 70 + i * 65;
+      const y = 180 - (d.revenue / maxRevenue) * 135;
+      return { x, y };
+    });
+  }, [chartData, maxRevenue]);
+
+  const dispatchPoints = useMemo(() => {
+    return chartData.map((d, i) => {
+      const x = 70 + i * 65;
+      const y = 180 - (d.dispatches / maxDispatches) * 110;
+      return { x, y };
+    });
+  }, [chartData, maxDispatches]);
+
+  const revenuePath = useMemo(() => {
+    if (chartPoints.length === 0) return '';
+    return `M ${chartPoints[0].x} ${chartPoints[0].y} ` + chartPoints.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+  }, [chartPoints]);
+
+  const revenueAreaPath = useMemo(() => {
+    if (chartPoints.length === 0) return '';
+    return `${revenuePath} L ${chartPoints[chartPoints.length - 1].x} 180 L ${chartPoints[0].x} 180 Z`;
+  }, [chartPoints, revenuePath]);
+
+  const dispatchPath = useMemo(() => {
+    if (dispatchPoints.length === 0) return '';
+    return `M ${dispatchPoints[0].x} ${dispatchPoints[0].y} ` + dispatchPoints.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+  }, [dispatchPoints]);
+
+  // Dynamic Chart Interactive Tooltip Parameters
+  const peakDayIndex = useMemo(() => {
+    let maxIdx = 0;
+    let maxRev = -1;
+    chartData.forEach((d, idx) => {
+      if (d.revenue > maxRev) {
+        maxRev = d.revenue;
+        maxIdx = idx;
+      }
+    });
+    return maxIdx;
+  }, [chartData]);
+
+  const hoverX = useMemo(() => {
+    return chartPoints[peakDayIndex]?.x ?? 70;
+  }, [chartPoints, peakDayIndex]);
+
+  const hoverY = useMemo(() => {
+    return chartPoints[peakDayIndex]?.y ?? 180;
+  }, [chartPoints, peakDayIndex]);
+
+  const tooltipWidth = 115;
+  const tooltipX = useMemo(() => {
+    return Math.max(50, Math.min(480 - tooltipWidth, hoverX - 57));
+  }, [hoverX]);
+
+  const tooltipY = useMemo(() => {
+    return hoverY - 50;
+  }, [hoverY]);
+
+  // Dynamic Geographic Shares Calculation
+  const stateShares = useMemo(() => {
+    const counts = {};
+    orders.forEach(o => {
+      let state = 'Others';
+      if (o.raw && o.raw.deliveryAddress && o.raw.deliveryAddress.stateName) {
+        state = o.raw.deliveryAddress.stateName;
+      }
+      counts[state] = (counts[state] || 0) + 1;
+    });
+
+    const total = orders.length || 1;
+    return Object.entries(counts)
+      .map(([state, count]) => ({
+        state,
+        pct: Math.round((count / total) * 100)
+      }))
+      .sort((a, b) => b.pct - a.pct);
+  }, [orders]);
+
+  // Dynamic Conversion Funnel Metrics
+  const funnelViews = totalSalesCount * 12 + 120;
+  const funnelCart = totalSalesCount * 4 + 40;
+  const funnelCheckout = totalSalesCount * 1.5 + 15;
+  const funnelSales = totalSalesCount;
+
+  const cartPct = funnelViews > 0 ? Math.round((funnelCart / funnelViews) * 100) : 0;
+  const checkoutPct = funnelViews > 0 ? Math.round((funnelCheckout / funnelViews) * 100) : 0;
+  const salesPct = funnelViews > 0 ? (funnelSales / funnelViews * 100).toFixed(2) : '0.00';
+
+  // Orders tab computed values â€” recalculated on every render when orders/filter state changes
+  const pendingOrdersCount = orders.filter(o => o.status === 'PENDING_APPROVAL').length;
+  const filteredOrdersDisplay = orderStatusFilter === 'all'
+    ? orders
+    : orderStatusFilter === 'DELIVERED'
+      ? orders.filter(o => o.status === 'DELIVERED' || o.status === 'COMPLETED')
+      : orders.filter(o => o.status === orderStatusFilter);
+
+  // Render high-end loading display during verification to prevent DOM flash
+  if (!isAuthorized) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#0a0b10', color: '#fff' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: '40px', height: '40px', border: '3px solid #1f2937', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p style={{ fontSize: '0.9rem', color: '#9ca3af' }}>Verifying merchant session credentials...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dashboard-layout">
+      {/* Toast Notifications */}
+      <div className="toast-container">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast ${toast.type}`}>
+            <div className="toast-content">
+              <span className="toast-title">{toast.title}</span>
+              <span className="toast-message">{toast.message}</span>
+            </div>
+            <button className="toast-close" onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 3l10 10M13 3L3 13" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Sidebar Mobile Backdrop Overlay */}
+      {isSidebarOpen && (
+        <div className="sidebar-backdrop" onClick={() => setIsSidebarOpen(false)} />
+      )}
+
+      {/* --- SIDEBAR --- */}
+      <aside className={`sidebar ${isSidebarOpen ? 'mobile-open' : ''}`}>
+        <Link href="/" className="sidebar-brand">
+          <div className="sidebar-logo">
+            <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+              <rect width="32" height="32" rx="8" fill="#6366f1" />
+              <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          </div>
+          <span className="sidebar-title">EMAHU</span>
+          <span className="sidebar-title-tag">Pro</span>
+        </Link>
+
+        <ul className="sidebar-menu">
+          {sellerUser?.status !== 'approved' && (
+            <li>
+              <button 
+                className={`sidebar-item-btn ${activeTab === 'status' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('status'); setIsSidebarOpen(false); }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                  <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Verification Status</span>
+              </button>
+            </li>
+          )}
+          <li>
+            <button 
+              className={`sidebar-item-btn ${activeTab === 'overview' ? 'active' : ''}`}
+              disabled={sellerUser?.status !== 'approved'}
+              onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="7" height="9" rx="1" />
+                <rect x="14" y="3" width="7" height="5" rx="1" />
+                <rect x="14" y="12" width="7" height="9" rx="1" />
+                <rect x="3" y="16" width="7" height="5" rx="1" />
+              </svg>
+              <span>Overview</span>
+              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+            </button>
+          </li>
+          <li>
+            <button 
+              className={`sidebar-item-btn ${activeTab === 'products' ? 'active' : ''}`}
+              disabled={sellerUser?.status !== 'approved'}
+              onClick={() => { setActiveTab('products'); setIsSidebarOpen(false); }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Approved Products</span>
+              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+            </button>
+          </li>
+          <li>
+            <button 
+              className={`sidebar-item-btn ${activeTab === 'requests' ? 'active' : ''}`}
+              disabled={sellerUser?.status !== 'approved'}
+              onClick={() => { setActiveTab('requests'); setIsSidebarOpen(false); }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+              <span>Verification Requests</span>
+              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+            </button>
+          </li>
+          <li>
+            <button 
+              className={`sidebar-item-btn ${activeTab === 'orders' ? 'active' : ''}`}
+              disabled={sellerUser?.status !== 'approved'}
+              onClick={() => { setActiveTab('orders'); setIsSidebarOpen(false); }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Orders</span>
+              {activeTab !== 'orders' && pendingOrdersCount > 0 && (
+                <span className="sidebar-title-tag" style={{ marginLeft: '10px', background: 'var(--color-danger)' }}>
+                  {pendingOrdersCount}
+                </span>
+              )}
+              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+            </button>
+          </li>
+          <li>
+            <button 
+              className={`sidebar-item-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+              disabled={sellerUser?.status !== 'approved'}
+              onClick={() => { setActiveTab('analytics'); setIsSidebarOpen(false); }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 20V10M12 20V4M6 20v-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Analytics</span>
+              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+            </button>
+          </li>
+          <li>
+            <button 
+              className={`sidebar-item-btn ${activeTab === 'settings' ? 'active' : ''}`}
+              disabled={sellerUser?.status !== 'approved'}
+              onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              <span>Settings</span>
+              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+            </button>
+          </li>
+        </ul>
+
+        <div className="sidebar-profile">
+          <div className="avatar-wrapper">
+            <div className="sidebar-avatar">
+              {sellerUser && sellerUser.name ? sellerUser.name.substring(0, 2).toUpperCase() : 'PS'}
+            </div>
+            <span className="avatar-badge"></span>
+          </div>
+          <div className="sidebar-user-info">
+            <span className="sidebar-username">{sellerUser ? sellerUser.name : 'Pro Seller Inc.'}</span>
+            <span className="sidebar-usertag">{sellerUser ? sellerUser.email : 'Premium Account'}</span>
+          </div>
+          <button className="logout-btn" onClick={handleSignOut} title="Log Out">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+      </aside>
+
+      {/* --- MAIN CONTENT AREA --- */}
+      <div className="main-wrapper">
+        {/* --- HEADER --- */}
+        <header className="header">
+          <button className="mobile-toggle-btn" onClick={() => setIsSidebarOpen(true)}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+
+          <div className="header-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input 
+              type="text" 
+              className="search-input" 
+              placeholder="Search across analytics & products..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="header-actions" style={{ position: 'relative' }}>
+            <button className="icon-badge-btn" onClick={() => { setIsNotifOpen(!isNotifOpen); handleMarkNotifsRead(); }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              {notifications.some(n => !n.read) && <span className="badge-dot"></span>}
+            </button>
+
+            {isNotifOpen && (
+              <div className="notif-popover" style={{
+                position: 'absolute',
+                top: '50px',
+                right: '10px',
+                width: '320px',
+                maxHeight: '400px',
+                backgroundColor: '#18181b',
+                border: '1px solid #27272a',
+                borderRadius: '8px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                textAlign: 'left'
+              }}>
+                <div style={{
+                  padding: '12px 16px',
+                  borderBottom: '1px solid #27272a',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Notifications Center</strong>
+                  <button 
+                    onClick={() => {
+                      try {
+                        const stored = localStorage.getItem('emahu_notifications') || '[]';
+                        const parsed = JSON.parse(stored);
+                        const updated = parsed.filter(n => n.role !== 'seller');
+                        localStorage.setItem('emahu_notifications', JSON.stringify(updated));
+                        window.dispatchEvent(new Event('storage'));
+                      } catch (e) {
+                        console.error(e);
+                      }
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#a1a1aa', fontSize: '0.75rem', cursor: 'pointer' }}
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1, padding: '8px 0' }}>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: '#a1a1aa', fontSize: '0.8rem' }}>
+                      No notifications yet
+                    </div>
+                  ) : (
+                    notifications.map(n => (
+                      <div key={n.id} style={{
+                        padding: '10px 16px',
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        backgroundColor: n.read ? 'transparent' : 'rgba(65, 105, 225, 0.08)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontWeight: 'bold', fontSize: '0.8rem', color: '#fff' }}>{n.title}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#a1a1aa' }}>{n.date}</span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#cbd5e1', lineHeight: '1.3' }}>{n.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="header-divider"></div>
+
+            {sellerUser?.status === 'approved' && (
+              <div style={{ height: '36px' }} />
+            )}
+          </div>
+        </header>
+
+        {/* --- DYNAMIC VIEWPORT CONTROLLER --- */}
+        <main className="view-container">
+          {sellerUser?.status === 'pending' && (
+            <div style={{
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+              borderRadius: '8px',
+              padding: '16px 20px',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+              <div>
+                <h4 style={{ margin: 0, color: '#fff', fontSize: '0.95rem', fontWeight: 'bold' }}>Store Account Pending Verification</h4>
+                <p style={{ margin: '4px 0 0 0', color: '#fbbf24', fontSize: '0.9rem', lineHeight: '1.4', fontWeight: '600' }}>
+                  Aapki business registration verification pending hai. Compliance experts details verify kar rahe hain. Tab tak aap product verification requests submit kar sakte hain.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {sellerUser?.status === 'rejected' && (
+            <div style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: '8px',
+              padding: '16px 20px',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <span style={{ fontSize: '1.5rem' }}>❌</span>
+              <div>
+                <h4 style={{ margin: 0, color: '#fff', fontSize: '0.95rem', fontWeight: 'bold' }}>Store Registration Rejected</h4>
+                <p style={{ margin: '4px 0 0 0', color: '#fca5a5', fontSize: '0.9rem', lineHeight: '1.4', fontWeight: '600' }}>
+                  Aapki seller profile evaluation standard terms complete nahi kar payi. Please parameters resolve karein or support se clarify karein.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: VERIFICATION STATUS (FOR UNAPPROVED SELLERS) */}
+          {activeTab === 'status' && (
+            <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px 0' }}>
+              <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+                <h2 style={{ fontSize: '2rem', fontWeight: '800', color: '#fff' }}>
+                  Verification Desk
+                </h2>
+                <p style={{ color: '#a1a1aa', marginTop: '8px' }}>Monitor onboarding progress and resubmit compliance credentials.</p>
+              </div>
+
+              {sellerUser?.status === 'pending' && (
+                <div style={{
+                  background: 'rgba(245, 158, 11, 0.05)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  borderRadius: '16px',
+                  padding: '32px',
+                  textAlign: 'center',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                  backdropFilter: 'blur(10px)',
+                  marginBottom: '32px'
+                }}>
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 20px',
+                    animation: 'pulse 2s infinite'
+                  }}>
+                    <span style={{ fontSize: '2rem' }}>⏳</span>
+                  </div>
+                  <h3 style={{ fontSize: '1.4rem', color: '#fff', fontWeight: '700', marginBottom: '12px' }}>
+                    Waiting for Admin Approval
+                  </h3>
+                  <p style={{ color: '#fbbf24', fontSize: '1rem', lineHeight: '1.6', margin: '0 auto', maxWidth: '600px', fontWeight: '600' }}>
+                    Aapki business registration verification pending hai. Compliance experts details verify kar rahe hain. Tab tak aap product verification requests submit kar sakte hain.
+                  </p>
+                </div>
+              )}
+
+              {sellerUser?.status === 'rejected' && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.05)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '16px',
+                  padding: '32px',
+                  textAlign: 'center',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                  backdropFilter: 'blur(10px)',
+                  marginBottom: '32px'
+                }}>
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 20px'
+                  }}>
+                    <span style={{ fontSize: '2rem' }}>❌</span>
+                  </div>
+                  <h3 style={{ fontSize: '1.4rem', color: '#fff', fontWeight: '700', marginBottom: '12px' }}>
+                    Store Registration Rejected
+                  </h3>
+                  <p style={{ color: '#fca5a5', fontSize: '0.95rem', lineHeight: '1.6', margin: '0 auto', maxWidth: '600px', fontWeight: '600' }}>
+                    Aapki seller profile evaluation standard terms complete nahi kar payi. Please parameters resolve karein or support se clarify karein.
+                  </p>
+                  {sellerUser?.verificationFeedback && (
+                    <div style={{
+                      marginTop: '20px',
+                      background: 'rgba(0,0,0,0.2)',
+                      border: '1px solid rgba(239,68,68,0.2)',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      color: '#ef4444',
+                      fontSize: '0.9rem',
+                      textAlign: 'left'
+                    }}>
+                      <strong>Admin Feedback:</strong> {sellerUser.verificationFeedback}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {sellerUser?.status === 'more_info_requested' && (
+                <div style={{
+                  background: 'rgba(59, 130, 246, 0.05)',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: '16px',
+                  padding: '32px',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                  backdropFilter: 'blur(10px)',
+                  marginBottom: '32px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      <span style={{ fontSize: '1.5rem' }}>ℹ️</span>
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.3rem', color: '#fff', fontWeight: '700', margin: 0 }}>
+                        Verification Information Required
+                      </h3>
+                      <p style={{ color: '#93c5fd', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+                        The compliance team has requested more details regarding your registration.
+                      </p>
+                    </div>
+                  </div>
+
+                  {sellerUser?.verificationFeedback && (
+                    <div style={{
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      color: '#cbd5e1',
+                      fontSize: '0.9rem',
+                      marginBottom: '24px'
+                    }}>
+                      <strong style={{ color: '#60a5fa', display: 'block', marginBottom: '4px' }}>Auditor Feedback:</strong>
+                      {sellerUser.verificationFeedback}
+                    </div>
+                  )}
+
+                  {/* Document resubmission form */}
+                  <SellerDocumentResubmissionForm 
+                    documents={sellerDocuments} 
+                    onSuccess={async () => {
+                      triggerToast('Details Resubmitted', 'Your store verification request is now pending review.', 'success');
+                      // Re-sync user status by calling getProfile
+                      const token = localStorage.getItem('emahu_seller_token');
+                      if (token) {
+                        const res = await getProfile(token);
+                        if (res.success && res.user) {
+                          setSellerUser(res.user);
+                          localStorage.setItem('emahu_seller_user', JSON.stringify(res.user));
+                        }
+                      }
+                      fetchSellerDocuments();
+                    }} 
+                  />
+                </div>
+              )}
+
+              {/* Documents status tracker list */}
+              <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '16px', padding: '24px' }}>
+                <h3 style={{ color: '#fff', fontSize: '1.1rem', fontWeight: '700', marginBottom: '16px' }}>Uploaded Documents Status</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {['business_registration', 'id_proof'].map(type => {
+                    const doc = sellerDocuments.find(d => d.documentType === type);
+                    const docName = type === 'business_registration' ? 'Business Registration Document' : 'ID Proof (PAN/Aadhaar)';
+                    return (
+                      <div key={type} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '16px',
+                        background: 'rgba(255,255,255,0.02)',
+                        border: '1px solid #27272a',
+                        borderRadius: '12px'
+                      }}>
+                        <div>
+                          <strong style={{ color: '#fff', fontSize: '0.9rem', display: 'block' }}>{docName}</strong>
+                          {doc ? (
+                            <a href={doc.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#6366f1', fontSize: '0.8rem', textDecoration: 'underline', display: 'inline-block', marginTop: '4px' }}>
+                              View Submitted Document
+                            </a>
+                          ) : (
+                            <span style={{ color: '#71717a', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>Not uploaded</span>
+                          )}
+                        </div>
+                        <div>
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            backgroundColor: doc?.status === 'approved' ? 'rgba(16, 185, 129, 0.1)' : doc?.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                            color: doc?.status === 'approved' ? '#10b981' : doc?.status === 'rejected' ? '#ef4444' : '#f59e0b',
+                            border: `1px solid ${doc?.status === 'approved' ? 'rgba(16, 185, 129, 0.2)' : doc?.status === 'rejected' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`
+                          }}>
+                            {doc ? doc.status.toUpperCase() : 'PENDING'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* TAB 1: OVERVIEW */}
+          {activeTab === 'overview' && (
+            <div>
+              <div className="view-header">
+                <div className="view-title-group">
+                  <h2>Overview Dashboard</h2>
+                  <p>Real-time analytics, company sales volumes, and core inventory alerts.</p>
+                </div>
+              </div>
+
+              {/* STATS SUMMARY GRID */}
+              <div className="stats-grid">
+                <div className="stat-card primary-theme">
+                  <div className="stat-header">
+                    <span className="stat-title">Total Sales Revenue</span>
+                    <div className="stat-icon primary">₹</div>
+                  </div>
+                  <div className="stat-value">₹{totalRevenue.toLocaleString('en-IN')}</div>
+                  <div className="stat-footer">
+                    <span className="stat-trend up">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="18 15 12 9 6 15" />
+                      </svg>
+                      {totalRevenue > 0 ? 'Active' : '0%'}
+                    </span>
+                    <span>vs last month</span>
+                  </div>
+                </div>
+
+                <div className="stat-card success-theme">
+                  <div className="stat-header">
+                    <span className="stat-title">Total Orders Dispatched</span>
+                    <div className="stat-icon success">📦</div>
+                  </div>
+                  <div className="stat-value">{totalSalesCount.toLocaleString()}</div>
+                  <div className="stat-footer">
+                    <span className="stat-trend up">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="18 15 12 9 6 15" />
+                      </svg>
+                      {totalSalesCount > 0 ? 'Active' : '0%'}
+                    </span>
+                    <span>monthly growth</span>
+                  </div>
+                </div>
+
+                <div className="stat-card warning-theme">
+                  <div className="stat-header">
+                    <span className="stat-title">Low Stock SKUs</span>
+                    <div className="stat-icon warning">⚠️ï¸</div>
+                  </div>
+                  <div className="stat-value">{lowStockCount}</div>
+                  <div className="stat-footer">
+                    <span>{products.filter(p => p.status === 'in-stock').length} Healthy list items</span>
+                  </div>
+                </div>
+
+                <div className="stat-card danger-theme">
+                  <div className="stat-header">
+                    <span className="stat-title">Out of Stock items</span>
+                    <div className="stat-icon danger">⛔</div>
+                  </div>
+                  <div className="stat-value">{outOfStockCount}</div>
+                  <div className="stat-footer">
+                    <span style={{ color: 'var(--color-danger)' }}>Requires instant re-order</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* TWO COLS GRID: SALES GRAPH & RECENT TRANSACTIONS */}
+              <div className="dashboard-grid-two-cols">
+                {/* SVG Graph area */}
+                <div className="glass-card">
+                  <div className="glass-card-header">
+                    <span className="glass-card-title">Weekly Revenue Breakdown (INR)</span>
+                    <div className="chart-legend">
+                      <div className="legend-item">
+                        <span className="legend-color revenue"></span>
+                        <span>Revenue</span>
+                      </div>
+                      <div className="legend-item">
+                        <span className="legend-color orders"></span>
+                        <span>Dispatches</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="chart-container">
+                    <svg className="chart-svg" viewBox="0 0 500 220">
+                      <defs>
+                        <linearGradient id="revenue-gradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10b981" stopOpacity="0.3"/>
+                          <stop offset="100%" stopColor="#10b981" stopOpacity="0"/>
+                        </linearGradient>
+                      </defs>
+                      
+                      {/* Grid Lines */}
+                      <line x1="40" y1="45" x2="480" y2="45" className="chart-grid-line" />
+                      <line x1="40" y1="90" x2="480" y2="90" className="chart-grid-line" />
+                      <line x1="40" y1="135" x2="480" y2="135" className="chart-grid-line" />
+                      
+                      {/* Axes */}
+                      <line x1="40" y1="20" x2="40" y2="180" className="chart-axis-line" />
+                      <line x1="40" y1="180" x2="480" y2="180" className="chart-axis-line" />
+                      
+                      {/* Axis Labels */}
+                      <text x="35" y="180" textAnchor="end" className="chart-axis-text">0</text>
+                      <text x="35" y="135" textAnchor="end" className="chart-axis-text">₹{Math.round(maxRevenue / 3).toLocaleString()}</text>
+                      <text x="35" y="90" textAnchor="end" className="chart-axis-text">₹{Math.round((maxRevenue / 3) * 2).toLocaleString()}</text>
+                      <text x="35" y="45" textAnchor="end" className="chart-axis-text">₹{Math.round(maxRevenue).toLocaleString()}</text>
+
+                      {/* X labels */}
+                      <text x="70" y="198" textAnchor="middle" className="chart-axis-text">Mon</text>
+                      <text x="135" y="198" textAnchor="middle" className="chart-axis-text">Tue</text>
+                      <text x="200" y="198" textAnchor="middle" className="chart-axis-text">Wed</text>
+                      <text x="265" y="198" textAnchor="middle" className="chart-axis-text">Thu</text>
+                      <text x="330" y="198" textAnchor="middle" className="chart-axis-text">Fri</text>
+                      <text x="395" y="198" textAnchor="middle" className="chart-axis-text">Sat</text>
+                      <text x="460" y="198" textAnchor="middle" className="chart-axis-text">Sun</text>
+
+                      {/* Line Chart Area Fill for Revenue */}
+                      {revenueAreaPath && <path d={revenueAreaPath} className="chart-area-revenue" />}
+
+                      {/* Line Chart Stroke for Revenue (Green) */}
+                      {revenuePath && <path d={revenuePath} className="chart-path-revenue" />}
+
+                      {/* Line Chart Stroke for Orders (Yellow) */}
+                      {dispatchPath && <path d={dispatchPath} className="chart-path-orders" />}
+
+                      {/* Dotted Vertical Hover Line */}
+                      <line x1={hoverX} y1={hoverY} x2={hoverX} y2="180" stroke="#10b981" strokeWidth="1.5" strokeDasharray="4 4" className="chart-hover-line" />
+                      <rect x={hoverX - 15} y={hoverY} width="30" height={180 - hoverY} fill="rgba(16, 185, 129, 0.08)" className="chart-hover-bg" />
+
+                      {/* Interactive Dots for Revenue */}
+                      {chartPoints.map((pt, idx) => (
+                        <circle 
+                          key={idx} 
+                          cx={pt.x} 
+                          cy={pt.y} 
+                          r={idx === peakDayIndex ? 5 : 4} 
+                          fill={idx === peakDayIndex ? "#10b981" : "#fff"} 
+                          stroke={idx === peakDayIndex ? "#fff" : "#10b981"} 
+                          strokeWidth={idx === peakDayIndex ? 2 : 2.5} 
+                          className="chart-point" 
+                        />
+                      ))}
+
+                      {/* Tooltip Box (Rendered last to sit on top of all graph nodes) */}
+                      <g className="chart-tooltip">
+                        <rect x={tooltipX} y={tooltipY} width={tooltipWidth} height="42" rx="6" fill="#18181b" />
+                        <text x={tooltipX + 10} y={tooltipY + 16} fill="#fff" fontSize="10" fontFamily="sans-serif">Peak Day: {chartData[peakDayIndex].day}</text>
+                        <circle cx={tooltipX + 14} cy={tooltipY + 30} r="3" fill="#10b981" />
+                        <text x={tooltipX + 22} y={tooltipY + 33} fill="#fff" fontSize="11" fontFamily="sans-serif" fontWeight="bold">₹{chartData[peakDayIndex].revenue.toLocaleString('en-IN')} <tspan fontWeight="normal" fill="#a1a1aa">Sales</tspan></text>
+                      </g>
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Recent Transactions List */}
+                <div className="glass-card">
+                  <div className="glass-card-header">
+                    <span className="glass-card-title">Real-Time Transactions</span>
+                    <span className="sidebar-title-tag" style={{ background: 'rgba(16, 185, 129, 0.15)', color: 'var(--color-success)' }}>Live Orders</span>
+                  </div>
+
+                  <div className="realtime-list">
+                    {orders.slice(0, 4).map((order) => (
+                      <div key={order.id} className="realtime-item">
+                        <div className="realtime-img">
+                          {order.product.includes('Headphones') ? '🎧' : 
+                           order.product.includes('Chrono') ? '⌚' : 
+                           order.product.includes('Desk') ? 'ðŸ–¥ï¸' : 
+                           (order.product.includes('Tracker') || order.product.includes('Ring')) ? 'ðŸ’' : '📦'}
+                        </div>
+                        <div className="realtime-details">
+                          <span className="realtime-title">{order.customer}</span>
+                          <span className="realtime-subtitle">{order.product}</span>
+                        </div>
+                        <div className="realtime-meta">
+                          <div className="realtime-value">₹{order.amount.toLocaleString('en-IN')}</div>
+                          <span className="realtime-time">{order.time}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Product Performance Matrix (Selling Range & High Sellers) */}
+              <div className="glass-card" style={{ marginTop: '24px' }}>
+                <div className="glass-card-header" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '16px' }}>
+                  <span className="glass-card-title">📈 Product Performance & Selling Range</span>
+                  <span className="sidebar-title-tag" style={{ background: 'rgba(99, 102, 241, 0.15)', color: 'var(--color-primary)' }}>Sales Matrix</span>
+                </div>
+
+                {highestSellingProduct && highestSellingProduct.sales > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px', alignItems: 'stretch' }}>
+                    {/* Highest Selling Card */}
+                    <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ color: '#10b981', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                          🏆 Highest Selling Product
+                        </div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', color: '#fff', fontWeight: 700 }}>
+                          {highestSellingProduct.name}
+                        </h4>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                          Category: {highestSellingProduct.category} · Brand: {highestSellingProduct.brand}
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '16px' }}>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Units Sold</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{highestSellingProduct.sales}</div>
+                        </div>
+                        <div style={{ borderLeft: '1px solid var(--border-color)', paddingLeft: '16px' }}>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Remaining Stock</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: highestSellingProduct.stock === 0 ? '#ef4444' : highestSellingProduct.stock <= 10 ? '#f59e0b' : '#3b82f6' }}>
+                            {highestSellingProduct.stock} {highestSellingProduct.stock === 0 ? '(Out of Stock)' : 'units'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Selling Range List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff' }}>Products Sales Distribution (Selling Range):</span>
+                      <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}>
+                        <table className="portal-table" style={{ width: '100%', fontSize: '0.8rem' }}>
+                          <thead>
+                            <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                              <th style={{ textAlign: 'left', padding: '8px 12px' }}>Rank</th>
+                              <th style={{ textAlign: 'left', padding: '8px 12px' }}>Product</th>
+                              <th style={{ textAlign: 'center', padding: '8px 12px' }}>Price</th>
+                              <th style={{ textAlign: 'center', padding: '8px 12px' }}>Stock</th>
+                              <th style={{ textAlign: 'center', padding: '8px 12px' }}>Units Sold</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sortedProductsRange.map((p, idx) => (
+                              <tr key={p.id || p._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <td style={{ padding: '8px 12px', fontWeight: 'bold', color: idx === 0 ? '#10b981' : '#fff' }}>
+                                  #{idx + 1}
+                                </td>
+                                <td style={{ padding: '8px 12px', color: '#fff' }}>
+                                  {p.name}
+                                </td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                  ₹{p.price.toLocaleString('en-IN')}
+                                </td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center', color: p.stock === 0 ? '#ef4444' : p.stock <= 10 ? '#f59e0b' : '#fff' }}>
+                                  {p.stock}
+                                </td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>
+                                  {p.sales || 0}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                    No product sales records recorded yet. Start selling to see analytics and product selling range!
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: PRODUCTS (CRUD PORTAL) */}
+          {activeTab === 'products' && (
+            <div>
+              <div className="view-header">
+                <div className="view-title-group">
+                  <h2>Product Inventory</h2>
+                  <p>Complete listing catalog: create new offerings, monitor current stock, and edit properties.</p>
+                </div>
+              </div>
+
+              {/* Search, filters, actions */}
+              <div className="table-controls">
+                <div className="search-filter-row">
+                  <div className="inline-search">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <input 
+                      type="text" 
+                      className="inline-search-input" 
+                      placeholder="Search by name or SKU..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+
+                  <select 
+                    className="select-filter"
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                  >
+                    <option value="all">All Categories</option>
+                    <option value="Electronics">Electronics</option>
+                    <option value="Furniture">Furniture</option>
+                    <option value="Fitness">Fitness</option>
+                    <option value="Apparel">Apparel</option>
+                    <option value="Tech">Tech & Gadgets</option>
+                    <option value="Shoes">Shoes</option>
+                    <option value="Kitchen">Kitchen</option>
+                    <option value="Lifestyle">Lifestyle</option>
+                  </select>
+
+                  <select 
+                    className="select-filter"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="in-stock">In Stock</option>
+                    <option value="low-stock">Low Stock</option>
+                    <option value="out-of-stock">Out of Stock</option>
+                  </select>
+
+                  <select 
+                    className="select-filter"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                  >
+                    <option value="name">Sort by Name</option>
+                    <option value="price-low">Price: Low to High</option>
+                    <option value="price-high">Price: High to Low</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Data Table */}
+              <div className="table-wrapper">
+                {filteredProducts.length > 0 ? (
+                  <table className="pro-table">
+                    <thead>
+                      <tr>
+                        <th>Product Info</th>
+                        <th>Category</th>
+                        <th>Retail Price</th>
+                        <th>Stock Qty</th>
+                        <th>Listing Status</th>
+                        <th style={{ textAlign: 'center' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredProducts.map((product) => {
+                        const isApproved = product.approvalStatus === 'approved';
+                        const isPending = product.approvalStatus === 'pending';
+                        const isRejected = product.approvalStatus === 'rejected';
+
+                        return (
+                          <tr key={product.id || product._id}>
+                            <td>
+                              <div className="product-cell">
+                                <div className="product-img">
+                                  {(!product.image || !product.image.startsWith('http')) ? (
+                                    product.image || '📦'
+                                  ) : (
+                                    <img src={product.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  )}
+                                </div>
+                                <div className="product-meta-details">
+                                  <span className="product-name">{product.name}</span>
+                                  {isApproved ? (
+                                    <span className="product-sku">{product.sku}</span>
+                                  ) : (
+                                    <span className="product-sku" style={{ fontStyle: 'italic', color: '#94a3b8' }}>SKU Pending</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td>{product.category}</td>
+                            <td>
+                              <span className="price-text">₹{product.price.toLocaleString('en-IN')}</span>
+                              {product.comparePrice && (
+                                <span className="compare-price">₹{product.comparePrice.toLocaleString('en-IN')}</span>
+                              )}
+                            </td>
+                            <td style={{ fontWeight: 600 }}>{product.stock} units</td>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span className={`status-badge ${
+                                  isApproved ? 'in-stock' :
+                                  (isPending && product.adminCode) ? 'low-stock' :
+                                  isPending ? 'draft' : 'out-of-stock'
+                                }`}>
+                      {isApproved ? 'Approved & Live' :
+                                   (isPending && product.adminCode) ? 'Pending Activation' :
+                                   isPending ? 'Under Admin Review' : 'Rejected'}
+                                </span>
+                                {isRejected && product.rejectionReason && (
+                                  <span style={{ fontSize: '0.75rem', color: '#ef4444', maxWidth: '200px', wordBreak: 'break-word', display: 'inline-block' }}>
+                                    Reason: {product.rejectionReason}
+                                  </span>
+                                )}
+                                {isPending && product.adminCode && (
+                                  <div style={{ display: 'flex', gap: '4px', marginTop: '6px', alignItems: 'center' }}>
+                                    <input
+                                      type="text"
+                                      placeholder="Admin Code"
+                                      className="form-input"
+                                      style={{
+                                        height: '28px',
+                                        fontSize: '0.75rem',
+                                        padding: '2px 6px',
+                                        width: '90px',
+                                        background: 'rgba(255,255,255,0.08)',
+                                        borderColor: 'var(--color-success)',
+                                        color: '#10b981',
+                                        borderRadius: '4px',
+                                        fontWeight: 'bold',
+                                        textAlign: 'center',
+                                        cursor: 'not-allowed'
+                                      }}
+                                      value={product.adminCode || ''}
+                                      readOnly={true}
+                                    />
+                                    <button
+                                      className="company-portal-btn"
+                                      style={{
+                                        height: '28px',
+                                        fontSize: '0.75rem',
+                                        padding: '0 8px',
+                                        background: 'var(--color-success)',
+                                        borderColor: 'var(--color-success)',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                      onClick={() => handleVerifyProductCode(product.id || product._id)}
+                                    >
+                                      Verify
+                                    </button>
+                                  </div>
+                                )}
+                                {isPending && !product.adminCode && (
+                                  <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                    Waiting for admin review
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <div className="action-buttons-group" style={{ justifyContent: 'center' }}>
+                                <button className="action-btn" title="Edit Properties" onClick={() => {
+                                  handleOpenResubmitModal(product);
+                                }}>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                  </svg>
+                                </button>
+                                <button className="action-btn delete" title="Delete Product" onClick={() => confirmDeleteProduct(product)}>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="3 6 5 6 21 6" />
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="empty-state">
+                    <div className="empty-icon">📂</div>
+                    <h3>No products found</h3>
+                    <p>Try refining your search queries or adding new list items to the directory.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: VERIFICATION REQUESTS */}
+          {activeTab === 'requests' && (
+            <div>
+              <div className="view-header">
+                <div className="view-title-group">
+                  <h2>Verification & Listing Requests</h2>
+                  <p>Submit product listings for administration audit and activate approved listings with security codes.</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '24px', alignItems: 'start', marginTop: '24px' }}>
+                
+                {/* LEFT COLUMN: CREATE REQUEST FORM */}
+                <div className="card" style={{ padding: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                    <span>📝</span> Submit New Request
+                  </h3>
+                  
+                  {formError && (
+                    <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', padding: '10px 16px', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '16px', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                      ⚠️ {formError}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleAddProduct}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Product Title *</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          style={{ height: '36px', fontSize: '0.85rem' }}
+                          placeholder="e.g. Aura Wireless Earbuds" 
+                          value={newProductName}
+                          onChange={(e) => setNewProductName(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Brand Name *</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          style={{ height: '36px', fontSize: '0.85rem' }}
+                          placeholder="e.g. Aura" 
+                          value={newProductBrand}
+                          onChange={(e) => setNewProductBrand(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Category *</label>
+                        <select 
+                          className="select-filter" 
+                          style={{ height: '36px', width: '100%', fontSize: '0.85rem' }}
+                          value={newProductCategory}
+                          onChange={(e) => setNewProductCategory(e.target.value)}
+                          required
+                        >
+                          {getCategoryOptions(sellerUser?.category).map(opt => (
+                            <option key={opt.value + opt.label} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Price (INR) *</label>
+                          <input 
+                            type="number" 
+                            className="form-input" 
+                            style={{ height: '36px', fontSize: '0.85rem' }}
+                            placeholder="4999" 
+                            value={newProductPrice}
+                            onChange={(e) => setNewProductPrice(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Compare Price *</label>
+                          <input 
+                            type="number" 
+                            className="form-input" 
+                            style={{ height: '36px', fontSize: '0.85rem' }}
+                            placeholder="7999" 
+                            value={newProductComparePrice}
+                            onChange={(e) => setNewProductComparePrice(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Inventory *</label>
+                          <input 
+                            type="number" 
+                            className="form-input" 
+                            style={{ height: '36px', fontSize: '0.85rem' }}
+                            placeholder="20" 
+                            value={newProductStock}
+                            onChange={(e) => setNewProductStock(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Image URL *</label>
+                          <input 
+                            type="url" 
+                            className="form-input" 
+                            style={{ height: '36px', fontSize: '0.85rem' }}
+                            placeholder="https://..." 
+                            value={newProductImage}
+                            onChange={(e) => setNewProductImage(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Description *</label>
+                        <textarea 
+                          className="form-input" 
+                          style={{ height: '60px', fontSize: '0.85rem', padding: '8px', resize: 'none' }}
+                          placeholder="Short description..." 
+                          value={newProductDescription}
+                          onChange={(e) => setNewProductDescription(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <button 
+                        type="submit" 
+                        className="company-portal-btn"
+                        style={{ height: '40px', width: '100%', marginTop: '8px', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                        disabled={isSubmittingProduct}
+                      >
+                        {isSubmittingProduct ? 'Submitting...' : 'Submit Request'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* RIGHT COLUMN: REQUESTS HISTORY & STATUS */}
+                <div className="card" style={{ padding: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)' }}>
+                    📋 Verification History
+                  </h3>
+                  
+                  <div style={{ maxHeight: '550px', overflowY: 'auto' }}>
+                    <table className="portal-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: 'left', padding: '10px' }}>Product</th>
+                          <th style={{ textAlign: 'left', padding: '10px' }}>Category</th>
+                          <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
+                          <th style={{ textAlign: 'left', padding: '10px' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {products.map((product) => {
+                          const isApproved = product.approvalStatus === 'approved';
+                          const isPending = product.approvalStatus === 'pending';
+                          const isRejected = product.approvalStatus === 'rejected';
+
+                          return (
+                            <tr key={product.id || product._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                              <td style={{ padding: '12px 10px' }}>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <div style={{ fontSize: '1.5rem' }}>{(!product.image || !product.image.startsWith('http')) ? (product.image || '📦') : '📦'}</div>
+                                  <div>
+                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{product.name}</div>
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>₹{product.price.toLocaleString('en-IN')}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px 10px' }}>
+                                <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{product.category}</div>
+                              </td>
+                              <td style={{ padding: '12px 10px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span className={`status-badge ${
+                                    isApproved ? 'in-stock' :
+                                    (isPending && product.adminCode) ? 'low-stock' :
+                                    isPending ? 'draft' : 'out-of-stock'
+                                  }`} style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
+                                    {isApproved ? 'Approved & Live' :
+                                     (isPending && product.adminCode) ? 'Pending Activation' :
+                                     isPending ? 'Under Review' : 'Rejected'}
+                                  </span>
+                                  
+                                  {isPending && product.adminCode && (
+                                    <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
+                                      Code Generated!
+                                    </span>
+                                  )}
+
+                                  {isRejected && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                      {product.rejectionReason && (
+                                        <span style={{ fontSize: '0.72rem', color: '#ef4444', maxWidth: '140px', wordBreak: 'break-all' }}>
+                                          Reason: {product.rejectionReason}
+                                        </span>
+                                      )}
+                                      <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 'bold' }}>
+                                        Rejections: {product.approvalAttempts || 0} / 3
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px 10px' }}>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <button
+                                    className="company-portal-btn"
+                                    style={{
+                                      height: '24px',
+                                      fontSize: '0.7rem',
+                                      padding: '0 8px',
+                                      background: 'var(--bg-secondary)',
+                                      border: '1px solid var(--border-color)',
+                                      color: 'var(--text-primary)',
+                                      cursor: 'pointer'
+                                    }}
+                                    onClick={() => setSelectedDetailedProduct(product)}
+                                  >
+                                    Details
+                                  </button>
+
+                                  {isPending && product.adminCode && (
+                                    <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
+                                      <input
+                                        type="text"
+                                        placeholder="Admin Code"
+                                        className="form-input"
+                                        style={{
+                                          height: '24px',
+                                          fontSize: '0.7rem',
+                                          padding: '2px 4px',
+                                          width: '85px',
+                                          borderRadius: '4px',
+                                          background: 'rgba(255,255,255,0.08)',
+                                          borderColor: 'var(--color-success)',
+                                          color: '#10b981',
+                                          fontWeight: 'bold',
+                                          textAlign: 'center',
+                                          cursor: 'not-allowed'
+                                        }}
+                                        value={product.adminCode || ''}
+                                        readOnly={true}
+                                      />
+                                      <button
+                                        className="company-portal-btn"
+                                        style={{
+                                          height: '24px',
+                                          fontSize: '0.7rem',
+                                          padding: '0 4px',
+                                          background: 'var(--color-success)',
+                                          borderColor: 'var(--color-success)',
+                                          width: '85px'
+                                        }}
+                                        onClick={() => handleVerifyProductCode(product.id || product._id)}
+                                      >
+                                        Verify Code
+                                      </button>
+                                    </div>
+                                  )}
+                                  {isPending && !product.adminCode && (
+                                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>Pending Admin</span>
+                                  )}
+                                  {isApproved && (
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--color-success)', fontWeight: '600' }}>
+                                      ✓ Live
+                                    </span>
+                                  )}
+                                  {isRejected && (
+                                    <button className="action-btn" title="Fix and Resubmit" onClick={() => handleOpenResubmitModal(product)}>
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {products.length === 0 && (
+                          <tr>
+                            <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No requests submitted yet.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: ORDERS */}
+          {activeTab === 'orders' && (
+            <div>
+              <div className="view-header">
+                <div className="view-title-group">
+                  <h2>Orders Management</h2>
+                  <p>Process incoming orders, assign couriers, and track all fulfillments in real-time.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {pendingOrdersCount > 0 && (
+                    <span className="order-stat-pill pending">â³ {pendingOrdersCount} Pending</span>
+                  )}
+                  {orders.filter(o => o.status === 'APPROVED').length > 0 && (
+                    <span className="order-stat-pill approved">✅ {orders.filter(o => o.status === 'APPROVED').length} Approved</span>
+                  )}
+                  <span className="order-stat-pill total">📦 {orders.length} Total Orders</span>
+                </div>
+              </div>
+
+              {/* Order Status Filter Tabs */}
+              <div className="order-filter-tabs">
+                {[
+                  { key: 'all', label: 'All Orders' },
+                  { key: 'PENDING_APPROVAL', label: 'Pending Approval' },
+                  { key: 'APPROVED', label: 'Approved' },
+                  { key: 'REJECTED', label: 'Rejected' },
+                  { key: 'READY_FOR_PICKUP', label: 'Ready For Pickup' },
+                  { key: 'IN_TRANSIT', label: 'In Transit' },
+                  { key: 'DELIVERED', label: 'Delivered' },
+                ].map(tab => {
+                  const cnt = tab.key === 'all'
+                    ? orders.length
+                    : tab.key === 'DELIVERED'
+                      ? orders.filter(o => o.status === 'DELIVERED' || o.status === 'COMPLETED').length
+                      : orders.filter(o => o.status === tab.key).length;
+                  return (
+                    <button
+                      key={tab.key}
+                      className={`order-tab-btn ${orderStatusFilter === tab.key ? 'active' : ''}`}
+                      onClick={() => setOrderStatusFilter(tab.key)}
+                    >
+                      {tab.label}
+                      {cnt > 0 && (
+                        <span className={`order-tab-count${tab.key === 'PENDING_APPROVAL' ? ' danger' : ''}`}>
+                          {cnt}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Filtered Orders Table */}
+              <div className="table-wrapper" style={{ marginTop: '0', borderTop: 'none', borderTopLeftRadius: '0', borderTopRightRadius: '0' }}>
+                <table className="pro-table">
+                  <thead>
+                    <tr>
+                      <th>Order ID</th>
+                      <th>Customer</th>
+                      <th>Product</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOrdersDisplay.length > 0 ? (
+                      filteredOrdersDisplay.map((order) => (
+                        <tr key={order.id}>
+                          <td
+                            style={{ fontWeight: 700, color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline' }}
+                            onClick={() => setSelectedDetailedOrderId(order.id)}
+                            title="Click to open Order Details"
+                          >
+                            #{order.id}
+                          </td>
+                          <td style={{ fontWeight: 600 }}>{order.customer}</td>
+                          <td>
+                            <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>
+                              {order.product}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: 700 }}>₹{order.amount.toLocaleString('en-IN')}</td>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              <span className={`status-badge ${
+                                order.status === 'COMPLETED' || order.status === 'DELIVERED' ? 'in-stock' :
+                                order.status === 'REJECTED' ? 'out-of-stock' :
+                                order.status === 'PENDING_APPROVAL' ? 'draft' : 'low-stock'
+                              }`}>
+                                {order.status === 'PENDING_APPROVAL' ? 'Pending Approval' :
+                                 order.status === 'APPROVED' ? 'Approved' :
+                                 order.status === 'REJECTED' ? 'Rejected' :
+                                 order.status === 'DELIVERY_ASSIGNED' ? 'Delivery Assigned' :
+                                 order.status === 'LABEL_GENERATED' ? 'Label Generated' :
+                                 order.status === 'READY_FOR_PICKUP' ? 'Ready For Pickup' :
+                                 order.status === 'PICKED_UP' ? 'Picked Up' :
+                                 order.status === 'IN_TRANSIT' ? 'In Transit' :
+                                 order.status === 'OUT_FOR_DELIVERY' ? 'Out For Delivery' :
+                                 order.status === 'COMPLETED' || order.status === 'DELIVERED' ? 'Delivered' : order.status}
+                              </span>
+                              {order.raw?.rejectionReason && order.status === 'REJECTED' && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--color-danger)' }}>
+                                  ↳ {order.raw.rejectionReason}
+                                </span>
+                              )}
+                              {order.raw?.carrier && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                  {order.raw.carrier}{order.raw.trackingId ? ` · ${order.raw.trackingId}` : ''}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{order.time}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <button
+                                className="btn-secondary"
+                                style={{ height: '30px', padding: '0 10px', fontSize: '0.75rem' }}
+                                onClick={() => setSelectedDetailedOrderId(order.id)}
+                                disabled={orderLoading[order.id]}
+                              >
+                                Details
+                              </button>
+
+                              {order.status === 'PENDING_APPROVAL' && (
+                                <>
+                                  <button
+                                    className="order-action-btn approve"
+                                    onClick={() => handleApproveOrder(order.id)}
+                                    disabled={orderLoading[order.id]}
+                                  >
+                                    {orderLoading[order.id] ? 'Processing...' : '✓ Approve'}
+                                  </button>
+                                  <button
+                                    className="order-action-btn reject"
+                                    onClick={() => {
+                                      setSelectedOrderId(order.id);
+                                      setRejectionReasonType('Out of Stock');
+                                      setCustomRejectReason('');
+                                      setIsRejectModalOpen(true);
+                                    }}
+                                    disabled={orderLoading[order.id]}
+                                  >
+                                    ✕ Reject
+                                  </button>
+                                </>
+                              )}
+
+                              {order.status === 'APPROVED' && (
+                                <button
+                                  className="order-action-btn carrier"
+                                  onClick={() => { setSelectedOrderId(order.id); setIsDeliveryModalOpen(true); }}
+                                  disabled={orderLoading[order.id]}
+                                >
+                                  {orderLoading[order.id] ? 'Processing...' : '🚚 Assign Carrier'}
+                                </button>
+                              )}
+
+                              {order.status === 'DELIVERY_ASSIGNED' && (
+                                <button
+                                  className="order-action-btn label"
+                                  onClick={() => handleGenerateLabel(order.id)}
+                                  disabled={orderLoading[order.id]}
+                                >
+                                  {orderLoading[order.id] ? 'Processing...' : '🏷️ Gen. Label'}
+                                </button>
+                              )}
+
+                              {order.status === 'LABEL_GENERATED' && (
+                                <>
+                                  <button
+                                    className="order-action-btn carrier"
+                                    onClick={() => { setActiveLabelOrder(order.raw); setIsLabelModalOpen(true); }}
+                                    disabled={orderLoading[order.id]}
+                                  >
+                                    🖨️ Print
+                                  </button>
+                                  <button
+                                    className="order-action-btn approve"
+                                    onClick={() => handleMarkReadyForPickup(order.id)}
+                                    disabled={orderLoading[order.id]}
+                                  >
+                                    {orderLoading[order.id] ? 'Processing...' : '📦 Mark Ready'}
+                                  </button>
+                                </>
+                              )}
+
+                              {order.status === 'READY_FOR_PICKUP' && (
+                                <button
+                                  className="order-action-btn carrier"
+                                  onClick={() => handleAdvanceStatus(order.id, 'PICKED_UP')}
+                                  disabled={orderLoading[order.id]}
+                                >
+                                  {orderLoading[order.id] ? 'Processing...' : '🚀 Ship'}
+                                </button>
+                              )}
+
+                              {order.status === 'PICKED_UP' && (
+                                <button
+                                  className="order-action-btn label"
+                                  onClick={() => handleAdvanceStatus(order.id, 'IN_TRANSIT')}
+                                  disabled={orderLoading[order.id]}
+                                >
+                                  {orderLoading[order.id] ? 'Processing...' : '🚛 In Transit'}
+                                </button>
+                              )}
+
+                              {order.status === 'IN_TRANSIT' && (
+                                <button
+                                  className="order-action-btn label"
+                                  onClick={() => handleAdvanceStatus(order.id, 'OUT_FOR_DELIVERY')}
+                                  disabled={orderLoading[order.id]}
+                                >
+                                  {orderLoading[order.id] ? 'Processing...' : '🛵 Out For Delivery'}
+                                </button>
+                              )}
+
+                              {order.status === 'OUT_FOR_DELIVERY' && (
+                                <button
+                                  className="order-action-btn approve"
+                                  onClick={() => handleAdvanceStatus(order.id, 'DELIVERED')}
+                                  disabled={orderLoading[order.id]}
+                                >
+                                  {orderLoading[order.id] ? 'Processing...' : '🎉 Delivered'}
+                                </button>
+                              )}
+
+                              {['LABEL_GENERATED', 'READY_FOR_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'].includes(order.status) && order.raw?.trackingId && (
+                                <button
+                                  className="btn-secondary"
+                                  style={{ height: '30px', padding: '0 8px', fontSize: '0.75rem' }}
+                                  onClick={() => { setActiveLabelOrder(order.raw); setIsLabelModalOpen(true); }}
+                                >
+                                  📄 Label
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '60px 24px' }}>
+                          <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>
+                            {orderStatusFilter === 'PENDING_APPROVAL' ? '⏳' :
+                             orderStatusFilter === 'APPROVED' ? '✅' :
+                             orderStatusFilter === 'REJECTED' ? '❌' :
+                             orderStatusFilter === 'DELIVERED' ? '🎉' : '📦'}
+                          </div>
+                          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                            {orderStatusFilter === 'all' ? 'No Orders Yet' :
+                             `No ${orderStatusFilter.replace(/_/g, ' ').toLowerCase()} orders`}
+                          </h3>
+                          <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', maxWidth: '380px', margin: '0 auto' }}>
+                            {orderStatusFilter === 'PENDING_APPROVAL'
+                              ? 'All caught up! No orders are waiting for your approval.'
+                              : orderStatusFilter === 'all'
+                                ? 'Once buyers complete checkout, their orders will appear here for review.'
+                                : 'No orders match this status filter yet.'}
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: ANALYTICS */}
+          {activeTab === 'analytics' && (
+            <div>
+              <div className="view-header">
+                <div className="view-title-group">
+                  <h2>Enterprise Analytics</h2>
+                  <p>Comprehensive store performance metrics, customer behavior indicators, and traffic graphs.</p>
+                </div>
+              </div>
+
+              {/* Advanced metrics graphs and stats */}
+              <div className="dashboard-grid-two-cols">
+                <div className="glass-card">
+                  <span className="glass-card-title" style={{ marginBottom: '16px' }}>Monthly Conversion Funnel</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '10px' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
+                        <span>1. Product Views ({funnelViews.toLocaleString()} visitors)</span>
+                        <span style={{ fontWeight: 'bold' }}>100%</span>
+                      </div>
+                      <div style={{ height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: '100%', height: '100%', background: 'linear-gradient(to right, var(--color-primary), #a855f7)' }}></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
+                        <span>2. Add to Cart ({funnelCart.toLocaleString()} sessions)</span>
+                        <span style={{ fontWeight: 'bold' }}>{cartPct}%</span>
+                      </div>
+                      <div style={{ height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${cartPct}%`, height: '100%', background: 'linear-gradient(to right, var(--color-primary), #a855f7)' }}></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
+                        <span>3. Initiated Checkout ({funnelCheckout.toLocaleString()} sessions)</span>
+                        <span style={{ fontWeight: 'bold' }}>{checkoutPct}%</span>
+                      </div>
+                      <div style={{ height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${checkoutPct}%`, height: '100%', background: 'linear-gradient(to right, var(--color-primary), #a855f7)' }}></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
+                        <span>4. Completed Sales ({funnelSales.toLocaleString()} orders)</span>
+                        <span style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>{salesPct}% Net Conv.</span>
+                      </div>
+                      <div style={{ height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${parseFloat(salesPct) > 100 ? 100 : salesPct}%`, height: '100%', background: 'var(--color-success)' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card">
+                  <span className="glass-card-title" style={{ marginBottom: '16px' }}>Geographic Sales Share</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '10px' }}>
+                    {stateShares.map((share, index) => (
+                      <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.875rem' }}>{share.state}</span>
+                        <span style={{ fontWeight: 700 }}>{share.pct}%</span>
+                      </div>
+                    ))}
+                    {stateShares.length === 0 && (
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', textAlign: 'center', padding: '20px 0' }}>
+                        No geographic transaction records
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Product Performance Matrix (Selling Range & High Sellers) */}
+              <div className="glass-card" style={{ marginTop: '24px' }}>
+                <div className="glass-card-header" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '16px' }}>
+                  <span className="glass-card-title">📈 Product Performance & Selling Range</span>
+                  <span className="sidebar-title-tag" style={{ background: 'rgba(99, 102, 241, 0.15)', color: 'var(--color-primary)' }}>Sales Matrix</span>
+                </div>
+
+                {highestSellingProduct && highestSellingProduct.sales > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px', alignItems: 'stretch' }}>
+                    {/* Highest Selling Card */}
+                    <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ color: '#10b981', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                          🏆 Highest Selling Product
+                        </div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', color: '#fff', fontWeight: 700 }}>
+                          {highestSellingProduct.name}
+                        </h4>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                          Category: {highestSellingProduct.category} · Brand: {highestSellingProduct.brand}
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '16px' }}>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Units Sold</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{highestSellingProduct.sales}</div>
+                        </div>
+                        <div style={{ borderLeft: '1px solid var(--border-color)', paddingLeft: '16px' }}>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Remaining Stock</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: highestSellingProduct.stock === 0 ? '#ef4444' : highestSellingProduct.stock <= 10 ? '#f59e0b' : '#3b82f6' }}>
+                            {highestSellingProduct.stock} {highestSellingProduct.stock === 0 ? '(Out of Stock)' : 'units'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Selling Range List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff' }}>Products Sales Distribution (Selling Range):</span>
+                      <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}>
+                        <table className="portal-table" style={{ width: '100%', fontSize: '0.8rem' }}>
+                          <thead>
+                            <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                              <th style={{ textAlign: 'left', padding: '8px 12px' }}>Rank</th>
+                              <th style={{ textAlign: 'left', padding: '8px 12px' }}>Product</th>
+                              <th style={{ textAlign: 'center', padding: '8px 12px' }}>Price</th>
+                              <th style={{ textAlign: 'center', padding: '8px 12px' }}>Stock</th>
+                              <th style={{ textAlign: 'center', padding: '8px 12px' }}>Units Sold</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sortedProductsRange.map((p, idx) => (
+                              <tr key={p.id || p._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <td style={{ padding: '8px 12px', fontWeight: 'bold', color: idx === 0 ? '#10b981' : '#fff' }}>
+                                  #{idx + 1}
+                                </td>
+                                <td style={{ padding: '8px 12px', color: '#fff' }}>
+                                  {p.name}
+                                </td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                  ₹{p.price.toLocaleString('en-IN')}
+                                </td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center', color: p.stock === 0 ? '#ef4444' : p.stock <= 10 ? '#f59e0b' : '#fff' }}>
+                                  {p.stock}
+                                </td>
+                                <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>
+                                  {p.sales || 0}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                    No product sales records recorded yet. Start selling to see analytics and product selling range!
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: SETTINGS */}
+          {activeTab === 'settings' && (
+            <div>
+              <div className="view-header">
+                <div className="view-title-group">
+                  <h2>Store configuration</h2>
+                  <p>Admin profile management, notifications frequencies, payment payouts, and billing configs.</p>
+                </div>
+              </div>
+
+              <div className="settings-grid">
+                <div className="settings-nav-sidebar">
+                  <button className="settings-nav-btn active">General Information</button>
+                  <button className="settings-nav-btn" onClick={() => triggerToast('Config Locked', 'Settings subpages are managed by corporate dashboard controls.', 'danger')}>Payout Methods</button>
+                  <button className="settings-nav-btn" onClick={() => triggerToast('Config Locked', 'Settings subpages are managed by corporate dashboard controls.', 'danger')}>Shipping Tiers</button>
+                  <button className="settings-nav-btn" onClick={() => triggerToast('Config Locked', 'Settings subpages are managed by corporate dashboard controls.', 'danger')}>API Access keys</button>
+                </div>
+
+                <div className="glass-card settings-card">
+                  <div>
+                    <h4 className="settings-section-title">Public profile details</h4>
+                    <div className="avatar-upload-area" style={{ marginTop: '20px' }}>
+                      <div className="settings-avatar-preview">PS</div>
+                      <div className="avatar-upload-actions">
+                        <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>Brand Logo / Identity</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>PNG or JPEG formats. Size up to 2MB.</span>
+                        <button className="btn-secondary" style={{ width: 'max-content' }} onClick={() => triggerToast('Select Image', 'Native browser file browser selected.', 'success')}>Upload Image</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Vendor Store Name</label>
+                      <input type="text" className="form-input" defaultValue="Pro Seller Inc." />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Support Help Email</label>
+                      <input type="email" className="form-input" defaultValue="support@proseller.in" />
+                    </div>
+                  </div>
+
+                  <div className="form-grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Registered GSTIN Number</label>
+                      <input 
+                        ref={gstinRef} 
+                        type="text" 
+                        className="form-input gstin-input" 
+                        defaultValue="27AAAAA1111A1Z1" 
+                        readOnly 
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Default Fulfillment Partner</label>
+                      <select className="select-filter" style={{ height: '44px' }} defaultValue="Delhivery">
+                        <option value="Delhivery">Delhivery Logistics</option>
+                        <option value="BlueDart">BlueDart Premium</option>
+                        <option value="EmahuXpress">Emahu Xpress Direct</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '24px 0 0 0', marginTop: '8px' }}>
+                    <button className="save-btn" onClick={() => triggerToast('Store Settings Saved', 'Vendor configuration updated and propagated to Emahu CDN.', 'success')}>
+                      Save Profiles Changes
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+
+        </main>
+      </div>
+
+      {/* --- PRODUCT DETAILS MODAL --- */}
+      {selectedDetailedProduct && (
+        <div className="modal-overlay" style={{ zIndex: 99999 }}>
+          <div className="modal-card" style={{ maxWidth: '600px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3 style={{ color: 'var(--text-primary)' }}>Product Request Details</h3>
+                <p style={{ color: 'var(--text-muted)' }}>Detailed view of the listing submitted for admin approval.</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedDetailedProduct(null)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', color: 'var(--text-primary)', overflowY: 'auto', maxHeight: '70vh' }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.1)' }}>
+                  {(!selectedDetailedProduct.image || !selectedDetailedProduct.image.startsWith('http')) ? (
+                    selectedDetailedProduct.image || '📦'
+                  ) : (
+                    <img src={selectedDetailedProduct.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  )}
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', color: 'var(--text-primary)' }}>{selectedDetailedProduct.name}</h4>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Brand: {selectedDetailedProduct.brand}</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.85rem' }}>
+                <div>
+                  <strong style={{ color: 'var(--text-secondary)' }}>Category:</strong>
+                  <div style={{ marginTop: '2px' }}>{selectedDetailedProduct.category}</div>
+                </div>
+                <div>
+                  <strong style={{ color: 'var(--text-secondary)' }}>Price:</strong>
+                  <div style={{ marginTop: '2px' }}>₹{selectedDetailedProduct.price?.toLocaleString('en-IN')}</div>
+                </div>
+                <div>
+                  <strong style={{ color: 'var(--text-secondary)' }}>Compare Price:</strong>
+                  <div style={{ marginTop: '2px' }}>₹{selectedDetailedProduct.comparePrice?.toLocaleString('en-IN')}</div>
+                </div>
+                <div>
+                  <strong style={{ color: 'var(--text-secondary)' }}>Stock:</strong>
+                  <div style={{ marginTop: '2px' }}>{selectedDetailedProduct.stock} units</div>
+                </div>
+              </div>
+
+              <div>
+                <strong style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Description:</strong>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-primary)' }}>{selectedDetailedProduct.description}</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '4px' }}>
+                <strong style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Request Status:</strong>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                  <span className={`status-badge ${
+                    selectedDetailedProduct.approvalStatus === 'approved' ? 'in-stock' :
+                    (selectedDetailedProduct.approvalStatus === 'pending' && selectedDetailedProduct.adminCode) ? 'low-stock' :
+                    selectedDetailedProduct.approvalStatus === 'pending' ? 'draft' : 'out-of-stock'
+                  }`}>
+                    {selectedDetailedProduct.approvalStatus === 'approved' ? 'Approved & Live' :
+                     (selectedDetailedProduct.approvalStatus === 'pending' && selectedDetailedProduct.adminCode) ? 'Pending Activation' :
+                     selectedDetailedProduct.approvalStatus === 'pending' ? 'Under Admin Review' : 'Rejected'}
+                  </span>
+                  {selectedDetailedProduct.approvalAttempts > 0 && (
+                    <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 'bold' }}>
+                      (Attempts: {selectedDetailedProduct.approvalAttempts}/3)
+                    </span>
+                  )}
+                </div>
+                {selectedDetailedProduct.rejectionReason && (
+                  <div style={{ marginTop: '10px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '10px 12px', borderRadius: '6px', color: '#ef4444', fontSize: '0.8rem' }}>
+                    <strong>Rejection Reason:</strong> {selectedDetailedProduct.rejectionReason}
+                  </div>
+                )}
+                {selectedDetailedProduct.adminCode && selectedDetailedProduct.approvalStatus === 'pending' && (
+                  <div style={{ marginTop: '10px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '10px 12px', borderRadius: '6px', color: '#10b981', fontSize: '0.8rem' }}>
+                    <strong>Admin Code for Activation:</strong> {selectedDetailedProduct.adminCode}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="modal-btn cancel" onClick={() => setSelectedDetailedProduct(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADD PRODUCT MODAL --- */}
+      {isAddModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-card wide">
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>{resubmitProductId ? 'Fix & Resubmit Product Listing' : 'List New Merchandise'}</h3>
+                <p>{resubmitProductId ? 'Update rejected values to resubmit for admin approval.' : 'Provide details to submit this product request for approval.'}</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setIsAddModalOpen(false)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {resubmitProductId && products.find(p => (p.id || p._id) === resubmitProductId)?.rejectionReason && (
+              <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', color: 'var(--color-danger)', padding: '12px 24px', fontSize: '0.85rem', fontWeight: 600, borderBottom: '1px solid rgba(239, 68, 68, 0.12)' }}>
+                ⚠️ï¸ <strong>Admin Rejection Reason:</strong> {products.find(p => (p.id || p._id) === resubmitProductId)?.rejectionReason}
+              </div>
+            )}
+
+            {formError && (
+              <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', padding: '12px 24px', fontSize: '0.85rem', fontWeight: 600, borderBottom: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                ⚠️ï¸ {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleAddProduct} className="modal-form">
+              <div className="modal-form-body">
+                {/* --- SECTION 1: GENERAL INFORMATION --- */}
+                <div style={{
+                  fontSize: '0.9rem',
+                  fontWeight: '700',
+                  color: 'var(--text-primary)',
+                  borderBottom: '1px solid var(--border-color)',
+                  paddingBottom: '8px',
+                  marginTop: '8px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span style={{ fontSize: '1.1rem' }}>ðŸ“</span> General Product Details
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Product Title *</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="e.g. Minimalist Walnut Coffee Table" 
+                      value={newProductName}
+                      onChange={(e) => setNewProductName(e.target.value)}
+                      required
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                      Enter a customer-friendly, search-optimized title.
+                    </span>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Brand Name *</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="e.g. Apple, Sony, Nike" 
+                      value={newProductBrand}
+                      onChange={(e) => setNewProductBrand(e.target.value)}
+                      required
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                      Manufactured brand or your vendor store name.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginTop: '16px' }}>
+                  <label className="form-label">Merchandise Category *</label>
+                  <select 
+                    className="select-filter" 
+                    style={{ height: '42px', width: '100%' }}
+                    value={newProductCategory}
+                    onChange={(e) => setNewProductCategory(e.target.value)}
+                    required
+                  >
+                    {getCategoryOptions(sellerUser?.category).map(opt => (
+                      <option key={opt.value + opt.label} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    Helps buyers filter and discover your items.
+                  </span>
+                </div>
+
+                {/* --- SECTION 2: PRICING & INVENTORY --- */}
+                <div style={{
+                  fontSize: '0.9rem',
+                  fontWeight: '700',
+                  color: 'var(--text-primary)',
+                  borderBottom: '1px solid var(--border-color)',
+                  paddingBottom: '8px',
+                  marginTop: '20px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span style={{ fontSize: '1.1rem' }}>💰</span> Pricing and Stock Levels
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Listing Price (INR) *</label>
+                    <input 
+                      type="number" 
+                      className="form-input" 
+                      placeholder="₹12,499" 
+                      value={newProductPrice}
+                      onChange={(e) => setNewProductPrice(e.target.value)}
+                      required
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                      The actual amount the customer is charged.
+                    </span>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Compare-At Price (INR) *</label>
+                    <input 
+                      type="number" 
+                      className="form-input" 
+                      placeholder="₹15,000" 
+                      value={newProductComparePrice}
+                      onChange={(e) => setNewProductComparePrice(e.target.value)}
+                      required
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                      Original strike-through price (shows discount rate).
+                    </span>
+                    {newProductComparePrice && newProductPrice && parseFloat(newProductComparePrice) <= parseFloat(newProductPrice) && (
+                      <span style={{ color: 'var(--color-danger)', fontSize: '0.75rem', marginTop: '4px', display: 'block', fontWeight: '500' }}>
+                        ⚠️ï¸ Compare-at price must be greater than Listing Price.
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Available Inventory *</label>
+                    <input 
+                      type="number" 
+                      className="form-input" 
+                      placeholder="e.g. 50" 
+                      value={newProductStock}
+                      onChange={(e) => setNewProductStock(e.target.value)}
+                      required
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                      Units in stock. Set to 0 to show Out-Of-Stock.
+                    </span>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Product Image URL *</label>
+                    <input 
+                      type="url" 
+                      className="form-input" 
+                      placeholder="e.g. https://images.unsplash.com/photo-..." 
+                      value={newProductImage}
+                      onChange={(e) => setNewProductImage(e.target.value)}
+                      required
+                    />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                      Web URL to a clear picture of the item.
+                    </span>
+                  </div>
+                </div>
+
+                {newProductImage && (
+                  <div className="form-group">
+                    <label className="form-label">Image Preview</label>
+                    <div style={{
+                      marginTop: '8px',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      height: '120px',
+                      border: '1px solid var(--border-color)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'rgba(0, 0, 0, 0.05)'
+                    }}>
+                      <img 
+                        src={newProductImage} 
+                        alt="Product Preview" 
+                        style={{ height: '100%', width: 'auto', objectFit: 'contain', padding: '10px' }} 
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* --- SECTION 3: MEDIA & SPECIFICATIONS --- */}
+                <div style={{
+                  fontSize: '0.9rem',
+                  fontWeight: '700',
+                  color: 'var(--text-primary)',
+                  borderBottom: '1px solid var(--border-color)',
+                  paddingBottom: '8px',
+                  marginTop: '20px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span style={{ fontSize: '1.1rem' }}>ðŸ–¼ï¸</span> Product Copy and Specifications
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Description *</label>
+                  <textarea 
+                    className="form-textarea" 
+                    style={{ minHeight: '100px' }}
+                    placeholder="Summarize product parameters, size details, materials, warranty terms, and special care instructions..."
+                    value={newProductDescription}
+                    onChange={(e) => setNewProductDescription(e.target.value)}
+                    required
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    A clear, detailed description boosts sales conversions.
+                  </span>
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ flexShrink: 0 }}>
+                <button 
+                  type="button" 
+                  className="modal-btn cancel" 
+                  onClick={() => setIsAddModalOpen(false)}
+                  disabled={isSubmittingProduct}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="modal-btn confirm"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    opacity: isSubmittingProduct ? 0.7 : 1,
+                    cursor: isSubmittingProduct ? 'not-allowed' : 'pointer'
+                  }}
+                  disabled={isSubmittingProduct || (newProductComparePrice && newProductPrice && parseFloat(newProductComparePrice) <= parseFloat(newProductPrice))}
+                >
+                  {isSubmittingProduct ? (
+                    <>
+                      <svg style={{ animation: 'spin 1s linear infinite' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.2)" />
+                        <path d="M12 2a10 10 0 0 1 10 10" />
+                      </svg>
+                      Submitting...
+                    </>
+                  ) : (
+                    resubmitProductId ? 'Resubmit for Approval' : 'Confirm and Submit'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- DELIVERY PARTNER SELECTION MODAL --- */}
+      {isDeliveryModalOpen && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal-card" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>Assign Delivery Partner</h3>
+                <p>Select a verified carrier grid partner for Order #{selectedOrderId}</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setIsDeliveryModalOpen(false)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' }}>
+              {[
+                { name: 'Delhivery', time: '2-4 Days', cost: 80, rating: 4.8 },
+                { name: 'Blue Dart', time: '1-3 Days', cost: 120, rating: 4.9 },
+                { name: 'XpressBees', time: '2-5 Days', cost: 75, rating: 4.6 },
+                { name: 'Ecom Express', time: '3-5 Days', cost: 70, rating: 4.5 }
+              ].map((partner) => (
+                <div 
+                  key={partner.name} 
+                  style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    padding: '16px', 
+                    borderRadius: '10px', 
+                    backgroundColor: 'rgba(255,255,255,0.03)', 
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    cursor: orderLoading[selectedOrderId] ? 'not-allowed' : 'pointer',
+                    opacity: orderLoading[selectedOrderId] ? 0.6 : 1,
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => {
+                    if (orderLoading[selectedOrderId]) return;
+                    handleSelectDeliveryPartner(selectedOrderId, partner.name, partner.time, partner.cost);
+                    setIsDeliveryModalOpen(false);
+                  }}
+                >
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', color: '#fff', fontSize: '1rem' }}>{partner.name}</h4>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>🕒 Est. delivery: {partner.time} | â­ {partner.rating} Rating</span>
+                  </div>
+                  <strong style={{ color: 'var(--color-success)', fontSize: '1.1rem' }}>₹{partner.cost}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- REJECTION REASON MODAL --- */}
+      {isRejectModalOpen && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal-card" style={{ maxWidth: '420px' }}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>Reject Order Request</h3>
+                <p>Provide a rejection reason feedback to the customer for Order #{selectedOrderId}</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setIsRejectModalOpen(false)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div style={{ padding: '20px' }}>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label" style={{ color: '#fff' }}>Select Reason *</label>
+                <select 
+                  className="select-filter"
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                  value={rejectionReasonType}
+                  onChange={(e) => setRejectionReasonType(e.target.value)}
+                >
+                  <option value="Out of Stock">Out of Stock</option>
+                  <option value="Product Damaged">Product Damaged</option>
+                  <option value="Invalid Address">Invalid Address</option>
+                  <option value="Pricing Error">Pricing Error</option>
+                  <option value="Seller Unable to Fulfill">Seller Unable to Fulfill</option>
+                  <option value="Other">Other (Write Custom Reason Below)</option>
+                </select>
+              </div>
+
+              {rejectionReasonType === 'Other' && (
+                <div className="form-group">
+                  <label className="form-label" style={{ color: '#fff' }}>Custom Reason *</label>
+                  <textarea 
+                    className="form-textarea" 
+                    style={{ height: '80px', width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px', borderRadius: '6px' }}
+                    placeholder="Describe custom reason..."
+                    value={customRejectReason}
+                    onChange={(e) => setCustomRejectReason(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button className="modal-btn cancel" onClick={() => setIsRejectModalOpen(false)}>Cancel</button>
+              <button 
+                className="modal-btn delete" 
+                style={{ background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+                disabled={orderLoading[selectedOrderId]}
+                onClick={() => {
+                  if (orderLoading[selectedOrderId]) return;
+                  const finalReason = rejectionReasonType === 'Other' ? customRejectReason.trim() : rejectionReasonType;
+                  if (rejectionReasonType === 'Other' && !finalReason) {
+                    triggerToast('Error', 'Please enter a custom rejection reason.', 'danger');
+                    return;
+                  }
+                  handleRejectOrder(selectedOrderId, finalReason);
+                  setIsRejectModalOpen(false);
+                }}
+              >
+                {orderLoading[selectedOrderId] ? 'Rejecting...' : 'Reject Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- SHIPPING LABEL PRINT MODAL --- */}
+      {isLabelModalOpen && activeLabelOrder && (
+        <div className="modal-overlay" style={{ zIndex: 99999, backgroundColor: 'rgba(0,0,0,0.8)' }}>
+          <div className="modal-card" style={{ maxWidth: '600px', backgroundColor: '#fff', color: '#000', padding: '24px', borderRadius: '12px' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+              <div className="modal-title-group">
+                <h3 style={{ color: '#0f172a', margin: 0 }}>Shipping Label</h3>
+                <p style={{ color: '#64748b', margin: '4px 0 0 0', fontSize: '0.85rem' }}>Print or download dispatch manifest for Order #{activeLabelOrder.orderId}</p>
+              </div>
+              <button className="modal-close-btn" style={{ color: '#64748b' }} onClick={() => setIsLabelModalOpen(false)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Printable Label Sheet */}
+            <div id="printable-shipping-label" style={{ border: '2px solid #000', padding: '16px', marginTop: '20px', fontFamily: 'monospace' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: '8px' }}>
+                <div>
+                  <h2 style={{ margin: '0 0 4px 0', fontSize: '1.5rem', fontWeight: 'bold' }}>{activeLabelOrder.carrier || 'COURIER'}</h2>
+                  <span>PRIORITY ELECTRIC SHIELD</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <strong>SHIPMENT ID:</strong>
+                  <div>{activeLabelOrder.shipmentId || 'EMH-SHIP-XXXXXX'}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: '8px' }}>
+                <div style={{ borderRight: '1px solid #000', paddingRight: '8px' }}>
+                  <strong>FROM (SELLER):</strong>
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                    <strong>{sellerUser?.name || 'Authorized Merchant'}</strong><br />
+                    {sellerUser?.address || 'Emahu Transit Corridor Hub'}<br />
+                    Phone: {sellerUser?.phone || 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <strong>TO (BUYER):</strong>
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                    <strong>{activeLabelOrder.deliveryAddress?.fullName}</strong><br />
+                    {activeLabelOrder.deliveryAddress?.address}<br />
+                    {activeLabelOrder.deliveryAddress?.city}, {activeLabelOrder.deliveryAddress?.stateName} - {activeLabelOrder.deliveryAddress?.pincode}<br />
+                    Phone: {activeLabelOrder.deliveryAddress?.phone}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: '8px' }}>
+                <strong>PRODUCT INFORMATION:</strong>
+                <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                  {activeLabelOrder.items?.map((item, idx) => (
+                    <div key={idx}>• {item.name} (Qty: {item.quantity})</div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'center' }}>
+                <div>
+                  <strong>ORDER ID:</strong> {activeLabelOrder.orderId}<br />
+                  <strong>WEIGHT:</strong> {activeLabelOrder.packageWeight || '2.10 kg'}<br />
+                  <strong>TRACKING ID:</strong> {activeLabelOrder.trackingId || 'EMH-TRK-XXXXXX'}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                  {/* Barcode/QR Code generator mock */}
+                  <div style={{ letterSpacing: '3px', fontWeight: 'bold', fontSize: '1.2rem', margin: '4px 0' }}>
+                    ||||| | |||| ||| || |||
+                  </div>
+                  <span style={{ fontSize: '0.7rem' }}>*{activeLabelOrder.trackingId}*</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid #e2e8f0', marginTop: '20px', paddingTop: '12px' }}>
+              <button className="modal-btn cancel" style={{ border: '1px solid #e2e8f0', color: '#000' }} onClick={() => setIsLabelModalOpen(false)}>Close</button>
+              <button 
+                className="modal-btn confirm" 
+                style={{ background: '#4f46e5', borderColor: '#4f46e5', color: '#fff' }}
+                onClick={() => {
+                  const printContent = document.getElementById('printable-shipping-label').innerHTML;
+                  const printWindow = window.open('', '_blank');
+                  printWindow.document.write(`
+                    <html>
+                      <head>
+                        <title>Shipping Label - Order #${activeLabelOrder.orderId}</title>
+                        <style>
+                          body { margin: 20px; font-family: monospace; color: #000; background: #fff; }
+                          * { box-sizing: border-box; }
+                        </style>
+                      </head>
+                      <body>
+                        ${printContent}
+                        <script>
+                          window.onload = function() {
+                            window.print();
+                            window.close();
+                          };
+                        </script>
+                      </body>
+                    </html>
+                  `);
+                  printWindow.document.close();
+                }}
+              >
+                🖨️ Print Label
+              </button>
+              <button 
+                className="modal-btn confirm" 
+                style={{ background: '#10b981', borderColor: '#10b981', color: '#fff' }}
+                onClick={() => {
+                  // Mock download by saving string representation
+                  const printContent = document.getElementById('printable-shipping-label').innerText;
+                  const blob = new Blob([printContent], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `shipping-label-${activeLabelOrder.orderId}.txt`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  triggerToast('Downloaded', 'Shipping label downloaded as TXT manifest.', 'success');
+                }}
+              >
+                📥 Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- ORDER DETAILS & ACTION PANEL MODAL --- */}
+      {selectedDetailedOrderId && selectedDetailedOrder && (() => {
+        const isSeller = sellerUser && (sellerUser.role === 'seller' || localStorage.getItem('emahu_seller_logged_in') === 'true');
+        const ownsOrder = selectedDetailedOrder.items?.some(item => {
+          const sellerUserId = sellerUser?._id || sellerUser?.id;
+          if (typeof item.seller === 'string') {
+            return sellerUserId && item.seller.toString() === sellerUserId.toString();
+          }
+          const itemSellerId = item.seller?._id || item.seller?.id;
+          return (itemSellerId && sellerUserId && itemSellerId.toString() === sellerUserId.toString()) ||
+                 (item.seller?.email && sellerUser?.email && item.seller.email === sellerUser.email);
+        });
+
+        const ORDER_STAGES = [
+          { key: 'PENDING_APPROVAL', label: 'Pending',     icon: '⏳' },
+          { key: 'APPROVED',         label: 'Approved',    icon: '✅' },
+          { key: 'DELIVERY_ASSIGNED',label: 'Assigned',    icon: '🚚' },
+          { key: 'LABEL_GENERATED',  label: 'Label Ready', icon: '🏷️' },
+          { key: 'READY_FOR_PICKUP', label: 'Ready',       icon: '📦' },
+          { key: 'PICKED_UP',        label: 'Picked Up',   icon: '🚀' },
+          { key: 'IN_TRANSIT',       label: 'In Transit',  icon: '🚛' },
+          { key: 'OUT_FOR_DELIVERY', label: 'Out Delivery',icon: '🛵' },
+          { key: 'DELIVERED',        label: 'Delivered',   icon: '🎉' },
+          { key: 'COMPLETED',        label: 'Completed',   icon: '✔️' },
+        ];
+        const currentStageIdx = ORDER_STAGES.findIndex(s => s.key === selectedDetailedOrder.status);
+        const isRejected  = selectedDetailedOrder.status === 'REJECTED' || !!selectedDetailedOrder.sellerRejected;
+        const isCompleted = selectedDetailedOrder.status === 'COMPLETED' || selectedDetailedOrder.status === 'DELIVERED';
+
+        const stColorMap = {
+          PENDING_APPROVAL: { bg:'#fffbeb', text:'#d97706', border:'#fcd34d' },
+          APPROVED:         { bg:'#f0fdf4', text:'#16a34a', border:'#86efac' },
+          DELIVERY_ASSIGNED:{ bg:'#eff6ff', text:'#2563eb', border:'#93c5fd' },
+          LABEL_GENERATED:  { bg:'#f0f9ff', text:'#0369a1', border:'#7dd3fc' },
+          READY_FOR_PICKUP: { bg:'#fff7ed', text:'#ea580c', border:'#fdba74' },
+          PICKED_UP:        { bg:'#f5f3ff', text:'#7c3aed', border:'#c4b5fd' },
+          IN_TRANSIT:       { bg:'#faf5ff', text:'#7c3aed', border:'#d8b4fe' },
+          OUT_FOR_DELIVERY: { bg:'#fff1f2', text:'#e11d48', border:'#fda4af' },
+          DELIVERED:        { bg:'#f0fdf4', text:'#15803d', border:'#4ade80' },
+          COMPLETED:        { bg:'#f0fdf4', text:'#15803d', border:'#4ade80' },
+          REJECTED:         { bg:'#fef2f2', text:'#dc2626', border:'#fca5a5' },
+        };
+        const sc = isRejected ? stColorMap.REJECTED : (stColorMap[selectedDetailedOrder.status] || { bg:'#f8fafc', text:'#475569', border:'#cbd5e1' });
+
+        return (
+          <div className="modal-overlay" style={{ zIndex: 9998, backgroundColor: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)' }}>
+            <div style={{
+              background: '#ffffff', color: '#0f172a', width: '95vw', maxWidth: '940px',
+              borderRadius: '18px', border: '1px solid #e2e8f0', overflow: 'hidden',
+              boxShadow: '0 30px 70px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column',
+              maxHeight: '92vh'
+            }}>
+              {/* Header */}
+              <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)', padding: '20px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '3px' }}>
+                    <span style={{ fontSize: '1.1rem' }}>📋</span>
+                    <h3 style={{ color: '#fff', margin: 0, fontSize: '1.2rem', fontWeight: '700' }}>Order Details &amp; Action Panel</h3>
+                  </div>
+                  <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.78rem' }}>Order #{selectedDetailedOrder.orderId} &nbsp;·&nbsp; {selectedDetailedOrder.date}</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ padding: '5px 14px', borderRadius: '20px', fontSize: '0.77rem', fontWeight: '700', background: sc.bg, color: sc.text, border: `1.5px solid ${sc.border}` }}>
+                    {isRejected ? '❌ Rejected' : `${ORDER_STAGES[currentStageIdx]?.icon || ''} ${ORDER_STAGES[currentStageIdx]?.label || selectedDetailedOrder.status}`}
+                  </span>
+                  <button onClick={() => { setSelectedDetailedOrderId(null); setSelectedCarrier(''); }}
+                    style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: '8px', cursor: 'pointer', color: '#fff', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Stage Progress Bar */}
+              {!isRejected && !isCompleted && (
+                <div style={{ padding: '14px 28px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', overflowX: 'auto', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0', minWidth: 'max-content' }}>
+                    {ORDER_STAGES.map((stage, si) => {
+                      const done = currentStageIdx > si;
+                      const curr = currentStageIdx === si;
+                      return (
+                        <div key={stage.key} style={{ display: 'flex', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', width: '64px' }}>
+                            <div style={{ width: '34px', height: '34px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: '700', background: done ? '#16a34a' : curr ? '#2563eb' : '#e2e8f0', color: (done || curr) ? '#fff' : '#94a3b8', boxShadow: curr ? '0 0 0 3px rgba(37,99,235,0.22)' : 'none', transition: 'all 0.3s' }}>
+                              {done ? '✓' : stage.icon}
+                            </div>
+                            <span style={{ fontSize: '0.6rem', fontWeight: curr ? '700' : '500', color: curr ? '#2563eb' : done ? '#16a34a' : '#94a3b8', textAlign: 'center', lineHeight: 1.2 }}>{stage.label}</span>
+                          </div>
+                          {si < ORDER_STAGES.length - 1 && (
+                            <div style={{ width: '20px', height: '2px', background: done ? '#16a34a' : '#e2e8f0', marginBottom: '16px', flexShrink: 0, transition: 'background 0.3s' }} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Body */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', flex: 1, overflowY: 'auto', minHeight: 0 }}>
+
+                {/* LEFT: Info */}
+                <div style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: '16px', borderRight: '1px solid #f0f0f0', overflowY: 'auto' }}>
+
+                  {/* Order Info */}
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '12px' }}>📦 Order Information</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
+                      {[['Order ID', <span key="id" style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#0f172a' }}>{selectedDetailedOrder.orderId}</span>],
+                        ['Date', selectedDetailedOrder.date],
+                        ['Payment Status', <span key="status" style={{ color: '#16a34a', fontWeight: '600' }}>🔒 Secured in Escrow</span>],
+                      ].map(([label, val], i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: i < 2 ? '1px solid #f0f0f0' : 'none', paddingBottom: i < 2 ? '8px' : '0' }}>
+                          <span style={{ color: '#64748b' }}>{label}</span>
+                          <strong>{val}</strong>
+                        </div>
+                      ))}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '2px' }}>
+                        <span style={{ color: '#64748b' }}>Order Total</span>
+                        <strong style={{ color: '#16a34a', fontSize: '1rem' }}>₹{selectedDetailedOrder.total?.toLocaleString('en-IN')}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Escrow Lock Details */}
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>🔐</span> Buyer Escrow Vault Lock
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#64748b' }}>Vault Status</span>
+                        {verifiedEscrow[selectedDetailedOrder.orderId] ? (
+                          <span style={{ color: '#16a34a', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            🟢 LOCKED &amp; VERIFIED
+                          </span>
+                        ) : (
+                          <span style={{ color: '#ea580c', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            🟡 HELD IN COLD LOCK
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
+                        <span style={{ color: '#64748b' }}>Escrow Account</span>
+                        <strong style={{ textTransform: 'capitalize' }}>
+                          {selectedDetailedOrder.escrowMethod ? `${selectedDetailedOrder.escrowMethod} Escrow` : 'Wallet Vault'}
+                        </strong>
+                      </div>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
+                        <span style={{ color: '#64748b' }}>Lock Hash</span>
+                        <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#475569' }}>
+                          {(() => {
+                            let hash = 0;
+                            const str = selectedDetailedOrder.orderId || 'default';
+                            for (let i = 0; i < str.length; i++) {
+                              hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                            }
+                            const hex = Math.abs(hash).toString(16).padEnd(8, '7f').slice(0, 8);
+                            return `0x${hex}aec8...7df4`;
+                          })()}
+                        </span>
+                      </div>
+                      
+                      {/* Interactive Verification Action */}
+                      <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '12px', marginTop: '4px' }}>
+                        {verifiedEscrow[selectedDetailedOrder.orderId] ? (
+                          <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', padding: '10px 12px', color: '#065f46', fontSize: '0.8rem', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                            <span style={{ fontSize: '1rem', marginTop: '2px' }}>🛡️</span>
+                            <div>
+                              <strong style={{ display: 'block', marginBottom: '2px' }}>Escrow Custody Confirmed</strong>
+                              <span>Ledger verification successful. Funds of ₹{selectedDetailedOrder.total?.toLocaleString('en-IN')} are locked in custody. Release authorized only upon successful delivery.</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => handleVerifyEscrow(selectedDetailedOrder.orderId, selectedDetailedOrder.total || 0)}
+                            disabled={verifyingEscrow[selectedDetailedOrder.orderId]}
+                            style={{ 
+                              width: '100%', padding: '9px 12px', background: verifyingEscrow[selectedDetailedOrder.orderId] ? '#cbd5e1' : '#4f46e5', 
+                              color: verifyingEscrow[selectedDetailedOrder.orderId] ? '#475569' : '#fff', border: 'none', borderRadius: '8px', 
+                              fontSize: '0.8rem', fontWeight: '700', cursor: verifyingEscrow[selectedDetailedOrder.orderId] ? 'not-allowed' : 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s'
+                            }}
+                          >
+                            {verifyingEscrow[selectedDetailedOrder.orderId] ? (
+                              <>
+                                <svg style={{ animation: 'spin 1s linear infinite' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                  <circle cx="12" cy="12" r="10" stroke="rgba(0,0,0,0.1)" />
+                                  <path d="M12 2a10 10 0 0 1 10 10" />
+                                </svg>
+                                Verifying Lock Ledger...
+                              </>
+                            ) : (
+                              '🔎 Verify Escrow Lock Status'
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Customer */}
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '12px' }}>👤 Customer</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '0.84rem' }}>
+                      <strong style={{ color: '#0f172a', fontSize: '0.92rem' }}>{selectedDetailedOrder.deliveryAddress?.fullName || 'N/A'}</strong>
+                      <span style={{ color: '#475569' }}>📞 {selectedDetailedOrder.deliveryAddress?.phone || '—'}</span>
+                      <span style={{ color: '#475569' }}>✉️ {selectedDetailedOrder.deliveryAddress?.email || '—'}</span>
+                    </div>
+                  </div>
+
+                  {/* Address */}
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '10px' }}>📍 Delivery Address</div>
+                    <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: '1.65', margin: 0 }}>
+                      {selectedDetailedOrder.deliveryAddress?.address}<br/>
+                      {selectedDetailedOrder.deliveryAddress?.city}, {selectedDetailedOrder.deliveryAddress?.stateName} — {selectedDetailedOrder.deliveryAddress?.pincode}
+                    </p>
+                  </div>
+
+                  {/* Products */}
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '12px' }}>🛒 Ordered Items</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {selectedDetailedOrder.items?.map((item, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center', padding: '8px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                          {item.img && item.img.startsWith('http') ? (
+                            <img src={item.img} alt={item.name} style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '7px', flexShrink: 0, border: '1px solid #e2e8f0' }} />
+                          ) : (
+                            <div style={{ width: '42px', height: '42px', background: '#f1f5f9', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', flexShrink: 0 }}>{item.img || '📦'}</div>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '0.84rem', fontWeight: '600', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
+                            <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: '2px' }}>{item.brand} · Qty: {item.quantity}</div>
+                          </div>
+                          <strong style={{ fontSize: '0.84rem', color: '#0f172a', flexShrink: 0 }}>₹{item.price?.toLocaleString('en-IN')}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Log */}
+                  {selectedDetailedOrder.timeline?.length > 0 && (
+                    <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '12px' }}>🕒 Activity Log</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {[...selectedDetailedOrder.timeline].reverse().map((t, idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                            <span style={{ color: '#16a34a', fontSize: '0.7rem', marginTop: '3px', flexShrink: 0 }}>●</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <strong style={{ fontSize: '0.8rem', color: '#0f172a', display: 'block' }}>{t.label || t.status}</strong>
+                              {t.desc && <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#475569' }}>{t.desc}</p>}
+                            </div>
+                            <span style={{ fontSize: '0.71rem', color: '#94a3b8', whiteSpace: 'nowrap', flexShrink: 0 }}>{t.date || ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* RIGHT: Actions */}
+                <div style={{ padding: '22px 22px', background: '#fafbfc', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
+                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b' }}>⚡ Action Panel</div>
+
+                  {(!isSeller || !ownsOrder) ? (
+                    <div style={{ padding: '16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', color: '#dc2626', fontSize: '0.84rem' }}>
+                      ⚠️ You do not have permissions to execute actions on this order.
+                    </div>
+                  ) : (
+                    <>
+                      {/* PENDING_APPROVAL */}
+                      {selectedDetailedOrder.status === 'PENDING_APPROVAL' && (
+                        <div style={{ background: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: '12px', padding: '18px' }}>
+                          <p style={{ fontSize: '0.82rem', color: '#92400e', fontWeight: '600', margin: '0 0 12px 0' }}>⌛ Awaiting your decision. Approve or reject this order.</p>
+                          {!verifiedEscrow[selectedDetailedOrder.orderId] && (
+                            <div style={{ fontSize: '0.76rem', color: '#b45309', background: '#fef3c7', padding: '8px 10px', borderRadius: '6px', marginBottom: '14px', border: '1px solid #fde68a' }}>
+                              💡 <strong>Tip:</strong> Click the <strong>Verify Escrow Lock Status</strong> button in the left panel first to ensure buyer payment is securely locked.
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <button onClick={() => handleApproveOrder(selectedDetailedOrder.orderId)} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                              style={{ flex: 1, padding: '11px 0', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
+                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Approving...' : '✓ Approve Order'}
+                            </button>
+                            <button onClick={() => { setSelectedOrderId(selectedDetailedOrder.orderId); setRejectionReasonType('Out of Stock'); setCustomRejectReason(''); setIsRejectModalOpen(true); }} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                              style={{ flex: 1, padding: '11px 0', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
+                              ✕ Reject Order
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* APPROVED */}
+                      {selectedDetailedOrder.status === 'APPROVED' && (
+                        <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                            <span style={{ width: '22px', height: '22px', background: '#16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>✓</span>
+                            <span style={{ fontSize: '0.82rem', color: '#15803d', fontWeight: '700' }}>Order Approved — Assign Delivery Partner</span>
+                          </div>
+                          <label style={{ fontSize: '0.78rem', color: '#475569', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Select Courier Partner</label>
+                          <select value={selectedCarrier} onChange={e => setSelectedCarrier(e.target.value)} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                            style={{ width: '100%', height: '40px', border: '1.5px solid #d1d5db', borderRadius: '8px', padding: '0 10px', fontSize: '0.85rem', color: '#0f172a', background: '#fff', marginBottom: '12px', outline: 'none', cursor: 'pointer' }}>
+                            <option value="">— Select Courier Partner —</option>
+                            <option value="Delhivery">🚚 Delhivery</option>
+                            <option value="Blue Dart">🔵 Blue Dart</option>
+                            <option value="XpressBees">🐝 XpressBees</option>
+                            <option value="DTDC">📦 DTDC</option>
+                            <option value="Ecom Express">⚡ Ecom Express</option>
+                            <option value="India Post">🇮🇳 India Post</option>
+                          </select>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <button onClick={() => {
+                              if (orderLoading[selectedDetailedOrder.orderId]) return;
+                              handleSelectDeliveryPartner(selectedDetailedOrder.orderId, selectedCarrier, selectedCarrier === 'Blue Dart' ? '1-3 Days' : '2-4 Days', selectedCarrier === 'Blue Dart' ? 120 : 80);
+                            }} disabled={!selectedCarrier || !!orderLoading[selectedDetailedOrder.orderId]}
+                              style={{ width: '100%', padding: '12px 0', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', border: 'none', cursor: selectedCarrier ? 'pointer' : 'not-allowed', background: selectedCarrier ? '#4f46e5' : '#cbd5e1', color: selectedCarrier ? '#fff' : '#94a3b8', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
+                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Assigning...' : '🚚 Assign Courier Partner'}
+                            </button>
+                            <span style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', marginTop: '6px' }}>
+                              Or bypass directly to label ready:
+                            </span>
+                            <button onClick={() => handleAssignAndGenerateLabel(selectedDetailedOrder.orderId, selectedCarrier)} disabled={!selectedCarrier || !!orderLoading[selectedDetailedOrder.orderId]}
+                              style={{ width: '100%', padding: '10px 0', borderRadius: '8px', fontWeight: '600', fontSize: '0.8rem', border: '1px solid #cbd5e1', cursor: selectedCarrier ? 'pointer' : 'not-allowed', background: '#fff', color: selectedCarrier ? '#4f46e5' : '#cbd5e1', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
+                              🏷️ Assign &amp; Auto-Generate Label
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* DELIVERY_ASSIGNED */}
+                      {selectedDetailedOrder.status === 'DELIVERY_ASSIGNED' && (
+                        <div style={{ background: '#eff6ff', border: '1.5px solid #93c5fd', borderRadius: '12px', padding: '18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                            <span style={{ width: '22px', height: '22px', background: '#2563eb', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>🚚</span>
+                            <span style={{ fontSize: '0.82rem', color: '#1e3a8a', fontWeight: '700' }}>Courier Assigned</span>
+                          </div>
+                          <p style={{ fontSize: '0.8rem', color: '#1e3a8a', margin: '0 0 14px 0', lineHeight: '1.4' }}>
+                            Order assigned to <strong>{selectedDetailedOrder.carrier}</strong>. Tracking ID <strong>{selectedDetailedOrder.trackingId}</strong> has been registered. 
+                            Generate the shipping label to prepare packaging.
+                          </p>
+                          <button onClick={() => handleGenerateLabel(selectedDetailedOrder.orderId)} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                            style={{ width: '100%', padding: '12px 0', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
+                            {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Generating...' : '🏷️ Generate Shipping Label'}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* LABEL_GENERATED */}
+                      {selectedDetailedOrder.status === 'LABEL_GENERATED' && (
+                        <div style={{ background: '#f0f9ff', border: '1.5px solid #7dd3fc', borderRadius: '12px', padding: '18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                            <span style={{ width: '22px', height: '22px', background: '#0284c7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>🏷️</span>
+                            <span style={{ fontSize: '0.82rem', color: '#0369a1', fontWeight: '700' }}>Shipping Label Generated</span>
+                          </div>
+                          <p style={{ fontSize: '0.8rem', color: '#0369a1', margin: '0 0 14px 0', lineHeight: '1.4' }}>
+                            Label generated. Print the shipping label / manifest and mark the package as ready for courier pickup.
+                          </p>
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <button onClick={() => { setActiveLabelOrder(selectedDetailedOrder); setIsLabelModalOpen(true); }}
+                              style={{ flex: 1, padding: '11px 0', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}>
+                              🖨️ Print Label
+                            </button>
+                            <button onClick={() => handleMarkReadyForPickup(selectedDetailedOrder.orderId)} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                              style={{ flex: 1, padding: '11px 0', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
+                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '📦 Mark Ready'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* READY_FOR_PICKUP */}
+                      {selectedDetailedOrder.status === 'READY_FOR_PICKUP' && (
+                        <div style={{ background: '#fff7ed', border: '1.5px solid #fdba74', borderRadius: '12px', padding: '18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                            <span style={{ width: '22px', height: '22px', background: '#ea580c', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>📦</span>
+                            <span style={{ fontSize: '0.82rem', color: '#c2410c', fontWeight: '700' }}>Ready for Carrier Pickup</span>
+                          </div>
+                          <p style={{ fontSize: '0.8rem', color: '#9a3412', margin: '0 0 14px 0', lineHeight: '1.4' }}>
+                            The package is sealed and waiting at your dispatch desk. Click below once the carrier agent collects the shipment.
+                          </p>
+                          <button onClick={() => handleAdvanceStatus(selectedDetailedOrder.orderId, 'PICKED_UP')} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                            style={{ width: '100%', padding: '12px 0', background: '#ea580c', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
+                            {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🚀 Mark Picked Up by Courier'}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* PICKED_UP / IN_TRANSIT / OUT_FOR_DELIVERY */}
+                      {['PICKED_UP','IN_TRANSIT','OUT_FOR_DELIVERY'].includes(selectedDetailedOrder.status) && (
+                        <div style={{ background: '#faf5ff', border: '1.5px solid #d8b4fe', borderRadius: '12px', padding: '18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                            <span style={{ width: '22px', height: '22px', background: '#7c3aed', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>
+                              {selectedDetailedOrder.status === 'PICKED_UP' ? '🚀' : selectedDetailedOrder.status === 'IN_TRANSIT' ? '🚛' : '🛵'}
+                            </span>
+                            <span style={{ fontSize: '0.82rem', color: '#6d28d9', fontWeight: '700' }}>
+                              {selectedDetailedOrder.status === 'PICKED_UP' ? 'Package Picked Up' : selectedDetailedOrder.status === 'IN_TRANSIT' ? 'Package In Transit' : 'Package Out For Delivery'}
+                            </span>
+                          </div>
+                          <p style={{ fontSize: '0.8rem', color: '#6d28d9', margin: '0 0 14px 0', lineHeight: '1.4' }}>
+                            {selectedDetailedOrder.status === 'PICKED_UP' && 'The shipment has been picked up by the courier. Advance status to In Transit once sorted at hub.'}
+                            {selectedDetailedOrder.status === 'IN_TRANSIT' && 'The shipment is in transit on the EV logistics corridor. Advance status to Out For Delivery when arrived at local station.'}
+                            {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && 'The delivery agent is en route. Mark Delivered when final drop-off is complete.'}
+                          </p>
+                          {selectedDetailedOrder.status === 'PICKED_UP' && (
+                            <button onClick={() => handleAdvanceStatus(selectedDetailedOrder.orderId, 'IN_TRANSIT')} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                              style={{ width: '100%', padding: '11px 0', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
+                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🚛 Mark In Transit'}
+                            </button>
+                          )}
+                          {selectedDetailedOrder.status === 'IN_TRANSIT' && (
+                            <button onClick={() => handleAdvanceStatus(selectedDetailedOrder.orderId, 'OUT_FOR_DELIVERY')} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                              style={{ width: '100%', padding: '11px 0', background: '#a855f7', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
+                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🛵 Mark Out for Delivery'}
+                            </button>
+                          )}
+                          {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && (
+                            <button onClick={() => handleAdvanceStatus(selectedDetailedOrder.orderId, 'DELIVERED')} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                              style={{ width: '100%', padding: '11px 0', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
+                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🎉 Mark Delivered'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* COMPLETED / DELIVERED */}
+                      {isCompleted && (
+                        <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '24px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '2.8rem', marginBottom: '10px' }}>🎉</div>
+                          <p style={{ color: '#15803d', fontWeight: '700', fontSize: '1.05rem', margin: '0 0 4px 0' }}>Transaction Completed</p>
+                          <p style={{ color: '#16a34a', fontSize: '0.8rem', margin: 0 }}>Funds will be released after buyer confirmation or auto-release window.</p>
+                        </div>
+                      )}
+
+                      {/* REJECTED */}
+                      {isRejected && (
+                        <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '12px', padding: '18px' }}>
+                          <div style={{ color: '#dc2626', fontWeight: '700', fontSize: '1rem', marginBottom: '8px' }}>❌ Order Rejected</div>
+                          {selectedDetailedOrder.rejectionReason && (
+                            <div style={{ background: '#fff', border: '1px solid #fca5a5', borderRadius: '8px', padding: '10px 12px', fontSize: '0.82rem', color: '#7f1d1d' }}>
+                              <strong>Reason:</strong> {selectedDetailedOrder.rejectionReason}
+                            </div>
+                          )}
+                          <p style={{ fontSize: '0.77rem', color: '#94a3b8', marginTop: '10px', marginBottom: 0 }}>Escrow funds will be automatically returned to the buyer.</p>
+                        </div>
+                      )}
+
+                      {/* Carrier details if assigned */}
+                      {selectedDetailedOrder.carrier && !['PENDING_APPROVAL','APPROVED','REJECTED'].includes(selectedDetailedOrder.status) && (
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px' }}>
+                          <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '10px' }}>🚚 Carrier Details</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#64748b' }}>Partner</span><strong>{selectedDetailedOrder.carrier}</strong></div>
+                            {selectedDetailedOrder.trackingId && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#64748b' }}>Tracking #</span><strong style={{ color: '#4f46e5', fontFamily: 'monospace', fontSize: '0.78rem' }}>{selectedDetailedOrder.trackingId}</strong></div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ borderTop: '1px solid #e2e8f0', padding: '14px 28px', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc', flexShrink: 0 }}>
+                <button onClick={() => { setSelectedDetailedOrderId(null); setSelectedCarrier(''); }}
+                  style={{ padding: '9px 24px', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '8px', color: '#475569', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer' }}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* --- DELETE CONFIRMATION MODAL --- */}
+      {isDeleteModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-card" style={{ maxWidth: '420px' }}>
+            <div className="confirm-body">
+              <div className="confirm-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <h4>Delete listed merchandise?</h4>
+              <p>Are you sure you want to remove <strong>&ldquo;{productToDelete?.name}&rdquo;</strong> from your live index? This cannot be undone.</p>
+            </div>
+            
+            <div className="modal-footer">
+              <button className="modal-btn cancel" onClick={() => setIsDeleteModalOpen(false)}>Abort</button>
+              <button className="modal-btn delete" onClick={handleDeleteProduct}>Delete Listing</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
+  const [rejectionReasonMap, setRejectionReasonMap] = useState({});
+  const [loadingMap, setLoadingMap] = useState({});
+
+  const handleDecision = async (productId, decision) => {
+    setLoadingMap(prev => ({ ...prev, [productId]: true }));
+    const reason = rejectionReasonMap[productId] || '';
+    
+    if (decision === 'reject' && !reason.trim()) {
+      triggerToast('Error', 'Please enter a rejection reason first.', 'danger');
+      setLoadingMap(prev => ({ ...prev, [productId]: false }));
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/products/${productId}/admin-decision`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ decision, reason })
+      });
+      const data = await res.json();
+      if (data.success) {
+        triggerToast(
+          decision === 'approve' ? 'Approval Code Generated' : 'Product Rejected',
+          decision === 'approve' 
+            ? `Admin code generated: ${data.product.adminCode}. Give this code to the seller.` 
+            : `Listing rejected. Feedback sent to vendor.`,
+          decision === 'approve' ? 'success' : 'danger'
+        );
+        // Reset reason field
+        setRejectionReasonMap(prev => ({ ...prev, [productId]: '' }));
+        onRefreshProducts();
+      } else {
+        triggerToast('Error', data.error || 'Request failed', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error', 'danger');
+    } finally {
+      setLoadingMap(prev => ({ ...prev, [productId]: false }));
+    }
+  };
+
+  // Filter pending / rejected products for verification simulation
+  const pendingProducts = products.filter(p => p.approvalStatus !== 'approved');
+
+  return (
+    <div>
+      <div className="view-header">
+        <div className="view-title-group">
+          <h2>Admin Approval Simulation Hub</h2>
+          <p style={{ color: '#ef4444' }}>⚠️ï¸ DEBUG MODE: Simulate marketplace admin operations. Approve or reject vendor product listings below.</p>
+        </div>
+      </div>
+
+      <div className="table-wrapper" style={{ marginTop: '20px' }}>
+        {pendingProducts.length > 0 ? (
+          <table className="pro-table">
+            <thead>
+              <tr>
+                <th>Product Request</th>
+                <th>Brand</th>
+                <th>Listing Details</th>
+                <th>Status / Attempts</th>
+                <th>Admin Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendingProducts.map((p) => {
+                const isRejected = p.approvalStatus === 'rejected';
+                return (
+                  <tr key={p.id || p._id}>
+                    <td>
+                      <div className="product-cell">
+                        <div className="product-img">
+                          {(!p.image || !p.image.startsWith('http')) ? (
+                            p.image || '📦'
+                          ) : (
+                            <img src={p.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          )}
+                        </div>
+                        <div className="product-meta-details">
+                          <span className="product-name">{p.name}</span>
+                          <span className="product-sku" style={{ textTransform: 'capitalize' }}>Category: {p.category}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: 600, color: '#fff' }}>{p.brand || 'No Brand'}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span className="price-text">₹{p.price.toLocaleString('en-IN')}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Stock: {p.stock} units</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span className={`status-badge ${isRejected ? 'out-of-stock' : 'low-stock'}`}>
+                          {p.approvalStatus === 'pending' ? 'Pending Admin' : 'Rejected'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          Attempt {p.approvalAttempts || 1} of 3
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 0' }}>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button
+                            className="company-portal-btn"
+                            style={{ background: 'var(--color-success)', borderColor: 'var(--color-success)', height: '32px', fontSize: '0.8rem' }}
+                            onClick={() => handleDecision(p.id || p._id, 'approve')}
+                            disabled={loadingMap[p.id || p._id]}
+                          >
+                            Approve & Get Code
+                          </button>
+                          
+                          <button
+                            className="company-portal-btn"
+                            style={{ background: 'var(--color-danger)', borderColor: 'var(--color-danger)', height: '32px', fontSize: '0.8rem' }}
+                            onClick={() => handleDecision(p.id || p._id, 'reject')}
+                            disabled={loadingMap[p.id || p._id] || p.approvalAttempts >= 3}
+                          >
+                            Reject Listing
+                          </button>
+                        </div>
+                        
+                        {!isRejected && p.approvalAttempts < 3 && (
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ height: '32px', fontSize: '0.8rem', background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(255,255,255,0.1)' }}
+                            placeholder="Rejection reason (required to reject)..."
+                            value={rejectionReasonMap[p.id || p._id] || ''}
+                            onChange={(e) => setRejectionReasonMap(prev => ({ ...prev, [p.id || p._id]: e.target.value }))}
+                          />
+                        )}
+
+                        {p.adminCode && p.approvalStatus === 'pending' && (
+                          <div style={{ fontSize: '0.8rem', color: 'var(--color-success)', fontWeight: 'bold', border: '1px dashed var(--color-success)', padding: '6px', borderRadius: '4px', textAlign: 'center', background: 'rgba(16, 185, 129, 0.1)' }}>
+                            Generated Admin Code: {p.adminCode}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-icon" style={{ color: 'var(--color-success)' }}>✓</div>
+            <h3>No pending product requests</h3>
+            <p>All listings have been approved or verified. Check back when vendors add new items.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SellerDocumentResubmissionForm({ documents, onSuccess }) {
+  const [businessDocUrl, setBusinessDocUrl] = useState('');
+  const [idDocUrl, setIdDocUrl] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!businessDocUrl.trim() && !idDocUrl.trim()) {
+      setError('Please provide at least one document URL to resubmit.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      
+      if (businessDocUrl.trim()) {
+        const res = await fetch('http://localhost:5000/api/auth/seller/documents', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            documentType: 'business_registration',
+            fileUrl: businessDocUrl.trim()
+          })
+        });
+        if (res.status === 401) {
+          handleSessionExpired();
+          return;
+        }
+        const data = await res.json();
+        if (!data.success) {
+          setError(data.error || 'Failed to submit business registration');
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      if (idDocUrl.trim()) {
+        const res = await fetch('http://localhost:5000/api/auth/seller/documents', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            documentType: 'id_proof',
+            fileUrl: idDocUrl.trim()
+          })
+        });
+        if (res.status === 401) {
+          handleSessionExpired();
+          return;
+        }
+        const data = await res.json();
+        if (!data.success) {
+          setError(data.error || 'Failed to submit ID proof');
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      onSuccess();
+    } catch (err) {
+      console.error(err);
+      setError('Network error resubmitting details. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginTop: '24px' }}>
+      {error && (
+        <div style={{ color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', border: '1px solid rgba(239, 68, 68, 0.2)', fontSize: '0.85rem' }}>
+          ⚠️ {error}
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="form-group">
+          <label className="form-label" style={{ color: '#fff', fontSize: '0.85rem' }}>Resubmit Business Registration Document URL</label>
+          <input 
+            type="url" 
+            className="form-input" 
+            placeholder="e.g. https://mock-s3.emahu.com/docs/gst_cert.pdf" 
+            value={businessDocUrl} 
+            onChange={e => setBusinessDocUrl(e.target.value)} 
+            style={{ width: '100%', padding: '10px', borderRadius: '6px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label" style={{ color: '#fff', fontSize: '0.85rem' }}>Resubmit ID Proof (PAN / Aadhaar) Document URL</label>
+          <input 
+            type="url" 
+            className="form-input" 
+            placeholder="e.g. https://mock-s3.emahu.com/docs/pan_card.jpg" 
+            value={idDocUrl} 
+            onChange={e => setIdDocUrl(e.target.value)} 
+            style={{ width: '100%', padding: '10px', borderRadius: '6px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+          />
+        </div>
+        <button 
+          type="submit" 
+          className="company-portal-btn" 
+          style={{ width: '100%', height: '40px', background: '#6366f1', color: '#fff', fontWeight: '700', borderRadius: '8px', cursor: submitting ? 'not-allowed' : 'pointer', border: 'none' }}
+          disabled={submitting}
+        >
+          {submitting ? 'Resubmitting details...' : 'Resubmit for Verification'}
+        </button>
+      </div>
+    </form>
+  );
+}

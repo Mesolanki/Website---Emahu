@@ -1,0 +1,522 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+/* =============================================================
+   BUYER ONBOARDING — PREMIUM LIGHT THEMED STYLES
+   Used by both login/page.jsx and register/page.jsx
+   ============================================================= */
+
+:root {
+  --br-primary: #4169e1; /* Royal Blue */
+  --br-primary-dark: #2b4594;
+  --br-primary-glow: rgba(65, 105, 225, 0.1);
+  --br-secondary: #12b7b2; /* EMAHU Teal */
+  --br-bg: #f8fafc;
+  --br-card-bg: #ffffff;
+  --br-border: #cbd5e1;
+  --br-text: #0f172a;
+  --br-text-muted: #475569;
+  --br-font: 'Inter', sans-serif;
+}
+
+.br-wrapper {
+  min-height: 100vh;
+  background-color: var(--br-bg);
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(240, 244, 255, 0.8) 0, transparent 50%), 
+    radial-gradient(at 100% 100%, rgba(224, 231, 255, 0.5) 0, transparent 50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  font-family: var(--br-font);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ambient Blurry Background Blobs */
+.br-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  z-index: 1;
+  opacity: 0.6;
+  pointer-events: none;
+  animation: brBlobFloat 15s ease-in-out infinite alternate;
+}
+
+.br-blob--1 {
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(65, 105, 225, 0.08) 0%, transparent 70%);
+  top: -10%;
+  left: 5%;
+}
+
+.br-blob--2 {
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, rgba(18, 183, 178, 0.06) 0%, transparent 70%);
+  bottom: -15%;
+  right: 5%;
+  animation-delay: -7s;
+}
+
+@keyframes brBlobFloat {
+  0% { transform: translateY(0) scale(1) rotate(0deg); }
+  100% { transform: translateY(35px) scale(1.1) rotate(15deg); }
+}
+
+/* Main Container Card */
+.br-container {
+  width: 1000px;
+  max-width: 100%;
+  background: var(--br-card-bg);
+  border: 1px solid var(--br-border);
+  border-radius: 24px;
+  display: grid;
+  grid-template-columns: 1.1fr 1.4fr;
+  overflow: hidden;
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.05),
+    0 10px 10px -5px rgba(0, 0, 0, 0.02);
+  z-index: 10;
+  animation: brCardFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes brCardFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─────────────────────────────────────────────
+   LEFT PANEL: PROGRESS INDICATORS
+   ───────────────────────────────────────────── */
+.br-progress-panel {
+  padding: 48px;
+  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+}
+
+/* Brand Logo */
+.br-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--br-text);
+  letter-spacing: 2px;
+  margin-bottom: 36px;
+}
+
+.br-logo svg {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(65, 105, 225, 0.2);
+  transition: transform 0.3s ease;
+}
+
+.br-logo:hover svg {
+  transform: rotate(5deg) scale(1.05);
+}
+
+.br-logo__text {
+  font-size: 18px;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: 2px;
+}
+
+/* Vertical Steps list */
+.br-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  position: relative;
+}
+
+/* Connector Line behind steps */
+.br-steps-list::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: #cbd5e1;
+  z-index: 1;
+}
+
+.br-step-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  z-index: 5;
+}
+
+.br-step-item__number {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: var(--br-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13.5px;
+  font-weight: 700;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.br-step-item__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.br-step-item__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--br-text-muted);
+  transition: color 0.35s ease;
+}
+
+.br-step-item__subtitle {
+  font-size: 11px;
+  color: #64748b;
+  transition: color 0.35s ease;
+}
+
+/* Step Active State */
+.br-step-item--active .br-step-item__number {
+  background: var(--br-primary);
+  border-color: var(--br-primary);
+  color: white;
+  box-shadow: 0 4px 12px rgba(65, 105, 225, 0.25);
+}
+
+.br-step-item--active .br-step-item__title {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.br-step-item--active .br-step-item__subtitle {
+  color: var(--br-primary);
+}
+
+/* Step Completed State */
+.br-step-item--completed .br-step-item__number {
+  background: #dcfce7;
+  border-color: #a7f3d0;
+  color: #10b981;
+}
+
+.br-step-item--completed .br-step-item__title {
+  color: #10b981;
+}
+
+.br-step-item--completed .br-step-item__subtitle {
+  color: #059669;
+}
+
+/* Left Panel Footer bar */
+.br-progress-footer {
+  margin-top: 40px;
+}
+
+.br-progress-footer__label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.br-progress-bar-bg {
+  width: 100%;
+  height: 4px;
+  background: #cbd5e1;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.br-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(to right, var(--br-primary), var(--br-secondary));
+  border-radius: 2px;
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─────────────────────────────────────────────
+   RIGHT FORM CARD
+   ───────────────────────────────────────────── */
+.br-form-panel {
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+}
+
+.br-step-content {
+  animation: brStepSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes brStepSlideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.br-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+}
+
+.br-subtitle {
+  font-size: 13.5px;
+  color: var(--br-text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Onboarding Input Grids */
+.br-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 24px;
+  margin-bottom: 28px;
+}
+
+.br-form-grid--full {
+  grid-template-columns: 1fr;
+}
+
+.br-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.br-field--full {
+  grid-column: span 2;
+}
+
+.br-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.br-input {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: #0f172a;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.br-input::placeholder {
+  color: #94a3b8;
+}
+
+.br-input:hover {
+  border-color: #94a3b8;
+}
+
+.br-input:focus {
+  border-color: var(--br-primary);
+  box-shadow: 0 0 0 3px var(--br-primary-glow);
+}
+
+.br-input--error {
+  border-color: #f87171 !important;
+  background: #fef2f2 !important;
+}
+
+.br-error {
+  font-size: 12px;
+  color: #dc2626;
+  margin-top: 2px;
+}
+
+/* Button Actions bar */
+.br-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 24px;
+  margin-top: 12px;
+}
+
+.br-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 26px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  box-sizing: border-box;
+}
+
+.br-btn--next {
+  background: var(--br-primary);
+  color: white;
+  box-shadow: 0 4px 12px rgba(65, 105, 225, 0.2);
+}
+
+.br-btn--next:hover {
+  transform: translateY(-1.5px);
+  background: var(--br-primary-dark);
+  box-shadow: 0 8px 16px rgba(65, 105, 225, 0.3);
+}
+
+.br-btn--secondary {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.br-btn--secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.br-btn--loading {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.br-btn__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: brButtonSpinner 0.6s linear infinite;
+}
+
+@keyframes brButtonSpinner {
+  to { transform: rotate(360deg); }
+}
+
+/* Link Button Text styles */
+.br-btn-sub {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.br-btn-sub:hover {
+  color: var(--br-primary);
+}
+
+.text-buyer {
+  color: var(--br-primary);
+}
+
+.text-buyer:hover {
+  color: var(--br-primary-dark);
+}
+
+/* ─────────────────────────────────────────────
+   SUCCESS SCREEN SPECIFICS
+   ───────────────────────────────────────────── */
+.br-success-view {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0;
+  animation: brStepSlideIn 0.5s ease both;
+}
+
+.br-success-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+}
+
+.br-success-view h3 {
+  font-size: 22px;
+  color: #0f172a;
+  margin: 0 0 8px 0;
+}
+
+/* ─────────────────────────────────────────────
+   RESPONSIVE DESIGN BREAKPOINTS
+   ───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .br-progress-panel {
+    display: none;
+  }
+  .br-container {
+    max-width: 500px;
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .br-wrapper {
+    padding: 16px;
+  }
+  .br-container {
+    border-radius: 20px;
+  }
+  .br-form-panel {
+    padding: 32px 24px;
+  }
+  .br-title {
+    font-size: 20px;
+  }
+  .br-form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .br-field--full {
+    grid-column: span 1;
+  }
+  .br-form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .br-btn {
+    width: 100%;
+  }
+}

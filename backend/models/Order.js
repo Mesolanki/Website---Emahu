@@ -1,0 +1,119 @@
+const mongoose = require('mongoose');
+
+const orderSchema = new mongoose.Schema(
+  {
+    orderId: {
+      type: String,
+      required: true,
+      unique: true
+    },
+    billId: {
+      type: String
+    },
+    sellerId: {
+      type: String,
+      required: true
+    },
+    sellerEmail: {
+      type: String
+    },
+    userId: {
+      type: String,
+      required: true
+    },
+    date: {
+      type: String,
+      required: true
+    },
+    items: [
+      {
+        productId: {
+          type: String,
+          required: true
+        },
+        name: {
+          type: String,
+          required: true
+        },
+        price: {
+          type: Number,
+          required: true
+        },
+        quantity: {
+          type: Number,
+          required: true
+        },
+        brand: {
+          type: String
+        },
+        img: {
+          type: String
+        },
+        seller: {
+          type: mongoose.Schema.Types.Mixed
+        }
+      }
+    ],
+    total: {
+      type: Number,
+      required: true
+    },
+    status: {
+      type: String,
+      enum: [
+        'PENDING_APPROVAL',
+        'APPROVED',
+        'REJECTED',
+        'READY_FOR_PICKUP',
+        'DELIVERY_ASSIGNED',
+        'LABEL_GENERATED',
+        'PICKED_UP',
+        'IN_TRANSIT',
+        'OUT_FOR_DELIVERY',
+        'DELIVERED',
+        'COMPLETED',
+        '⚠️ VAULT DISPUTED / FROZEN',
+        '🔓 FUNDS RELEASED',
+        '❌ Order Rejected by Seller'
+      ],
+      default: 'PENDING_APPROVAL'
+    },
+    timeline: [
+      {
+        status: String,
+        label: String,
+        desc: String,
+        date: String
+      }
+    ],
+    deliveryAddress: {
+      fullName: String,
+      phone: String,
+      email: String,
+      address: String,
+      city: String,
+      stateName: String,
+      pincode: String
+    },
+    shippingSpeed: {
+      type: String
+    },
+    escrowMethod: {
+      type: String
+    },
+    carrier: String,
+    trackingId: String,
+    deliveryCost: Number,
+    estDays: String,
+    shipmentId: String,
+    packageWeight: String,
+    rejectionReason: String,
+    sellerConfirmed: Boolean,
+    sellerRejected: Boolean
+  },
+  {
+    timestamps: true
+  }
+);
+
+module.exports = mongoose.model('Order', orderSchema);

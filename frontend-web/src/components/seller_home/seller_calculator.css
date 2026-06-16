@@ -1,0 +1,440 @@
+/* =============================================================
+   SELLER CALCULATOR — GOD TIER WHITE ADMIN-PANEL STYLING
+   Theme: Clean SaaS Calculator | Soft Gradients | Blue Highlights
+   ============================================================= */
+
+.sc-sec {
+  padding: 100px 24px;
+  background-color: #f8fafc; /* Premium clean light gray backdrop */
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Background Glowing Blurs (Subtle details) */
+.sc-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  z-index: 1;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.sc-glow--1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.04) 0%, transparent 70%);
+  top: 15%;
+  left: 5%;
+}
+
+.sc-glow--2 {
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.03) 0%, transparent 70%);
+  bottom: 10%;
+  right: 5%;
+}
+
+.sc-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 5;
+}
+
+/* ─────────────────────────────────────────────
+   HEADER BLOCK
+   ───────────────────────────────────────────── */
+.sc-header {
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto 56px auto;
+}
+
+.sc-header__badge {
+  display: inline-block;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.04);
+}
+
+.sc-header__title {
+  font-size: 38px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+  margin: 0 0 16px 0;
+  letter-spacing: -1px;
+}
+
+.sc-header__desc {
+  font-size: 16px;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ─────────────────────────────────────────────
+   CALCULATOR CARD LAYOUT
+   ───────────────────────────────────────────── */
+.sc-calc-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  overflow: hidden;
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.05),
+    0 10px 10px -5px rgba(0, 0, 0, 0.02);
+}
+
+/* Left Panel: Inputs area */
+.sc-calc-inputs {
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  border-right: 1px solid #e2e8f0;
+}
+
+.sc-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sc-label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Category Grid list */
+.sc-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.sc-cat-btn {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  padding: 14px 16px;
+  border-radius: 12px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sc-cat-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+.sc-cat-btn--active {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.04);
+}
+
+.sc-cat-btn__rate {
+  font-size: 11px;
+  color: #2563eb;
+  font-weight: 700;
+}
+
+/* Custom sales Range Slider styling */
+.sc-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sc-slider-val {
+  font-size: 20px;
+  font-weight: 800;
+  color: #2563eb;
+}
+
+.sc-range-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sc-range-input {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+.sc-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 4px solid #2563eb;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.2);
+  transition: transform 0.1s ease;
+}
+
+.sc-range-input::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.sc-range-marks {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.sc-range-marks span {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Policy Callout block */
+.sc-policy-info {
+  display: flex;
+  gap: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.sc-policy-info__icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.sc-policy-info__body strong {
+  display: block;
+  font-size: 13.5px;
+  color: #0f172a;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.sc-policy-info__body p {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ─────────────────────────────────────────────
+   RIGHT PANEL: LIVE CALCULATION SCREEN
+   ───────────────────────────────────────────── */
+.sc-calc-screen {
+  padding: 48px;
+  background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 100%);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-screen-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 70% 70%, rgba(37, 99, 235, 0.08), transparent 60%);
+  pointer-events: none;
+}
+
+.sc-screen-inner {
+  position: relative;
+  z-index: 5;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.sc-screen-subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.sc-screen-headline {
+  font-size: 42px;
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: -1.5px;
+}
+
+.sc-screen-tag {
+  font-size: 13px;
+  color: #475569;
+  margin-top: 4px;
+  margin-bottom: 28px;
+}
+
+/* Calculation breakdown list table */
+.sc-breakdown {
+  border-top: 1px solid #cbd5e1;
+  border-bottom: 1px solid #cbd5e1;
+  padding: 16px 0;
+  margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sc-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13.5px;
+  color: #334155;
+}
+
+.sc-breakdown-row--commission {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* Payout instructions widget */
+.sc-payout-widget {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+}
+
+.sc-payout-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sc-payout-title__dot {
+  width: 6px;
+  height: 6px;
+  background: #16a34a;
+  border-radius: 50%;
+  display: block;
+  box-shadow: 0 0 10px rgba(22, 163, 74, 0.5);
+}
+
+.sc-payout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 12px;
+}
+
+.sc-payout-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sc-payout-cell span {
+  font-size: 10px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sc-payout-cell strong {
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.sc-payout-note {
+  font-size: 11px;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ─────────────────────────────────────────────
+   RESPONSIVE DESIGN BREAKPOINTS
+   ───────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .sc-calc-card {
+    grid-template-columns: 1fr;
+  }
+  .sc-calc-inputs {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 32px;
+  }
+  .sc-calc-screen {
+    padding: 32px;
+  }
+}
+
+@media (max-width: 640px) {
+  .sc-sec {
+    padding: 60px 16px;
+  }
+  .sc-header__title {
+    font-size: 28px;
+  }
+  .sc-header__desc {
+    font-size: 14.5px;
+  }
+  .sc-calc-inputs {
+    padding: 24px 16px;
+    gap: 28px;
+  }
+  .sc-cat-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .sc-calc-screen {
+    padding: 24px 16px;
+  }
+  .sc-screen-headline {
+    font-size: 32px;
+  }
+  .sc-payout-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}

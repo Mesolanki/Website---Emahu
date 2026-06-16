@@ -1,0 +1,283 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import './login.css';
+import { loginUser, saveAuthSession, googleLoginUser } from '@/utils/auth';
+
+/**
+ * SellerLogin Component
+ * A luxury-themed, high-fidelity vendor login page with dynamic state handling,
+ * responsive glassmorphism styling, and premium interactive micro-animations.
+ */
+export default function SellerLogin() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // If already logged in, redirect directly to the seller dashboard (unless expired)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('expired') === 'true') {
+      setError('Your session has expired. Please log in again.');
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    } else if (localStorage.getItem('emahu_seller_logged_in') === 'true') {
+      router.replace('/seller/dashboard');
+    }
+  }, [router]);
+
+  const handleGoogleSignIn = () => {
+    const width = 500;
+    const height = 600;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    
+    const popup = window.open(
+      '/buyer/google-auth?role=seller',
+      'google_auth_popup',
+      `width=${width},height=${height},top=${top},left=${left}`
+    );
+
+    const handleMessage = async (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data?.role === 'seller') {
+        window.removeEventListener('message', handleMessage);
+        const { email, name, role } = event.data;
+        setLoading(true);
+        setError('');
+        try {
+          const data = await googleLoginUser({ email, name, role });
+          saveAuthSession(data, 'seller');
+          setLoading(false);
+          router.replace('/seller/dashboard');
+        } catch (err) {
+          setLoading(false);
+          setError(err.message || 'Google Sign-In failed');
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Please fill in all fields.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+
+    try {
+      // Call actual backend authentication
+      const data = await loginUser(email, password);
+
+      // Verify the user is a seller
+      if (data.user.role !== 'seller') {
+        throw new Error('Access denied. Please log in using the correct portal.');
+      }
+
+      saveAuthSession(data, 'seller');
+      setLoading(false);
+      
+      router.replace('/seller/dashboard');
+    } catch (err) {
+      setLoading(false);
+      setError(err.message || 'Invalid email or password.');
+    }
+  };
+
+  return (
+    <div className="sl-wrapper">
+      {/* Dynamic Ambient Background Blobs */}
+      <div className="sl-ambient-blob sl-ambient-blob--1" />
+      <div className="sl-ambient-blob sl-ambient-blob--2" />
+
+      {/* Floating Sparkles/Particles */}
+      <div className="sl-sparkle sl-sparkle--1" />
+      <div className="sl-sparkle sl-sparkle--2" />
+
+      <div className="sl-container">
+        
+        {/* Left Side: Brand Cinematic Welcome Panel */}
+        <div className="sl-brand-card">
+          <div className="sl-brand-card__overlay" />
+          <div className="sl-brand-card__content">
+            <Link href="/" className="sl-logo">
+              <svg width="40" height="40" viewBox="0 0 32 32" fill="none">
+                <rect width="32" height="32" rx="10" fill="white" />
+                <path d="M8 12h16M8 16h12M8 20h14" stroke="#2b4594" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+              <span className="sl-logo__text">EMAHU</span>
+            </Link>
+            
+            <div className="sl-brand-card__hero-text">
+              <h1 className="sl-brand-card__title">Empower Your Business Today.</h1>
+              <p className="sl-brand-card__desc">
+                Join India&apos;s most seller-friendly marketplace with 0% commission, seamless doorstep shipping, and ultra-fast 48-hour payouts.
+              </p>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div className="sl-metrics">
+              <div className="sl-metric">
+                <span className="sl-metric__num">2M+</span>
+                <span className="sl-metric__lbl">Active Sellers</span>
+              </div>
+              <div className="sl-metric__divider" />
+              <div className="sl-metric">
+                <span className="sl-metric__num">0%</span>
+                <span className="sl-metric__lbl">Commission</span>
+              </div>
+              <div className="sl-metric__divider" />
+              <div className="sl-metric">
+                <span className="sl-metric__num">48h</span>
+                <span className="sl-metric__lbl">Payout Guarantee</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: High-End Interactive Login Form */}
+        <div className="sl-form-card">
+          <div className="sl-form-card__header">
+            <h2 className="sl-form-card__title">Welcome Back</h2>
+            <p className="sl-form-card__subtitle">Sign in to manage your Emahu store</p>
+          </div>
+
+          {error && (
+            <div className="sl-error" role="alert">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="sl-error__icon">
+                <circle cx="9" cy="9" r="8" stroke="#ef4444" strokeWidth="1.8" />
+                <path d="M9 6v4M9 12h.01" stroke="#ef4444" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form className="sl-form" onSubmit={handleSubmit}>
+            
+            {/* Input Group: Email */}
+            <div className="sl-input-group">
+              <label className="sl-label" htmlFor="sl-email">Email Address</label>
+              <div className="sl-input-wrapper">
+                <svg className="sl-input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">
+                  <path d="M2.5 5h15c.8 0 1.5.7 1.5 1.5v7c0 .8-.7 1.5-1.5 1.5h-15C1.7 15 1 14.3 1 13.5v-7C1 5.7 1.7 5 2.5 5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <path d="M1 6.5l9 5.5 9-5.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <input
+                  id="sl-email"
+                  type="email"
+                  className="sl-input"
+                  placeholder="name@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Input Group: Password */}
+            <div className="sl-input-group">
+              <div className="sl-label-row">
+                <label className="sl-label" htmlFor="sl-password">Password</label>
+                <a href="#forgot" className="sl-forgot-link">Forgot Password?</a>
+              </div>
+              <div className="sl-input-wrapper">
+                <svg className="sl-input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">
+                  <rect x="3" y="9" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.6" />
+                  <path d="M6 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="1.6" />
+                </svg>
+                <input
+                  id="sl-password"
+                  type="password"
+                  className="sl-input"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Checkbox: Remember Me */}
+            <div className="sl-row">
+              <label className="sl-checkbox-wrapper">
+                <input
+                  type="checkbox"
+                  className="sl-checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                <span className="sl-checkbox-custom" />
+                <span className="sl-checkbox-label">Keep me logged in</span>
+              </label>
+            </div>
+
+            {/* Main Submit button with dynamic loading state */}
+            <button
+              type="submit"
+              className={`sl-btn sl-btn--primary ${loading ? 'sl-btn--loading' : ''}`}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <span className="sl-btn__spinner" />
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign In</span>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Social login divider */}
+          <div className="sl-social-divider">
+            <span className="sl-social-divider__line" />
+            <span className="sl-social-divider__text">or sign in with</span>
+            <span className="sl-social-divider__line" />
+          </div>
+
+          {/* Social Sign-In buttons */}
+          <div className="sl-social-grid">
+            <button className="sl-social-btn" aria-label="Sign in with Google" onClick={handleGoogleSignIn} type="button">
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <path fill="#EA4335" d="M12.2 10.3v3.4h5.7c-.2 1.3-1 2.4-2.2 3.1v2.6h3.6c2.1-1.9 3.3-4.7 3.3-8.1 0-.6-.1-1.1-.2-1.6H12.2z" />
+                <path fill="#4285F4" d="M12.2 24c3.2 0 6-1.1 7.9-2.9l-3.6-2.6c-1 .7-2.3 1.1-4.3 1.1-3.3 0-6.1-2.2-7.1-5.2H1.4v2.8C3.4 20.3 7.5 24 12.2 24z" />
+                <path fill="#FBBC05" d="M5.1 14.4c-.3-.8-.4-1.7-.4-2.6 0-.9.1-1.8.4-2.6V6.4H1.4C.5 8.2 0 10.2 0 12.2s.5 4 1.4 5.8l3.7-3.6z" />
+                <path fill="#34A853" d="M12.2 4.7c1.8 0 3.3.6 4.6 1.8l3.4-3.4C18.2 1.1 15.4 0 12.2 0 7.5 0 3.4 3.7 1.4 7.7l3.7 2.8c1-3 3.8-5.8 7.1-5.8z" />
+              </svg>
+              <span>Google</span>
+            </button>
+            <button className="sl-social-btn" aria-label="Sign in with Apple">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.7 18.5C17.5 20.3 16.3 22 14.5 22c-1.8 0-2.3-1.1-4.3-1.1-2.1 0-2.6 1.1-4.3 1.1-1.7 0-3.1-1.8-4.2-3.4C-.6 15 1.1 9.4 3.7 9.4c1.8 0 2.8 1.1 3.9 1.1 1.1 0 2.3-1.1 4.4-1.1 1.8 0 3.2 1 4.1 2.2-3.8 2.2-3.2 7.7.3 9.4-.7 1.9-1.9 3.5-3.7 3.5zM15.8 6.4c1-1.2 1.6-2.8 1.4-4.4-1.4.1-3 1-4 2.1-1 1.1-1.8 2.8-1.5 4.3 1.5.1 3-1 4.1-2z" />
+              </svg>
+              <span>Apple</span>
+            </button>
+          </div>
+
+          {/* Form Footer links */}
+          <div className="sl-form-card__footer">
+            <span className="sl-form-card__footer-text">New to Emahu Seller?</span>
+            <Link href="/seller/register" className="sl-form-card__footer-link">
+              Create an Account
+            </Link>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}

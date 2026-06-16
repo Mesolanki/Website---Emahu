@@ -1,0 +1,478 @@
+/* 
+  Emahu Pro-Level Full-Width Hero Section CSS
+  Stretches 100% screen-width, content centers at 1200px.
+*/
+
+.bh-home-wrapper {
+  background-color: #f8fafc;
+  min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Full-Width Hero Section ── */
+.bh-hero-section {
+  width: 100%;
+  height: 480px;
+  position: relative;
+  overflow: hidden;
+  background-color: #ffffff;
+}
+
+.bh-hero-slider {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.bh-hero-slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  visibility: hidden;
+  display: flex;
+  align-items: center;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: scale(1.02);
+}
+
+.bh-hero-slide--active {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
+}
+
+/* Premium full-width background gradients matching high-end tech/fashion retail */
+.bh-hero-slide:nth-child(1) {
+  background: linear-gradient(135deg, #f0fdfa 0%, #e2fbf7 50%, #bbf7ec 100%); /* Emerald Mint */
+}
+
+.bh-hero-slide:nth-child(2) {
+  background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 50%, #bae6fd 100%); /* Clean sky blue */
+}
+
+.bh-hero-slide:nth-child(3) {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%); /* Golden Amber */
+}
+
+/* Centered content grid matching header width */
+.bh-hero-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  align-items: center;
+  height: 100%;
+  box-sizing: border-box;
+  gap: 40px;
+}
+
+/* Left Column Info */
+.bh-hero-info {
+  max-width: 580px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
+}
+
+.bh-hero-slide--active .bh-hero-info {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.bh-hero-badge {
+  display: inline-block;
+  background: rgba(18, 183, 178, 0.1);
+  color: #12b7b2; /* EMAHU Teal */
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  margin-bottom: 18px;
+}
+
+.bh-hero-slide:nth-child(2) .bh-hero-badge {
+  background: rgba(65, 105, 225, 0.1);
+  color: #4169e1;
+}
+
+.bh-hero-slide:nth-child(3) .bh-hero-badge {
+  background: rgba(217, 119, 6, 0.1);
+  color: #d97706;
+}
+
+.bh-hero-title {
+  font-size: 2.8rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: #0f172a;
+  margin: 0 0 16px;
+  letter-spacing: -0.5px;
+}
+
+.bh-hero-desc {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #4b5563;
+  margin: 0 0 28px;
+}
+
+.bh-hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #111111; /* Matte black matching header login */
+  color: #ffffff;
+  padding: 12px 32px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bh-hero-cta:hover {
+  background-color: #000000;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Right Column Gadget Mockups */
+.bh-hero-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  height: 100%;
+  opacity: 0;
+  transform: translateX(40px) scale(0.95);
+  transition: all 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.3s;
+}
+
+.bh-hero-slide--active .bh-hero-visual {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+/* ── Pro Smartphone CSS Mockup ── */
+.bh-phone-mockup {
+  width: 200px;
+  height: 380px;
+  background: #0f172a;
+  border: 10px solid #1e293b;
+  border-radius: 36px;
+  position: relative;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 
+              0 0 40px rgba(18, 183, 178, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.bh-phone-screen {
+  flex: 1;
+  background: linear-gradient(180deg, #111827 0%, #1e1b4b 100%);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.bh-phone-camera {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 18px;
+  background: #000000;
+  border-radius: 20px;
+  z-index: 10;
+}
+
+.bh-phone-glow {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(18, 183, 178, 0.4) 0%, rgba(18, 183, 178, 0) 70%);
+  animation: bhMockupPulse 3s infinite alternate ease-in-out;
+}
+
+.bh-phone-content {
+  z-index: 2;
+  text-align: center;
+  color: #ffffff;
+}
+
+.bh-phone-logo {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #12b7b2;
+  letter-spacing: 1px;
+}
+
+.bh-phone-tagline {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+@keyframes bhMockupPulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  100% { transform: scale(1.2); opacity: 1; }
+}
+
+/* Floating Badges */
+.bh-floating-badge {
+  position: absolute;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 5;
+  animation: bhFloating 4s infinite ease-in-out;
+}
+
+.bh-floating-badge--1 {
+  top: 60px;
+  left: -20px;
+  animation-delay: 0s;
+}
+
+.bh-floating-badge--2 {
+  bottom: 80px;
+  right: -25px;
+  animation-delay: 1.5s;
+}
+
+@keyframes bhFloating {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* ── Pro Slide 2 Visual (Kitchenware Mockup) ── */
+.bh-glass-mockup {
+  width: 140px;
+  height: 280px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #1e3a8a;
+  position: relative;
+}
+
+.bh-glass-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 60%);
+  border-radius: 24px;
+}
+
+/* ── Pro Slide 3 Visual (Running Shoes visual card) ── */
+.bh-sport-card {
+  width: 220px;
+  height: 220px;
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(217, 119, 6, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(217, 119, 6, 0.05);
+}
+
+.bh-sport-streak {
+  position: absolute;
+  width: 150%;
+  height: 40px;
+  background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.2), transparent);
+  transform: rotate(-45deg);
+  animation: bhStreak 2s infinite linear;
+}
+
+@keyframes bhStreak {
+  0% { transform: rotate(-45deg) translateY(-200px); }
+  100% { transform: rotate(-45deg) translateY(200px); }
+}
+
+/* Slider Left/Right Arrows */
+.bh-hero-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  color: #111111;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.bh-hero-arrow:hover {
+  background-color: #ffffff;
+  color: #12b7b2;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.bh-hero-arrow--left {
+  left: 24px;
+}
+
+.bh-hero-arrow--right {
+  right: 24px;
+}
+
+/* Dots Indicators */
+.bh-hero-dots {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+
+.bh-hero-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bh-hero-dot--active {
+  width: 24px;
+  border-radius: 8px;
+  background: #111111;
+}
+
+
+/* ── Tablet Responsiveness (1024px) ── */
+@media (max-width: 1024px) {
+  .bh-hero-section {
+    height: 400px; /* Safe heights to avoid container collapse */
+  }
+  .bh-hero-title {
+    font-size: 2.2rem;
+  }
+  .bh-hero-container {
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 24px;
+  }
+  .bh-phone-mockup {
+    width: 170px;
+    height: 320px;
+    border-width: 8px;
+  }
+  .bh-floating-badge {
+    padding: 6px 12px;
+    font-size: 0.7rem;
+  }
+  .bh-floating-badge--1 {
+    top: 40px;
+    left: -10px;
+  }
+  .bh-floating-badge--2 {
+    bottom: 60px;
+    right: -10px;
+  }
+  .bh-glass-mockup {
+    width: 120px;
+    height: 240px;
+  }
+  .bh-sport-card {
+    width: 180px;
+    height: 180px;
+  }
+}
+
+/* ── Mobile Responsiveness (768px) ── */
+@media (max-width: 768px) {
+  .bh-hero-section {
+    height: 360px; /* Strong, fixed mobile height so absolute slides render correctly */
+  }
+  .bh-hero-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 24px 16px;
+    gap: 0;
+  }
+  .bh-hero-info {
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .bh-hero-badge {
+    margin-bottom: 12px;
+    font-size: 0.7rem;
+    padding: 4px 10px;
+  }
+  .bh-hero-title {
+    font-size: 1.75rem;
+    margin-bottom: 10px;
+    line-height: 1.25;
+  }
+  .bh-hero-desc {
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .bh-hero-cta {
+    padding: 10px 24px;
+    font-size: 0.85rem;
+  }
+  .bh-hero-visual {
+    display: none; /* Hide visual on mobile viewports to prevent layout congestion */
+  }
+  .bh-hero-dots {
+    bottom: 12px;
+  }
+  .bh-hero-arrow {
+    display: none; /* Hide arrows on mobile viewports for clean touch sliding */
+  }
+}

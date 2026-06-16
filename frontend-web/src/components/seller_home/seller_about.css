@@ -1,0 +1,1158 @@
+/* ==========================================================================
+   EMAHU ENGINE ABOUT SECTION — Ultra-Premium Enterprise SaaS Theme
+   ========================================================================== */
+
+.sa-section {
+  position: relative;
+  width: 100%;
+  background: #f8fafc; /* Sleek, crisp slate-white background */
+  padding: 120px 24px;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+  color: #0f172a; /* Slate dark text */
+  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+/* Background Grid Pattern */
+.sa-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Soft ambient background glows */
+.sa-bg__glow {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  filter: blur(140px);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.sa-bg__glow--left {
+  top: -10%;
+  left: -10%;
+  background: radial-gradient(circle, rgba(147, 197, 253, 0.35) 0%, transparent 70%);
+}
+
+.sa-bg__glow--right {
+  bottom: -10%;
+  right: -10%;
+  background: radial-gradient(circle, rgba(191, 219, 254, 0.3) 0%, transparent 70%);
+}
+
+/* Main Container */
+.sa-container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Section Header */
+.sa-header {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 72px auto;
+}
+
+.sa-header__badge {
+  display: inline-block;
+  padding: 6px 18px;
+  border-radius: 9999px;
+  background: rgba(37, 99, 235, 0.05);
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  color: #2563eb;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.05);
+}
+
+.sa-header__title {
+  font-size: clamp(32px, 5vw, 46px);
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: -1.8px;
+  color: #0f172a;
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #2563eb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 22px;
+}
+
+.sa-header__desc {
+  font-size: 17px;
+  color: #475569;
+  line-height: 1.65;
+}
+
+/* Dashboard Grid Layout */
+.sa-dashboard {
+  display: grid;
+  grid-template-columns: 1.15fr 1.85fr;
+  gap: 48px;
+  align-items: start;
+  min-width: 0;
+  width: 100%;
+}
+
+/* Left Panel: Tabs Control */
+.sa-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  width: 100%;
+}
+
+.sa-controls__list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  width: 100%;
+}
+
+.sa-tab-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  padding: 22px 26px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  border-radius: 20px;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 
+    0 4px 12px rgba(15, 23, 42, 0.01),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.sa-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(15, 23, 42, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 12px 24px -10px rgba(15, 23, 42, 0.04),
+    0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+.sa-tab-btn--active {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 
+    0 20px 40px -12px rgba(15, 23, 42, 0.06),
+    0 0 1px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translateY(-2px);
+}
+
+/* Tab active border modifier styles */
+.sa-tab-btn--shield.sa-tab-btn--active {
+  border-left: 4px solid #2563eb;
+}
+.sa-tab-btn--escrow.sa-tab-btn--active {
+  border-left: 4px solid #16a34a;
+}
+.sa-tab-btn--catalog.sa-tab-btn--active {
+  border-left: 4px solid #4f46e5;
+}
+.sa-tab-btn--logistics.sa-tab-btn--active {
+  border-left: 4px solid #ea580c;
+}
+
+/* Indicator strip inside buttons */
+.sa-tab-btn__indicator {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 36px;
+  border-radius: 0 4px 4px 0;
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.sa-tab-btn--active .sa-tab-btn__indicator {
+  opacity: 1;
+}
+
+.sa-tab-btn--shield .sa-tab-btn__indicator { background: #2563eb; }
+.sa-tab-btn--escrow .sa-tab-btn__indicator { background: #16a34a; }
+.sa-tab-btn--catalog .sa-tab-btn__indicator { background: #4f46e5; }
+.sa-tab-btn--logistics .sa-tab-btn__indicator { background: #ea580c; }
+
+/* Icon Container inside buttons */
+.sa-tab-btn__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #f1f5f9;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  color: #64748b;
+}
+
+.sa-tab-btn--active .sa-tab-btn__icon {
+  transform: scale(1.08) rotate(3deg);
+}
+
+.sa-tab-btn--shield.sa-tab-btn--active .sa-tab-btn__icon {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.15);
+  color: #2563eb;
+}
+
+.sa-tab-btn--escrow.sa-tab-btn--active .sa-tab-btn__icon {
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(22, 163, 74, 0.15);
+  color: #16a34a;
+}
+
+.sa-tab-btn--catalog.sa-tab-btn--active .sa-tab-btn__icon {
+  background: rgba(79, 70, 229, 0.08);
+  border-color: rgba(79, 70, 229, 0.15);
+  color: #4f46e5;
+}
+
+.sa-tab-btn--logistics.sa-tab-btn--active .sa-tab-btn__icon {
+  background: rgba(234, 88, 12, 0.08);
+  border-color: rgba(234, 88, 12, 0.15);
+  color: #ea580c;
+}
+
+/* Button text labels */
+.sa-tab-btn__txt {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sa-tab-btn__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  transition: color 0.3s ease;
+}
+
+.sa-tab-btn--active .sa-tab-btn__title {
+  color: #0f172a;
+}
+
+.sa-tab-btn__sub {
+  font-size: 12.5px;
+  color: #64748b;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.sa-tab-btn--active .sa-tab-btn__sub {
+  color: #475569;
+}
+
+/* Right Panel: Animated Visual Canvas Wrapper */
+.sa-canvas-wrapper {
+  perspective: 1000px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.sa-canvas {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-height: 520px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 28px;
+  padding: 44px;
+  overflow: hidden;
+  box-shadow: 
+    0 30px 60px -15px rgba(15, 23, 42, 0.04),
+    0 0 0 1px rgba(15, 23, 42, 0.02),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 36px;
+  transition: all 0.4s ease;
+}
+
+.sa-canvas__plate {
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.04), transparent 60%),
+    radial-gradient(circle at bottom left, rgba(79, 70, 229, 0.03), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Dynamic active state borders */
+.sa-canvas--shield { border-color: rgba(37, 99, 235, 0.15); }
+.sa-canvas--escrow { border-color: rgba(22, 163, 74, 0.15); }
+.sa-canvas--catalog { border-color: rgba(79, 70, 229, 0.15); }
+.sa-canvas--logistics { border-color: rgba(234, 88, 12, 0.15); }
+
+/* Animated visual container */
+.sa-visual-container {
+  position: relative;
+  width: 100%;
+  height: 270px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(20px) scale(0.98);
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1;
+}
+
+.sa-visual-container--active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.sa-vis {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   🛡️ 1. SHIELD STYLES: Premium Profit Console
+   ========================================================================== */
+
+.sa-vis--shield {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 520px;
+  gap: 24px;
+}
+
+/* Console Box */
+.sa-console {
+  flex: 1;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.sa-console__header {
+  padding: 12px 18px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sa-console__indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sa-console__dot {
+  width: 6px;
+  height: 6px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: beaconPulse 1.5s infinite ease-in-out;
+}
+
+.sa-console__status {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.8px;
+}
+
+.sa-console__savings-pill {
+  font-size: 10px;
+  font-weight: 850;
+  background: rgba(34, 197, 94, 0.08);
+  color: #16a34a;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(34, 197, 94, 0.15);
+}
+
+.sa-console__body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sa-console__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sa-console__metric-lbl {
+  font-size: 9px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 1px;
+}
+
+.sa-console__metric-val {
+  font-size: 24px;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+}
+
+.sa-console__metric-sub {
+  font-size: 11px;
+  color: #22c55e;
+  font-weight: 700;
+}
+
+/* Audit table */
+.sa-console__table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sa-table__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  border-radius: 12px;
+  font-size: 11.5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.01);
+}
+
+.sa-table__col-id {
+  font-weight: 750;
+  color: #94a3b8;
+}
+
+.sa-table__col-amt {
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.sa-table__col-status {
+  font-weight: 800;
+  font-size: 11px;
+}
+
+.sa-status--success {
+  color: #16a34a;
+}
+
+/* Glowing Defensive Vector Shield */
+.sa-shield-vector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 140px;
+  height: 140px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.sa-shield-vector svg {
+  animation: floatShield 4s ease-in-out infinite;
+  filter: drop-shadow(0 15px 30px rgba(37, 99, 235, 0.3));
+}
+
+@keyframes beaconPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.4; }
+}
+
+@keyframes floatShield {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-8px) scale(1.03); }
+}
+
+
+/* ==========================================================================
+   💼 2. ESCROW STYLES: Settlement Payout Pipeline
+   ========================================================================== */
+
+.sa-vis--escrow {
+  max-width: 480px;
+  width: 100%;
+}
+
+.sa-escrow-terminal {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 20px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.05);
+}
+
+.sa-terminal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sa-terminal__title {
+  font-size: 10px;
+  font-weight: 850;
+  color: #64748b;
+  letter-spacing: 1px;
+}
+
+.sa-terminal__badge {
+  font-size: 9.5px;
+  font-weight: 850;
+  color: #16a34a;
+  background: rgba(34, 197, 94, 0.08);
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(34, 197, 94, 0.15);
+}
+
+.sa-terminal__flow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  position: relative;
+  padding: 10px 0;
+}
+
+.sa-flow__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 2;
+  position: relative;
+}
+
+.sa-step__circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 900;
+  transition: all 0.3s ease;
+}
+
+.sa-flow__step--active .sa-step__circle {
+  background: #16a34a;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(22, 163, 74, 0.4);
+}
+
+.sa-flow__step--pending .sa-step__circle {
+  background: #e2e8f0;
+  color: #64748b;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+.sa-step__lbl {
+  font-size: 11px;
+  font-weight: 800;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.sa-flow__line {
+  flex: 1;
+  height: 3px;
+  background: #e2e8f0;
+  margin: 0 -10px;
+  margin-top: -18px;
+  z-index: 1;
+}
+
+.sa-flow__line--active {
+  background: #16a34a;
+}
+
+.sa-flow__line--pulsing {
+  background: linear-gradient(90deg, #16a34a, #dcfce7, #16a34a);
+  background-size: 200% 100%;
+  animation: flowPulse 2s linear infinite;
+}
+
+@keyframes flowPulse {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* Ledger Box */
+.sa-ledger {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.sa-ledger__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sa-ledger__lbl {
+  font-size: 12px;
+  font-weight: 750;
+  color: #64748b;
+}
+
+.sa-ledger__val {
+  font-size: 18px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.sa-ledger__footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid rgba(15, 23, 42, 0.04);
+  padding-top: 10px;
+}
+
+.sa-ledger__status-dot {
+  width: 6px;
+  height: 6px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: beaconPulse 1.5s infinite;
+}
+
+.sa-ledger__status-txt {
+  font-size: 10px;
+  font-weight: 800;
+  color: #16a34a;
+}
+
+
+/* ==========================================================================
+   ⚡ 3. AI CATALOG STYLES: Smart Generation Panel
+   ========================================================================== */
+
+.sa-vis--catalog {
+  max-width: 520px;
+  width: 100%;
+}
+
+.sa-ai-studio {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 40px 1.25fr;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.05);
+}
+
+/* Studio Input Pane */
+.sa-studio__input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sa-input__badge {
+  font-size: 9px;
+  font-weight: 850;
+  color: #64748b;
+  letter-spacing: 0.8px;
+}
+
+.sa-input__photo {
+  position: relative;
+  height: 130px;
+  background: #ffffff;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.sa-input__icon {
+  font-size: 42px;
+  filter: grayscale(0.2);
+}
+
+/* Sweep Laser bar */
+.sa-input__scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #4f46e5, transparent);
+  box-shadow: 0 0 10px 1px rgba(79, 70, 229, 0.5);
+  animation: studioSweep 3s infinite linear;
+}
+
+@keyframes studioSweep {
+  0% { top: 5%; }
+  50% { top: 92%; }
+  100% { top: 5%; }
+}
+
+/* Divider Arrow */
+.sa-studio__divider {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.sa-divider__spark {
+  animation: sparkPulse 2s infinite ease-in-out;
+}
+
+@keyframes sparkPulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.2) rotate(180deg); opacity: 1; }
+}
+
+/* Studio Output Pane */
+.sa-studio__output {
+  background: rgba(79, 70, 229, 0.03);
+  border: 1px solid rgba(79, 70, 229, 0.16);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.02);
+  animation: previewFade 3s infinite ease-in-out;
+}
+
+@keyframes previewFade {
+  0%, 100% { opacity: 0.2; transform: scale(0.97); }
+  45%, 55% { opacity: 1; transform: scale(1); }
+}
+
+.sa-output__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sa-output__badge {
+  font-size: 8px;
+  font-weight: 900;
+  color: #4f46e5;
+  background: rgba(79, 70, 229, 0.08);
+  padding: 3px 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(79, 70, 229, 0.15);
+  letter-spacing: 0.5px;
+}
+
+.sa-output__score {
+  font-size: 9px;
+  font-weight: 800;
+  color: #16a34a;
+}
+
+.sa-output__title {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.sa-output__desc {
+  font-size: 10.5px;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.sa-output__tags {
+  display: flex;
+  gap: 6px;
+}
+
+.sa-output__tags span {
+  font-size: 9px;
+  font-weight: 750;
+  color: #4f46e5;
+  background: #ffffff;
+  border: 1px solid rgba(79, 70, 229, 0.08);
+  padding: 2.5px 6px;
+  border-radius: 4px;
+}
+
+
+/* ==========================================================================
+   🚚 4. LOGISTICS STYLES: Courier Routing Console
+   ========================================================================== */
+
+.sa-vis--logistics {
+  max-width: 480px;
+  width: 100%;
+}
+
+.sa-logistics-panel {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 20px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.05);
+}
+
+.sa-logistics-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sa-logistics-panel__title {
+  font-size: 10px;
+  font-weight: 850;
+  color: #64748b;
+  letter-spacing: 1px;
+}
+
+.sa-logistics-panel__hud {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #22c55e;
+}
+
+.sa-hud__pulse {
+  width: 6px;
+  height: 6px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: beaconPulse 1.5s infinite;
+}
+
+/* Carriers Box */
+.sa-logistics-panel__carriers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sa-carrier-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 14px;
+  transition: all 0.3s ease;
+}
+
+.sa-carrier-card--active {
+  background: #ffffff;
+  border: 1.5px solid #ea580c;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.06);
+}
+
+.sa-carrier-card--inactive {
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  opacity: 0.65;
+}
+
+.sa-carrier__details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+}
+
+.sa-carrier__name {
+  font-size: 12px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.sa-carrier__perf {
+  font-size: 10px;
+  font-weight: 750;
+  color: #ea580c;
+}
+
+.sa-carrier-card--inactive .sa-carrier__perf {
+  color: #64748b;
+}
+
+.sa-carrier__price {
+  font-size: 13px;
+  font-weight: 850;
+  color: #0f172a;
+}
+
+/* AWB Card */
+.sa-awb-card {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.sa-awb__lbl {
+  font-size: 9px;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+
+.sa-awb__val {
+  font-size: 11px;
+  font-weight: 750;
+  color: #334155;
+}
+
+
+/* ==========================================================================
+   BOTTOM DETAILS INFORMATION DISPLAY
+   ========================================================================== */
+
+.sa-info {
+  border-top: 1px solid rgba(15, 23, 42, 0.05);
+  padding-top: 28px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  z-index: 1;
+}
+
+.sa-info__badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+/* Dynamically styled info badge based on active tab! */
+.sa-canvas--shield .sa-info__badge {
+  background: rgba(37, 99, 235, 0.06);
+  color: #2563eb;
+}
+.sa-canvas--escrow .sa-info__badge {
+  background: rgba(22, 163, 74, 0.06);
+  color: #16a34a;
+}
+.sa-canvas--catalog .sa-info__badge {
+  background: rgba(79, 70, 229, 0.06);
+  color: #4f46e5;
+}
+.sa-canvas--logistics .sa-info__badge {
+  background: rgba(234, 88, 12, 0.06);
+  color: #ea580c;
+}
+
+.sa-info__title {
+  font-size: clamp(20px, 3.5vw, 24px);
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 10px;
+  letter-spacing: -0.5px;
+}
+
+.sa-info__desc {
+  font-size: 14.5px;
+  color: #475569;
+  line-height: 1.65;
+}
+
+
+/* ==========================================================================
+   5. RESPONSIVE DESIGN & CENTER ALIGNMENTS (Tested & Robust)
+   ========================================================================== */
+
+@media (max-width: 1120px) {
+  .sa-dashboard {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  
+  .sa-controls__list {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 4px 4px 12px 4px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 16px;
+    scrollbar-width: none;
+  }
+
+  .sa-controls__list::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .sa-tab-btn {
+    flex: 0 0 280px;
+    scroll-snap-align: start;
+    padding: 16px 20px;
+  }
+
+  .sa-canvas {
+    padding: 32px;
+    min-height: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .sa-section {
+    padding: 80px 16px;
+  }
+
+  .sa-header {
+    margin-bottom: 48px;
+  }
+
+  .sa-canvas {
+    padding: 24px;
+    gap: 28px;
+  }
+
+  .sa-visual-container {
+    height: auto;
+    min-height: 240px;
+  }
+
+  .sa-vis--shield {
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .sa-console {
+    width: 100%;
+  }
+
+  .sa-shield-vector {
+    width: 100px;
+    height: 100px;
+  }
+
+  .sa-shield-vector svg {
+    width: 70px;
+    height: auto;
+  }
+
+  .sa-ai-studio {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .sa-studio__divider {
+    transform: rotate(90deg);
+  }
+
+  .sa-info {
+    padding-top: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sa-section {
+    padding: 64px 12px;
+  }
+
+  .sa-canvas {
+    padding: 20px;
+  }
+
+  .sa-tab-btn {
+    flex: 0 0 250px;
+  }
+
+  .sa-console__body {
+    padding: 16px;
+  }
+
+  .sa-console__metric-val {
+    font-size: 20px;
+  }
+
+  .sa-flow__step {
+    gap: 4px;
+  }
+
+  .sa-step__circle {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+  }
+
+  .sa-step__lbl {
+    font-size: 9.5px;
+  }
+
+  .sa-ledger__val {
+    font-size: 16px;
+  }
+}

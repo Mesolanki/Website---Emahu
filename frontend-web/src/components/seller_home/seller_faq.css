@@ -1,0 +1,223 @@
+/* =============================================================
+   SELLER FAQ — GOD TIER WHITE ADMIN-PANEL STYLING
+   Theme: Pure White | Clean Accordions | Premium Transitions
+   ============================================================= */
+
+.sfq-sec {
+  padding: 100px 24px;
+  background-color: #ffffff; /* Pure White background */
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Background Glowing Blurs (Subtle details) */
+.sfq-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  z-index: 1;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.sfq-glow--1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.04) 0%, transparent 70%);
+  top: 10%;
+  right: 5%;
+}
+
+.sfq-glow--2 {
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.03) 0%, transparent 70%);
+  bottom: 10%;
+  left: 5%;
+}
+
+.sfq-container {
+  max-width: 800px; /* Slimmer container for reading comfort */
+  margin: 0 auto;
+  position: relative;
+  z-index: 5;
+}
+
+/* ─────────────────────────────────────────────
+   HEADER BLOCK
+   ───────────────────────────────────────────── */
+.sfq-header {
+  text-align: center;
+  margin-bottom: 56px;
+}
+
+.sfq-header__badge {
+  display: inline-block;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.04);
+}
+
+.sfq-header__title {
+  font-size: 38px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+  margin: 0 0 16px 0;
+  letter-spacing: -1px;
+}
+
+.sfq-header__desc {
+  font-size: 16px;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ─────────────────────────────────────────────
+   ACCORDION ITEMS LIST
+   ───────────────────────────────────────────── */
+.sfq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sfq-item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 1px 2px rgba(0, 0, 0, 0.01);
+}
+
+.sfq-item:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04);
+}
+
+/* Open Accordion State details */
+.sfq-item--open {
+  background: rgba(37, 99, 235, 0.02);
+  border-color: rgba(37, 99, 235, 0.3);
+  box-shadow: 
+    0 10px 15px -3px rgba(37, 99, 235, 0.04),
+    0 4px 6px -2px rgba(37, 99, 235, 0.02);
+}
+
+/* Accordion Trigger button */
+.sfq-trigger {
+  width: 100%;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  color: #0f172a;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+}
+
+.sfq-question {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+  transition: color 0.2s ease;
+}
+
+.sfq-item:hover .sfq-question {
+  color: #2563eb;
+}
+
+.sfq-item--open .sfq-question {
+  color: #2563eb;
+}
+
+.sfq-icon-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  flex-shrink: 0;
+  transition: all 0.25s ease;
+}
+
+.sfq-item:hover .sfq-icon-wrap {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+.sfq-item--open .sfq-icon-wrap {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.2);
+  color: #2563eb;
+}
+
+.sfq-chevron {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sfq-item--open .sfq-chevron {
+  transform: rotate(180deg);
+}
+
+/* Smooth Accordion Sliding transitions */
+.sfq-answer-container {
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sfq-answer {
+  font-size: 14.5px;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0 24px 24px 24px;
+}
+
+/* ─────────────────────────────────────────────
+   RESPONSIVE DESIGN BREAKPOINTS
+   ───────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .sfq-sec {
+    padding: 60px 16px;
+  }
+  .sfq-header__title {
+    font-size: 28px;
+  }
+  .sfq-header__desc {
+    font-size: 14.5px;
+  }
+  .sfq-trigger {
+    padding: 18px;
+  }
+  .sfq-question {
+    font-size: 14.5px;
+  }
+  .sfq-answer {
+    font-size: 13.5px;
+    padding: 0 18px 18px 18px;
+  }
+}

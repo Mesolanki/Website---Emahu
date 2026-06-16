@@ -1,0 +1,322 @@
+.al-wrapper {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #0b0c10;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  padding: 20px;
+  color: #f3f4f6;
+}
+
+/* Background Glowing Blobs */
+.al-ambient-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.15;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.al-ambient-blob--1 {
+  width: 500px;
+  height: 500px;
+  background-color: #6366f1;
+  top: -100px;
+  left: -100px;
+  animation: float1 15s infinite alternate ease-in-out;
+}
+
+.al-ambient-blob--2 {
+  width: 600px;
+  height: 600px;
+  background-color: #3b82f6;
+  bottom: -150px;
+  right: -100px;
+  animation: float2 18s infinite alternate ease-in-out;
+}
+
+@keyframes float1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(60px, 40px) scale(1.1); }
+}
+
+@keyframes float2 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-80px, -50px) scale(1.05); }
+}
+
+/* Card Container Layout */
+.al-container {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 1000px;
+  max-width: 100%;
+  background: rgba(17, 18, 23, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+/* Left Brand Column */
+.al-brand-card {
+  position: relative;
+  flex: 1;
+  padding: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(59, 130, 246, 0.05) 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.al-brand-card__overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  opacity: 0.1;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.al-brand-card__content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.al-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.al-logo__text {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 1.5px;
+}
+
+.al-brand-card__hero-text {
+  margin: 60px 0;
+}
+
+.al-brand-card__title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.25;
+  margin-bottom: 20px;
+  background: linear-gradient(to right, #ffffff, #94a3b8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.al-brand-card__desc {
+  font-size: 0.95rem;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+.al-metrics {
+  display: flex;
+  gap: 30px;
+  align-items: center;
+}
+
+.al-metric__num {
+  display: block;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #818cf8;
+}
+
+.al-metric__lbl {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.al-metric__divider {
+  width: 1px;
+  height: 35px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Right Form Column */
+.al-form-card {
+  width: 460px;
+  padding: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.al-form-card__header {
+  margin-bottom: 30px;
+}
+
+.al-form-card__title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.al-form-card__subtitle {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-top: 6px;
+}
+
+.al-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 0.85rem;
+  color: #fca5a5;
+}
+
+.al-error__icon {
+  flex-shrink: 0;
+}
+
+.al-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.al-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.al-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.al-input-wrapper {
+  position: relative;
+}
+
+.al-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #fff;
+  font-size: 0.95rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.al-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.al-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  margin-top: 10px;
+}
+
+.al-btn:hover {
+  background: #4f46e5;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.al-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.al-btn__spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.al-form-card__footer {
+  margin-top: 30px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.875rem;
+}
+
+.al-form-card__footer-text {
+  color: #64748b;
+}
+
+.al-form-card__footer-link {
+  color: #6366f1;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.al-form-card__footer-link:hover {
+  text-decoration: underline;
+}
+
+/* Responsiveness */
+@media (max-width: 900px) {
+  .al-brand-card {
+    display: none;
+  }
+  .al-container {
+    width: 480px;
+  }
+  .al-form-card {
+    width: 100%;
+    padding: 40px;
+  }
+}

@@ -1,0 +1,383 @@
+/*
+  Coming Soon & Portal Preview Stylesheet
+  Design System: Dark Mode Glassmorphism with floating vibrant accents (Blue or Green/Teal)
+*/
+
+.cs-wrapper {
+  position: relative;
+  min-height: 100vh;
+  width: 100vw;
+  background-color: #05070f;
+  color: #f7fafc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 40px 24px;
+  box-sizing: border-box;
+}
+
+/* Luxury Grid Backdrop Overlay */
+.cs-wrapper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-size: 60px 60px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  pointer-events: none;
+}
+
+/* Ambient Radial Mesh Glowing Blobs */
+.cs-blob {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  filter: blur(140px);
+  opacity: 0.18;
+  z-index: 2;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  animation: csFloat 15s ease-in-out infinite alternate;
+}
+
+.cs-blob--buyer {
+  background: radial-gradient(circle, #4169e1 0%, transparent 70%);
+  top: 10%;
+  left: 20%;
+}
+
+.cs-blob--dealer {
+  background: radial-gradient(circle, #319795 0%, transparent 70%);
+  bottom: 10%;
+  right: 20%;
+  animation-delay: -6s;
+}
+
+@keyframes csFloat {
+  0% { transform: translate(-40px, -20px) scale(0.95); }
+  100% { transform: translate(40px, 20px) scale(1.05); }
+}
+
+/* Container */
+.cs-container {
+  position: relative;
+  z-index: 10;
+  max-width: 680px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+/* Back navigation button */
+.cs-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #a0aec0;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.cs-back-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(-4px);
+}
+
+/* Glass Main Card */
+.cs-card {
+  background: rgba(13, 17, 30, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 28px;
+  padding: 56px 48px;
+  width: 100%;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: csCardEntry 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes csCardEntry {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Icon Container */
+.cs-icon-container {
+  width: 80px;
+  height: 80px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+/* Badges */
+.cs-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(65, 105, 225, 0.1);
+  border: 1px solid rgba(65, 105, 225, 0.3);
+  color: #63b3ed;
+  margin-bottom: 20px;
+}
+
+.cs-badge--dealer {
+  background: rgba(49, 151, 149, 0.1);
+  border-color: rgba(49, 151, 149, 0.3);
+  color: #81e6d9;
+}
+
+/* Title text */
+.cs-title {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #ffffff;
+  margin-bottom: 16px;
+}
+
+.cs-subtitle {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #a0aec0;
+  margin-bottom: 40px;
+  max-width: 520px;
+}
+
+/* Waitlist Form Styling */
+.cs-form {
+  width: 100%;
+  max-width: 500px;
+  margin-bottom: 40px;
+}
+
+.cs-input-group {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 6px;
+  transition: all 0.3s ease;
+}
+
+.cs-input-group:focus-within {
+  border-color: rgba(65, 105, 225, 0.4);
+  box-shadow: 0 0 15px rgba(65, 105, 225, 0.15);
+}
+
+.cs-wrapper--dealer .cs-input-group:focus-within {
+  border-color: rgba(49, 151, 149, 0.4);
+  box-shadow: 0 0 15px rgba(49, 151, 149, 0.15);
+}
+
+.cs-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+}
+
+.cs-input::placeholder {
+  color: #4a5568;
+}
+
+.cs-input--error {
+  color: #feb2b2;
+}
+
+/* Waitlist Button */
+.cs-btn {
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cs-btn--buyer {
+  background: #4169e1;
+  color: #ffffff;
+}
+
+.cs-btn--buyer:hover {
+  background: #527bf5;
+}
+
+.cs-btn--dealer {
+  background: #319795;
+  color: #ffffff;
+}
+
+.cs-btn--dealer:hover {
+  background: #3cbcba;
+}
+
+.cs-error {
+  display: block;
+  font-size: 0.8rem;
+  color: #feb2b2;
+  margin-top: 8px;
+  text-align: left;
+  padding-left: 16px;
+}
+
+.cs-form-tip {
+  font-size: 0.8rem;
+  color: #718096;
+  margin-top: 14px;
+}
+
+/* Success Message styling */
+.cs-success {
+  background: rgba(65, 105, 225, 0.08);
+  border: 1px solid rgba(65, 105, 225, 0.2);
+  border-radius: 16px;
+  padding: 32px;
+  width: 100%;
+  max-width: 500px;
+  margin-bottom: 40px;
+  animation: csSuccessPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.cs-success--dealer {
+  background: rgba(49, 151, 149, 0.08);
+  border-color: rgba(49, 151, 149, 0.2);
+}
+
+@keyframes csSuccessPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.cs-success-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #48bb78;
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.cs-success h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.cs-success p {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #cbd5e0;
+}
+
+/* Progress Tracker styling */
+.cs-progress-container {
+  width: 100%;
+  max-width: 500px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  padding-top: 24px;
+  text-align: left;
+}
+
+.cs-progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #718096;
+  margin-bottom: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cs-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.cs-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1s ease;
+}
+
+.cs-progress-fill--buyer {
+  background: linear-gradient(to right, #63b3ed, #4169e1);
+}
+
+.cs-progress-fill--dealer {
+  background: linear-gradient(to right, #81e6d9, #319795);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .cs-card {
+    padding: 36px 24px;
+  }
+  
+  .cs-title {
+    font-size: 1.75rem;
+  }
+  
+  .cs-input-group {
+    flex-direction: column;
+    background: transparent;
+    border: none;
+    padding: 0;
+    gap: 12px;
+  }
+  
+  .cs-input {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    width: 100%;
+  }
+  
+  .cs-btn {
+    width: 100%;
+    border-radius: 12px;
+  }
+}
