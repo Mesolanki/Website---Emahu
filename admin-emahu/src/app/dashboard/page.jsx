@@ -135,7 +135,7 @@ export default function AdminDashboard() {
       const token = localStorage.getItem('emahu_admin_token');
       if (!token) return;
       
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/central-sellers-directory', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/central-sellers-directory`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -147,7 +147,7 @@ export default function AdminDashboard() {
       // Fallback to normal admin sellers endpoint if helper route not defined
       let data;
       if (res.status === 404) {
-        const fallbackRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/sellers', {
+        const fallbackRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/sellers`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (fallbackRes.status === 401) {
@@ -185,7 +185,7 @@ export default function AdminDashboard() {
       const token = localStorage.getItem('emahu_admin_token');
       if (!token) return;
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/admin/all', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/admin/all`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -219,7 +219,7 @@ export default function AdminDashboard() {
     setLoadingAuditLogs(true);
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/audit', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/audit`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -242,7 +242,7 @@ export default function AdminDashboard() {
     setLoadingNotifications(true);
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -343,7 +343,7 @@ export default function AdminDashboard() {
   const handle2FASetup = async () => {
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/2fa/setup', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/2fa/setup`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -367,7 +367,7 @@ export default function AdminDashboard() {
   const handle2FAVerify = async () => {
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/2fa/verify', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/2fa/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -402,7 +402,7 @@ export default function AdminDashboard() {
   const handle2FADisable = async () => {
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/2fa/disable', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/2fa/disable`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
