@@ -1,3 +1,5 @@
+'use client';
+
 export async function logAnalyticsEvent({ type, productId, sellerId }) {
   try {
     if (!sellerId) return;

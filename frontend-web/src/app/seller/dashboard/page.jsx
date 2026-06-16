@@ -318,7 +318,7 @@ export default function EmahuProDashboard() {
         try {
           const url = sellerUserIdOpt 
             ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?sellerId=${sellerUserIdOpt}`
-            : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders';
+            : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders`;
           const res = await fetch(url);
           const data = await res.json();
           if (data.success && data.orders) {
