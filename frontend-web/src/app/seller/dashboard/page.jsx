@@ -220,9 +220,10 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents`, {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(apiBase + '/api/auth/seller/documents', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
       if (res.status === 401) {
@@ -2231,7 +2232,7 @@ export default function EmahuProDashboard() {
                         <div style={{ color: '#10b981', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
                           🏆 Highest Selling Product
                         </div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', color: '#fff', fontWeight: 700 }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 700 }}>
                           {highestSellingProduct.name}
                         </h4>
                         <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
@@ -2255,11 +2256,11 @@ export default function EmahuProDashboard() {
 
                     {/* Selling Range List */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff' }}>Products Sales Distribution (Selling Range):</span>
-                      <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>Products Sales Distribution (Selling Range):</span>
+                      <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-secondary)' }}>
                         <table className="portal-table" style={{ width: '100%', fontSize: '0.8rem' }}>
                           <thead>
-                            <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                            <tr style={{ background: 'rgba(0,0,0,0.03)' }}>
                               <th style={{ textAlign: 'left', padding: '8px 12px' }}>Rank</th>
                               <th style={{ textAlign: 'left', padding: '8px 12px' }}>Product</th>
                               <th style={{ textAlign: 'center', padding: '8px 12px' }}>Price</th>
@@ -2269,17 +2270,17 @@ export default function EmahuProDashboard() {
                           </thead>
                           <tbody>
                             {sortedProductsRange.map((p, idx) => (
-                              <tr key={p.id || p._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                <td style={{ padding: '8px 12px', fontWeight: 'bold', color: idx === 0 ? '#10b981' : '#fff' }}>
+                              <tr key={p.id || p._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '8px 12px', fontWeight: 'bold', color: idx === 0 ? '#10b981' : 'var(--text-primary)' }}>
                                   #{idx + 1}
                                 </td>
-                                <td style={{ padding: '8px 12px', color: '#fff' }}>
+                                <td style={{ padding: '8px 12px', color: 'var(--text-primary)' }}>
                                   {p.name}
                                 </td>
-                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                   ₹{p.price.toLocaleString('en-IN')}
                                 </td>
-                                <td style={{ padding: '8px 12px', textAlign: 'center', color: p.stock === 0 ? '#ef4444' : p.stock <= 10 ? '#f59e0b' : '#fff' }}>
+                                <td style={{ padding: '8px 12px', textAlign: 'center', color: p.stock === 0 ? '#ef4444' : p.stock <= 10 ? '#f59e0b' : 'var(--text-secondary)' }}>
                                   {p.stock}
                                 </td>
                                 <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>
