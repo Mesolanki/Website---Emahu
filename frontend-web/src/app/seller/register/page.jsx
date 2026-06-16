@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -212,7 +212,7 @@ export default function SellerRegister() {
         // Automatically submit documents upon registration
         if (data.accessToken) {
           const docUrl = `https://emahu-documents.s3.amazonaws.com/${formData.kycFile ? encodeURIComponent(formData.kycFile.name) : 'kyc_document.jpg'}`;
-          await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents', {
+          await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -224,7 +224,7 @@ export default function SellerRegister() {
             })
           });
 
-          await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents', {
+          await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

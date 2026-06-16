@@ -220,7 +220,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -282,7 +282,7 @@ export default function EmahuProDashboard() {
       try {
         const token = localStorage.getItem('emahu_seller_token');
         if (!token) return;
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/my', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/my`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -579,7 +579,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1121,7 +1121,7 @@ export default function EmahuProDashboard() {
       const token = localStorage.getItem('emahu_seller_token');
       const url = resubmitProductId 
         ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/${resubmitProductId}/resubmit`
-        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products';
+        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`;
       const method = resubmitProductId ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -4642,7 +4642,7 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
       const token = localStorage.getItem('emahu_seller_token');
       
       if (businessDocUrl.trim()) {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -4666,7 +4666,7 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
       }
 
       if (idDocUrl.trim()) {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
