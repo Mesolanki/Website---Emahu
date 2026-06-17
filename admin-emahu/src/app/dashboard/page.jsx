@@ -160,12 +160,14 @@ export default function AdminDashboard() {
       }
       
       if (data.success) {
-        const sortedSellers = [...data.sellers].sort((a, b) => {
-          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          if (timeA !== timeB) return timeB - timeA;
-          return String(b._id || '').localeCompare(String(a._id || ''));
-        });
+        const sortedSellers = (data.sellers || [])
+          .map(s => ({ ...s, status: s.status || 'approved' }))
+          .sort((a, b) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            if (timeA !== timeB) return timeB - timeA;
+            return String(b._id || '').localeCompare(String(a._id || ''));
+          });
         setSellers(sortedSellers);
       } else {
         triggerToast('Error', data.error || 'Failed to fetch sellers list.', 'danger');
@@ -196,12 +198,14 @@ export default function AdminDashboard() {
       }
       const data = await res.json();
       if (data.success) {
-        const sortedProducts = [...data.products].sort((a, b) => {
-          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          if (timeA !== timeB) return timeB - timeA;
-          return String(b._id || b.id || '').localeCompare(String(a._id || a.id || ''));
-        });
+        const sortedProducts = (data.products || [])
+          .map(p => ({ ...p, approvalStatus: p.approvalStatus || 'pending' }))
+          .sort((a, b) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            if (timeA !== timeB) return timeB - timeA;
+            return String(b._id || b.id || '').localeCompare(String(a._id || a.id || ''));
+          });
         setProducts(sortedProducts);
       } else {
         triggerToast('Error', data.error || 'Failed to fetch products list.', 'danger');
@@ -438,7 +442,7 @@ export default function AdminDashboard() {
     if (!isAuthorized) return;
     if (activeTab === 'sellers' || activeTab === 'new-sellers') {
       setTimeout(() => fetchSellers(), 0);
-    } else if (activeTab === 'products') {
+    } else if (activeTab === 'products' || activeTab === 'new-products') {
       setTimeout(() => fetchProducts(), 0);
     } else if (activeTab === 'stats') {
       setTimeout(() => {
@@ -992,6 +996,12 @@ export default function AdminDashboard() {
                       <span className="ad-detail-row-label">Product Category</span>
                       <span className="ad-detail-row-val">{selectedDetailProduct.category}</span>
                     </div>
+                    <div className="ad-detail-row">
+                      <span className="ad-detail-row-label">Added On</span>
+                      <span className="ad-detail-row-val">
+                        {selectedDetailProduct.createdAt ? new Date(selectedDetailProduct.createdAt).toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' }) : 'N/A'}
+                      </span>
+                    </div>
                     <div style={{ marginTop: '10px' }}>
                       <span className="ad-detail-row-label" style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem' }}>Description Summary</span>
                       <p style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.5', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-admin-border)', maxHeight: '120px', overflowY: 'auto' }}>
@@ -1438,8 +1448,10 @@ export default function AdminDashboard() {
                                 </div>
                                 <div>
                                   <div className="ad-bold">{product.name}</div>
-                                  <div className="ad-muted">Brand: {product.brand || 'N/A'}</div>
-                                  <div className="ad-muted">Category: {product.category}</div>
+                                  <div className="ad-muted">Brand: {product.brand || 'N/A'} | Category: {product.category}</div>
+                                  <div className="ad-muted" style={{ fontSize: '0.75rem', marginTop: '2px', color: '#cbd5e1' }}>
+                                    📅 Added: {product.createdAt ? new Date(product.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
+                                  </div>
                                 </div>
                               </div>
                             </td>
@@ -1527,8 +1539,10 @@ export default function AdminDashboard() {
                                 </div>
                                 <div>
                                   <div className="ad-bold">{product.name}</div>
-                                  <div className="ad-muted">Brand: {product.brand || 'N/A'}</div>
-                                  <div className="ad-muted">Category: {product.category}</div>
+                                  <div className="ad-muted">Brand: {product.brand || 'N/A'} | Category: {product.category}</div>
+                                  <div className="ad-muted" style={{ fontSize: '0.75rem', marginTop: '2px', color: '#cbd5e1' }}>
+                                    📅 Added: {product.createdAt ? new Date(product.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
+                                  </div>
                                 </div>
                               </div>
                             </td>

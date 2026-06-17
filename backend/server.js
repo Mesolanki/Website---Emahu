@@ -25,7 +25,10 @@ app.use(cookieParser()); // Parse cookies from headers
 // CORS configuration (allow requests from frontend ports like 3000, 5173, etc. or allow all for development)
 app.use(
   cors({
-    origin: '*', // Allow all origins in dev, can lock down to specific domains later
+    origin: (origin, callback) => {
+      // Echo the request origin dynamically so that credentials/cookies are allowed
+      callback(null, true);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
