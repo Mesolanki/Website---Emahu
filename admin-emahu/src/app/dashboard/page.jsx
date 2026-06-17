@@ -628,7 +628,7 @@ export default function AdminDashboard() {
 
       {/* Feedback Modal */}
       {isFeedbackModalOpen && (
-        <div className="ad-modal-overlay">
+        <div className="ad-modal-overlay ad-feedback-overlay">
           <div className="ad-modal">
             <h3 className="ad-modal-title">
               {feedbackDecision === 'request_changes' ? 'Request Listing Changes' :

@@ -560,6 +560,10 @@
   justify-content: center;
 }
 
+.ad-feedback-overlay {
+  z-index: 10005;
+}
+
 .ad-modal {
   background: #12141d;
   border: 1px solid var(--color-admin-border);
