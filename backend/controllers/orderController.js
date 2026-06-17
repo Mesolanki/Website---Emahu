@@ -149,3 +149,22 @@ exports.updateOrder = async (req, res) => {
     });
   }
 };
+
+// @desc    Get all orders for admin review
+// @route   GET /api/orders/admin/all
+// @access  Private (Admin only)
+exports.getAdminOrders = async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ createdAt: -1 });
+    res.status(200).json({
+      success: true,
+      orders
+    });
+  } catch (error) {
+    console.error('Get Admin Orders Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error while retrieving orders for admin'
+    });
+  }
+};

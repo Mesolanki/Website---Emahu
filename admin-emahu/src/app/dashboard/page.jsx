@@ -52,6 +52,22 @@ export default function AdminDashboard() {
   // Category filter state for rejected products tab
   const [selectedRejectedCategory, setSelectedRejectedCategory] = useState('All');
 
+  // Orders states
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [ordersError, setOrdersError] = useState(false);
+  const [orderStatusFilter, setOrderStatusFilter] = useState('all');
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [selectedDetailOrder, setSelectedDetailOrder] = useState(null);
+  const [actionLoadingOrder, setActionLoadingOrder] = useState({});
+
+  // Tracking form states
+  const [carrier, setCarrier] = useState('Delhivery');
+  const [trackingId, setTrackingId] = useState('');
+  const [packageWeight, setPackageWeight] = useState('');
+  const [deliveryCost, setDeliveryCost] = useState('');
+  const [estDays, setEstDays] = useState('');
+
   // Feedback modals states (generic for reject / request changes / request more info)
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [feedbackType, setFeedbackType] = useState('product'); // 'seller' or 'product'
@@ -243,6 +259,199 @@ export default function AdminDashboard() {
     } finally {
       setLoadingProducts(false);
     }
+  };
+
+  // Fetch Orders List
+  const fetchOrders = async () => {
+    setLoadingOrders(true);
+    setOrdersError(false);
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      if (!token) return;
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/admin/all`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        setOrders(data.orders || []);
+        setOrdersError(false);
+      } else {
+        setOrdersError(true);
+        triggerToast('Error', data.error || 'Failed to fetch orders list.', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      setOrdersError(true);
+      triggerToast('Error', 'Network error fetching orders.', 'danger');
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  // Update Order (tracking and status)
+  const handleUpdateOrder = async (orderId, updateData, successMsg = 'Order updated successfully') => {
+    setActionLoadingOrder(prev => ({ ...prev, [orderId]: true }));
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updateData)
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        setOrders(prev => prev.map(o => o.orderId === orderId ? data.order : o));
+        if (selectedDetailOrder && selectedDetailOrder.orderId === orderId) {
+          setSelectedDetailOrder(data.order);
+        }
+        triggerToast('Order Updated', successMsg, 'success');
+      } else {
+        triggerToast('Error', data.error || 'Failed to update order.', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error updating order.', 'danger');
+    } finally {
+      setActionLoadingOrder(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleOrderFulfillmentAction = async (order, actionType, customTrackingData = null) => {
+    const orderId = order.orderId;
+    let nextStatus = order.status;
+    let successMsg = 'Order status updated successfully';
+    const timeline = [...(order.timeline || [])];
+    const updateData = {};
+
+    const formatTimestamp = () => {
+      return new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    if (actionType === 'ASSIGN_CARRIER') {
+      const carrierName = customTrackingData?.carrier || carrier || 'Delhivery';
+      const trkId = customTrackingData?.trackingId || trackingId || `EMH-TRK-${Math.floor(100000 + Math.random() * 900000)}`;
+      const weight = customTrackingData?.packageWeight || packageWeight || '0.5 kg';
+      const cost = Number(customTrackingData?.deliveryCost || deliveryCost || 80);
+      const est = customTrackingData?.estDays || estDays || '2-4 Days';
+
+      nextStatus = 'LABEL_GENERATED'; // transition directly to label generated as in seller dashboard
+      
+      const filtered1 = timeline.filter(t => t.status !== 'DELIVERY_ASSIGNED');
+      filtered1.push({
+        status: 'DELIVERY_ASSIGNED',
+        label: 'Delivery Assigned (Admin)',
+        desc: `🚚 Assigned to ${carrierName}. Tracking ID: ${trkId}`,
+        date: formatTimestamp()
+      });
+
+      const filtered2 = filtered1.filter(t => t.status !== 'LABEL_GENERATED');
+      filtered2.push({
+        status: 'LABEL_GENERATED',
+        label: 'Shipping Label Generated (Admin)',
+        desc: `📄 Shipping label has been generated successfully by administrator.`,
+        date: formatTimestamp()
+      });
+
+      updateData.carrier = carrierName;
+      updateData.trackingId = trkId;
+      updateData.packageWeight = weight;
+      updateData.deliveryCost = cost;
+      updateData.estDays = est;
+      updateData.shipmentId = order.shipmentId || `EMH-SHIP-${Math.floor(100000 + Math.random() * 900000)}`;
+      updateData.status = nextStatus;
+      updateData.timeline = filtered2;
+      successMsg = `Courier Assigned and label generated for Order #${orderId}.`;
+
+    } else if (actionType === 'UPDATE_TRACKING_INFO') {
+      updateData.carrier = carrier;
+      updateData.trackingId = trackingId;
+      updateData.packageWeight = packageWeight;
+      updateData.deliveryCost = Number(deliveryCost);
+      updateData.estDays = estDays;
+      successMsg = `Tracking details updated for Order #${orderId}.`;
+
+    } else if (actionType === 'MARK_READY') {
+      nextStatus = 'READY_FOR_PICKUP';
+      const filtered = timeline.filter(t => t.status !== 'READY_FOR_PICKUP');
+      filtered.push({
+        status: 'READY_FOR_PICKUP',
+        label: 'Ready for Pickup (Admin)',
+        desc: `📦 Package packed and ready for carrier pickup (Admin verified).`,
+        date: formatTimestamp()
+      });
+      updateData.status = nextStatus;
+      updateData.timeline = filtered;
+      successMsg = `Order #${orderId} marked ready for pickup.`;
+
+    } else if (actionType === 'SHIP') {
+      nextStatus = 'PICKED_UP';
+      const filtered = timeline.filter(t => t.status !== 'PICKED_UP');
+      filtered.push({
+        status: 'PICKED_UP',
+        label: 'Shipment Picked Up (Admin)',
+        desc: `📦 Courier partner ${order.carrier || 'Delhivery'} has picked up the package.`,
+        date: formatTimestamp()
+      });
+      updateData.status = nextStatus;
+      updateData.timeline = filtered;
+      successMsg = `Order #${orderId} has been shipped.`;
+
+    } else if (actionType === 'IN_TRANSIT') {
+      nextStatus = 'IN_TRANSIT';
+      const filtered = timeline.filter(t => t.status !== 'IN_TRANSIT');
+      filtered.push({
+        status: 'IN_TRANSIT',
+        label: 'In Transit (Admin)',
+        desc: `🚚 Order package is in transit via EV corridor.`,
+        date: formatTimestamp()
+      });
+      updateData.status = nextStatus;
+      updateData.timeline = filtered;
+      successMsg = `Order #${orderId} marked as in transit.`;
+
+    } else if (actionType === 'OUT_FOR_DELIVERY') {
+      nextStatus = 'OUT_FOR_DELIVERY';
+      const filtered = timeline.filter(t => t.status !== 'OUT_FOR_DELIVERY');
+      filtered.push({
+        status: 'OUT_FOR_DELIVERY',
+        label: 'Out For Delivery (Admin)',
+        desc: `🛵 Package is out for delivery with local dispatch rider.`,
+        date: formatTimestamp()
+      });
+      updateData.status = nextStatus;
+      updateData.timeline = filtered;
+      successMsg = `Order #${orderId} is out for delivery.`;
+
+    } else if (actionType === 'DELIVER') {
+      nextStatus = 'COMPLETED';
+      const filtered = timeline.filter(t => t.status !== 'DELIVERED');
+      filtered.push({
+        status: 'DELIVERED',
+        label: 'Delivered (Admin)',
+        desc: `✅ Order delivered successfully by administrator.`,
+        date: formatTimestamp()
+      });
+      updateData.status = nextStatus;
+      updateData.sellerConfirmed = true;
+      updateData.timeline = filtered;
+      successMsg = `Order #${orderId} marked as completed/delivered.`;
+    }
+
+    await handleUpdateOrder(orderId, updateData, successMsg);
   };
 
   // Fetch Audit Logs
@@ -490,7 +699,10 @@ export default function AdminDashboard() {
       setTimeout(() => {
         fetchSellers();
         fetchProducts();
+        fetchOrders();
       }, 0);
+    } else if (activeTab === 'orders') {
+      setTimeout(() => fetchOrders(), 0);
     } else if (activeTab === 'audit') {
       setTimeout(() => fetchAuditLogs(), 0);
     } else if (activeTab === 'notifications') {
@@ -1238,6 +1450,334 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Premium Order Detail Drawer/Modal */}
+      {selectedDetailOrder && (
+        <div className="ad-modal-overlay" onClick={() => setSelectedDetailOrder(null)}>
+          <div className="ad-detail-modal" style={{ width: '950px' }} onClick={(e) => e.stopPropagation()}>
+            <button className="ad-detail-close" onClick={() => setSelectedDetailOrder(null)}>✕</button>
+            
+            <div className="ad-detail-header-block">
+              <div className="ad-detail-title-section">
+                <h3 className="ad-detail-store-name">Order #{selectedDetailOrder.orderId}</h3>
+                <div className="ad-detail-store-meta">
+                  <span>📅 Ordered: {selectedDetailOrder.date ? new Date(selectedDetailOrder.date).toLocaleDateString('en-IN', { dateStyle: 'long' }) : 'N/A'}</span>
+                  <span>•</span>
+                  <span>👤 Buyer: {selectedDetailOrder.deliveryAddress?.fullName}</span>
+                </div>
+              </div>
+              <span className={`ad-status-badge ${
+                selectedDetailOrder.status === 'PENDING_APPROVAL' ? 'pending' : 
+                ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(selectedDetailOrder.status) ? 'rejected' : 'approved'
+              }`} style={{ fontSize: '0.85rem', padding: '6px 14px' }}>
+                {selectedDetailOrder.status?.replace(/_/g, ' ')?.toUpperCase()}
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', flex: 1, minHeight: '350px' }}>
+              {/* LEFT COLUMN: Shipping info, Items checklist, Visual timeline */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto', maxHeight: '55vh', paddingRight: '10px' }}>
+                
+                {/* Shipping & Contact Info */}
+                <div className="ad-detail-info-section">
+                  <h4>Delivery Address Details</h4>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Full Name</span>
+                    <span className="ad-detail-row-val">{selectedDetailOrder.deliveryAddress?.fullName}</span>
+                  </div>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Telephone</span>
+                    <span className="ad-detail-row-val">{selectedDetailOrder.deliveryAddress?.phone || 'N/A'}</span>
+                  </div>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Email</span>
+                    <span className="ad-detail-row-val">{selectedDetailOrder.deliveryAddress?.email || 'N/A'}</span>
+                  </div>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Street Address</span>
+                    <span className="ad-detail-row-val" style={{ textAlign: 'right', maxWidth: '240px', wordBreak: 'break-all' }}>
+                      {selectedDetailOrder.deliveryAddress?.address}
+                    </span>
+                  </div>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">City &amp; Zip</span>
+                    <span className="ad-detail-row-val">{selectedDetailOrder.deliveryAddress?.city} - {selectedDetailOrder.deliveryAddress?.pincode}</span>
+                  </div>
+                </div>
+
+                {/* Items list */}
+                <div className="ad-detail-info-section">
+                  <h4>Ordered Products Checklist</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {selectedDetailOrder.items?.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '8px', border: '1px solid var(--color-admin-border)' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '4px', background: 'rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', overflow: 'hidden' }}>
+                          {(!item.img || !item.img.startsWith('http')) ? '📦' : <img src={item.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div className="ad-bold" style={{ fontSize: '0.85rem' }}>{item.name}</div>
+                          <div className="ad-muted" style={{ fontSize: '0.72rem' }}>Brand: {item.brand || 'N/A'}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div className="ad-bold" style={{ fontSize: '0.85rem' }}>₹{item.price?.toLocaleString('en-IN')}</div>
+                          <div className="ad-muted" style={{ fontSize: '0.72rem' }}>Qty: {item.quantity || 1}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Order Summary Cost */}
+                <div className="ad-detail-info-section">
+                  <h4>Total Value Summary</h4>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Escrow Lockup Total</span>
+                    <span className="ad-detail-row-val" style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.05rem' }}>
+                      ₹{selectedDetailOrder.total?.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  {selectedDetailOrder.deliveryCost && (
+                    <div className="ad-detail-row">
+                      <span className="ad-detail-row-label">Estimated Delivery Cost</span>
+                      <span className="ad-detail-row-val">₹{selectedDetailOrder.deliveryCost}</span>
+                    </div>
+                  )}
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Escrow Release Method</span>
+                    <span className="ad-detail-row-val">{selectedDetailOrder.escrowMethod || 'Standard Escrow Vault'}</span>
+                  </div>
+                </div>
+
+                {/* Order Transit History (Timeline Log) */}
+                <div className="ad-detail-info-section">
+                  <h4>Transit Activity Log</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '10px' }}>
+                    {(selectedDetailOrder.timeline || []).map((tl, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '1rem', marginTop: '2px' }}>
+                          {tl.status === 'PENDING_APPROVAL' ? '⏳' :
+                           tl.status === 'DELIVERY_ASSIGNED' ? '🚚' :
+                           tl.status === 'LABEL_GENERATED' ? '📄' :
+                           tl.status === 'READY_FOR_PICKUP' ? '📦' :
+                           tl.status === 'PICKED_UP' ? '🚀' :
+                           tl.status === 'IN_TRANSIT' ? '🚛' :
+                           tl.status === 'OUT_FOR_DELIVERY' ? '🛵' :
+                           tl.status === 'DELIVERED' ? '✅' : '⚙️'}
+                        </span>
+                        <div>
+                          <div className="ad-bold" style={{ fontSize: '0.85rem' }}>{tl.label}</div>
+                          <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#94a3b8', lineHeight: '1.4' }}>{tl.desc}</p>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--color-admin-muted)' }}>{tl.date}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {(!selectedDetailOrder.timeline || selectedDetailOrder.timeline.length === 0) && (
+                      <div style={{ color: 'var(--color-admin-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                        No history entries found.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* RIGHT COLUMN: FULFILLMENT MANAGEMENT CONTROLS */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--color-admin-border)', borderRadius: '12px', padding: '20px' }}>
+                <h4>Fulfillment &amp; Courier Console</h4>
+                
+                {selectedDetailOrder.status === 'PENDING_APPROVAL' ? (
+                  <div style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '8px', padding: '16px', color: '#f59e0b', fontSize: '0.85rem', lineHeight: '1.5' }}>
+                    ⏳ <strong>Waiting for Seller Approval:</strong><br />
+                    This transaction is currently awaiting approval from the seller side. The seller must confirm stock and accept the order before courier tracking and dispatch operations can begin.
+                  </div>
+                ) : ['REJECTED', '❌ Order Rejected by Seller'].includes(selectedDetailOrder.status) ? (
+                  <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '8px', padding: '16px', color: '#ef4444', fontSize: '0.85rem', lineHeight: '1.5' }}>
+                    ❌ <strong>Order Rejected by Seller:</strong><br />
+                    This order was rejected or cancelled by the merchant. Reason: <em>&ldquo;{selectedDetailOrder.rejectionReason || 'No reason specified'}&rdquo;</em>. Fulfillment controls are locked.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.01)', padding: '14px', borderRadius: '8px', border: '1px solid var(--color-admin-border)' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>COURIER CORRIDOR TRACKING PROVISIONS</span>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '4px' }}>Logistics Carrier</label>
+                          <select 
+                            className="ad-modal-input" 
+                            style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px' }}
+                            value={carrier}
+                            onChange={(e) => setCarrier(e.target.value)}
+                          >
+                            <option value="Delhivery">Delhivery Logistics</option>
+                            <option value="Blue Dart">Blue Dart Premium</option>
+                            <option value="EmahuXpress">Emahu Xpress Direct</option>
+                            <option value="FedEx">FedEx International</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '4px' }}>Tracking Identifier</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. EMH-TRK-983"
+                            className="ad-modal-input"
+                            style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%' }}
+                            value={trackingId}
+                            onChange={(e) => setTrackingId(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '4px' }}>Package Weight</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 0.8 kg"
+                            className="ad-modal-input"
+                            style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%' }}
+                            value={packageWeight}
+                            onChange={(e) => setPackageWeight(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '4px' }}>Ship Cost (₹)</label>
+                          <input
+                            type="number"
+                            placeholder="80"
+                            className="ad-modal-input"
+                            style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%' }}
+                            value={deliveryCost}
+                            onChange={(e) => setDeliveryCost(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '4px' }}>Transit Time</label>
+                          <input
+                            type="text"
+                            placeholder="2-4 Days"
+                            className="ad-modal-input"
+                            style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%' }}
+                            value={estDays}
+                            onChange={(e) => setEstDays(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        className="ad-btn-sec"
+                        style={{ height: '34px', fontSize: '0.78rem', display: 'flex', alignSelf: 'flex-end', padding: '0 16px' }}
+                        onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'UPDATE_TRACKING_INFO')}
+                        disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
+                      >
+                        {actionLoadingOrder[selectedDetailOrder.orderId] ? 'Saving...' : '💾 Save Tracking Details'}
+                      </button>
+                    </div>
+
+                    {/* Progress Shipping State buttons */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>TRANSIT WORKFLOW ADVANCEMENT ACTIONS</span>
+                      
+                      {selectedDetailOrder.status === 'APPROVED' && (
+                        <button
+                          className="ad-btn-action approve"
+                          style={{ height: '40px', fontSize: '0.88rem' }}
+                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'ASSIGN_CARRIER')}
+                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
+                        >
+                          🚚 Assign Courier &amp; Generate Label
+                        </button>
+                      )}
+
+                      {selectedDetailOrder.status === 'DELIVERY_ASSIGNED' && (
+                        <button
+                          className="ad-btn-action approve"
+                          style={{ height: '40px', fontSize: '0.88rem' }}
+                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'ASSIGN_CARRIER')}
+                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
+                        >
+                          📄 Generate Shipping Label
+                        </button>
+                      )}
+
+                      {selectedDetailOrder.status === 'LABEL_GENERATED' && (
+                        <button
+                          className="ad-btn-action approve"
+                          style={{ height: '40px', fontSize: '0.88rem' }}
+                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'MARK_READY')}
+                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
+                        >
+                          📦 Mark Package Ready For Pickup
+                        </button>
+                      )}
+
+                      {selectedDetailOrder.status === 'READY_FOR_PICKUP' && (
+                        <button
+                          className="ad-btn-action approve"
+                          style={{ height: '40px', fontSize: '0.88rem' }}
+                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'SHIP')}
+                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
+                        >
+                          🚀 Mark Shipped / Picked Up
+                        </button>
+                      )}
+
+                      {selectedDetailOrder.status === 'PICKED_UP' && (
+                        <button
+                          className="ad-btn-action approve"
+                          style={{ height: '40px', fontSize: '0.88rem' }}
+                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'IN_TRANSIT')}
+                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
+                        >
+                          🚛 Move into Transit Route
+                        </button>
+                      )}
+
+                      {selectedDetailOrder.status === 'IN_TRANSIT' && (
+                        <button
+                          className="ad-btn-action approve"
+                          style={{ height: '40px', fontSize: '0.88rem' }}
+                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'OUT_FOR_DELIVERY')}
+                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
+                        >
+                          🛵 Dispatch for Out for Delivery
+                        </button>
+                      )}
+
+                      {selectedDetailOrder.status === 'OUT_FOR_DELIVERY' && (
+                        <button
+                          className="ad-btn-action approve"
+                          style={{ height: '40px', fontSize: '0.88rem', background: '#10b981' }}
+                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'DELIVER')}
+                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
+                        >
+                          🎉 Mark Delivered &amp; Release Funds
+                        </button>
+                      )}
+
+                      {['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].some(s => selectedDetailOrder.status?.includes(s)) && (
+                        <div style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', padding: '14px', color: '#10b981', fontSize: '0.82rem', textAlign: 'center', fontWeight: 'bold' }}>
+                          ✓ Fulfillment Cycle Completed Successfully
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                <button
+                  className="ad-btn-sec"
+                  style={{ height: '40px', width: '100%', marginTop: 'auto' }}
+                  onClick={() => setSelectedDetailOrder(null)}
+                >
+                  Close Console
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside className="ad-sidebar">
         <Link href="/" className="ad-sidebar-brand">
@@ -1285,6 +1825,15 @@ export default function AdminDashboard() {
               🚫 Rejected Catalog {products.filter(p => p.approvalStatus === 'rejected').length > 0 && (
                 <span style={{ background: '#ef4444', color: '#fff', borderRadius: '50%', padding: '2px 8px', fontSize: '0.7rem', marginLeft: '6px', fontWeight: 'bold' }}>
                   {products.filter(p => p.approvalStatus === 'rejected').length}
+                </span>
+              )}
+            </button>
+          </li>
+          <li>
+            <button className={`ad-sidebar-btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>
+              🚚 Fulfillment Hub {orders.filter(o => o.status !== 'DELIVERED' && o.status !== 'COMPLETED' && o.status !== 'REJECTED' && o.status !== '❌ Order Rejected by Seller').length > 0 && (
+                <span style={{ background: '#6366f1', color: '#fff', borderRadius: '50%', padding: '2px 8px', fontSize: '0.7rem', marginLeft: '6px', fontWeight: 'bold' }}>
+                  {orders.filter(o => o.status !== 'DELIVERED' && o.status !== 'COMPLETED' && o.status !== 'REJECTED' && o.status !== '❌ Order Rejected by Seller').length}
                 </span>
               )}
             </button>
@@ -1816,6 +2365,187 @@ export default function AdminDashboard() {
                           {filteredRejectedProducts.length === 0 && (
                             <tr>
                               <td colSpan="5" className="ad-empty">No rejected products in this category.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* TAB: ORDERS HUB */}
+          {activeTab === 'orders' && (
+            <div>
+              <div className="ad-view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h3>Fulfillment &amp; Orders Hub</h3>
+                  <p>Track all global platform transactions, assign couriers, print labels, and advance shipping steps.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button className="ad-btn-sec" onClick={fetchOrders} disabled={loadingOrders}>
+                    🔄 Refresh Orders
+                  </button>
+                </div>
+              </div>
+
+              {ordersError ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Connection Timeout</div>
+                  <div className="ad-error-message">
+                    Failed to communicate with the orders database. The server might be idle or loading.
+                  </div>
+                  <button className="ad-btn-sec" onClick={fetchOrders}>
+                    🔄 Retry Loading Orders
+                  </button>
+                </div>
+              ) : loadingOrders ? (
+                <div className="ad-loading">Loading transaction records...</div>
+              ) : (() => {
+                const filteredOrders = orders.filter(order => {
+                  const matchesSearch = 
+                    order.orderId.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+                    (order.deliveryAddress?.fullName || '').toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+                    (order.deliveryAddress?.email || '').toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+                    (order.sellerEmail || '').toLowerCase().includes(orderSearchQuery.toLowerCase());
+
+                  if (!matchesSearch) return false;
+                  if (orderStatusFilter === 'all') return true;
+                  if (orderStatusFilter === 'PENDING_APPROVAL') return order.status === 'PENDING_APPROVAL';
+                  if (orderStatusFilter === 'PROCESSING') return ['APPROVED', 'DELIVERY_ASSIGNED', 'LABEL_GENERATED'].includes(order.status);
+                  if (orderStatusFilter === 'READY') return order.status === 'READY_FOR_PICKUP';
+                  if (orderStatusFilter === 'IN_TRANSIT') return ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(order.status);
+                  if (orderStatusFilter === 'DELIVERED') return ['DELIVERED', 'COMPLETED'].includes(order.status);
+                  if (orderStatusFilter === 'DISPUTED') return ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(order.status);
+                  return true;
+                });
+
+                return (
+                  <div>
+                    {/* Filter controls and Search Bar */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+                      <div className="ad-detail-tabs-nav" style={{ margin: 0, borderBottom: 'none' }}>
+                        {[
+                          { key: 'all', label: 'All Orders', count: orders.length },
+                          { key: 'PENDING_APPROVAL', label: 'Pending Seller', count: orders.filter(o => o.status === 'PENDING_APPROVAL').length },
+                          { key: 'PROCESSING', label: 'Processing', count: orders.filter(o => ['APPROVED', 'DELIVERY_ASSIGNED', 'LABEL_GENERATED'].includes(o.status)).length },
+                          { key: 'READY', label: 'Ready', count: orders.filter(o => o.status === 'READY_FOR_PICKUP').length },
+                          { key: 'IN_TRANSIT', label: 'In Transit', count: orders.filter(o => ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(o.status)).length },
+                          { key: 'DELIVERED', label: 'Completed', count: orders.filter(o => ['DELIVERED', 'COMPLETED'].includes(o.status)).length },
+                          { key: 'DISPUTED', label: 'Cancelled/Disputed', count: orders.filter(o => ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(o.status)).length }
+                        ].map(f => (
+                          <button
+                            key={f.key}
+                            className={`ad-detail-tab-trigger ${orderStatusFilter === f.key ? 'active' : ''}`}
+                            onClick={() => setOrderStatusFilter(f.key)}
+                            style={{ padding: '8px 12px', fontSize: '0.82rem' }}
+                          >
+                            {f.label} ({f.count})
+                          </button>
+                        ))}
+                      </div>
+
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          placeholder="Search orders..."
+                          className="ad-modal-input"
+                          style={{ margin: 0, height: '38px', width: '260px', fontSize: '0.85rem', paddingRight: '30px' }}
+                          value={orderSearchQuery}
+                          onChange={(e) => setOrderSearchQuery(e.target.value)}
+                        />
+                        {orderSearchQuery && (
+                          <button 
+                            onClick={() => setOrderSearchQuery('')}
+                            style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+                          >✕</button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Table wrapper */}
+                    <div className="ad-table-wrapper">
+                      <table className="ad-table">
+                        <thead>
+                          <tr>
+                            <th>Order Details</th>
+                            <th>Customer info</th>
+                            <th>Merchant Info</th>
+                            <th>Items count &amp; Cost</th>
+                            <th>Fulfillment Status</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredOrders.map(order => {
+                            const isPending = order.status === 'PENDING_APPROVAL';
+                            const isDisputed = ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(order.status);
+                            const isCompleted = ['DELIVERED', 'COMPLETED'].includes(order.status);
+                            
+                            return (
+                              <tr key={order._id || order.orderId}>
+                                <td>
+                                  <div className="ad-bold" style={{ color: 'var(--color-admin-primary)' }}>#{order.orderId}</div>
+                                  <div className="ad-muted">
+                                    📅 {order.date ? new Date(order.date).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : 'N/A'}
+                                  </div>
+                                </td>
+                                <td>
+                                  <div className="ad-bold">{order.deliveryAddress?.fullName || 'Guest User'}</div>
+                                  <div className="ad-muted" style={{ fontSize: '0.78rem' }}>
+                                    📍 {order.deliveryAddress?.city}, {order.deliveryAddress?.pincode}
+                                  </div>
+                                </td>
+                                <td>
+                                  <div className="ad-bold" style={{ fontSize: '0.85rem' }}>{order.sellerEmail || 'N/A'}</div>
+                                  <div className="ad-muted" style={{ fontSize: '0.72rem', fontFamily: 'monospace' }}>ID: {order.sellerId}</div>
+                                </td>
+                                <td>
+                                  <div style={{ fontWeight: '600' }}>₹{order.total?.toLocaleString('en-IN')}</div>
+                                  <div className="ad-muted" style={{ fontSize: '0.78rem' }}>
+                                    {order.items?.length || 0} {order.items?.length === 1 ? 'item' : 'items'}
+                                  </div>
+                                </td>
+                                <td>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                                    <span className={`ad-status-badge ${
+                                      isPending ? 'pending' : 
+                                      isDisputed ? 'rejected' : 
+                                      isCompleted ? 'approved' : 'changes_requested'
+                                    }`} style={{ fontSize: '0.7rem' }}>
+                                      {order.status?.replace(/_/g, ' ')}
+                                    </span>
+                                    {order.carrier && (
+                                      <span style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)' }}>
+                                        🚚 {order.carrier} {order.trackingId ? `(${order.trackingId})` : ''}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td>
+                                  <button
+                                    className="ad-btn-sec"
+                                    style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem' }}
+                                    onClick={() => {
+                                      setSelectedDetailOrder(order);
+                                      setCarrier(order.carrier || 'Delhivery');
+                                      setTrackingId(order.trackingId || '');
+                                      setPackageWeight(order.packageWeight || '');
+                                      setDeliveryCost(order.deliveryCost || '');
+                                      setEstDays(order.estDays || '');
+                                    }}
+                                  >
+                                    Track &amp; Fulfill
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {filteredOrders.length === 0 && (
+                            <tr>
+                              <td colSpan="6" className="ad-empty">No orders found matching the filter criteria.</td>
                             </tr>
                           )}
                         </tbody>
