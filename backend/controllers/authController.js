@@ -520,19 +520,41 @@ exports.getSellers = async (req, res) => {
 
     const sellers = await User.find({ role: 'seller' }).lean();
 
-    for (let i = 0; i < sellers.length; i++) {
-      const sellerId = sellers[i]._id;
-      
-      // Calculate total products
-      sellers[i].totalProducts = await Product.countDocuments({ seller: sellerId });
+    // Fetch all products and count orders in parallel
+    const [allProducts, orderCounts] = await Promise.all([
+      Product.find({}).lean(),
+      Order.aggregate([
+        { $group: { _id: "$sellerId", count: { $sum: 1 } } }
+      ])
+    ]);
 
-      // Calculate total units sold and total revenue from product sales
-      const productsList = await Product.find({ seller: sellerId });
+    // Create maps for fast lookup
+    const orderCountMap = {};
+    orderCounts.forEach(item => {
+      if (item._id) {
+        orderCountMap[item._id.toString()] = item.count;
+      }
+    });
+
+    const sellerProductsMap = {};
+    allProducts.forEach(p => {
+      if (p.seller) {
+        const sId = p.seller.toString();
+        if (!sellerProductsMap[sId]) {
+          sellerProductsMap[sId] = [];
+        }
+        sellerProductsMap[sId].push(p);
+      }
+    });
+
+    for (let i = 0; i < sellers.length; i++) {
+      const sellerIdStr = sellers[i]._id.toString();
+      const productsList = sellerProductsMap[sellerIdStr] || [];
+
+      sellers[i].totalProducts = productsList.length;
       sellers[i].totalSales = productsList.reduce((acc, p) => acc + (p.sales || 0), 0);
       sellers[i].totalRevenue = productsList.reduce((acc, p) => acc + (p.price * (p.sales || 0)), 0);
-      
-      // Calculate total orders count
-      sellers[i].totalOrders = await Order.countDocuments({ sellerId: sellerId.toString() });
+      sellers[i].totalOrders = orderCountMap[sellerIdStr] || 0;
     }
 
     res.status(200).json({
