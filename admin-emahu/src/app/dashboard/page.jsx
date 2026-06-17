@@ -501,6 +501,7 @@ export default function AdminDashboard() {
       }
       const data = await res.json();
       if (data.success) {
+        setSelectedDetailSeller(null);
         setSellers(prev => prev.map(s => s._id === id ? data.seller : s));
         triggerToast('Seller Updated', `Seller account status changed to '${decision}' successfully.`, 'success');
       } else {
@@ -533,6 +534,7 @@ export default function AdminDashboard() {
       }
       const data = await res.json();
       if (data.success) {
+        setSelectedDetailProduct(null);
         if (data.productDeleted) {
           setProducts(prev => prev.filter(p => (p.id || p._id) !== id));
           triggerToast('Product Deleted', 'Product listing rejected 3 times and removed permanently.', 'warning');
