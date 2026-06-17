@@ -23,12 +23,9 @@ export default function AdminDashboard() {
   const [actionLoading, setActionLoading] = useState({});
   const [toasts, setToasts] = useState([]);
 
-  // Audit logs & Notifications states
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+  // Notifications states
   const [notifications, setNotifications] = useState([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
-  const [auditLogsError, setAuditLogsError] = useState(false);
   const [notificationsError, setNotificationsError] = useState(false);
 
   // Settings & 2FA states
@@ -51,6 +48,9 @@ export default function AdminDashboard() {
 
   // Category filter state for rejected products tab
   const [selectedRejectedCategory, setSelectedRejectedCategory] = useState('All');
+
+  // Sub-tab state for unified Products Hub tab
+  const [productsHubSubTab, setProductsHubSubTab] = useState('queue'); // 'queue' | 'live' | 'rejected'
 
   // Orders states
   const [orders, setOrders] = useState([]);
@@ -454,39 +454,6 @@ export default function AdminDashboard() {
     await handleUpdateOrder(orderId, updateData, successMsg);
   };
 
-  // Fetch Audit Logs
-  const fetchAuditLogs = async () => {
-    setLoadingAuditLogs(true);
-    setAuditLogsError(false);
-    try {
-      const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/audit`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.status === 401) {
-        handleSessionExpired();
-        return;
-      }
-      const data = await res.json();
-      if (data.success) {
-        const sortedLogs = (data.logs || []).sort((a, b) => {
-          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return timeB - timeA;
-        });
-        setAuditLogs(sortedLogs);
-        setAuditLogsError(false);
-      } else {
-        setAuditLogsError(true);
-      }
-    } catch (err) {
-      console.error(err);
-      setAuditLogsError(true);
-    } finally {
-      setLoadingAuditLogs(false);
-    }
-  };
-
   // Fetch Notifications
   const fetchNotifications = async () => {
     setLoadingNotifications(true);
@@ -693,7 +660,7 @@ export default function AdminDashboard() {
     if (!isAuthorized) return;
     if (activeTab === 'sellers' || activeTab === 'new-sellers') {
       setTimeout(() => fetchSellers(), 0);
-    } else if (activeTab === 'products' || activeTab === 'new-products' || activeTab === 'rejected-products') {
+    } else if (activeTab === 'products-hub') {
       setTimeout(() => fetchProducts(), 0);
     } else if (activeTab === 'stats') {
       setTimeout(() => {
@@ -703,8 +670,6 @@ export default function AdminDashboard() {
       }, 0);
     } else if (activeTab === 'orders') {
       setTimeout(() => fetchOrders(), 0);
-    } else if (activeTab === 'audit') {
-      setTimeout(() => fetchAuditLogs(), 0);
     } else if (activeTab === 'notifications') {
       setTimeout(() => fetchNotifications(), 0);
     }
@@ -1807,24 +1772,10 @@ export default function AdminDashboard() {
             </button>
           </li>
           <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'new-products' ? 'active' : ''}`} onClick={() => setActiveTab('new-products')}>
-              🆕 Product Onboarding {products.filter(p => p.approvalStatus === 'pending' || p.approvalStatus === 'changes_requested').length > 0 && (
+            <button className={`ad-sidebar-btn ${activeTab === 'products-hub' ? 'active' : ''}`} onClick={() => setActiveTab('products-hub')}>
+              📦 Products Hub {products.filter(p => p.approvalStatus === 'pending' || p.approvalStatus === 'changes_requested').length > 0 && (
                 <span style={{ background: '#f59e0b', color: '#000', borderRadius: '50%', padding: '2px 8px', fontSize: '0.7rem', marginLeft: '6px', fontWeight: 'bold' }}>
                   {products.filter(p => p.approvalStatus === 'pending' || p.approvalStatus === 'changes_requested').length}
-                </span>
-              )}
-            </button>
-          </li>
-          <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'products' ? 'active' : ''}`} onClick={() => setActiveTab('products')}>
-              📦 Catalog Directory
-            </button>
-          </li>
-          <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'rejected-products' ? 'active' : ''}`} onClick={() => setActiveTab('rejected-products')}>
-              🚫 Rejected Catalog {products.filter(p => p.approvalStatus === 'rejected').length > 0 && (
-                <span style={{ background: '#ef4444', color: '#fff', borderRadius: '50%', padding: '2px 8px', fontSize: '0.7rem', marginLeft: '6px', fontWeight: 'bold' }}>
-                  {products.filter(p => p.approvalStatus === 'rejected').length}
                 </span>
               )}
             </button>
@@ -1841,11 +1792,6 @@ export default function AdminDashboard() {
           <li>
             <button className={`ad-sidebar-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>
               📈 System Stats
-            </button>
-          </li>
-          <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'audit' ? 'active' : ''}`} onClick={() => setActiveTab('audit')}>
-              🛡️ Audit Logs
             </button>
           </li>
           <li>
@@ -2033,12 +1979,58 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* TAB: PRODUCT ONBOARDING QUEUE */}
-          {activeTab === 'new-products' && (
+          {/* TAB: PRODUCTS HUB */}
+          {activeTab === 'products-hub' && (
             <div>
               <div className="ad-view-header">
-                <h3>Product Onboarding Requests</h3>
-                <p>Audit newly submitted merchant inventory listings, verify details, and assign official system SKUs to authorize catalog publishing.</p>
+                <h3>Products Hub</h3>
+                <p>Manage product onboarding queue, view live catalog directory, and audit/re-approve rejected listings.</p>
+              </div>
+
+              {/* Sub-tab navigation */}
+              <div className="ad-detail-tabs-nav" style={{ marginBottom: '24px', borderBottom: '1px solid var(--color-admin-border)' }}>
+                <button
+                  className={`ad-detail-tab-trigger ${productsHubSubTab === 'queue' ? 'active' : ''}`}
+                  onClick={() => setProductsHubSubTab('queue')}
+                  style={{ padding: '10px 16px', fontSize: '0.85rem' }}
+                >
+                  Onboarding Queue <span style={{
+                    marginLeft: '6px',
+                    background: productsHubSubTab === 'queue' ? 'var(--color-admin-primary)' : 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    padding: '2px 6px',
+                    borderRadius: '10px',
+                    fontSize: '0.72rem'
+                  }}>{products.filter(p => p.approvalStatus === 'pending' || p.approvalStatus === 'changes_requested').length}</span>
+                </button>
+                <button
+                  className={`ad-detail-tab-trigger ${productsHubSubTab === 'live' ? 'active' : ''}`}
+                  onClick={() => setProductsHubSubTab('live')}
+                  style={{ padding: '10px 16px', fontSize: '0.85rem' }}
+                >
+                  Live Catalog <span style={{
+                    marginLeft: '6px',
+                    background: productsHubSubTab === 'live' ? 'var(--color-admin-primary)' : 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    padding: '2px 6px',
+                    borderRadius: '10px',
+                    fontSize: '0.72rem'
+                  }}>{products.filter(p => p.approvalStatus === 'approved').length}</span>
+                </button>
+                <button
+                  className={`ad-detail-tab-trigger ${productsHubSubTab === 'rejected' ? 'active' : ''}`}
+                  onClick={() => setProductsHubSubTab('rejected')}
+                  style={{ padding: '10px 16px', fontSize: '0.85rem' }}
+                >
+                  Rejected Catalog <span style={{
+                    marginLeft: '6px',
+                    background: productsHubSubTab === 'rejected' ? 'var(--color-admin-primary)' : 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    padding: '2px 6px',
+                    borderRadius: '10px',
+                    fontSize: '0.72rem'
+                  }}>{products.filter(p => p.approvalStatus === 'rejected').length}</span>
+                </button>
               </div>
 
               {productsError ? (
@@ -2052,249 +2044,11 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               ) : loadingProducts ? (
-                <div className="ad-loading">Fetching product onboarding queue...</div>
+                <div className="ad-loading">Fetching products...</div>
               ) : (
-                <div className="ad-table-wrapper">
-                  <table className="ad-table">
-                    <thead>
-                      <tr>
-                        <th>Product Details</th>
-                        <th>Merchant Vendor</th>
-                        <th>Pricing &amp; Stock</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.filter(p => p.approvalStatus === 'pending' || p.approvalStatus === 'changes_requested').map((product) => {
-                        return (
-                          <tr key={product.id || product._id}>
-                            <td>
-                              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                <div className="ad-prod-image">
-                                  {(!product.image || !product.image.startsWith('http')) ? (
-                                    product.image || '📦'
-                                  ) : (
-                                    <img src={product.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                  )}
-                                </div>
-                                <div>
-                                  <div className="ad-bold">{product.name}</div>
-                                  <div className="ad-muted">Brand: {product.brand || 'N/A'} | Category: {product.category}</div>
-                                  <div className="ad-muted" style={{ fontSize: '0.75rem', marginTop: '2px', color: '#cbd5e1' }}>
-                                    📅 Added: {product.createdAt ? new Date(product.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="ad-bold">{product.seller?.storeName || 'Not Provided'}</div>
-                              <div className="ad-muted">by {product.seller?.name || 'Unknown Seller'}</div>
-                            </td>
-                            <td>
-                              <div>₹{product.price?.toLocaleString('en-IN')}</div>
-                              <div className="ad-muted">Stock: {product.stock} units</div>
-                            </td>
-                            <td>
-                              <span className={`ad-status-badge ${product.approvalStatus}`}>
-                                {product.approvalStatus === 'pending' ? 'Pending' : 'Changes Requested'}
-                              </span>
-                              {product.approvalAttempts > 0 && (
-                                <div style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 'bold', marginTop: '4px', whiteSpace: 'nowrap' }}>
-                                  Rejections: {product.approvalAttempts}/3
-                                </div>
-                              )}
-                            </td>
-                            <td>
-                              <button
-                                className="ad-btn-sec"
-                                style={{ fontSize: '0.8rem', height: '34px', padding: '0 16px', fontWeight: '600' }}
-                                onClick={() => {
-                                  setSelectedDetailProduct(product);
-                                  setProductDetailTab('info');
-                                }}
-                              >
-                                Review Listing &amp; Audit
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {products.filter(p => p.approvalStatus === 'pending' || p.approvalStatus === 'changes_requested').length === 0 && (
-                        <tr>
-                          <td colSpan="5" className="ad-empty">No pending product listing requests in the onboarding queue.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB: CATALOG DIRECTORY */}
-          {activeTab === 'products' && (
-            <div>
-              <div className="ad-view-header">
-                <h3>Catalog Directory</h3>
-                <p>Read-only inventory records of all approved active listings and rejected catalog submissions.</p>
-              </div>
-
-              {productsError ? (
-                <div className="ad-error-container">
-                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
-                  <div className="ad-error-message">
-                    Failed to retrieve the product directory. The backend database server might be starting up from standby mode.
-                  </div>
-                  <button className="ad-btn-sec" onClick={fetchProducts}>
-                    🔄 Retry Loading Products
-                  </button>
-                </div>
-              ) : loadingProducts ? (
-                <div className="ad-loading">Fetching catalog listings...</div>
-              ) : (
-                <div className="ad-table-wrapper">
-                  <table className="ad-table">
-                    <thead>
-                      <tr>
-                        <th>Product Details</th>
-                        <th>Merchant Vendor</th>
-                        <th>Pricing &amp; Stock</th>
-                        <th>SKU Code</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.filter(p => p.approvalStatus === 'approved' || p.approvalStatus === 'rejected').map((product) => {
-                        const isApproved = product.approvalStatus === 'approved';
-                        return (
-                          <tr key={product.id || product._id}>
-                            <td>
-                              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                <div className="ad-prod-image">
-                                  {(!product.image || !product.image.startsWith('http')) ? (
-                                    product.image || '📦'
-                                  ) : (
-                                    <img src={product.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                  )}
-                                </div>
-                                <div>
-                                  <div className="ad-bold">{product.name}</div>
-                                  <div className="ad-muted">Brand: {product.brand || 'N/A'} | Category: {product.category}</div>
-                                  <div className="ad-muted" style={{ fontSize: '0.75rem', marginTop: '2px', color: '#cbd5e1' }}>
-                                    📅 Added: {product.createdAt ? new Date(product.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="ad-bold">{product.seller?.storeName || 'Not Provided'}</div>
-                              <div className="ad-muted">by {product.seller?.name || 'Unknown Seller'}</div>
-                            </td>
-                            <td>
-                              <div>₹{product.price?.toLocaleString('en-IN')}</div>
-                              <div className="ad-muted">Stock: {product.stock} units</div>
-                            </td>
-                            <td>
-                              <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{product.sku || 'N/A'}</span>
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <span className={`ad-status-badge ${product.approvalStatus}`}>
-                                  {isApproved ? 'Live' : 'Rejected'}
-                                </span>
-                                {product.adminCode && (
-                                  <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                                    Code: {product.adminCode}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td>
-                              <button
-                                className="ad-btn-sec"
-                                style={{ fontSize: '0.8rem', height: '34px', padding: '0 16px', fontWeight: '600' }}
-                                onClick={() => {
-                                  setSelectedDetailProduct(product);
-                                  setProductDetailTab('info');
-                                }}
-                              >
-                                View Listing Details
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {products.filter(p => p.approvalStatus === 'approved' || p.approvalStatus === 'rejected').length === 0 && (
-                        <tr>
-                          <td colSpan="6" className="ad-empty">No catalog records found in directory.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB: REJECTED PRODUCTS */}
-          {activeTab === 'rejected-products' && (
-            <div>
-              <div className="ad-view-header">
-                <h3>Rejected Product Catalog</h3>
-                <p>Complete listing of products rejected during onboarding audit. You can review details and re-approve them.</p>
-              </div>
-
-              {productsError ? (
-                <div className="ad-error-container">
-                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
-                  <div className="ad-error-message">
-                    Failed to communicate with the backend database. The live server may be waking up after being idle.
-                  </div>
-                  <button className="ad-btn-sec" onClick={fetchProducts}>
-                    🔄 Retry Loading Products
-                  </button>
-                </div>
-              ) : loadingProducts ? (
-                <div className="ad-loading">Fetching rejected products...</div>
-              ) : (() => {
-                const rejectedProducts = products.filter(p => p.approvalStatus === 'rejected');
-                const uniqueCategories = ['All', ...Array.from(new Set(rejectedProducts.map(p => p.category).filter(Boolean))).sort()];
-                const filteredRejectedProducts = selectedRejectedCategory === 'All'
-                  ? rejectedProducts
-                  : rejectedProducts.filter(p => p.category === selectedRejectedCategory);
-
-                return (
-                  <div>
-                    {/* Category tabs */}
-                    {rejectedProducts.length > 0 && (
-                      <div className="ad-detail-tabs-nav" style={{ marginBottom: '24px', borderBottom: '1px solid var(--color-admin-border)' }}>
-                        {uniqueCategories.map(cat => {
-                          const count = cat === 'All'
-                            ? rejectedProducts.length
-                            : rejectedProducts.filter(p => p.category === cat).length;
-                          return (
-                            <button
-                              key={cat}
-                              className={`ad-detail-tab-trigger ${selectedRejectedCategory === cat ? 'active' : ''}`}
-                              onClick={() => setSelectedRejectedCategory(cat)}
-                              style={{ padding: '10px 16px', fontSize: '0.85rem' }}
-                            >
-                              {cat} <span style={{ 
-                                marginLeft: '6px', 
-                                background: selectedRejectedCategory === cat ? 'var(--color-admin-primary)' : 'rgba(255,255,255,0.08)',
-                                color: '#fff',
-                                padding: '2px 6px',
-                                borderRadius: '10px',
-                                fontSize: '0.72rem'
-                              }}>{count}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
+                <>
+                  {/* Sub-tab: ONBOARDING QUEUE */}
+                  {productsHubSubTab === 'queue' && (
                     <div className="ad-table-wrapper">
                       <table className="ad-table">
                         <thead>
@@ -2302,12 +2056,12 @@ export default function AdminDashboard() {
                             <th>Product Details</th>
                             <th>Merchant Vendor</th>
                             <th>Pricing &amp; Stock</th>
-                            <th>Rejection Audit Reason</th>
+                            <th>Status</th>
                             <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredRejectedProducts.map((product) => {
+                          {products.filter(p => p.approvalStatus === 'pending' || p.approvalStatus === 'changes_requested').map((product) => {
                             return (
                               <tr key={product.id || product._id}>
                                 <td>
@@ -2337,14 +2091,97 @@ export default function AdminDashboard() {
                                   <div className="ad-muted">Stock: {product.stock} units</div>
                                 </td>
                                 <td>
-                                  <div style={{ maxWidth: '250px' }}>
-                                    <div style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                                      <span>🚫 Rejection Attempts:</span>
-                                      <span style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>{product.approvalAttempts || 0}/3</span>
+                                  <span className={`ad-status-badge ${product.approvalStatus}`}>
+                                    {product.approvalStatus === 'pending' ? 'Pending' : 'Changes Requested'}
+                                  </span>
+                                  {product.approvalAttempts > 0 && (
+                                    <div style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 'bold', marginTop: '4px', whiteSpace: 'nowrap' }}>
+                                      Rejections: {product.approvalAttempts}/3
                                     </div>
-                                    <p className="ad-muted" style={{ fontSize: '0.8rem', lineHeight: '1.4', margin: 0, fontStyle: 'italic', wordBreak: 'break-word' }}>
-                                      &ldquo;{product.rejectionReason || 'No reason provided.'}&rdquo;
-                                    </p>
+                                  )}
+                                </td>
+                                <td>
+                                  <button
+                                    className="ad-btn-sec"
+                                    style={{ fontSize: '0.8rem', height: '34px', padding: '0 16px', fontWeight: '600' }}
+                                    onClick={() => {
+                                      setSelectedDetailProduct(product);
+                                      setProductDetailTab('info');
+                                    }}
+                                  >
+                                    Review Listing &amp; Audit
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {products.filter(p => p.approvalStatus === 'pending' || p.approvalStatus === 'changes_requested').length === 0 && (
+                            <tr>
+                              <td colSpan="5" className="ad-empty">No pending product listing requests in the onboarding queue.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Sub-tab: LIVE CATALOG */}
+                  {productsHubSubTab === 'live' && (
+                    <div className="ad-table-wrapper">
+                      <table className="ad-table">
+                        <thead>
+                          <tr>
+                            <th>Product Details</th>
+                            <th>Merchant Vendor</th>
+                            <th>Pricing &amp; Stock</th>
+                            <th>SKU Code</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {products.filter(p => p.approvalStatus === 'approved').map((product) => {
+                            return (
+                              <tr key={product.id || product._id}>
+                                <td>
+                                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <div className="ad-prod-image">
+                                      {(!product.image || !product.image.startsWith('http')) ? (
+                                        product.image || '📦'
+                                      ) : (
+                                        <img src={product.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div className="ad-bold">{product.name}</div>
+                                      <div className="ad-muted">Brand: {product.brand || 'N/A'} | Category: {product.category}</div>
+                                      <div className="ad-muted" style={{ fontSize: '0.75rem', marginTop: '2px', color: '#cbd5e1' }}>
+                                        📅 Added: {product.createdAt ? new Date(product.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div className="ad-bold">{product.seller?.storeName || 'Not Provided'}</div>
+                                  <div className="ad-muted">by {product.seller?.name || 'Unknown Seller'}</div>
+                                </td>
+                                <td>
+                                  <div>₹{product.price?.toLocaleString('en-IN')}</div>
+                                  <div className="ad-muted">Stock: {product.stock} units</div>
+                                </td>
+                                <td>
+                                  <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{product.sku || 'N/A'}</span>
+                                </td>
+                                <td>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <span className="ad-status-badge approved">
+                                      Live
+                                    </span>
+                                    {product.adminCode && (
+                                      <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                                        Code: {product.adminCode}
+                                      </span>
+                                    )}
                                   </div>
                                 </td>
                                 <td>
@@ -2356,23 +2193,140 @@ export default function AdminDashboard() {
                                       setProductDetailTab('info');
                                     }}
                                   >
-                                    Review &amp; Re-Approve
+                                    View Listing Details
                                   </button>
                                 </td>
                               </tr>
                             );
                           })}
-                          {filteredRejectedProducts.length === 0 && (
+                          {products.filter(p => p.approvalStatus === 'approved').length === 0 && (
                             <tr>
-                              <td colSpan="5" className="ad-empty">No rejected products in this category.</td>
+                              <td colSpan="6" className="ad-empty">No live catalog records found.</td>
                             </tr>
                           )}
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                );
-              })()}
+                  )}
+
+                  {/* Sub-tab: REJECTED CATALOG */}
+                  {productsHubSubTab === 'rejected' && (() => {
+                    const rejectedProducts = products.filter(p => p.approvalStatus === 'rejected');
+                    const uniqueCategories = ['All', ...Array.from(new Set(rejectedProducts.map(p => p.category).filter(Boolean))).sort()];
+                    const filteredRejectedProducts = selectedRejectedCategory === 'All'
+                      ? rejectedProducts
+                      : rejectedProducts.filter(p => p.category === selectedRejectedCategory);
+
+                    return (
+                      <div>
+                        {/* Category tabs */}
+                        {rejectedProducts.length > 0 && (
+                          <div className="ad-detail-tabs-nav" style={{ marginBottom: '24px', borderBottom: '1px solid var(--color-admin-border)' }}>
+                            {uniqueCategories.map(cat => {
+                              const count = cat === 'All'
+                                ? rejectedProducts.length
+                                : rejectedProducts.filter(p => p.category === cat).length;
+                              return (
+                                <button
+                                  key={cat}
+                                  className={`ad-detail-tab-trigger ${selectedRejectedCategory === cat ? 'active' : ''}`}
+                                  onClick={() => setSelectedRejectedCategory(cat)}
+                                  style={{ padding: '10px 16px', fontSize: '0.85rem' }}
+                                >
+                                  {cat} <span style={{ 
+                                    marginLeft: '6px', 
+                                    background: selectedRejectedCategory === cat ? 'var(--color-admin-primary)' : 'rgba(255,255,255,0.08)',
+                                    color: '#fff',
+                                    padding: '2px 6px',
+                                    borderRadius: '10px',
+                                    fontSize: '0.72rem'
+                                  }}>{count}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        <div className="ad-table-wrapper">
+                          <table className="ad-table">
+                            <thead>
+                              <tr>
+                                <th>Product Details</th>
+                                <th>Merchant Vendor</th>
+                                <th>Pricing &amp; Stock</th>
+                                <th>Rejection Audit Reason</th>
+                                <th>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredRejectedProducts.map((product) => {
+                                return (
+                                  <tr key={product.id || product._id}>
+                                    <td>
+                                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                        <div className="ad-prod-image">
+                                          {(!product.image || !product.image.startsWith('http')) ? (
+                                            product.image || '📦'
+                                          ) : (
+                                            <img src={product.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                          )}
+                                        </div>
+                                        <div>
+                                          <div className="ad-bold">{product.name}</div>
+                                          <div className="ad-muted">Brand: {product.brand || 'N/A'} | Category: {product.category}</div>
+                                          <div className="ad-muted" style={{ fontSize: '0.75rem', marginTop: '2px', color: '#cbd5e1' }}>
+                                            📅 Added: {product.createdAt ? new Date(product.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td>
+                                      <div className="ad-bold">{product.seller?.storeName || 'Not Provided'}</div>
+                                      <div className="ad-muted">by {product.seller?.name || 'Unknown Seller'}</div>
+                                    </td>
+                                    <td>
+                                      <div>₹{product.price?.toLocaleString('en-IN')}</div>
+                                      <div className="ad-muted">Stock: {product.stock} units</div>
+                                    </td>
+                                    <td>
+                                      <div style={{ maxWidth: '250px' }}>
+                                        <div style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                          <span>🚫 Rejection Attempts:</span>
+                                          <span style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>{product.approvalAttempts || 0}/3</span>
+                                        </div>
+                                        <p className="ad-muted" style={{ fontSize: '0.8rem', lineHeight: '1.4', margin: 0, fontStyle: 'italic', wordBreak: 'break-word' }}>
+                                          &ldquo;{product.rejectionReason || 'No reason provided.'}&rdquo;
+                                        </p>
+                                      </div>
+                                    </td>
+                                    <td>
+                                      <button
+                                        className="ad-btn-sec"
+                                        style={{ fontSize: '0.8rem', height: '34px', padding: '0 16px', fontWeight: '600' }}
+                                        onClick={() => {
+                                          setSelectedDetailProduct(product);
+                                          setProductDetailTab('info');
+                                        }}
+                                      >
+                                        Review &amp; Re-Approve
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                              {filteredRejectedProducts.length === 0 && (
+                                <tr>
+                                  <td colSpan="5" className="ad-empty">No rejected products in this category.</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
             </div>
           )}
 
@@ -2601,73 +2555,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* TAB 4: AUDIT LOGS */}
-          {activeTab === 'audit' && (
-            <div>
-              <div className="ad-view-header">
-                <h3>Administrator Audit Logs</h3>
-                <p>Chronological listing of administrative actions, decisions, and system checks.</p>
-              </div>
-
-              {auditLogsError ? (
-                <div className="ad-error-container">
-                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
-                  <div className="ad-error-message">
-                    Failed to retrieve the administrator audit logs. The backend database server might be starting up from standby mode.
-                  </div>
-                  <button className="ad-btn-sec" onClick={fetchAuditLogs}>
-                    🔄 Retry Loading Audit Logs
-                  </button>
-                </div>
-              ) : loadingAuditLogs ? (
-                <div className="ad-loading">Loading audit records...</div>
-              ) : (
-                <div className="ad-table-wrapper">
-                  <table className="ad-table">
-                    <thead>
-                      <tr>
-                        <th>Administrator</th>
-                        <th>Action Code</th>
-                        <th>Target Reference</th>
-                        <th>Parameters / Details</th>
-                        <th>Timestamp</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {auditLogs.map((log) => (
-                        <tr key={log._id}>
-                          <td>
-                            <div className="ad-bold">{log.admin?.name || 'System Auto'}</div>
-                            <div className="ad-muted" style={{ fontSize: '0.75rem' }}>{log.admin?.email || 'N/A'}</div>
-                          </td>
-                          <td>
-                            <span className="ad-badge-grey" style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{log.action}</span>
-                          </td>
-                          <td>
-                            <div>{log.targetType}</div>
-                            <div className="ad-muted" style={{ fontSize: '0.72rem', fontFamily: 'monospace' }}>ID: {log.targetId}</div>
-                          </td>
-                          <td>
-                            <pre style={{ margin: 0, fontSize: '0.75rem', fontFamily: 'monospace', color: '#cbd5e1', whiteSpace: 'pre-wrap', maxWidth: '300px' }}>
-                              {JSON.stringify(log.details, null, 2)}
-                            </pre>
-                          </td>
-                          <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                            {log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN') : 'N/A'}
-                          </td>
-                        </tr>
-                      ))}
-                      {auditLogs.length === 0 && (
-                        <tr>
-                          <td colSpan="5" className="ad-empty">No audit records found.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* TAB 5: NOTIFICATIONS */}
           {activeTab === 'notifications' && (
