@@ -49,6 +49,9 @@ export default function AdminDashboard() {
   // Inline custom SKUs map
   const [customSkus, setCustomSkus] = useState({});
 
+  // Category filter state for rejected products tab
+  const [selectedRejectedCategory, setSelectedRejectedCategory] = useState('All');
+
   // Feedback modals states (generic for reject / request changes / request more info)
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [feedbackType, setFeedbackType] = useState('product'); // 'seller' or 'product'
@@ -481,7 +484,7 @@ export default function AdminDashboard() {
     if (!isAuthorized) return;
     if (activeTab === 'sellers' || activeTab === 'new-sellers') {
       setTimeout(() => fetchSellers(), 0);
-    } else if (activeTab === 'products' || activeTab === 'new-products') {
+    } else if (activeTab === 'products' || activeTab === 'new-products' || activeTab === 'rejected-products') {
       setTimeout(() => fetchProducts(), 0);
     } else if (activeTab === 'stats') {
       setTimeout(() => {
@@ -1278,6 +1281,15 @@ export default function AdminDashboard() {
             </button>
           </li>
           <li>
+            <button className={`ad-sidebar-btn ${activeTab === 'rejected-products' ? 'active' : ''}`} onClick={() => setActiveTab('rejected-products')}>
+              🚫 Rejected Catalog {products.filter(p => p.approvalStatus === 'rejected').length > 0 && (
+                <span style={{ background: '#ef4444', color: '#fff', borderRadius: '50%', padding: '2px 8px', fontSize: '0.7rem', marginLeft: '6px', fontWeight: 'bold' }}>
+                  {products.filter(p => p.approvalStatus === 'rejected').length}
+                </span>
+              )}
+            </button>
+          </li>
+          <li>
             <button className={`ad-sidebar-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>
               📈 System Stats
             </button>
@@ -1674,6 +1686,144 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB: REJECTED PRODUCTS */}
+          {activeTab === 'rejected-products' && (
+            <div>
+              <div className="ad-view-header">
+                <h3>Rejected Product Catalog</h3>
+                <p>Complete listing of products rejected during onboarding audit. You can review details and re-approve them.</p>
+              </div>
+
+              {productsError ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
+                  <div className="ad-error-message">
+                    Failed to communicate with the backend database. The live server may be waking up after being idle.
+                  </div>
+                  <button className="ad-btn-sec" onClick={fetchProducts}>
+                    🔄 Retry Loading Products
+                  </button>
+                </div>
+              ) : loadingProducts ? (
+                <div className="ad-loading">Fetching rejected products...</div>
+              ) : (() => {
+                const rejectedProducts = products.filter(p => p.approvalStatus === 'rejected');
+                const uniqueCategories = ['All', ...Array.from(new Set(rejectedProducts.map(p => p.category).filter(Boolean))).sort()];
+                const filteredRejectedProducts = selectedRejectedCategory === 'All'
+                  ? rejectedProducts
+                  : rejectedProducts.filter(p => p.category === selectedRejectedCategory);
+
+                return (
+                  <div>
+                    {/* Category tabs */}
+                    {rejectedProducts.length > 0 && (
+                      <div className="ad-detail-tabs-nav" style={{ marginBottom: '24px', borderBottom: '1px solid var(--color-admin-border)' }}>
+                        {uniqueCategories.map(cat => {
+                          const count = cat === 'All'
+                            ? rejectedProducts.length
+                            : rejectedProducts.filter(p => p.category === cat).length;
+                          return (
+                            <button
+                              key={cat}
+                              className={`ad-detail-tab-trigger ${selectedRejectedCategory === cat ? 'active' : ''}`}
+                              onClick={() => setSelectedRejectedCategory(cat)}
+                              style={{ padding: '10px 16px', fontSize: '0.85rem' }}
+                            >
+                              {cat} <span style={{ 
+                                marginLeft: '6px', 
+                                background: selectedRejectedCategory === cat ? 'var(--color-admin-primary)' : 'rgba(255,255,255,0.08)',
+                                color: '#fff',
+                                padding: '2px 6px',
+                                borderRadius: '10px',
+                                fontSize: '0.72rem'
+                              }}>{count}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="ad-table-wrapper">
+                      <table className="ad-table">
+                        <thead>
+                          <tr>
+                            <th>Product Details</th>
+                            <th>Merchant Vendor</th>
+                            <th>Pricing &amp; Stock</th>
+                            <th>Rejection Audit Reason</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredRejectedProducts.map((product) => {
+                            return (
+                              <tr key={product.id || product._id}>
+                                <td>
+                                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <div className="ad-prod-image">
+                                      {(!product.image || !product.image.startsWith('http')) ? (
+                                        product.image || '📦'
+                                      ) : (
+                                        <img src={product.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div className="ad-bold">{product.name}</div>
+                                      <div className="ad-muted">Brand: {product.brand || 'N/A'} | Category: {product.category}</div>
+                                      <div className="ad-muted" style={{ fontSize: '0.75rem', marginTop: '2px', color: '#cbd5e1' }}>
+                                        📅 Added: {product.createdAt ? new Date(product.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div className="ad-bold">{product.seller?.storeName || 'Not Provided'}</div>
+                                  <div className="ad-muted">by {product.seller?.name || 'Unknown Seller'}</div>
+                                </td>
+                                <td>
+                                  <div>₹{product.price?.toLocaleString('en-IN')}</div>
+                                  <div className="ad-muted">Stock: {product.stock} units</div>
+                                </td>
+                                <td>
+                                  <div style={{ maxWidth: '250px' }}>
+                                    <div style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                      <span>🚫 Rejection Attempts:</span>
+                                      <span style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>{product.approvalAttempts || 0}/3</span>
+                                    </div>
+                                    <p className="ad-muted" style={{ fontSize: '0.8rem', lineHeight: '1.4', margin: 0, fontStyle: 'italic', wordBreak: 'break-word' }}>
+                                      &ldquo;{product.rejectionReason || 'No reason provided.'}&rdquo;
+                                    </p>
+                                  </div>
+                                </td>
+                                <td>
+                                  <button
+                                    className="ad-btn-sec"
+                                    style={{ fontSize: '0.8rem', height: '34px', padding: '0 16px', fontWeight: '600' }}
+                                    onClick={() => {
+                                      setSelectedDetailProduct(product);
+                                      setProductDetailTab('info');
+                                    }}
+                                  >
+                                    Review &amp; Re-Approve
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {filteredRejectedProducts.length === 0 && (
+                            <tr>
+                              <td colSpan="5" className="ad-empty">No rejected products in this category.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
