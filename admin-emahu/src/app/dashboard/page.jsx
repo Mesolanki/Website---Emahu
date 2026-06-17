@@ -232,7 +232,12 @@ export default function AdminDashboard() {
       }
       const data = await res.json();
       if (data.success) {
-        setAuditLogs(data.logs);
+        const sortedLogs = (data.logs || []).sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+        setAuditLogs(sortedLogs);
       }
     } catch (err) {
       console.error(err);
@@ -1668,7 +1673,7 @@ export default function AdminDashboard() {
                             </pre>
                           </td>
                           <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                            {new Date(log.timestamp).toLocaleString('en-IN')}
+                            {log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN') : 'N/A'}
                           </td>
                         </tr>
                       ))}
