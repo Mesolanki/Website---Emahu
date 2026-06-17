@@ -102,8 +102,31 @@ export default function AdminDashboard() {
   // Auth checking
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('emahu_admin_logged_in') === 'true';
+    const token = localStorage.getItem('emahu_admin_token');
+    
+    let isTokenExpired = false;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          isTokenExpired = true;
+        }
+      } catch (e) {
+        console.error('Failed to parse token payload:', e);
+        isTokenExpired = true;
+      }
+    } else {
+      isTokenExpired = true;
+    }
+
     if (!isLoggedIn) {
       router.replace('/login');
+      return;
+    }
+
+    if (isTokenExpired) {
+      clearAuthSession('admin');
+      router.replace('/login?expired=true');
       return;
     }
 

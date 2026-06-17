@@ -150,8 +150,31 @@ export default function EmahuProDashboard() {
   // Verification session hook
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('emahu_seller_logged_in') === 'true';
+    const token = localStorage.getItem('emahu_seller_token');
+
+    let isTokenExpired = false;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          isTokenExpired = true;
+        }
+      } catch (e) {
+        console.error('Failed to parse seller token payload:', e);
+        isTokenExpired = true;
+      }
+    } else {
+      isTokenExpired = true;
+    }
+
     if (!isLoggedIn) {
       router.replace('/seller/login');
+      return;
+    }
+
+    if (isTokenExpired) {
+      clearAuthSession('seller');
+      router.replace('/seller/login?expired=true');
       return;
     }
     
