@@ -18,6 +18,7 @@ export default function AdminLogin() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('expired') === 'true') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError('Your session has expired. Please log in again.');
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);

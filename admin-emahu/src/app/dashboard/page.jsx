@@ -18,6 +18,8 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState([]);
   const [loadingSellers, setLoadingSellers] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [sellersError, setSellersError] = useState(false);
+  const [productsError, setProductsError] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
   const [toasts, setToasts] = useState([]);
 
@@ -26,6 +28,8 @@ export default function AdminDashboard() {
   const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [auditLogsError, setAuditLogsError] = useState(false);
+  const [notificationsError, setNotificationsError] = useState(false);
 
   // Settings & 2FA states
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
@@ -57,6 +61,7 @@ export default function AdminDashboard() {
     if (selectedDetailSeller) {
       const updated = sellers.find(s => s._id === selectedDetailSeller._id);
       if (updated && JSON.stringify(updated) !== JSON.stringify(selectedDetailSeller)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedDetailSeller(updated);
       }
     }
@@ -71,6 +76,7 @@ export default function AdminDashboard() {
     if (selectedDetailProduct) {
       const updated = products.find(p => (p._id || p.id) === (selectedDetailProduct._id || selectedDetailProduct.id));
       if (!updated) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedDetailProduct(null);
       } else if (JSON.stringify(updated) !== JSON.stringify(selectedDetailProduct)) {
         setSelectedDetailProduct(updated);
@@ -131,11 +137,12 @@ export default function AdminDashboard() {
   // Fetch Sellers List
   const fetchSellers = async () => {
     setLoadingSellers(true);
+    setSellersError(false);
     try {
       const token = localStorage.getItem('emahu_admin_token');
       if (!token) return;
       
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/central-sellers-directory`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/sellers`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -144,20 +151,7 @@ export default function AdminDashboard() {
         handleSessionExpired();
         return;
       }
-      // Fallback to normal admin sellers endpoint if helper route not defined
-      let data;
-      if (res.status === 404) {
-        const fallbackRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/sellers`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (fallbackRes.status === 401) {
-          handleSessionExpired();
-          return;
-        }
-        data = await fallbackRes.json();
-      } else {
-        data = await res.json();
-      }
+      const data = await res.json();
       
       if (data.success) {
         const sortedSellers = (data.sellers || [])
@@ -169,11 +163,14 @@ export default function AdminDashboard() {
             return String(b._id || '').localeCompare(String(a._id || ''));
           });
         setSellers(sortedSellers);
+        setSellersError(false);
       } else {
+        setSellersError(true);
         triggerToast('Error', data.error || 'Failed to fetch sellers list.', 'danger');
       }
     } catch (err) {
       console.error(err);
+      setSellersError(true);
       triggerToast('Error', 'Network error fetching sellers.', 'danger');
     } finally {
       setLoadingSellers(false);
@@ -183,6 +180,7 @@ export default function AdminDashboard() {
   // Fetch Products List
   const fetchProducts = async () => {
     setLoadingProducts(true);
+    setProductsError(false);
     try {
       const token = localStorage.getItem('emahu_admin_token');
       if (!token) return;
@@ -207,11 +205,14 @@ export default function AdminDashboard() {
             return String(b._id || b.id || '').localeCompare(String(a._id || a.id || ''));
           });
         setProducts(sortedProducts);
+        setProductsError(false);
       } else {
+        setProductsError(true);
         triggerToast('Error', data.error || 'Failed to fetch products list.', 'danger');
       }
     } catch (err) {
       console.error(err);
+      setProductsError(true);
       triggerToast('Error', 'Network error fetching products.', 'danger');
     } finally {
       setLoadingProducts(false);
@@ -221,6 +222,7 @@ export default function AdminDashboard() {
   // Fetch Audit Logs
   const fetchAuditLogs = async () => {
     setLoadingAuditLogs(true);
+    setAuditLogsError(false);
     try {
       const token = localStorage.getItem('emahu_admin_token');
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/audit`, {
@@ -238,9 +240,13 @@ export default function AdminDashboard() {
           return timeB - timeA;
         });
         setAuditLogs(sortedLogs);
+        setAuditLogsError(false);
+      } else {
+        setAuditLogsError(true);
       }
     } catch (err) {
       console.error(err);
+      setAuditLogsError(true);
     } finally {
       setLoadingAuditLogs(false);
     }
@@ -249,6 +255,7 @@ export default function AdminDashboard() {
   // Fetch Notifications
   const fetchNotifications = async () => {
     setLoadingNotifications(true);
+    setNotificationsError(false);
     try {
       const token = localStorage.getItem('emahu_admin_token');
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications`, {
@@ -261,9 +268,13 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (data.success) {
         setNotifications(data.notifications);
+        setNotificationsError(false);
+      } else {
+        setNotificationsError(true);
       }
     } catch (err) {
       console.error(err);
+      setNotificationsError(true);
     } finally {
       setLoadingNotifications(false);
     }
@@ -1289,7 +1300,17 @@ export default function AdminDashboard() {
                 <p>Verify bank details, business profiles, and KYC documents to activate new merchant listings.</p>
               </div>
 
-              {loadingSellers ? (
+              {sellersError ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
+                  <div className="ad-error-message">
+                    Failed to communicate with the backend database. The live server (on Render free tier) may be waking up after being idle. This spin-up process can take up to 60 seconds.
+                  </div>
+                  <button className="ad-btn-sec" onClick={fetchSellers}>
+                    🔄 Retry Loading Sellers
+                  </button>
+                </div>
+              ) : loadingSellers ? (
                 <div className="ad-loading">Fetching registration queue...</div>
               ) : (
                 <div className="ad-table-wrapper">
@@ -1353,7 +1374,17 @@ export default function AdminDashboard() {
                 <p>Complete record base of all verified and blocked sellers active on the storefront catalog.</p>
               </div>
 
-              {loadingSellers ? (
+              {sellersError ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
+                  <div className="ad-error-message">
+                    Failed to retrieve the seller directory. The backend database server might be starting up from standby mode.
+                  </div>
+                  <button className="ad-btn-sec" onClick={fetchSellers}>
+                    🔄 Retry Loading Sellers
+                  </button>
+                </div>
+              ) : loadingSellers ? (
                 <div className="ad-loading">Fetching sellers from directory...</div>
               ) : (
                 <div className="ad-table-wrapper">
@@ -1424,7 +1455,17 @@ export default function AdminDashboard() {
                 <p>Audit newly submitted merchant inventory listings, verify details, and assign official system SKUs to authorize catalog publishing.</p>
               </div>
 
-              {loadingProducts ? (
+              {productsError ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
+                  <div className="ad-error-message">
+                    Failed to communicate with the backend database. The live server (on Render free tier) may be waking up after being idle. This spin-up process can take up to 60 seconds.
+                  </div>
+                  <button className="ad-btn-sec" onClick={fetchProducts}>
+                    🔄 Retry Loading Products
+                  </button>
+                </div>
+              ) : loadingProducts ? (
                 <div className="ad-loading">Fetching product onboarding queue...</div>
               ) : (
                 <div className="ad-table-wrapper">
@@ -1513,7 +1554,17 @@ export default function AdminDashboard() {
                 <p>Read-only inventory records of all approved active listings and rejected catalog submissions.</p>
               </div>
 
-              {loadingProducts ? (
+              {productsError ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
+                  <div className="ad-error-message">
+                    Failed to retrieve the product directory. The backend database server might be starting up from standby mode.
+                  </div>
+                  <button className="ad-btn-sec" onClick={fetchProducts}>
+                    🔄 Retry Loading Products
+                  </button>
+                </div>
+              ) : loadingProducts ? (
                 <div className="ad-loading">Fetching catalog listings...</div>
               ) : (
                 <div className="ad-table-wrapper">
@@ -1609,25 +1660,39 @@ export default function AdminDashboard() {
                 <p>Operational statistics of the EMAHU platform registrations.</p>
               </div>
 
-              <div className="ad-stats-grid">
-                <div className="ad-stat-card">
-                  <span className="title">Total Registered Sellers</span>
-                  <span className="value">{sellers.length}</span>
-                  <span className="desc">{sellers.filter(s => s.status === 'approved').length} Active | {sellers.filter(s => s.status === 'pending').length} Pending</span>
+              {(sellersError || productsError) ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
+                  <div className="ad-error-message">
+                    Failed to calculate statistics. The backend database server might be starting up from standby mode.
+                  </div>
+                  <button className="ad-btn-sec" onClick={() => { fetchSellers(); fetchProducts(); }}>
+                    🔄 Retry Loading Stats
+                  </button>
                 </div>
-                <div className="ad-stat-card">
-                  <span className="title">Total Product Listings</span>
-                  <span className="value">{products.length}</span>
-                  <span className="desc">{products.filter(p => p.approvalStatus === 'approved').length} Live on Buyer Hub</span>
+              ) : (loadingSellers || loadingProducts) ? (
+                <div className="ad-loading">Calculating system statistics...</div>
+              ) : (
+                <div className="ad-stats-grid">
+                  <div className="ad-stat-card">
+                    <span className="title">Total Registered Sellers</span>
+                    <span className="value">{sellers.length}</span>
+                    <span className="desc">{sellers.filter(s => s.status === 'approved').length} Active | {sellers.filter(s => s.status === 'pending').length} Pending</span>
+                  </div>
+                  <div className="ad-stat-card">
+                    <span className="title">Total Product Listings</span>
+                    <span className="value">{products.length}</span>
+                    <span className="desc">{products.filter(p => p.approvalStatus === 'approved').length} Live on Buyer Hub</span>
+                  </div>
+                  <div className="ad-stat-card">
+                    <span className="title">Pending Review Actions</span>
+                    <span className="value">
+                      {sellers.filter(s => s.status === 'pending').length + products.filter(p => p.approvalStatus === 'pending' && !p.adminCode).length}
+                    </span>
+                    <span className="desc">Requires administrator decision</span>
+                  </div>
                 </div>
-                <div className="ad-stat-card">
-                  <span className="title">Pending Review Actions</span>
-                  <span className="value">
-                    {sellers.filter(s => s.status === 'pending').length + products.filter(p => p.approvalStatus === 'pending' && !p.adminCode).length}
-                  </span>
-                  <span className="desc">Requires administrator decision</span>
-                </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -1639,7 +1704,17 @@ export default function AdminDashboard() {
                 <p>Chronological listing of administrative actions, decisions, and system checks.</p>
               </div>
 
-              {loadingAuditLogs ? (
+              {auditLogsError ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
+                  <div className="ad-error-message">
+                    Failed to retrieve the administrator audit logs. The backend database server might be starting up from standby mode.
+                  </div>
+                  <button className="ad-btn-sec" onClick={fetchAuditLogs}>
+                    🔄 Retry Loading Audit Logs
+                  </button>
+                </div>
+              ) : loadingAuditLogs ? (
                 <div className="ad-loading">Loading audit records...</div>
               ) : (
                 <div className="ad-table-wrapper">
@@ -1704,7 +1779,17 @@ export default function AdminDashboard() {
                 )}
               </div>
 
-              {loadingNotifications ? (
+              {notificationsError ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
+                  <div className="ad-error-message">
+                    Failed to retrieve system alerts. The backend database server might be starting up from standby mode.
+                  </div>
+                  <button className="ad-btn-sec" onClick={fetchNotifications}>
+                    🔄 Retry Loading Alerts
+                  </button>
+                </div>
+              ) : loadingNotifications ? (
                 <div className="ad-loading">Loading alerts...</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '20px' }}>

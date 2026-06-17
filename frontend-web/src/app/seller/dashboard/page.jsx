@@ -1243,7 +1243,7 @@ export default function EmahuProDashboard() {
           return updated;
         });
         if (data.product && data.product.sku) {
-          window.open(`http://localhost:3000/buyer/products/${data.product.sku}`, '_blank');
+          window.open(`${window.location.origin}/buyer/products/${data.product.sku}`, '_blank');
         }
       } else {
         triggerToast('Verification Failed', data.error || 'Invalid verification code.', 'danger');
