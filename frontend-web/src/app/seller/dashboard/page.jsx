@@ -148,6 +148,9 @@ export default function EmahuProDashboard() {
   const [sellerUser, setSellerUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [sellerDocuments, setSellerDocuments] = useState([]);
+  const [editingDocType, setEditingDocType] = useState(null);
+  const [inputDocUrl, setInputDocUrl] = useState('');
+  const [inlineSubmitting, setInlineSubmitting] = useState(false);
 
   const [settingsForm, setSettingsForm] = useState({
     storeName: '',
@@ -650,6 +653,56 @@ export default function EmahuProDashboard() {
       }
     } catch (err) {
       console.error('Error fetching documents:', err);
+    }
+  };
+
+  const handleInlineSubmit = async (type) => {
+    if (!inputDocUrl.trim()) {
+      triggerToast('Error', 'Please provide a valid document URL.', 'danger');
+      return;
+    }
+    setInlineSubmitting(true);
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(apiBase + '/api/auth/seller/documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          documentType: type,
+          fileUrl: inputDocUrl.trim()
+        })
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        triggerToast('Document Submitted', `${type === 'business_registration' ? 'Business Registration' : 'ID Proof'} uploaded successfully and verification is pending.`, 'success');
+        setEditingDocType(null);
+        setInputDocUrl('');
+        // Refresh document list
+        await fetchSellerDocuments();
+        // Sync user profile status
+        if (token) {
+          const profileRes = await getProfile(token);
+          if (profileRes.success && profileRes.user) {
+            setSellerUser(profileRes.user);
+            localStorage.setItem('emahu_seller_user', JSON.stringify(profileRes.user));
+          }
+        }
+      } else {
+        triggerToast('Error', data.error || 'Failed to upload document', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error. Please try again.', 'danger');
+    } finally {
+      setInlineSubmitting(false);
     }
   };
 
@@ -2426,36 +2479,89 @@ export default function EmahuProDashboard() {
                     return (
                       <div key={type} style={{
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
+                        flexDirection: 'column',
+                        gap: '12px',
                         padding: '16px',
                         background: 'rgba(255,255,255,0.02)',
                         border: '1px solid #27272a',
                         borderRadius: '12px'
                       }}>
-                        <div>
-                          <strong style={{ color: '#fff', fontSize: '0.9rem', display: 'block' }}>{docName}</strong>
-                          {doc ? (
-                            <a href={doc.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#6366f1', fontSize: '0.8rem', textDecoration: 'underline', display: 'inline-block', marginTop: '4px' }}>
-                              View Submitted Document
-                            </a>
-                          ) : (
-                            <span style={{ color: '#71717a', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>Not uploaded</span>
-                          )}
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          width: '100%'
+                        }}>
+                          <div>
+                            <strong style={{ color: '#fff', fontSize: '0.9rem', display: 'block' }}>{docName}</strong>
+                            {doc ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                                <a href={doc.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#6366f1', fontSize: '0.8rem', textDecoration: 'underline' }}>
+                                  View Submitted Document
+                                </a>
+                                {doc.feedback && (
+                                  <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>(Feedback: {doc.feedback})</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: '#71717a', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>Not uploaded</span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {doc?.status !== 'approved' && editingDocType !== type && (
+                              <button 
+                                onClick={() => { setEditingDocType(type); setInputDocUrl(doc ? doc.fileUrl : ''); }}
+                                style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.4)', background: 'rgba(99, 102, 241, 0.1)', color: '#a5b4fc', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
+                              >
+                                {doc ? 'Update Link' : 'Provide Document'}
+                              </button>
+                            )}
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              backgroundColor: doc?.status === 'approved' ? 'rgba(16, 185, 129, 0.1)' : doc?.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                              color: doc?.status === 'approved' ? '#10b981' : doc?.status === 'rejected' ? '#ef4444' : '#f59e0b',
+                              border: `1px solid ${doc?.status === 'approved' ? 'rgba(16, 185, 129, 0.2)' : doc?.status === 'rejected' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`
+                            }}>
+                              {doc ? doc.status.toUpperCase() : 'PENDING'}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span style={{
-                            padding: '4px 10px',
-                            borderRadius: '20px',
-                            fontSize: '0.75rem',
-                            fontWeight: '600',
-                            backgroundColor: doc?.status === 'approved' ? 'rgba(16, 185, 129, 0.1)' : doc?.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                            color: doc?.status === 'approved' ? '#10b981' : doc?.status === 'rejected' ? '#ef4444' : '#f59e0b',
-                            border: `1px solid ${doc?.status === 'approved' ? 'rgba(16, 185, 129, 0.2)' : doc?.status === 'rejected' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`
+
+                        {editingDocType === type && (
+                          <div style={{
+                            marginTop: '8px',
+                            paddingTop: '12px',
+                            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            width: '100%'
                           }}>
-                            {doc ? doc.status.toUpperCase() : 'PENDING'}
-                          </span>
-                        </div>
+                            <DocumentUploader
+                              label="Attach Document File"
+                              value={inputDocUrl}
+                              onChange={setInputDocUrl}
+                            />
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                              <button 
+                                onClick={() => handleInlineSubmit(type)}
+                                disabled={inlineSubmitting || !inputDocUrl}
+                                style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', fontSize: '0.8rem', cursor: (inlineSubmitting || !inputDocUrl) ? 'not-allowed' : 'pointer', fontWeight: 'bold', opacity: (inlineSubmitting || !inputDocUrl) ? 0.6 : 1 }}
+                              >
+                                {inlineSubmitting ? 'Processing...' : 'Submit Document'}
+                              </button>
+                              <button 
+                                onClick={() => setEditingDocType(null)}
+                                style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#27272a', border: '1px solid #3f3f46', color: '#fff', fontSize: '0.8rem', cursor: 'pointer' }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -5401,6 +5507,117 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
   );
 }
 
+function DocumentUploader({ label, value, onChange }) {
+  const [dragging, setDragging] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = (file) => {
+    if (!file) return;
+    setFileName(file.name);
+    setUploading(true);
+    setProgress(0);
+
+    // Simulate progress bar loading
+    let current = 0;
+    const interval = setInterval(() => {
+      current += 10;
+      setProgress(current);
+      if (current >= 100) {
+        clearInterval(interval);
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          onChange(e.target.result); // yields base64 Data URL
+          setUploading(false);
+        };
+        reader.readAsDataURL(file);
+      }
+    }, 80);
+  };
+
+  const onDragOver = (e) => {
+    e.preventDefault();
+    setDragging(true);
+  };
+
+  const onDragLeave = () => {
+    setDragging(false);
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const onFileSelect = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0]);
+    }
+  };
+
+  const cleanLabel = (label || '').replace(/\s+/g, '-');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', textAlign: 'left' }}>
+      {label && <label style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 'bold' }}>{label}</label>}
+      <div
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        style={{
+          border: dragging ? '2px dashed #6366f1' : '2px dashed rgba(255, 255, 255, 0.1)',
+          borderRadius: '12px',
+          padding: '24px 16px',
+          textAlign: 'center',
+          backgroundColor: dragging ? 'rgba(99, 102, 241, 0.05)' : 'rgba(0, 0, 0, 0.2)',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease-in-out',
+          position: 'relative'
+        }}
+        onClick={() => document.getElementById(`file-input-${cleanLabel}`).click()}
+      >
+        <input
+          id={`file-input-${cleanLabel}`}
+          type="file"
+          accept="image/*,application/pdf"
+          style={{ display: 'none' }}
+          onChange={onFileSelect}
+        />
+        
+        {uploading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.05)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>Processing {fileName} ({progress}%)</span>
+            <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ width: `${progress}%`, height: '100%', backgroundColor: '#6366f1', transition: 'width 0.1s ease-in-out' }} />
+            </div>
+          </div>
+        ) : value ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '1.8rem' }}>📄</span>
+            <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 'bold' }}>✓ Document Attached</span>
+            {fileName && <span style={{ fontSize: '0.75rem', color: '#a1a1aa', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>}
+            <span style={{ fontSize: '0.7rem', color: '#6366f1', textDecoration: 'underline' }}>Click to replace file</span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '2rem', color: '#71717a' }}>📤</span>
+            <span style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: '600' }}>
+              Drag & Drop file here or <span style={{ color: '#818cf8', textDecoration: 'underline' }}>browse</span>
+            </span>
+            <span style={{ fontSize: '0.7rem', color: '#71717a' }}>Supports PDF or images (Max 5MB)</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SellerDocumentResubmissionForm({ documents, onSuccess }) {
   const [businessDocUrl, setBusinessDocUrl] = useState('');
   const [idDocUrl, setIdDocUrl] = useState('');
@@ -5410,7 +5627,7 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!businessDocUrl.trim() && !idDocUrl.trim()) {
-      setError('Please provide at least one document URL to resubmit.');
+      setError('Please attach at least one document to resubmit.');
       return;
     }
     setError('');
@@ -5483,33 +5700,21 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
           ⚠️ {error}
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div className="form-group">
-          <label className="form-label" style={{ color: '#fff', fontSize: '0.85rem' }}>Resubmit Business Registration Document URL</label>
-          <input 
-            type="url" 
-            className="form-input" 
-            placeholder="e.g. https://mock-s3.emahu.com/docs/gst_cert.pdf" 
-            value={businessDocUrl} 
-            onChange={e => setBusinessDocUrl(e.target.value)} 
-            style={{ width: '100%', padding: '10px', borderRadius: '6px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
-          />
-        </div>
-        <div className="form-group">
-          <label className="form-label" style={{ color: '#fff', fontSize: '0.85rem' }}>Resubmit ID Proof (PAN / Aadhaar) Document URL</label>
-          <input 
-            type="url" 
-            className="form-input" 
-            placeholder="e.g. https://mock-s3.emahu.com/docs/pan_card.jpg" 
-            value={idDocUrl} 
-            onChange={e => setIdDocUrl(e.target.value)} 
-            style={{ width: '100%', padding: '10px', borderRadius: '6px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
-          />
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <DocumentUploader
+          label="Resubmit Business Registration Document"
+          value={businessDocUrl}
+          onChange={setBusinessDocUrl}
+        />
+        <DocumentUploader
+          label="Resubmit ID Proof (PAN / Aadhaar)"
+          value={idDocUrl}
+          onChange={setIdDocUrl}
+        />
         <button 
           type="submit" 
           className="company-portal-btn" 
-          style={{ width: '100%', height: '40px', background: '#6366f1', color: '#fff', fontWeight: '700', borderRadius: '8px', cursor: submitting ? 'not-allowed' : 'pointer', border: 'none' }}
+          style={{ width: '100%', height: '40px', background: '#6366f1', color: '#fff', fontWeight: '700', borderRadius: '8px', cursor: submitting ? 'not-allowed' : 'pointer', border: 'none', marginTop: '8px' }}
           disabled={submitting}
         >
           {submitting ? 'Resubmitting details...' : 'Resubmit for Verification'}

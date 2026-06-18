@@ -1,0 +1,51 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model PaymentMethodConfig {
+  id               String   @id @default(uuid())
+  name             String
+  type             String   // e.g. "UPI", "CARD", "NETBANKING", "BNPL", "WALLET"
+  allowedCountries String   // Comma-separated list of ISO-2 codes e.g. "IN,US,NL"
+  allowedStates    String?  // Comma-separated list of states, or null for any
+  allowedZips      String?  // Comma-separated list or glob pattern, or null for any
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model PaymentGatewayRegistry {
+  id                   String   @id @default(uuid())
+  name                 String   // e.g. "Stripe", "Razorpay", "Adyen"
+  supportedMethods     String   // Comma-separated payment types e.g. "CARD,WALLET"
+  supportedCountries   String   // Comma-separated country codes or "*" for all
+  priority             Int      // Higher number = higher priority
+  processingFeePercent Float    // e.g. 1.5%
+  successRate          Float    // e.g. 0.98 for 98%
+  healthStatus         String   // "HEALTHY", "DEGRADED", "UNHEALTHY"
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Transaction {
+  id             String   @id @default(uuid())
+  amount         Float
+  currency       String
+  status         String   // "INITIATED", "PENDING", "SUCCESS", "FAILED"
+  paymentMethod  String
+  billingCountry String
+  billingState   String
+  billingZip     String
+  idempotencyKey String   @unique
+  pgTried        String   // Comma-separated list of gateways tried, e.g., "Razorpay,Stripe"
+  activePgId     String?  // Currently active PG processing the payment
+  failureReason  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
