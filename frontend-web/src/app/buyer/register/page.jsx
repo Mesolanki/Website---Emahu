@@ -24,6 +24,24 @@ export default function BuyerRegister() {
     }
   }, [router]);
 
+  // Read query params for Google Auth prefill
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const emailParam = urlParams.get('email');
+      const nameParam = urlParams.get('name');
+      if (emailParam) {
+        setFormData((prev) => ({
+          ...prev,
+          email: emailParam,
+          fullName: nameParam || emailParam.split('@')[0],
+          password: `GoogleAuthPass_${Math.random().toString(36).substring(2, 10)}`
+        }));
+        setErrors({ general: 'Google account connected. Please complete the registration details below.' });
+      }
+    }
+  }, []);
+
   const handleGoogleSignIn = () => {
     const width = 500;
     const height = 600;
@@ -40,11 +58,22 @@ export default function BuyerRegister() {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data?.role === 'buyer') {
         window.removeEventListener('message', handleMessage);
-        const { email, name, role } = event.data;
+        const { email, name, role, idToken } = event.data;
         setLoading(true);
         setErrors({});
         try {
-          const data = await googleLoginUser({ email, name, role });
+          const data = await googleLoginUser({ email, name, role, idToken });
+          if (data.exists === false) {
+            setLoading(false);
+            setFormData((prev) => ({
+              ...prev,
+              email: data.email || '',
+              fullName: data.name || '',
+              password: `GoogleAuthPass_${Math.random().toString(36).substring(2, 10)}`
+            }));
+            setErrors({ general: 'Google account connected! Please enter your phone number and address to register.' });
+            return;
+          }
           saveAuthSession(data, 'buyer');
           setLoading(false);
           setSuccess(true);
@@ -386,7 +415,7 @@ export default function BuyerRegister() {
                     <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(0,0,0,0.08)' }} />
                   </div>
 
-                  <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
                     <button
                       type="button"
                       onClick={handleGoogleSignIn}
@@ -395,20 +424,21 @@ export default function BuyerRegister() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '10px',
-                        flex: 1,
-                        padding: '12px',
+                        gap: '12px',
+                        width: '100%',
+                        height: '44px',
                         backgroundColor: '#fff',
                         border: '1px solid #dadce0',
                         borderRadius: '8px',
                         cursor: 'pointer',
-                        fontSize: '0.95rem',
-                        fontWeight: '500',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
                         color: '#3c4043',
-                        transition: 'background-color 0.2s'
+                        transition: 'background-color 0.2s, box-shadow 0.2s',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f8f9fa'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)'; }}
                     >
                       <svg width="18" height="18" viewBox="0 0 18 18">
                         <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
@@ -416,7 +446,7 @@ export default function BuyerRegister() {
                         <path d="M3.95 10.702c-.18-.54-.282-1.117-.282-1.702s.102-1.162.282-1.702V4.966H1.026C.371 6.273 0 7.761 0 9s.371 2.727 1.026 4.034l2.924-2.332z" fill="#FBBC05"/>
                         <path d="M9 3.58c1.32 0 2.5.454 3.435 1.348l2.58-2.58C13.464.896 11.428 0 9 0 5.534 0 2.51 2.02 1.026 4.966L3.95 7.298C4.659 5.165 6.648 3.58 9 3.58z" fill="#EA4335"/>
                       </svg>
-                      <span>Google</span>
+                      <span>Continue with Google</span>
                     </button>
 
                     <button
@@ -427,25 +457,25 @@ export default function BuyerRegister() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '10px',
-                        flex: 1,
-                        padding: '12px',
-                        backgroundColor: '#fff',
-                        border: '1px solid #dadce0',
+                        gap: '12px',
+                        width: '100%',
+                        height: '44px',
+                        backgroundColor: '#000000',
+                        border: 'none',
                         borderRadius: '8px',
                         cursor: 'pointer',
-                        fontSize: '0.95rem',
-                        fontWeight: '500',
-                        color: '#3c4043',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        color: '#ffffff',
                         transition: 'background-color 0.2s'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#000000'}
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M18.7 18.5C17.5 20.3 16.3 22 14.5 22c-1.8 0-2.3-1.1-4.3-1.1-2.1 0-2.6 1.1-4.3 1.1-1.7 0-3.1-1.8-4.2-3.4C-.6 15 1.1 9.4 3.7 9.4c1.8 0 2.8 1.1 3.9 1.1 1.1 0 2.3-1.1 4.4-1.1 1.8 0 3.2 1 4.1 2.2-3.8 2.2-3.2 7.7.3 9.4-.7 1.9-1.9 3.5-3.7 3.5zM15.8 6.4c1-1.2 1.6-2.8 1.4-4.4-1.4.1-3 1-4 2.1-1 1.1-1.8 2.8-1.5 4.3 1.5.1 3-1 4.1-2z" />
                       </svg>
-                      <span>Apple</span>
+                      <span>Continue with Apple ID</span>
                     </button>
                   </div>
 

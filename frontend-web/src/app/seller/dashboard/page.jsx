@@ -1636,6 +1636,12 @@ export default function EmahuProDashboard() {
   const [newProductStock, setNewProductStock] = useState('');
   const [newProductDescription, setNewProductDescription] = useState('');
   const [newProductImage, setNewProductImage] = useState('');
+  const [newProductImages, setNewProductImages] = useState([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [manualUrlInput, setManualUrlInput] = useState('');
+  const [sellerReviews, setSellerReviews] = useState([]);
+  const [adminReviews, setAdminReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [verifyCodes, setVerifyCodes] = useState({});
   const [resubmitProductId, setResubmitProductId] = useState(null);
@@ -1723,6 +1729,7 @@ export default function EmahuProDashboard() {
           comparePrice: comparePriceNum,
           stock: stockNum,
           image: newProductImage.trim(),
+          images: newProductImages,
           description: newProductDescription.trim()
         })
       });
@@ -1765,6 +1772,11 @@ export default function EmahuProDashboard() {
     }
   };
 
+  // Synchronize newProductImage with the first item in newProductImages
+  useEffect(() => {
+    setNewProductImage(newProductImages[0] || '');
+  }, [newProductImages]);
+
   const resetAddForm = () => {
     setNewProductName('');
     setNewProductBrand('');
@@ -1790,6 +1802,8 @@ export default function EmahuProDashboard() {
     setNewProductStock('');
     setNewProductDescription('');
     setNewProductImage('');
+    setNewProductImages([]);
+    setManualUrlInput('');
     setFormError('');
     setResubmitProductId(null);
   };
@@ -1852,8 +1866,254 @@ export default function EmahuProDashboard() {
     setNewProductStock(product.stock.toString());
     setNewProductDescription(product.description || '');
     setNewProductImage(product.image || '');
+    setNewProductImages(product.images || (product.image ? [product.image] : []));
     setIsAddModalOpen(true);
   };
+
+  const renderMultiImageSelector = () => {
+    const handleFileSelect = (e) => {
+      const files = Array.from(e.target.files);
+      processFiles(files);
+    };
+
+    const processFiles = (files) => {
+      files.forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setNewProductImages(prev => [...prev, e.target.result]);
+        };
+        reader.readAsDataURL(file);
+      });
+    };
+
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      setIsDragging(true);
+    };
+
+    const handleDragLeave = () => {
+      setIsDragging(false);
+    };
+
+    const handleDrop = (e) => {
+      e.preventDefault();
+      setIsDragging(false);
+      
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        processFiles(Array.from(e.dataTransfer.files));
+      }
+      
+      const link = e.dataTransfer.getData('text/plain');
+      if (link && link.startsWith('http')) {
+        setNewProductImages(prev => [...prev, link]);
+      }
+    };
+
+    const addManualUrl = () => {
+      if (manualUrlInput.trim() && manualUrlInput.trim().startsWith('http')) {
+        setNewProductImages(prev => [...prev, manualUrlInput.trim()]);
+        setManualUrlInput('');
+      } else {
+        triggerToast('Invalid URL', 'Please enter a valid HTTP/HTTPS image URL', 'danger');
+      }
+    };
+
+    const removeImage = (indexToRemove) => {
+      setNewProductImages(prev => prev.filter((_, idx) => idx !== indexToRemove));
+    };
+
+    return (
+      <div style={{ marginTop: '12px', width: '100%' }}>
+        <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Product Gallery * (Drag/drop files or links, or click upload)</label>
+        
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          style={{
+            border: isDragging ? '2px dashed var(--color-primary)' : '2px dashed var(--border-color)',
+            backgroundColor: isDragging ? 'rgba(56, 189, 248, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+            borderRadius: '10px',
+            padding: '20px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            position: 'relative'
+          }}
+        >
+          <input
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={handleFileSelect}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              opacity: 0,
+              cursor: 'pointer'
+            }}
+          />
+          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📸</div>
+          <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+            Drag & Drop image files or web links here
+          </p>
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            or click to browse local files
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+          <input
+            type="url"
+            className="form-input"
+            style={{ height: '36px', fontSize: '0.85rem', flex: 1 }}
+            placeholder="Paste external image link here..."
+            value={manualUrlInput}
+            onChange={(e) => setManualUrlInput(e.target.value)}
+          />
+          <button
+            type="button"
+            className="company-portal-btn"
+            onClick={addManualUrl}
+            style={{ height: '36px', padding: '0 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--color-primary)' }}
+          >
+            Add Link
+          </button>
+        </div>
+
+        {newProductImages.length > 0 && (
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '10px',
+            marginTop: '12px',
+            padding: '8px',
+            backgroundColor: 'rgba(0, 0, 0, 0.03)',
+            borderRadius: '8px',
+            border: '1px solid var(--border-color)'
+          }}>
+            {newProductImages.map((img, idx) => (
+              <div key={idx} style={{
+                position: 'relative',
+                width: '60px',
+                height: '60px',
+                borderRadius: '6px',
+                overflow: 'hidden',
+                border: '1px solid var(--border-color)',
+                backgroundColor: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <img
+                  src={img}
+                  alt={`Product img ${idx + 1}`}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => { e.target.src = 'https://placehold.co/60x60?text=Error'; }}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage(idx)}
+                  style={{
+                    position: 'absolute',
+                    top: '2px',
+                    right: '2px',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                    color: '#fff',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    padding: 0
+                  }}
+                >
+                  ✕
+                </button>
+                {idx === 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: 'var(--color-primary)',
+                    color: '#0f172a',
+                    fontSize: '8px',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    padding: '1px 0'
+                  }}>
+                    MAIN
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const fetchSellerReviews = async () => {
+    try {
+      setReviewsLoading(true);
+      const token = localStorage.getItem('emahu_seller_token');
+      if (!token) return;
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/reviews/seller`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSellerReviews(data.reviews);
+      }
+    } catch (err) {
+      console.error('Failed to fetch reviews:', err);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!window.confirm('Are you sure you want to delete this review?')) return;
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      if (!token) return;
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/reviews/${reviewId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        triggerToast('Review Removed', 'Review has been successfully deleted.', 'success');
+        setSellerReviews(prev => prev.filter(r => r._id !== reviewId));
+        setAdminReviews(prev => prev.filter(r => r._id !== reviewId));
+      } else {
+        triggerToast('Error', data.error || 'Failed to delete review.', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error deleting review.', 'danger');
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'reviews') {
+      fetchSellerReviews();
+    }
+  }, [activeTab]);
 
   // Open Delete Confirmation
   const confirmDeleteProduct = (product) => {

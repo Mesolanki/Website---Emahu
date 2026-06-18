@@ -264,9 +264,48 @@ exports.login = async (req, res) => {
 // @access  Public
 exports.googleLogin = async (req, res) => {
   try {
-    const { email, name, role } = req.body;
+    const { email, name, role, idToken } = req.body;
+    let finalEmail = email;
+    let finalName = name;
 
-    if (!email) {
+    if (idToken) {
+      const { OAuth2Client } = require('google-auth-library');
+      const googleClientId = process.env.GOOGLE_CLIENT_ID;
+      try {
+        const client = new OAuth2Client(googleClientId);
+        const ticket = await client.verifyIdToken({
+          idToken: idToken,
+          audience: googleClientId,
+        });
+        const payload = ticket.getPayload();
+        finalEmail = payload.email;
+        finalName = payload.name || payload.given_name || payload.email.split('@')[0];
+        console.log('Verified Google ID Token successfully for:', finalEmail);
+      } catch (tokenErr) {
+        console.error('ID Token verification failed, checking tokeninfo endpoint:', tokenErr.message);
+        try {
+          const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+          const tokenInfo = await verifyRes.json();
+          if (tokenInfo.email) {
+            finalEmail = tokenInfo.email;
+            finalName = tokenInfo.name || tokenInfo.email.split('@')[0];
+            console.log('Verified Google ID Token via tokeninfo fallback:', finalEmail);
+          } else {
+            return res.status(400).json({
+              success: false,
+              error: 'Invalid Google ID Token: ' + (tokenInfo.error_description || 'unknown error')
+            });
+          }
+        } catch (fetchErr) {
+          return res.status(400).json({
+            success: false,
+            error: 'Google authentication failed: ' + tokenErr.message
+          });
+        }
+      }
+    }
+
+    if (!finalEmail) {
       return res.status(400).json({
         success: false,
         error: 'Please provide a valid Google email'
@@ -274,39 +313,19 @@ exports.googleLogin = async (req, res) => {
     }
 
     // Find if user exists
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: finalEmail });
 
     if (!user) {
-      // Create user if not exists (Sign up)
-      console.log(`Google user not found. Creating new user with email ${email} and role ${role || 'buyer'}`);
-      
-      user = await User.create({
-        name: name || email.split('@')[0],
-        email,
-        password: `google_${Math.random().toString(36).substring(2, 12)}`, // randomized dummy password
-        role: role || 'buyer',
-        phone: '+91 99999 99999',
-        address: 'Google Account Address',
-        status: role === 'seller' ? 'pending' : 'approved'
+      console.log(`Google user not found: ${finalEmail}. Returning exists: false for registration completion.`);
+      return res.status(200).json({
+        success: true,
+        exists: false,
+        email: finalEmail,
+        name: finalName
       });
-
-      // Notify all admins of new Google seller registration
-      if (role === 'seller') {
-        const admins = await User.find({ role: 'admin' });
-        const Notification = require('../models/Notification');
-        for (const admin of admins) {
-          await Notification.create({
-            recipient: admin._id,
-            title: 'New Seller Registration (Google)',
-            message: `Seller "${user.name}" has registered via Google and is pending approval.`,
-            type: 'info'
-          });
-        }
-      }
-    } else {
-      console.log(`Google user found: ${user.name} (${user.email})`);
     }
 
+    console.log(`Google user found: ${user.name} (${user.email}). Logging in directly.`);
     // Send JWT and store refresh session
     await sendTokenResponse(user, 200, req, res);
   } catch (error) {
@@ -317,6 +336,7 @@ exports.googleLogin = async (req, res) => {
     });
   }
 };
+
 
 // @desc    Authenticate user via Apple (OAuth Simulation / JWT parsing)
 // @route   POST /api/auth/apple
@@ -1055,6 +1075,93 @@ exports.getApprovedDeliveryPartners = async (req, res) => {
   } catch (error) {
     console.error('Get Approved Delivery Partners Error:', error);
     res.status(500).json({ success: false, error: 'Server error fetching delivery partners' });
+  }
+};
+
+// @desc    Send OTP code to email
+// @route   POST /api/auth/send-otp
+// @access  Public
+exports.sendOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, error: 'Please provide an email address' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    
+    // Check if a registered user already exists with this email
+    const existingUser = await User.findOne({ email: cleanEmail });
+    if (existingUser) {
+      return res.status(400).json({ success: false, error: 'A user with this email already exists' });
+    }
+
+    // Generate 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes validity
+
+    const Otp = require('../models/Otp');
+    
+    // Delete any old OTP for this email
+    await Otp.deleteMany({ email: cleanEmail });
+
+    // Save new OTP
+    await Otp.create({
+      email: cleanEmail,
+      otp: otpCode,
+      expiresAt
+    });
+
+    // Simulated email dispatch: Print to server console
+    console.log('\n=================================================');
+    console.log(`✉️  SIMULATED EMAIL DISPATCH TO: ${cleanEmail}`);
+    console.log(`🔑  YOUR EMAHU REGISTRATION OTP: ${otpCode}`);
+    console.log('=================================================\n');
+
+    res.status(200).json({
+      success: true,
+      message: `OTP sent successfully to ${cleanEmail}. Check server console output.`
+    });
+  } catch (error) {
+    console.error('Send OTP Error:', error);
+    res.status(500).json({ success: false, error: 'Server error while sending OTP' });
+  }
+};
+
+// @desc    Verify OTP code
+// @route   POST /api/auth/verify-otp
+// @access  Public
+exports.verifyOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, error: 'Please provide both email and OTP code' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const otpCode = otp.trim();
+
+    const Otp = require('../models/Otp');
+
+    const otpRecord = await Otp.findOne({ email: cleanEmail });
+    if (!otpRecord) {
+      return res.status(400).json({ success: false, error: 'OTP has expired or does not exist. Please request a new one.' });
+    }
+
+    if (otpRecord.otp !== otpCode) {
+      return res.status(400).json({ success: false, error: 'Invalid OTP code. Please try again.' });
+    }
+
+    // OTP verified successfully - delete it so it can't be reused
+    await Otp.deleteOne({ _id: otpRecord._id });
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP verified successfully'
+    });
+  } catch (error) {
+    console.error('Verify OTP Error:', error);
+    res.status(500).json({ success: false, error: 'Server error verifying OTP' });
   }
 };
 

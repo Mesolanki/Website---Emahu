@@ -21,7 +21,9 @@ const {
   verifySellerDocument,
   getDeliveryPartners,
   deliveryPartnerDecision,
-  getApprovedDeliveryPartners
+  getApprovedDeliveryPartners,
+  sendOtp,
+  verifyOtp
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -32,6 +34,8 @@ router.post('/google', googleLogin);
 router.post('/apple', appleLogin);
 router.post('/refresh', refresh);
 router.post('/logout', logout);
+router.post('/send-otp', sendOtp);
+router.post('/verify-otp', verifyOtp);
 
 // Protected endpoints (requires valid JWT token in Authorization header)
 router.get('/me', protect, getMe);

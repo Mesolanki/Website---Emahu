@@ -17,12 +17,103 @@ export default function SellerRegister() {
   const [loading, setLoading] = useState(false);
   const [regSuccessData, setRegSuccessData] = useState(null);
 
+  const [isOtpVerifying, setIsOtpVerifying] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+
   // If already logged in, redirect directly to the seller dashboard
   useEffect(() => {
     if (localStorage.getItem('emahu_seller_logged_in') === 'true') {
       router.replace('/seller/dashboard');
     }
   }, [router]);
+
+  // Read query params for Google Auth prefill
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const emailParam = urlParams.get('email');
+      const nameParam = urlParams.get('name');
+      if (emailParam) {
+        setFormData((prev) => ({
+          ...prev,
+          email: emailParam,
+          ownerName: nameParam || emailParam.split('@')[0],
+          password: `GoogleAuthPass_${Math.random().toString(36).substring(2, 10)}`
+        }));
+        setErrors({ general: 'Google account connected. Please complete the registration details below.' });
+      }
+    }
+  }, []);
+
+  // OTP Cooldown timer
+  useEffect(() => {
+    let timer;
+    if (otpCooldown > 0) {
+      timer = setTimeout(() => setOtpCooldown(prev => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [otpCooldown]);
+
+  const triggerSendOtp = async (isResend = false) => {
+    setOtpSending(true);
+    setOtpError('');
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiUrl}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsOtpVerifying(true);
+        setOtpCooldown(60);
+        if (isResend) {
+          setOtpError('OTP has been resent to your email.');
+        }
+      } else {
+        setErrors({ general: data.error || 'Failed to send OTP. Please check email address.' });
+      }
+    } catch (err) {
+      console.error(err);
+      setErrors({ general: 'Network error sending OTP. Please try again.' });
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (!otpInput || otpInput.trim().length !== 6) {
+      setOtpError('Please enter a valid 6-digit OTP code.');
+      return;
+    }
+    setLoading(true);
+    setOtpError('');
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiUrl}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, otp: otpInput.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsOtpVerifying(false);
+        setStep(2);
+      } else {
+        setOtpError(data.error || 'Invalid OTP code. Please try again.');
+      }
+    } catch (err) {
+      console.error(err);
+      setOtpError('Network error verifying OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleGoogleSignIn = () => {
     const width = 500;
@@ -40,11 +131,22 @@ export default function SellerRegister() {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data?.role === 'seller') {
         window.removeEventListener('message', handleMessage);
-        const { email, name, role } = event.data;
+        const { email, name, role, idToken } = event.data;
         setLoading(true);
         setErrors({});
         try {
-          const data = await googleLoginUser({ email, name, role });
+          const data = await googleLoginUser({ email, name, role, idToken });
+          if (data.exists === false) {
+            setLoading(false);
+            setFormData((prev) => ({
+              ...prev,
+              email: data.email || '',
+              ownerName: data.name || '',
+              password: `GoogleAuthPass_${Math.random().toString(36).substring(2, 10)}`
+            }));
+            setErrors({ general: 'Google account connected! Please enter your store details and complete registration.' });
+            return;
+          }
           saveAuthSession(data, 'seller');
           setLoading(false);
           router.replace('/seller/dashboard');
@@ -207,7 +309,9 @@ export default function SellerRegister() {
   };
 
   const handleNext = () => {
-    if (step === 1 && validateStep1()) setStep(2);
+    if (step === 1 && validateStep1()) {
+      triggerSendOtp();
+    }
     if (step === 2 && validateStep2()) setStep(3);
   };
 
@@ -497,7 +601,7 @@ export default function SellerRegister() {
                 <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
                 <button
                   type="button"
                   onClick={handleGoogleSignIn}
@@ -506,20 +610,21 @@ export default function SellerRegister() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '10px',
-                    flex: 1,
-                    padding: '12px',
+                    gap: '12px',
+                    width: '100%',
+                    height: '44px',
                     backgroundColor: '#fff',
                     border: '1px solid #dadce0',
                     borderRadius: '8px',
                     cursor: 'pointer',
-                    fontSize: '0.95rem',
-                    fontWeight: '500',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
                     color: '#3c4043',
-                    transition: 'background-color 0.2s'
+                    transition: 'background-color 0.2s, box-shadow 0.2s',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f8f9fa'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)'; }}
                 >
                   <svg width="18" height="18" viewBox="0 0 18 18">
                     <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
@@ -527,7 +632,7 @@ export default function SellerRegister() {
                     <path d="M3.95 10.702c-.18-.54-.282-1.117-.282-1.702s.102-1.162.282-1.702V4.966H1.026C.371 6.273 0 7.761 0 9s.371 2.727 1.026 4.034l2.924-2.332z" fill="#FBBC05"/>
                     <path d="M9 3.58c1.32 0 2.5.454 3.435 1.348l2.58-2.58C13.464.896 11.428 0 9 0 5.534 0 2.51 2.02 1.026 4.966L3.95 7.298C4.659 5.165 6.648 3.58 9 3.58z" fill="#EA4335"/>
                   </svg>
-                  <span>Google</span>
+                  <span>Continue with Google</span>
                 </button>
 
                 <button
@@ -538,25 +643,25 @@ export default function SellerRegister() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '10px',
-                    flex: 1,
-                    padding: '12px',
-                    backgroundColor: '#fff',
-                    border: '1px solid #dadce0',
+                    gap: '12px',
+                    width: '100%',
+                    height: '44px',
+                    backgroundColor: '#000000',
+                    border: 'none',
                     borderRadius: '8px',
                     cursor: 'pointer',
-                    fontSize: '0.95rem',
-                    fontWeight: '500',
-                    color: '#3c4043',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    color: '#ffffff',
                     transition: 'background-color 0.2s'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#000000'}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M18.7 18.5C17.5 20.3 16.3 22 14.5 22c-1.8 0-2.3-1.1-4.3-1.1-2.1 0-2.6 1.1-4.3 1.1-1.7 0-3.1-1.8-4.2-3.4C-.6 15 1.1 9.4 3.7 9.4c1.8 0 2.8 1.1 3.9 1.1 1.1 0 2.3-1.1 4.4-1.1 1.8 0 3.2 1 4.1 2.2-3.8 2.2-3.2 7.7.3 9.4-.7 1.9-1.9 3.5-3.7 3.5zM15.8 6.4c1-1.2 1.6-2.8 1.4-4.4-1.4.1-3 1-4 2.1-1 1.1-1.8 2.8-1.5 4.3 1.5.1 3-1 4.1-2z" />
                   </svg>
-                  <span>Apple</span>
+                  <span>Continue with Apple ID</span>
                 </button>
               </div>
 
@@ -802,6 +907,157 @@ export default function SellerRegister() {
         </div>
 
       </div>
+
+      {isOtpVerifying && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '420px',
+            padding: '32px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            textAlign: 'center',
+            animation: 'fadeIn 0.3s ease-out'
+          }}>
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(56, 189, 248, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px'
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#ffffff', marginBottom: '8px' }}>
+              Confirm Your Email
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: '1.5', marginBottom: '24px' }}>
+              We sent a 6-digit verification code to <strong style={{ color: '#f8fafc' }}>{formData.email}</strong>. Please enter it below.
+            </p>
+
+            {otpError && (
+              <div style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                color: '#f87171',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                marginBottom: '16px',
+                textAlign: 'left'
+              }}>
+                {otpError}
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyOtp}>
+              <div style={{ marginBottom: '20px' }}>
+                <input
+                  type="text"
+                  maxLength="6"
+                  placeholder="000000"
+                  value={otpInput}
+                  onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                  style={{
+                    width: '100%',
+                    height: '50px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                    color: '#ffffff',
+                    fontSize: '1.5rem',
+                    fontWeight: '700',
+                    textAlign: 'center',
+                    letterSpacing: '8px',
+                    outline: 'none',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
+                  onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  borderRadius: '8px',
+                  backgroundColor: '#38bdf8',
+                  color: '#0f172a',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'opacity 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  opacity: loading ? 0.7 : 1
+                }}
+              >
+                {loading ? 'Verifying...' : 'Verify & Continue'}
+              </button>
+            </form>
+
+            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+              <button
+                type="button"
+                onClick={() => setIsOtpVerifying(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                Change Email
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerSendOtp(true)}
+                disabled={otpCooldown > 0 || otpSending}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: otpCooldown > 0 ? '#64748b' : '#38bdf8',
+                  cursor: otpCooldown > 0 ? 'not-allowed' : 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Resend OTP'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

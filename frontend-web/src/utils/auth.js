@@ -65,12 +65,12 @@ export async function loginUser(email, password) {
 /**
  * Authenticate via Google payload
  */
-export async function googleLoginUser({ email, name, role }) {
+export async function googleLoginUser({ email, name, role, idToken }) {
   try {
     const response = await fetch(`${API_BASE_URL}/google`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ email, name, role }),
+      body: JSON.stringify({ email, name, role, idToken }),
     });
 
     const data = await response.json();

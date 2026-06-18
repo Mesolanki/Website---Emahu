@@ -11,6 +11,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 // Initialize app
 const app = express();
@@ -65,6 +66,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/delivery', deliveryRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 
 // 404 Route handler
