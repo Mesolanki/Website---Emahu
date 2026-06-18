@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './login.css';
-import { loginUser, saveAuthSession, googleLoginUser, appleLoginUser } from '@/utils/auth';
+import { loginUser, saveAuthSession, googleLoginUser } from '@/utils/auth';
+import { useGoogleAuth } from '@/utils/useGoogleAuth';
 
 /**
  * SellerLogin Component
@@ -32,78 +33,32 @@ export default function SellerLogin() {
     }
   }, [router]);
 
-  const handleGoogleSignIn = () => {
-    const width = 500;
-    const height = 600;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-    
-    const popup = window.open(
-      '/buyer/google-auth?role=seller',
-      'google_auth_popup',
-      `width=${width},height=${height},top=${top},left=${left}`
-    );
-
-    const handleMessage = async (event) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data?.role === 'seller') {
-        window.removeEventListener('message', handleMessage);
-        const { email, name, role, idToken } = event.data;
-        setLoading(true);
-        setError('');
-        try {
-          const data = await googleLoginUser({ email, name, role, idToken });
-          if (data.exists === false) {
-            setLoading(false);
-            router.push(`/seller/register?email=${encodeURIComponent(data.email)}&name=${encodeURIComponent(data.name)}`);
-            return;
-          }
-          saveAuthSession(data, 'seller');
-          setLoading(false);
-          router.replace('/seller/dashboard');
-        } catch (err) {
-          setLoading(false);
-          setError(err.message || 'Google Sign-In failed');
-        }
+  const onGoogleSuccess = useCallback(async ({ email, name, idToken }) => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await googleLoginUser({ email, name, role: 'seller', idToken });
+      if (data.exists === false) {
+        setLoading(false);
+        router.push(`/seller/register?email=${encodeURIComponent(data.email)}&name=${encodeURIComponent(data.name)}`);
+        return;
       }
-    };
+      saveAuthSession(data, 'seller');
+      setLoading(false);
+      router.replace('/seller/dashboard');
+    } catch (err) {
+      setLoading(false);
+      setError(err.message || 'Google Sign-In failed');
+    }
+  }, [router]);
 
-    window.addEventListener('message', handleMessage);
-  };
+  const onGoogleError = useCallback((msg) => {
+    setError(msg);
+  }, []);
 
-  const handleAppleSignIn = () => {
-    const width = 500;
-    const height = 600;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-    
-    const popup = window.open(
-      '/buyer/apple-auth?role=seller',
-      'apple_auth_popup',
-      `width=${width},height=${height},top=${top},left=${left}`
-    );
+  const { triggerGoogleSignIn } = useGoogleAuth(onGoogleSuccess, onGoogleError);
 
-    const handleMessage = async (event) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === 'APPLE_AUTH_SUCCESS' && event.data?.role === 'seller') {
-        window.removeEventListener('message', handleMessage);
-        const { email, name, role } = event.data;
-        setLoading(true);
-        setError('');
-        try {
-          const data = await appleLoginUser({ email, name, role });
-          saveAuthSession(data, 'seller');
-          setLoading(false);
-          router.replace('/seller/dashboard');
-        } catch (err) {
-          setLoading(false);
-          setError(err.message || 'Apple ID Sign-In failed');
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-  };
+  const handleGoogleSignIn = () => triggerGoogleSignIn();
 
   const handleSubmit = async (e) => {
     e.preventDefault();

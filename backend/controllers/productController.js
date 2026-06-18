@@ -219,6 +219,33 @@ exports.deleteProduct = async (req, res) => {
       });
     }
 
+    // Block deletion if there are active/pending delivery orders for this product
+    const Order = require('../models/Order');
+    const ACTIVE_STATUSES = [
+      'PENDING_APPROVAL',
+      'APPROVED',
+      'READY_FOR_PICKUP',
+      'DELIVERY_ASSIGNED',
+      'LABEL_GENERATED',
+      'PICKED_UP',
+      'IN_TRANSIT',
+      'OUT_FOR_DELIVERY'
+    ];
+
+    const activeOrders = await Order.find({
+      'items.productId': req.params.id,
+      status: { $in: ACTIVE_STATUSES }
+    }).select('orderId status');
+
+    if (activeOrders.length > 0) {
+      const orderIds = activeOrders.map(o => o.orderId).join(', ');
+      return res.status(409).json({
+        success: false,
+        error: `Cannot delete this product — it has ${activeOrders.length} active order(s) pending delivery. Wait until all orders are delivered or completed before removing this listing.`,
+        activeOrders: activeOrders.map(o => ({ orderId: o.orderId, status: o.status }))
+      });
+    }
+
     await product.deleteOne();
 
     res.status(200).json({

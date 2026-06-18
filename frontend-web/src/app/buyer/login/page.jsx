@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import '@/app/buyer/register/buyer-register.css'; // Reuses the unified light onboarding styles
-import { loginUser, saveAuthSession, googleLoginUser, appleLoginUser } from '@/utils/auth';
+import { loginUser, saveAuthSession, googleLoginUser } from '@/utils/auth';
+import { useGoogleAuth } from '@/utils/useGoogleAuth';
 
 /**
  * Retail Buyer Login Component
@@ -25,84 +26,34 @@ export default function BuyerLogin() {
     }
   }, [router]);
 
-  const handleGoogleSignIn = () => {
-    const width = 500;
-    const height = 600;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-    
-    const popup = window.open(
-      '/buyer/google-auth?role=buyer',
-      'google_auth_popup',
-      `width=${width},height=${height},top=${top},left=${left}`
-    );
-
-    const handleMessage = async (event) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data?.role === 'buyer') {
-        window.removeEventListener('message', handleMessage);
-        const { email, name, role, idToken } = event.data;
-        setLoading(true);
-        setErrors({});
-        try {
-          const data = await googleLoginUser({ email, name, role, idToken });
-          if (data.exists === false) {
-            setLoading(false);
-            router.push(`/buyer/register?email=${encodeURIComponent(data.email)}&name=${encodeURIComponent(data.name)}`);
-            return;
-          }
-          saveAuthSession(data, 'buyer');
-          setLoading(false);
-          setSuccess(true);
-          setTimeout(() => {
-            router.replace('/buyer/products');
-          }, 1000);
-        } catch (err) {
-          setLoading(false);
-          setErrors({ general: err.message || 'Google Sign-In failed' });
-        }
+  const onGoogleSuccess = useCallback(async ({ email, name, idToken }) => {
+    setLoading(true);
+    setErrors({});
+    try {
+      const data = await googleLoginUser({ email, name, role: 'buyer', idToken });
+      if (data.exists === false) {
+        setLoading(false);
+        router.push(`/buyer/register?email=${encodeURIComponent(data.email)}&name=${encodeURIComponent(data.name)}`);
+        return;
       }
-    };
+      saveAuthSession(data, 'buyer');
+      setLoading(false);
+      setSuccess(true);
+      setTimeout(() => router.replace('/buyer/products'), 1000);
+    } catch (err) {
+      setLoading(false);
+      setErrors({ general: err.message || 'Google Sign-In failed' });
+    }
+  }, [router]);
 
-    window.addEventListener('message', handleMessage);
-  };
+  const onGoogleError = useCallback((msg) => {
+    setErrors({ general: msg });
+  }, []);
 
-  const handleAppleSignIn = () => {
-    const width = 500;
-    const height = 600;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-    
-    const popup = window.open(
-      '/buyer/apple-auth?role=buyer',
-      'apple_auth_popup',
-      `width=${width},height=${height},top=${top},left=${left}`
-    );
+  const { triggerGoogleSignIn } = useGoogleAuth(onGoogleSuccess, onGoogleError);
 
-    const handleMessage = async (event) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === 'APPLE_AUTH_SUCCESS' && event.data?.role === 'buyer') {
-        window.removeEventListener('message', handleMessage);
-        const { email, name, role } = event.data;
-        setLoading(true);
-        setErrors({});
-        try {
-          const data = await appleLoginUser({ email, name, role });
-          saveAuthSession(data, 'buyer');
-          setLoading(false);
-          setSuccess(true);
-          setTimeout(() => {
-            router.replace('/buyer/products');
-          }, 1000);
-        } catch (err) {
-          setLoading(false);
-          setErrors({ general: err.message || 'Apple ID Sign-In failed' });
-        }
-      }
-    };
+  const handleGoogleSignIn = () => triggerGoogleSignIn();
 
-    window.addEventListener('message', handleMessage);
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -259,35 +210,6 @@ export default function BuyerLogin() {
                     <path d="M9 3.58c1.32 0 2.5.454 3.435 1.348l2.58-2.58C13.464.896 11.428 0 9 0 5.534 0 2.51 2.02 1.026 4.966L3.95 7.298C4.659 5.165 6.648 3.58 9 3.58z" fill="#EA4335"/>
                   </svg>
                   <span>Continue with Google</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleAppleSignIn}
-                  disabled={loading}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '12px',
-                    width: '100%',
-                    height: '44px',
-                    backgroundColor: '#000000',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    fontWeight: '600',
-                    color: '#ffffff',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#000000'}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18.7 18.5C17.5 20.3 16.3 22 14.5 22c-1.8 0-2.3-1.1-4.3-1.1-2.1 0-2.6 1.1-4.3 1.1-1.7 0-3.1-1.8-4.2-3.4C-.6 15 1.1 9.4 3.7 9.4c1.8 0 2.8 1.1 3.9 1.1 1.1 0 2.3-1.1 4.4-1.1 1.8 0 3.2 1 4.1 2.2-3.8 2.2-3.2 7.7.3 9.4-.7 1.9-1.9 3.5-3.7 3.5zM15.8 6.4c1-1.2 1.6-2.8 1.4-4.4-1.4.1-3 1-4 2.1-1 1.1-1.8 2.8-1.5 4.3 1.5.1 3-1 4.1-2z" />
-                  </svg>
-                  <span>Continue with Apple ID</span>
                 </button>
               </div>
             </form>

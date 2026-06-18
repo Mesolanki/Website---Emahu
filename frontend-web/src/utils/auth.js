@@ -85,28 +85,6 @@ export async function googleLoginUser({ email, name, role, idToken }) {
 }
 
 /**
- * Authenticate via Apple payload
- */
-export async function appleLoginUser({ email, name, role }) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/apple`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify({ email, name, role }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Apple login failed');
-    }
-    return data;
-  } catch (error) {
-    console.error('API Apple Login Error:', error.message);
-    throw error;
-  }
-}
-
-/**
  * Clear session cookies on the backend and destroy database token record
  */
 export async function logoutUser() {

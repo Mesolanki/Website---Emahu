@@ -2141,7 +2141,16 @@ export default function EmahuProDashboard() {
       }
 
       const data = await res.json();
-      if (data.success) {
+
+      if (res.status === 409) {
+        // Active orders blocking deletion
+        const count = data.activeOrders?.length || 0;
+        triggerToast(
+          '🚚 Delivery In Progress',
+          `Cannot delete "${productToDelete.name}" — it has ${count} active order${count !== 1 ? 's' : ''} pending delivery. Wait until all orders are delivered before removing this listing.`,
+          'warning'
+        );
+      } else if (data.success) {
         setProducts((prev) => prev.filter((p) => (p.id || p._id) !== productId));
         triggerToast(
           'Product Removed',
