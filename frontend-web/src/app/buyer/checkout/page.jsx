@@ -38,7 +38,6 @@ export default function CheckoutPage() {
     freeShippingThreshold: 2000,
     expressDeliverySurcharge: 100
   });
-
   const [leafletLoaded, setLeafletLoaded] = useState(false);
   const checkoutMapRef = useRef(null);
   const routePolylineRef = useRef(null);
@@ -174,10 +173,12 @@ export default function CheckoutPage() {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
           
-          setBuyerCoordinates({
+          const coords = {
             latitude: lat.toFixed(6),
             longitude: lon.toFixed(6)
-          });
+          };
+          setBuyerCoordinates(coords);
+          localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
           
           // Nominatim reverse-geocoding
           try {
@@ -393,6 +394,11 @@ export default function CheckoutPage() {
   const handlePlaceOrder = (e) => {
     e.preventDefault();
     if (cartItems.length === 0) return;
+
+    if (!buyerCoordinates.latitude || !buyerCoordinates.longitude) {
+      alert('Checkout Blocked: A verified GPS location is required to secure the escrow transit route. Please share your current GPS location first.');
+      return;
+    }
 
     if (maxDistanceExceeded) {
       alert(`Checkout Blocked: The delivery distance exceeds the maximum allowed limit of ${deliverySettings.maxDeliveryDistance} KM. Please update your address or coordinates.`);
@@ -697,6 +703,75 @@ export default function CheckoutPage() {
             <div className="co-form-section">
               <h1 className="co-section-title">Secure Escrow Lock Setup</h1>
               
+              {/* GPS Verification Status Banner */}
+              {(!buyerCoordinates.latitude || !buyerCoordinates.longitude) ? (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1.5px solid rgba(239, 68, 68, 0.25)',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: '800', fontSize: '0.95rem' }}>
+                    <span>⚠️ GPS Geolocation Required</span>
+                  </div>
+                  <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, lineHeight: 1.5 }}>
+                    Without a precise GPS location, delivery transit fees cannot be locked and checkout is disabled. Please share your current location.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleGPSDetect}
+                    className="co-btn-outline"
+                    style={{
+                      width: 'max-content',
+                      padding: '8px 14px',
+                      fontSize: '0.82rem',
+                      fontWeight: '800',
+                      borderColor: '#dc2626',
+                      color: '#dc2626',
+                      background: 'white'
+                    }}
+                  >
+                    📡 Share Current GPS Location
+                  </button>
+                </div>
+              ) : (
+                <div style={{
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  border: '1.5px solid rgba(16, 185, 129, 0.25)',
+                  borderRadius: '12px',
+                  padding: '12px 18px',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', fontWeight: '750', fontSize: '0.88rem' }}>
+                    <span>✓ GPS Location Verified: {buyerCoordinates.latitude}, {buyerCoordinates.longitude}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGPSDetect}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#059669',
+                      textDecoration: 'underline',
+                      fontSize: '0.8rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      padding: 0
+                    }}
+                  >
+                    Update Location
+                  </button>
+                </div>
+              )}
+
               <form onSubmit={handlePlaceOrder} className="co-form">
                                 {addressType === 'saved' ? (
                   /* Option A: Saved Profile Address Summary Card */

@@ -132,7 +132,15 @@ const orderSchema = new mongoose.Schema(
     packageWeight: String,
     rejectionReason: String,
     sellerConfirmed: Boolean,
-    sellerRejected: Boolean
+    sellerRejected: Boolean,
+    couponCode: {
+      type: String,
+      default: ''
+    },
+    discountAmount: {
+      type: Number,
+      default: 0
+    }
   },
   {
     timestamps: true

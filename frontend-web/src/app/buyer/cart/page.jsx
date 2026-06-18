@@ -45,6 +45,23 @@ export default function CartPage() {
     fetchSettings();
   }, []);
 
+  // ── Load Coordinates on mount ──
+  useEffect(() => {
+    const storedCoords = localStorage.getItem('emahu_buyer_coordinates');
+    if (storedCoords) {
+      try {
+        const parsed = JSON.parse(storedCoords);
+        if (parsed.latitude && parsed.longitude) {
+          setBuyerCoordinates(parsed);
+          const storedCity = localStorage.getItem('emahu_buyer_city');
+          if (storedCity) {
+            setBuyerCity(storedCity);
+          }
+        }
+      } catch (e) {}
+    }
+  }, []);
+
   // ── Load Cart items on mount ──
   useEffect(() => {
     const loadCartAndProducts = async () => {
@@ -201,14 +218,18 @@ export default function CartPage() {
       async (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
-        setBuyerCoordinates({ latitude: lat.toFixed(6), longitude: lon.toFixed(6) });
+        const coords = { latitude: lat.toFixed(6), longitude: lon.toFixed(6) };
+        setBuyerCoordinates(coords);
+        localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
         setGpsLoading(false);
         // Reverse geocode to get city name
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
           const data = await res.json();
           if (data && data.address) {
-            setBuyerCity(data.address.city || data.address.town || data.address.village || data.address.county || '');
+            const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || '';
+            setBuyerCity(cityVal);
+            localStorage.setItem('emahu_buyer_city', cityVal);
           }
         } catch (_) {}
       },
@@ -615,7 +636,12 @@ export default function CartPage() {
                   {/* Clear button — only shown when location is set */}
                   {buyerCoordinates.latitude && (
                     <button
-                      onClick={() => { setBuyerCoordinates({ latitude: '', longitude: '' }); setBuyerCity(''); }}
+                      onClick={() => {
+                        setBuyerCoordinates({ latitude: '', longitude: '' });
+                        setBuyerCity('');
+                        localStorage.removeItem('emahu_buyer_coordinates');
+                        localStorage.removeItem('emahu_buyer_city');
+                      }}
                       style={{ padding: '9px 12px', background: 'transparent', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}
                       title="Clear location"
                     >
@@ -709,13 +735,24 @@ export default function CartPage() {
               </div>
 
               {/* Large Matte Checkout Button */}
-              <Link href="/buyer/checkout" className="cart-checkout-btn" style={{ textDecoration: 'none' }}>
+              <button 
+                onClick={(e) => {
+                  if (!buyerCoordinates.latitude || !buyerCoordinates.longitude) {
+                    e.preventDefault();
+                    alert('Location Required: You must share your GPS location to calculate transit delivery fee before proceeding to checkout.');
+                    return;
+                  }
+                  window.location.href = '/buyer/checkout';
+                }}
+                className="cart-checkout-btn" 
+                style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', border: 'none', cursor: 'pointer' }}
+              >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
                 <span>Proceed to Checkout</span>
-              </Link>
+              </button>
 
             </div>
 

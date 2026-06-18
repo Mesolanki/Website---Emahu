@@ -48,6 +48,22 @@ const productSchema = new mongoose.Schema(
       type: String,
       default: '📦'
     },
+    images: {
+      type: [String],
+      default: []
+    },
+    videoUrl: {
+      type: String,
+      default: ''
+    },
+    faqs: [
+      {
+        question: { type: String, required: true },
+        answer: { type: String },
+        askedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        answeredAt: { type: Date }
+      }
+    ],
     seller: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
