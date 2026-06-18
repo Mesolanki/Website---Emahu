@@ -928,7 +928,7 @@ export default function AdminDashboard() {
               </span>
             </div>
 
-            <div style={{ flex: 1, minHeight: '300px', display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', minHeight: '300px', display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
               <div className="ad-detail-info-grid">
                 <div className="ad-detail-info-section">
                   <h4>Fleet Parameters</h4>
@@ -1086,7 +1086,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <div style={{ flex: 1, minHeight: '300px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', minHeight: '300px' }}>
               {detailTab === 'profile' && (
                 <div className="ad-detail-info-grid">
                   <div className="ad-detail-info-section">
@@ -1451,7 +1451,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <div style={{ flex: 1, minHeight: '300px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', minHeight: '300px' }}>
               {productDetailTab === 'info' && (
                 <div className="ad-detail-info-grid">
                   <div className="ad-detail-info-section" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -1848,7 +1848,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* RIGHT COLUMN: FULFILLMENT MANAGEMENT CONTROLS */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--color-admin-border)', borderRadius: '12px', padding: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--color-admin-border)', borderRadius: '12px', padding: '20px', overflowY: 'auto', maxHeight: '55vh' }}>
                 <h4>Fulfillment &amp; Courier Console</h4>
                 
                 {selectedDetailOrder.status === 'PENDING_APPROVAL' ? (

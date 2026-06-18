@@ -7,6 +7,17 @@ import './dashboard.css';
 import { logoutUser, clearAuthSession, getProfile } from '@/utils/auth';
 import CategorySelector from '@/components/seller_home/CategorySelector';
 
+if (typeof window !== 'undefined') {
+  let url = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+  url = url.trim();
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    process.env.NEXT_PUBLIC_API_URL = url.replace('localhost', '127.0.0.1');
+  } else {
+    process.env.NEXT_PUBLIC_API_URL = url.replace('localhost', hostname).replace('127.0.0.1', hostname);
+  }
+}
+
 const INITIAL_PRODUCTS = [
   {
     id: 'prod-1',
@@ -65,6 +76,16 @@ const getTimestampString = () => Date.now().toString();
 const getRandomNumberStr = (min, max) => Math.floor(min + Math.random() * (max - min)).toString();
 const getRandomWeightStr = () => `${(1.5 + Math.random() * 3).toFixed(2)} kg`;
 const generateNotificationId = () => `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
+const getDynamicApiUrl = () => {
+  let base = process.env.NEXT_PUBLIC_API_URL || '';
+  base = base.trim();
+  // If it's a local address or empty, return an empty string to use Next.js server-side proxy rewrites
+  if (!base || base.includes('localhost') || base.includes('127.0.0.1')) {
+    return '';
+  }
+  return base;
+};
 
 function parseOrderDate(ord) {
   if (!ord) return new Date();
@@ -662,9 +683,34 @@ export default function EmahuProDashboard() {
       return;
     }
     setInlineSubmitting(true);
+    
+    // 1. Validate token exists before making request
+    const token = localStorage.getItem('emahu_seller_token');
+    if (!token) {
+      triggerToast('Error', 'Seller token not found. Please log in again.', 'danger');
+      setInlineSubmitting(false);
+      return;
+    }
+
+    // 2. Get and validate API Base URL
+    const apiBase = getDynamicApiUrl();
+    if (apiBase !== '' && !apiBase.startsWith('http')) {
+      triggerToast('Error', 'Invalid API Base URL configuration', 'danger');
+      setInlineSubmitting(false);
+      return;
+    }
+
+    // 3. Add console logging
+    console.log('API Base:', apiBase);
+    console.log('Request URL:', apiBase + '/api/auth/seller/documents');
+
+    // 4. Setup AbortController for fetch timeout protection (10 seconds)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 10000);
+
     try {
-      const token = localStorage.getItem('emahu_seller_token');
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const res = await fetch(apiBase + '/api/auth/seller/documents', {
         method: 'POST',
         headers: {
@@ -674,12 +720,22 @@ export default function EmahuProDashboard() {
         body: JSON.stringify({
           documentType: type,
           fileUrl: inputDocUrl.trim()
-        })
+        }),
+        signal: controller.signal
       });
-      if (res.status === 401) {
-        handleSessionExpired();
-        return;
+
+      // Clear the timeout upon request completion
+      clearTimeout(timeoutId);
+
+      // 5. Handle HTTP Errors
+      if (!res.ok) {
+        if (res.status === 401) {
+          handleSessionExpired();
+          return;
+        }
+        throw new Error(`HTTP Error: ${res.status} ${res.statusText || ''}`);
       }
+
       const data = await res.json();
       if (data.success) {
         triggerToast('Document Submitted', `${type === 'business_registration' ? 'Business Registration' : 'ID Proof'} uploaded successfully and verification is pending.`, 'success');
@@ -688,19 +744,22 @@ export default function EmahuProDashboard() {
         // Refresh document list
         await fetchSellerDocuments();
         // Sync user profile status
-        if (token) {
-          const profileRes = await getProfile(token);
-          if (profileRes.success && profileRes.user) {
-            setSellerUser(profileRes.user);
-            localStorage.setItem('emahu_seller_user', JSON.stringify(profileRes.user));
-          }
+        const profileRes = await getProfile(token);
+        if (profileRes.success && profileRes.user) {
+          setSellerUser(profileRes.user);
+          localStorage.setItem('emahu_seller_user', JSON.stringify(profileRes.user));
         }
       } else {
         triggerToast('Error', data.error || 'Failed to upload document', 'danger');
       }
     } catch (err) {
-      console.error(err);
-      triggerToast('Error', 'Network error. Please try again.', 'danger');
+      clearTimeout(timeoutId);
+      console.error('Document Upload Error:', err);
+      if (err.name === 'AbortError') {
+        triggerToast('Error', 'Request timed out. Please try again.', 'danger');
+      } else {
+        triggerToast('Error', err.message || 'Network error. Please try again.', 'danger');
+      }
     } finally {
       setInlineSubmitting(false);
     }
@@ -1047,7 +1106,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications`, {
+      const res = await fetch(`${getDynamicApiUrl()}/api/notifications`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

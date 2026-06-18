@@ -8,6 +8,10 @@
   --color-admin-border: rgba(255, 255, 255, 0.08);
 }
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 .ad-layout {
   display: flex;
   min-height: 100vh;
@@ -661,7 +665,7 @@
   width: 900px;
   max-width: 95%;
   max-height: 85vh;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 35px;
   display: flex;
   flex-direction: column;
@@ -937,6 +941,7 @@
   padding-top: 24px;
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 12px;
 }
 
