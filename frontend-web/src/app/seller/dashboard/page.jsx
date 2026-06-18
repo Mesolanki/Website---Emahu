@@ -179,6 +179,7 @@ export default function EmahuProDashboard() {
   const [availablePartnersError, setAvailablePartnersError] = useState('');
   const [selectedPartnerId, setSelectedPartnerId] = useState('');
   const [isConfirmChecked, setIsConfirmChecked] = useState(false);
+  const [hasContactedPartner, setHasContactedPartner] = useState(false);
 
   const fetchAvailablePartners = async (orderId) => {
     setAvailablePartnersLoading(true);
@@ -1138,6 +1139,7 @@ export default function EmahuProDashboard() {
       fetchAvailablePartners(selectedOrderId);
       setSelectedPartnerId('');
       setIsConfirmChecked(false);
+      setHasContactedPartner(false);
     }
   }, [isDeliveryModalOpen, selectedOrderId]);
 
@@ -4688,8 +4690,8 @@ export default function EmahuProDashboard() {
                         gap: '8px',
                         padding: '16px', 
                         borderRadius: '10px', 
-                        backgroundColor: isSelected ? 'rgba(49, 151, 149, 0.08)' : 'rgba(255,255,255,0.03)', 
-                        border: isSelected ? '1px solid #319795' : '1px solid rgba(255,255,255,0.08)',
+                        backgroundColor: isSelected ? 'rgba(49, 151, 149, 0.08)' : '#f7fafc', 
+                        border: isSelected ? '1px solid #319795' : '1px solid #e2e8f0',
                         cursor: orderLoading[selectedOrderId] ? 'not-allowed' : 'pointer',
                         opacity: orderLoading[selectedOrderId] ? 0.6 : 1,
                         transition: 'all 0.2s ease'
@@ -4698,19 +4700,20 @@ export default function EmahuProDashboard() {
                         if (orderLoading[selectedOrderId]) return;
                         setSelectedPartnerId(partner._id);
                         setIsConfirmChecked(false);
+                        setHasContactedPartner(false);
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                          <h4 style={{ margin: '0 0 4px 0', color: '#fff', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <h4 style={{ margin: '0 0 4px 0', color: '#1a202c', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {partner.name}
                             {isSelected && <span style={{ color: '#319795', fontSize: '0.8rem' }}>● Selected</span>}
                           </h4>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: '0.8rem', color: '#4a5568' }}>
                             📍 Location: {partner.currentArea}, {partner.currentCity} ({partner.pincode})
                           </div>
                           {partner.latitude && partner.longitude && (
-                            <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#4a5568', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span>🧭 Coordinates: {partner.latitude}, {partner.longitude}</span>
                               <a
                                 href={`https://www.google.com/maps/search/?api=1&query=${partner.latitude},${partner.longitude}`}
@@ -4723,29 +4726,30 @@ export default function EmahuProDashboard() {
                               </a>
                             </div>
                           )}
-                          <div style={{ fontSize: '0.78rem', color: '#a0aec0', marginTop: '4px' }}>
+                          <div style={{ fontSize: '0.78rem', color: '#4a5568', marginTop: '4px' }}>
                             Vehicle: {partner.vehicleType?.toUpperCase()} | Radius: {partner.serviceRadius} KM | Rate: ₹{partner.ratePerKm}/KM
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <strong style={{ color: 'var(--color-success)', fontSize: '1.25rem', display: 'block' }}>₹{partner.totalCost}</strong>
-                          <span style={{ fontSize: '0.75rem', color: '#718096' }}>Total Cost</span>
+                          <strong style={{ color: '#15803d', fontSize: '1.25rem', display: 'block' }}>₹{partner.totalCost}</strong>
+                          <span style={{ fontSize: '0.75rem', color: '#4a5568' }}>Total Cost</span>
                         </div>
                       </div>
 
                       {/* Direct Contact Buttons */}
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }} onClick={(e) => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }} onClick={(e) => e.stopPropagation()}>
                         <a 
                           href={`tel:${partner.phone}`}
+                          onClick={() => setHasContactedPartner(true)}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
                             padding: '6px 12px',
                             borderRadius: '6px',
-                            backgroundColor: 'rgba(255,255,255,0.05)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            color: '#fff',
+                            backgroundColor: '#f7fafc',
+                            border: '1px solid #cbd5e0',
+                            color: '#2d3748',
                             fontSize: '0.78rem',
                             textDecoration: 'none',
                             transition: 'background-color 0.2s'
@@ -4757,6 +4761,7 @@ export default function EmahuProDashboard() {
                           href={whatsappUrl}
                           target="_blank"
                           rel="noreferrer"
+                          onClick={() => setHasContactedPartner(true)}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -4781,9 +4786,9 @@ export default function EmahuProDashboard() {
             </div>
 
             {/* Checkbox Confirmation & Action Button */}
-            {selectedPartnerId && (
-              <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(0,0,0,0.1)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '0.85rem', cursor: 'pointer', marginBottom: '12px' }}>
+            {selectedPartnerId && hasContactedPartner && (
+              <div style={{ padding: '16px 20px', borderTop: '1px solid #e2e8f0', background: '#f7fafc' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2d3748', fontSize: '0.85rem', cursor: 'pointer', marginBottom: '12px' }}>
                   <input
                     type="checkbox"
                     checked={isConfirmChecked}
@@ -4799,7 +4804,7 @@ export default function EmahuProDashboard() {
                     margin: 0, 
                     padding: '10px', 
                     borderRadius: '8px',
-                    backgroundColor: isConfirmChecked ? '#319795' : 'rgba(255,255,255,0.08)', 
+                    backgroundColor: isConfirmChecked ? '#319795' : 'rgba(0,0,0,0.08)', 
                     cursor: isConfirmChecked ? 'pointer' : 'not-allowed', 
                     color: isConfirmChecked ? '#fff' : '#4a5568',
                     border: 'none',
