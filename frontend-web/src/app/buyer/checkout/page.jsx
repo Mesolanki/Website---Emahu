@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import './checkout.css';
 
-const ALL_PRODUCTS = [];
+import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 
 export default function CheckoutPage() {
   const [cartItems, setCartItems] = useState([]);
@@ -26,14 +26,269 @@ export default function CheckoutPage() {
   const [pincode, setPincode] = useState('');
   const [addressType, setAddressType] = useState('saved'); // saved | manual
 
+  // Distance calculation states
+  const [deliveryCharge, setDeliveryCharge] = useState(99);
+  const [deliveryDistance, setDeliveryDistance] = useState(0);
+  const [deliveryBreakdown, setDeliveryBreakdown] = useState([]);
+  const [maxDistanceExceeded, setMaxDistanceExceeded] = useState(false);
+  const [deliveryCalculationError, setDeliveryCalculationError] = useState('');
+  const [buyerCoordinates, setBuyerCoordinates] = useState({ latitude: '', longitude: '' });
+  const [deliverySettings, setDeliverySettings] = useState({
+    maxDeliveryDistance: 100,
+    freeShippingThreshold: 2000,
+    expressDeliverySurcharge: 100
+  });
+
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+  const checkoutMapRef = useRef(null);
+  const routePolylineRef = useRef(null);
+  const buyerMarkerRef = useRef(null);
+  const sellerMarkersRef = useRef([]);
+
+  // Fetch delivery settings on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/settings`);
+        const data = await res.json();
+        if (data.success && data.settings) {
+          setDeliverySettings(data.settings);
+        }
+      } catch (err) {
+        console.error('Failed to fetch delivery settings:', err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  // Leaflet CDNs lazy loader
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    if (!document.getElementById('leaflet-js')) {
+      const script = document.createElement('script');
+      script.id = 'leaflet-js';
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => setLeafletLoaded(true);
+      document.head.appendChild(script);
+    } else {
+      setLeafletLoaded(true);
+    }
+  }, []);
+
+  function getHaversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  // Update/draw Leaflet map showing buyer/seller connection routes
+  useEffect(() => {
+    if (!leafletLoaded || typeof window === 'undefined' || !window.L) return;
+    
+    const container = document.getElementById('checkout-route-map');
+    if (!container) return;
+    
+    const bLat = parseFloat(buyerCoordinates.latitude);
+    const bLon = parseFloat(buyerCoordinates.longitude);
+    
+    if (isNaN(bLat) || isNaN(bLon)) return;
+    
+    // Determine seller coordinates
+    const sellerLocations = cartItems.map(item => {
+      const sellerObj = item.seller;
+      const sLat = (sellerObj && sellerObj.latitude !== undefined && sellerObj.latitude !== null) ? sellerObj.latitude : 23.0225;
+      const sLon = (sellerObj && sellerObj.longitude !== undefined && sellerObj.longitude !== null) ? sellerObj.longitude : 72.5714;
+      const sName = (sellerObj && (sellerObj.storeName || sellerObj.name)) || 'Emahu Seller';
+      return { latitude: sLat, longitude: sLon, name: sName };
+    });
+    
+    if (!checkoutMapRef.current) {
+      checkoutMapRef.current = window.L.map('checkout-route-map').setView([bLat, bLon], 10);
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(checkoutMapRef.current);
+    }
+    
+    if (routePolylineRef.current) {
+      checkoutMapRef.current.removeLayer(routePolylineRef.current);
+    }
+    if (buyerMarkerRef.current) {
+      checkoutMapRef.current.removeLayer(buyerMarkerRef.current);
+    }
+    sellerMarkersRef.current.forEach(marker => {
+      checkoutMapRef.current.removeLayer(marker);
+    });
+    sellerMarkersRef.current = [];
+    
+    buyerMarkerRef.current = window.L.marker([bLat, bLon], {
+      icon: window.L.divIcon({
+        className: 'buyer-marker-icon',
+        html: '<div style="background-color: #3b82f6; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5)"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      })
+    }).addTo(checkoutMapRef.current).bindPopup('Your Location');
+    
+    const points = [[bLat, bLon]];
+    
+    sellerLocations.forEach(loc => {
+      const sMarker = window.L.marker([loc.latitude, loc.longitude], {
+        icon: window.L.divIcon({
+          className: 'seller-marker-icon',
+          html: '<div style="background-color: #10b981; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5)"></div>',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        })
+      }).addTo(checkoutMapRef.current).bindPopup(`Seller: ${loc.name}`);
+      
+      sellerMarkersRef.current.push(sMarker);
+      points.push([loc.latitude, loc.longitude]);
+      
+      const poly = window.L.polyline([[bLat, bLon], [loc.latitude, loc.longitude]], { color: '#4f46e5', weight: 3, dashArray: '5, 5' }).addTo(checkoutMapRef.current);
+      routePolylineRef.current = poly;
+    });
+    
+    if (points.length > 1) {
+      const bounds = window.L.latLngBounds(points);
+      checkoutMapRef.current.fitBounds(bounds, { padding: [40, 40] });
+    }
+  }, [leafletLoaded, buyerCoordinates.latitude, buyerCoordinates.longitude, cartItems]);
+
+  const handleGPSDetect = () => {
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          
+          setBuyerCoordinates({
+            latitude: lat.toFixed(6),
+            longitude: lon.toFixed(6)
+          });
+          
+          // Nominatim reverse-geocoding
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+            const data = await res.json();
+            if (data && data.address) {
+              const road = data.address.road || '';
+              const suburb = data.address.suburb || data.address.neighbourhood || '';
+              const addrText = [road, suburb, data.address.county].filter(Boolean).join(', ') || data.display_name;
+              setAddress(addrText);
+              setCity(data.address.city || data.address.town || data.address.village || '');
+              setStateName(data.address.state || '');
+              setPincode(data.address.postcode || '');
+              setAddressType('manual');
+            }
+          } catch (geocodingErr) {
+            console.error('Reverse geocoding failed:', geocodingErr);
+          }
+        },
+        (error) => {
+          console.error(error);
+          alert('GPS Geolocation request failed. Please input your coordinates manually.');
+        }
+      );
+    } else {
+      alert('Geolocation is not supported by your browser.');
+    }
+  };
+
+  const subtotal = cartItems.reduce((acc, p) => acc + (p.price * p.quantity), 0);
+
+  // Dynamic delivery charge calculation
+  useEffect(() => {
+    const calculateCharge = async () => {
+      const lat = parseFloat(buyerCoordinates.latitude);
+      const lon = parseFloat(buyerCoordinates.longitude);
+      if (isNaN(lat) || isNaN(lon) || !cartItems.length) {
+        // Fallback standard pricing
+        const standardFee = 99;
+        const expressSurcharge = shippingSpeed === 'express' ? deliverySettings.expressDeliverySurcharge : 0;
+        setDeliveryCharge(standardFee + expressSurcharge);
+        setDeliveryDistance(0);
+        setDeliveryBreakdown([]);
+        setMaxDistanceExceeded(false);
+        setDeliveryCalculationError('');
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/calculate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            buyerLat: lat,
+            buyerLon: lon,
+            cartItems: cartItems.map(item => ({
+              productId: item.id || item._id,
+              quantity: item.quantity
+            }))
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          let baseFee = data.totalDeliveryCharge;
+          if (shippingSpeed === 'express') {
+            baseFee += data.expressDeliverySurcharge || 100;
+          }
+          setDeliveryCharge(baseFee);
+          setDeliveryDistance(data.maxDistanceKm);
+          setDeliveryBreakdown(data.breakdown || []);
+          setMaxDistanceExceeded(false);
+          setDeliveryCalculationError('');
+        } else {
+          setDeliveryCalculationError(data.error || 'Failed to calculate delivery');
+          setDeliveryBreakdown([]);
+          if (data.error && data.error.includes('exceeds')) {
+            setMaxDistanceExceeded(true);
+          }
+        }
+      } catch (err) {
+        console.error('Delivery calculation failed:', err);
+        const standardFee = 99;
+        const expressSurcharge = shippingSpeed === 'express' ? deliverySettings.expressDeliverySurcharge : 0;
+        setDeliveryCharge(standardFee + expressSurcharge);
+        setDeliveryDistance(0);
+        setDeliveryBreakdown([]);
+        setMaxDistanceExceeded(false);
+      }
+    };
+    
+    calculateCharge();
+  }, [buyerCoordinates.latitude, buyerCoordinates.longitude, cartItems, shippingSpeed, deliverySettings]);
+
   // Load items from localstorage and backend
   useEffect(() => {
     const loadCheckoutData = async () => {
       try {
+        // Retrieve saved coordinates from localStorage if available
+        const storedCoords = localStorage.getItem('emahu_buyer_coordinates');
+        if (storedCoords) {
+          try {
+            setBuyerCoordinates(JSON.parse(storedCoords));
+          } catch (e) {}
+        }
+
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
         const data = await res.json();
         let formattedList = [];
-        if (data.success) {
+        if (data.success && data.products) {
           formattedList = data.products.map(p => {
             let mappedCategory = p.category;
             if (p.category === 'Electronics') mappedCategory = 'Tech';
@@ -59,12 +314,22 @@ export default function CheckoutPage() {
           });
         }
 
+        // Combine DB products with static mock products
+        const allProducts = [...formattedList, ...STATIC_PRODUCTS];
+        const seen = new Set();
+        const uniqueProducts = allProducts.filter(p => {
+          const pid = p.id.toString();
+          if (seen.has(pid)) return false;
+          seen.add(pid);
+          return true;
+        });
+
         const storedCart = localStorage.getItem('emahu_cart');
         if (storedCart) {
           const parsed = JSON.parse(storedCart);
           const matched = parsed.map(cItem => {
             const cItemId = typeof cItem === 'object' ? cItem.id : cItem;
-            const prod = formattedList.find(p => p.id.toString() === cItemId.toString());
+            const prod = uniqueProducts.find(p => p.id.toString() === cItemId.toString());
             if (prod) {
               return {
                 ...prod,
@@ -121,14 +386,18 @@ export default function CheckoutPage() {
     loadCheckoutData();
   }, []);
 
-  const subtotal = cartItems.reduce((acc, p) => acc + (p.price * p.quantity), 0);
-  const shippingFee = subtotal === 0 ? 0 : (shippingSpeed === 'express' ? 199 : 99);
+  const shippingFee = subtotal === 0 ? 0 : deliveryCharge;
   const taxAmount = Math.round(subtotal * 0.18); // 18% Escrow Tax
   const grandTotal = subtotal + shippingFee + taxAmount;
 
   const handlePlaceOrder = (e) => {
     e.preventDefault();
     if (cartItems.length === 0) return;
+
+    if (maxDistanceExceeded) {
+      alert(`Checkout Blocked: The delivery distance exceeds the maximum allowed limit of ${deliverySettings.maxDeliveryDistance} KM. Please update your address or coordinates.`);
+      return;
+    }
 
     // Validate fields based on addressType selected
     if (addressType === 'manual') {
@@ -196,11 +465,35 @@ export default function CheckoutPage() {
           placedOrderIds.push(orderId);
 
           const subtotal = item.price * item.quantity;
-          const shippingFee = subtotal === 0 ? 0 : (shippingSpeed === 'express' ? 199 : 99);
-          const taxAmount = Math.round(subtotal * 0.18);
-          const grandTotal = subtotal + shippingFee + taxAmount;
-
+          
+          const bLat = parseFloat(buyerCoordinates.latitude);
+          const bLon = parseFloat(buyerCoordinates.longitude);
+          
+          let itemDistance = 0;
+          let itemDeliveryFee = 99;
+          
           const sellerObj = item.seller || null;
+          const sLat = (sellerObj && sellerObj.latitude !== undefined && sellerObj.latitude !== null) ? sellerObj.latitude : 23.0225;
+          const sLon = (sellerObj && sellerObj.longitude !== undefined && sellerObj.longitude !== null) ? sellerObj.longitude : 72.5714;
+          
+          if (!isNaN(bLat) && !isNaN(bLon)) {
+            itemDistance = getHaversineDistance(bLat, bLon, sLat, sLon);
+            const matchedSlab = deliverySettings.slabs?.find(slab => itemDistance >= slab.fromKm && itemDistance < slab.toKm);
+            itemDeliveryFee = matchedSlab ? matchedSlab.charge : 99;
+            if (shippingSpeed === 'express') {
+              itemDeliveryFee += deliverySettings.expressDeliverySurcharge || 100;
+            }
+          } else {
+            // standard fallback
+            itemDeliveryFee = 99;
+            if (shippingSpeed === 'express') {
+              itemDeliveryFee += 100;
+            }
+          }
+
+          const taxAmount = Math.round(subtotal * 0.18);
+          const grandTotal = subtotal + itemDeliveryFee + taxAmount;
+
           let sellerId = 'default_seller';
           let sellerEmail = null;
           if (sellerObj) {
@@ -244,7 +537,22 @@ export default function CheckoutPage() {
               pincode: addressType === 'saved' ? 'Profile Zip' : pincode
             },
             shippingSpeed,
-            escrowMethod
+            escrowMethod,
+            buyerLocation: {
+              latitude: !isNaN(bLat) ? bLat : undefined,
+              longitude: !isNaN(bLon) ? bLon : undefined,
+              address: address
+            },
+            sellerLocation: {
+              shopName: (sellerObj && (sellerObj.storeName || sellerObj.name)) || 'Emahu Seller',
+              latitude: sLat,
+              longitude: sLon,
+              address: (sellerObj && sellerObj.address) || 'Ahmedabad, Gujarat'
+            },
+            distanceKm: parseFloat(itemDistance.toFixed(2)),
+            deliveryCharge: itemDeliveryFee,
+            productAmount: subtotal,
+            totalPaid: grandTotal
           };
 
           orderObjects.push(newOrderPayload);
@@ -519,9 +827,27 @@ export default function CheckoutPage() {
                           />
                         </div>
                       </div>
+
+                      <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <button 
+                          type="button" 
+                          className="co-btn-outline" 
+                          onClick={handleGPSDetect}
+                          style={{ width: 'max-content', padding: '10px 16px', fontSize: '0.85rem', fontWeight: '700' }}
+                        >
+                          📡 Autofill with Current Location (GPS)
+                        </button>
+                        
+                        {deliveryCalculationError && (
+                          <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '0.82rem', fontWeight: '600' }}>
+                            ⚠️ {deliveryCalculationError}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
+
 
                 {/* Section 3: Escrow Payment Method */}
                 <div className="co-form-bento">
@@ -623,10 +949,30 @@ export default function CheckoutPage() {
                     </strong>
                   </div>
 
+                  {/* Per-seller breakdown */}
+                  {deliveryBreakdown.length > 1 && (
+                    <div style={{ background: 'rgba(100,116,139,0.05)', borderRadius: '8px', padding: '10px', marginTop: '-4px', marginBottom: '4px' }}>
+                      <p style={{ fontSize: '0.71rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Seller Breakdown</p>
+                      {deliveryBreakdown.map((b, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#475569', padding: '3px 0' }}>
+                          <span>{b.sellerName} — {b.distanceKm} km</span>
+                          <span style={{ fontWeight: '600' }}>{b.freeShippingApplied ? 'FREE' : `₹${b.deliveryCharge}`}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="co-breakdown-row">
                     <span>Vault Escrow Tax (GST 18%)</span>
                     <strong>₹{taxAmount.toLocaleString('en-IN')}</strong>
                   </div>
+
+                  {deliveryDistance > 0 && (
+                    <div className="co-breakdown-row">
+                      <span>Calculated Distance</span>
+                      <strong style={{ color: '#4169e1' }}>{deliveryDistance.toFixed(2)} KM</strong>
+                    </div>
+                  )}
 
                   <div className="co-summary-divider" style={{ margin: '16px 0' }} />
 

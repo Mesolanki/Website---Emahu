@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './dashboard.css';
 import { logoutUser, clearAuthSession, getProfile } from '@/utils/auth';
+import CategorySelector from '@/components/seller_home/CategorySelector';
 
 const INITIAL_PRODUCTS = [
   {
@@ -146,6 +147,338 @@ export default function EmahuProDashboard() {
   const [newProductCategory, setNewProductCategory] = useState('Electronics');
   const [sellerUser, setSellerUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [sellerDocuments, setSellerDocuments] = useState([]);
+
+  const [settingsForm, setSettingsForm] = useState({
+    storeName: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    latitude: '',
+    longitude: ''
+  });
+
+  const [adminDeliverySettings, setAdminDeliverySettings] = useState({
+    maxDeliveryDistance: 100,
+    freeShippingThreshold: 2000,
+    expressDeliverySurcharge: 100,
+    slabs: []
+  });
+  const [loadingAdminSettings, setLoadingAdminSettings] = useState(false);
+
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+
+  // Sync settingsForm with sellerUser details when loaded
+  useEffect(() => {
+    if (sellerUser) {
+      setSettingsForm({
+        storeName: sellerUser.storeName || '',
+        phone: sellerUser.phone || '',
+        address: sellerUser.address || '',
+        city: sellerUser.city || '',
+        state: sellerUser.state || '',
+        latitude: sellerUser.latitude !== undefined && sellerUser.latitude !== null ? sellerUser.latitude : '',
+        longitude: sellerUser.longitude !== undefined && sellerUser.longitude !== null ? sellerUser.longitude : ''
+      });
+    }
+  }, [sellerUser]);
+
+  // Leaflet CDNs lazy loader
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    if (!document.getElementById('leaflet-js')) {
+      const script = document.createElement('script');
+      script.id = 'leaflet-js';
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => setLeafletLoaded(true);
+      document.head.appendChild(script);
+    } else {
+      setLeafletLoaded(true);
+    }
+  }, []);
+
+  // Build popup HTML for the seller map marker
+  const buildMarkerPopup = (lat, lon, storeName, address, city, state) => {
+    const fullAddress = [address, city, state].filter(Boolean).join(', ') || 'Address not set';
+    const shopLabel = storeName || 'My Shop';
+    const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+    return `
+      <div style="min-width:220px;font-family:'Inter',sans-serif;">
+        <div style="font-weight:700;font-size:0.95rem;color:#1a1a2e;margin-bottom:4px;">
+          🏪 ${shopLabel}
+        </div>
+        <div style="font-size:0.78rem;color:#555;line-height:1.5;margin-bottom:8px;">
+          📍 ${fullAddress}
+        </div>
+        <div style="font-size:0.72rem;color:#888;margin-bottom:10px;">
+          Lat: ${parseFloat(lat).toFixed(5)}, Lon: ${parseFloat(lon).toFixed(5)}
+        </div>
+        <a
+          href="${gmapsUrl}"
+          target="_blank"
+          rel="noopener noreferrer"
+          style="
+            display:inline-flex;align-items:center;gap:6px;
+            background:#4169e1;color:#fff;
+            padding:7px 14px;border-radius:7px;
+            font-size:0.78rem;font-weight:700;
+            text-decoration:none;cursor:pointer;
+          "
+        >
+          🗺️ Navigate in Google Maps
+        </a>
+      </div>
+    `;
+  };
+
+  // Update/draw Leaflet map centered on coordinates
+  useEffect(() => {
+    if (!leafletLoaded || typeof window === 'undefined' || !window.L) return;
+
+    const lat = parseFloat(settingsForm.latitude) || 23.0225;
+    const lon = parseFloat(settingsForm.longitude) || 72.5714;
+
+    const container = document.getElementById('seller-shop-map');
+    if (!container) return;
+
+    const popupHtml = buildMarkerPopup(
+      lat, lon,
+      settingsForm.storeName,
+      settingsForm.address,
+      settingsForm.city,
+      settingsForm.state
+    );
+
+    if (!mapRef.current) {
+      mapRef.current = window.L.map('seller-shop-map').setView([lat, lon], 14);
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(mapRef.current);
+
+      markerRef.current = window.L.marker([lat, lon], { draggable: true })
+        .addTo(mapRef.current)
+        .bindPopup(popupHtml, { maxWidth: 280 })
+        .openPopup();
+
+      // Drag: update coords + reverse-geocode + refresh popup
+      markerRef.current.on('dragend', async (e) => {
+        const pos = markerRef.current.getLatLng();
+        const newLat = pos.lat.toFixed(6);
+        const newLon = pos.lng.toFixed(6);
+        setSettingsForm(prev => ({ ...prev, latitude: newLat, longitude: newLon }));
+        const geo = await reverseGeocodeAndFill(newLat, newLon);
+        const updatedHtml = buildMarkerPopup(
+          newLat, newLon,
+          settingsForm.storeName,
+          geo ? geo.streetLine : settingsForm.address,
+          geo ? geo.city : settingsForm.city,
+          geo ? geo.state : settingsForm.state
+        );
+        markerRef.current.setPopupContent(updatedHtml).openPopup();
+      });
+
+      // Click on map: move marker, reverse-geocode, refresh popup
+      mapRef.current.on('click', async (e) => {
+        const pos = e.latlng;
+        const newLat = pos.lat.toFixed(6);
+        const newLon = pos.lng.toFixed(6);
+        markerRef.current.setLatLng(pos);
+        setSettingsForm(prev => ({ ...prev, latitude: newLat, longitude: newLon }));
+        const geo = await reverseGeocodeAndFill(newLat, newLon);
+        const updatedHtml = buildMarkerPopup(
+          newLat, newLon,
+          settingsForm.storeName,
+          geo ? geo.streetLine : settingsForm.address,
+          geo ? geo.city : settingsForm.city,
+          geo ? geo.state : settingsForm.state
+        );
+        markerRef.current.setPopupContent(updatedHtml).openPopup();
+      });
+    } else {
+      mapRef.current.setView([lat, lon], 14);
+      markerRef.current.setLatLng([lat, lon]);
+      markerRef.current.setPopupContent(popupHtml).openPopup();
+    }
+  }, [
+    leafletLoaded,
+    settingsForm.latitude,
+    settingsForm.longitude,
+    settingsForm.storeName,
+    settingsForm.address,
+    settingsForm.city,
+    settingsForm.state,
+    activeTab
+  ]);
+
+  // Reverse-geocode lat/lon → address fields using Nominatim
+  const reverseGeocodeAndFill = async (lat, lon) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`
+      );
+      const data = await res.json();
+      if (data && data.address) {
+        const a = data.address;
+        const road = a.road || a.pedestrian || a.footway || '';
+        const suburb = a.suburb || a.neighbourhood || a.quarter || '';
+        const county = a.county || a.state_district || '';
+        const streetLine = [road, suburb, county].filter(Boolean).join(', ') || data.display_name || '';
+        const city = a.city || a.town || a.village || a.municipality || '';
+        const state = a.state || '';
+        setSettingsForm(prev => ({
+          ...prev,
+          address: streetLine,
+          city,
+          state
+        }));
+        return { streetLine, city, state };
+      }
+    } catch (err) {
+      console.warn('Reverse geocoding failed:', err);
+    }
+    return null;
+  };
+
+  const detectSellerLocation = () => {
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude.toFixed(6);
+          const lon = position.coords.longitude.toFixed(6);
+          setSettingsForm(prev => ({ ...prev, latitude: lat, longitude: lon }));
+          const geo = await reverseGeocodeAndFill(lat, lon);
+          const addrLabel = geo ? `${geo.city || ''}, ${geo.state || ''}`.replace(/^, |, $/, '') : `${lat}, ${lon}`;
+          triggerToast('Location Detected', `Shop pinned to: ${addrLabel}`, 'success');
+        },
+        (error) => {
+          console.error(error);
+          triggerToast('Location Error', 'Failed to auto-detect location. Please allow browser location access.', 'danger');
+        },
+        { timeout: 10000 }
+      );
+    } else {
+      triggerToast('Not Supported', 'Geolocation is not supported by your browser.', 'danger');
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      if (!token) return;
+      
+      const payload = {
+        storeName: settingsForm.storeName,
+        phone: settingsForm.phone,
+        address: settingsForm.address,
+        city: settingsForm.city,
+        state: settingsForm.state,
+        latitude: settingsForm.latitude !== '' ? parseFloat(settingsForm.latitude) : undefined,
+        longitude: settingsForm.longitude !== '' ? parseFloat(settingsForm.longitude) : undefined
+      };
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/update-details`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await res.json();
+      if (data.success && data.user) {
+        setSellerUser(data.user);
+        localStorage.setItem('emahu_seller_user', JSON.stringify(data.user));
+        triggerToast('Settings Saved', 'Your store profile location details have been saved successfully.', 'success');
+      } else {
+        triggerToast('Error', data.error || 'Failed to update store details.', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error while saving settings.', 'danger');
+    }
+  };
+
+  const fetchAdminDeliverySettings = async () => {
+    try {
+      setLoadingAdminSettings(true);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/settings`);
+      const data = await res.json();
+      if (data.success && data.settings) {
+        setAdminDeliverySettings(data.settings);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to fetch delivery settings', 'danger');
+    } finally {
+      setLoadingAdminSettings(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'delivery_settings') {
+      fetchAdminDeliverySettings();
+    }
+  }, [activeTab]);
+
+  const handleSaveAdminDeliverySettings = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      if (!token) return;
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(adminDeliverySettings)
+      });
+      const data = await res.json();
+      if (data.success && data.settings) {
+        setAdminDeliverySettings(data.settings);
+        triggerToast('Settings Saved', 'Global distance delivery parameters have been updated.', 'success');
+      } else {
+        triggerToast('Error', data.error || 'Failed to update settings', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error while updating settings', 'danger');
+    }
+  };
+
+  const handleAddSlab = () => {
+    setAdminDeliverySettings(prev => ({
+      ...prev,
+      slabs: [...prev.slabs, { fromKm: 0, toKm: 0, charge: 0 }]
+    }));
+  };
+
+  const handleRemoveSlab = (index) => {
+    setAdminDeliverySettings(prev => ({
+      ...prev,
+      slabs: prev.slabs.filter((_, idx) => idx !== index)
+    }));
+  };
+
+  const handleSlabChange = (index, field, value) => {
+    setAdminDeliverySettings(prev => {
+      const copy = [...prev.slabs];
+      copy[index] = { ...copy[index], [field]: parseFloat(value) || 0 };
+      return { ...prev, slabs: copy };
+    });
+  };
 
   // Verification session hook
   useEffect(() => {
@@ -199,6 +532,63 @@ export default function EmahuProDashboard() {
         if (res.success && res.user) {
           setTimeout(() => setSellerUser(res.user), 0);
           localStorage.setItem('emahu_seller_user', JSON.stringify(res.user));
+
+          // Auto-detect & save location on login/sign-in every time using GPS
+          if (typeof window !== 'undefined' && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              async (position) => {
+                const lat = position.coords.latitude.toFixed(6);
+                const lon = position.coords.longitude.toFixed(6);
+                
+                try {
+                  const geoRes = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`
+                  );
+                  const geoData = await geoRes.json();
+                  if (geoData && geoData.address) {
+                    const a = geoData.address;
+                    const road = a.road || a.pedestrian || a.footway || '';
+                    const suburb = a.suburb || a.neighbourhood || a.quarter || '';
+                    const county = a.county || a.state_district || '';
+                    const streetLine = [road, suburb, county].filter(Boolean).join(', ') || geoData.display_name || '';
+                    const city = a.city || a.town || a.village || a.municipality || '';
+                    const state = a.state || '';
+                    
+                    const payload = {
+                      storeName: res.user.storeName,
+                      phone: res.user.phone,
+                      address: streetLine,
+                      city,
+                      state,
+                      latitude: parseFloat(lat),
+                      longitude: parseFloat(lon)
+                    };
+                    
+                    const updateRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/update-details`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify(payload)
+                    });
+                    const updateData = await updateRes.json();
+                    if (updateData.success && updateData.user) {
+                      setTimeout(() => setSellerUser(updateData.user), 0);
+                      localStorage.setItem('emahu_seller_user', JSON.stringify(updateData.user));
+                      console.log('GPS Seller location auto-synchronized successfully');
+                    }
+                  }
+                } catch (geoErr) {
+                  console.error('Auto GPS geocoding/update failed:', geoErr);
+                }
+              },
+              (geoErr) => {
+                console.warn('GPS auto-detection skipped/failed:', geoErr);
+              },
+              { timeout: 8000 }
+            );
+          }
         }
       } catch (err) {
         console.error('Error syncing profile:', err);
@@ -230,14 +620,15 @@ export default function EmahuProDashboard() {
     }
   }, [sellerUser]);
 
-  // Lock user to status tab if not approved
+  // Lock user to status tab if not approved and documents not fully verified
   useEffect(() => {
-    if (sellerUser && sellerUser.status !== 'approved') {
+    const allDocsApproved = ['business_registration', 'id_proof'].every(type =>
+      sellerDocuments.some(doc => doc.documentType === type && doc.status === 'approved')
+    );
+    if (sellerUser && sellerUser.status !== 'approved' && !allDocsApproved) {
       setTimeout(() => setActiveTab('status'), 0);
     }
-  }, [sellerUser]);
-
-  const [sellerDocuments, setSellerDocuments] = useState([]);
+  }, [sellerUser, sellerDocuments]);
 
   const fetchSellerDocuments = async () => {
     try {
@@ -263,7 +654,7 @@ export default function EmahuProDashboard() {
   };
 
   useEffect(() => {
-    if (isAuthorized && sellerUser && sellerUser.status !== 'approved') {
+    if (isAuthorized && sellerUser) {
       setTimeout(() => fetchSellerDocuments(), 0);
     }
   }, [isAuthorized, sellerUser]);
@@ -1532,6 +1923,11 @@ export default function EmahuProDashboard() {
     );
   }
 
+  const isApproved = sellerUser?.status === 'approved' || 
+    (['business_registration', 'id_proof'].every(type => 
+      sellerDocuments.some(d => d.documentType === type && d.status === 'approved')
+    ));
+
   return (
     <div className="dashboard-layout">
       {/* Toast Notifications */}
@@ -1570,7 +1966,7 @@ export default function EmahuProDashboard() {
         </Link>
 
         <ul className="sidebar-menu">
-          {sellerUser?.status !== 'approved' && (
+          {!isApproved && (
             <li>
               <button 
                 className={`sidebar-item-btn ${activeTab === 'status' ? 'active' : ''}`}
@@ -1586,7 +1982,7 @@ export default function EmahuProDashboard() {
           <li>
             <button 
               className={`sidebar-item-btn ${activeTab === 'overview' ? 'active' : ''}`}
-              disabled={sellerUser?.status !== 'approved'}
+              disabled={!isApproved}
               onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1596,26 +1992,26 @@ export default function EmahuProDashboard() {
                 <rect x="3" y="16" width="7" height="5" rx="1" />
               </svg>
               <span>Overview</span>
-              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+              {!isApproved && <span style={{ marginLeft: 'auto' }}>🔒</span>}
             </button>
           </li>
           <li>
             <button 
               className={`sidebar-item-btn ${activeTab === 'products' ? 'active' : ''}`}
-              disabled={sellerUser?.status !== 'approved'}
+              disabled={!isApproved}
               onClick={() => { setActiveTab('products'); setIsSidebarOpen(false); }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span>Approved Products</span>
-              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+              {!isApproved && <span style={{ marginLeft: 'auto' }}>🔒</span>}
             </button>
           </li>
           <li>
             <button 
               className={`sidebar-item-btn ${activeTab === 'requests' ? 'active' : ''}`}
-              disabled={sellerUser?.status !== 'approved'}
+              disabled={!isApproved}
               onClick={() => { setActiveTab('requests'); setIsSidebarOpen(false); }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1626,13 +2022,13 @@ export default function EmahuProDashboard() {
                 <polyline points="10 9 9 9 8 9" />
               </svg>
               <span>Verification Requests</span>
-              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+              {!isApproved && <span style={{ marginLeft: 'auto' }}>🔒</span>}
             </button>
           </li>
           <li>
             <button 
               className={`sidebar-item-btn ${activeTab === 'orders' ? 'active' : ''}`}
-              disabled={sellerUser?.status !== 'approved'}
+              disabled={!isApproved}
               onClick={() => { setActiveTab('orders'); setIsSidebarOpen(false); }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1644,26 +2040,26 @@ export default function EmahuProDashboard() {
                   {pendingOrdersCount}
                 </span>
               )}
-              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+              {!isApproved && <span style={{ marginLeft: 'auto' }}>🔒</span>}
             </button>
           </li>
           <li>
             <button 
               className={`sidebar-item-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-              disabled={sellerUser?.status !== 'approved'}
+              disabled={!isApproved}
               onClick={() => { setActiveTab('analytics'); setIsSidebarOpen(false); }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M18 20V10M12 20V4M6 20v-6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span>Analytics</span>
-              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+              {!isApproved && <span style={{ marginLeft: 'auto' }}>🔒</span>}
             </button>
           </li>
           <li>
             <button 
               className={`sidebar-item-btn ${activeTab === 'settings' ? 'active' : ''}`}
-              disabled={sellerUser?.status !== 'approved'}
+              disabled={!isApproved}
               onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1671,9 +2067,25 @@ export default function EmahuProDashboard() {
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
               <span>Settings</span>
-              {sellerUser?.status !== 'approved' && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+              {!isApproved && <span style={{ marginLeft: 'auto' }}>🔒</span>}
             </button>
           </li>
+          {sellerUser?.role === 'admin' && (
+            <li>
+              <button 
+                className={`sidebar-item-btn ${activeTab === 'delivery_settings' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('delivery_settings'); setIsSidebarOpen(false); }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                  <rect x="1" y="3" width="15" height="13" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="5.5" cy="18.5" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="18.5" cy="18.5" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Delivery Settings</span>
+              </button>
+            </li>
+          )}
         </ul>
 
         <div className="sidebar-profile">
@@ -2536,7 +2948,30 @@ export default function EmahuProDashboard() {
 
           {/* TAB: VERIFICATION REQUESTS */}
           {activeTab === 'requests' && (
-            <div>
+            sellerUser?.role === 'admin' ? (
+              <AdminSimulationHub 
+                products={products} 
+                triggerToast={triggerToast} 
+                onRefreshProducts={async () => {
+                  try {
+                    const token = localStorage.getItem('emahu_seller_token');
+                    if (!token) return;
+                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`, {
+                      headers: {
+                        'Authorization': `Bearer ${token}`
+                      }
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      setProducts(data.products);
+                    }
+                  } catch (e) {
+                    console.error('Failed to refresh products:', e);
+                  }
+                }} 
+              />
+            ) : (
+              <div>
               <div className="view-header">
                 <div className="view-title-group">
                   <h2>Verification & Listing Requests</h2>
@@ -2588,17 +3023,10 @@ export default function EmahuProDashboard() {
 
                       <div className="form-group">
                         <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Category *</label>
-                        <select 
-                          className="select-filter" 
-                          style={{ height: '36px', width: '100%', fontSize: '0.85rem' }}
-                          value={newProductCategory}
-                          onChange={(e) => setNewProductCategory(e.target.value)}
-                          required
-                        >
-                          {getCategoryOptions(sellerUser?.category).map(opt => (
-                            <option key={opt.value + opt.label} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
+                        <CategorySelector 
+                          value={newProductCategory} 
+                          onChange={setNewProductCategory} 
+                        />
                       </div>
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -2835,6 +3263,7 @@ export default function EmahuProDashboard() {
 
               </div>
             </div>
+            )
           )}
 
           {/* TAB 3: ORDERS */}
@@ -2896,8 +3325,11 @@ export default function EmahuProDashboard() {
                     <tr>
                       <th>Order ID</th>
                       <th>Customer</th>
-                      <th>Product</th>
-                      <th>Amount</th>
+                      <th>Location</th>
+                      <th>Distance</th>
+                      <th>Delivery Fee</th>
+                      <th>Earnings</th>
+                      <th>Total Paid</th>
                       <th>Status</th>
                       <th>Date</th>
                       <th>Actions</th>
@@ -2916,9 +3348,18 @@ export default function EmahuProDashboard() {
                           </td>
                           <td style={{ fontWeight: 600 }}>{order.customer}</td>
                           <td>
-                            <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>
-                              {order.product}
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                              {order.raw?.deliveryAddress?.city || order.raw?.deliveryAddress?.stateName || 'N/A'}
                             </span>
+                          </td>
+                          <td style={{ fontWeight: 600 }}>
+                            {order.raw?.distanceKm !== undefined ? `${order.raw.distanceKm} KM` : '—'}
+                          </td>
+                          <td style={{ fontWeight: 600 }}>
+                            {order.raw?.deliveryCharge !== undefined ? `₹${order.raw.deliveryCharge}` : '—'}
+                          </td>
+                          <td style={{ fontWeight: 700, color: 'var(--color-success)' }}>
+                            {order.raw?.productAmount !== undefined ? `₹${order.raw.productAmount}` : '—'}
                           </td>
                           <td style={{ fontWeight: 700 }}>₹{order.amount.toLocaleString('en-IN')}</td>
                           <td>
@@ -3302,40 +3743,308 @@ export default function EmahuProDashboard() {
                   <div className="form-grid-2">
                     <div className="form-group">
                       <label className="form-label">Vendor Store Name</label>
-                      <input type="text" className="form-input" defaultValue="Pro Seller Inc." />
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        value={settingsForm.storeName} 
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, storeName: e.target.value }))} 
+                      />
                     </div>
                     <div className="form-group">
                       <label className="form-label">Support Help Email</label>
-                      <input type="email" className="form-input" defaultValue="support@proseller.in" />
+                      <input 
+                        type="email" 
+                        className="form-input" 
+                        value={sellerUser?.email || ''} 
+                        readOnly 
+                        disabled 
+                      />
                     </div>
                   </div>
 
                   <div className="form-grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Active Contact Phone</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        value={settingsForm.phone} 
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, phone: e.target.value }))} 
+                      />
+                    </div>
                     <div className="form-group">
                       <label className="form-label">Registered GSTIN Number</label>
                       <input 
                         ref={gstinRef} 
                         type="text" 
                         className="form-input gstin-input" 
-                        defaultValue="27AAAAA1111A1Z1" 
+                        value={sellerUser?.gstNumber || '27AAAAA1111A1Z1'} 
                         readOnly 
                       />
                     </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: '16px' }}>
+                    <label className="form-label">Registered Shop Address</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      value={settingsForm.address} 
+                      onChange={(e) => setSettingsForm(prev => ({ ...prev, address: e.target.value }))} 
+                      placeholder="Enter street, building, and landmark..."
+                    />
+                  </div>
+
+                  <div className="form-grid-2" style={{ marginTop: '16px' }}>
                     <div className="form-group">
-                      <label className="form-label">Default Fulfillment Partner</label>
-                      <select className="select-filter" style={{ height: '44px' }} defaultValue="Delhivery">
-                        <option value="Delhivery">Delhivery Logistics</option>
-                        <option value="BlueDart">BlueDart Premium</option>
-                        <option value="EmahuXpress">Emahu Xpress Direct</option>
-                      </select>
+                      <label className="form-label">City</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        value={settingsForm.city} 
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, city: e.target.value }))} 
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">State</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        value={settingsForm.state} 
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, state: e.target.value }))} 
+                      />
                     </div>
                   </div>
 
-                  <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '24px 0 0 0', marginTop: '8px' }}>
-                    <button className="save-btn" onClick={() => triggerToast('Store Settings Saved', 'Vendor configuration updated and propagated to Emahu CDN.', 'success')}>
-                      Save Profiles Changes
-                    </button>
+                  <div className="form-grid-2" style={{ marginTop: '16px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Latitude</label>
+                      <input 
+                        type="number" 
+                        step="any"
+                        className="form-input" 
+                        value={settingsForm.latitude} 
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, latitude: e.target.value }))} 
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Longitude</label>
+                      <input 
+                        type="number" 
+                        step="any"
+                        className="form-input" 
+                        value={settingsForm.longitude} 
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, longitude: e.target.value }))} 
+                      />
+                    </div>
                   </div>
+
+                  <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* GPS Detect + current location preview */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                      <button 
+                        type="button" 
+                        className="btn-secondary" 
+                        onClick={detectSellerLocation}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        Detect My GPS Location
+                      </button>
+
+                      {/* Live address badge */}
+                      {(settingsForm.address || settingsForm.city) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(65,105,225,0.08)', border: '1px solid rgba(65,105,225,0.2)', borderRadius: '8px', padding: '6px 14px', fontSize: '0.8rem', color: '#4169e1', fontWeight: 600, maxWidth: '360px' }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4169e1" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {[settingsForm.address, settingsForm.city, settingsForm.state].filter(Boolean).join(', ')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Map container */}
+                    <div style={{ marginTop: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          📌 Shop Location — Click map or drag marker to repin
+                        </span>
+
+                        {/* External Navigate button */}
+                        {settingsForm.latitude && settingsForm.longitude && (
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${settingsForm.latitude},${settingsForm.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '6px',
+                              background: '#4169e1', color: '#fff',
+                              padding: '7px 14px', borderRadius: '7px',
+                              fontSize: '0.78rem', fontWeight: 700,
+                              textDecoration: 'none', cursor: 'pointer',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                            Navigate to Shop
+                          </a>
+                        )}
+                      </div>
+
+                      <div 
+                        id="seller-shop-map" 
+                        style={{ 
+                          height: '320px', 
+                          width: '100%', 
+                          borderRadius: '10px', 
+                          border: '1px solid var(--border-color)',
+                          position: 'relative',
+                          zIndex: 10
+                        }} 
+                      />
+
+                      {/* Coordinate readout */}
+                      {settingsForm.latitude && settingsForm.longitude && (
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          <span>🌐 Lat: <strong>{parseFloat(settingsForm.latitude).toFixed(5)}</strong></span>
+                          <span>Lon: <strong>{parseFloat(settingsForm.longitude).toFixed(5)}</strong></span>
+                        </div>
+                      )}
+                    </div>
+
+
+                 </div>
+
+              </div>
+            </div>
+          </div>
+          )}
+
+
+
+          {/* TAB: DELIVERY SETTINGS (ADMIN ONLY) */}
+          {activeTab === 'delivery_settings' && sellerUser?.role === 'admin' && (
+            <div>
+              <div className="view-header">
+                <div className="view-title-group">
+                  <h2>Distance-Based Delivery Settings</h2>
+                  <p>Configure global delivery charge slabs and thresholds for the platform.</p>
+                </div>
+              </div>
+
+              <div className="settings-grid" style={{ marginTop: '24px' }}>
+                <div className="settings-nav-sidebar">
+                  <button className="settings-nav-btn active">Delivery Cost Slabs</button>
+                </div>
+
+                <div className="glass-card settings-card" style={{ padding: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)' }}>
+                  {loadingAdminSettings ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading settings data...</div>
+                  ) : (
+                    <form onSubmit={handleSaveAdminDeliverySettings}>
+                      <div className="form-grid-2">
+                        <div className="form-group">
+                          <label className="form-label" style={{ color: 'var(--text-secondary)' }}>Maximum Allowed Delivery Distance (KM)</label>
+                          <input 
+                            type="number" 
+                            className="form-input" 
+                            value={adminDeliverySettings.maxDeliveryDistance}
+                            onChange={(e) => setAdminDeliverySettings(prev => ({ ...prev, maxDeliveryDistance: parseFloat(e.target.value) || 0 }))}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-grid-2" style={{ marginTop: '16px' }}>
+                        <div className="form-group">
+                          <label className="form-label" style={{ color: 'var(--text-secondary)' }}>Express Shipping Extra Surcharge (₹)</label>
+                          <input 
+                            type="number" 
+                            className="form-input" 
+                            value={adminDeliverySettings.expressDeliverySurcharge}
+                            onChange={(e) => setAdminDeliverySettings(prev => ({ ...prev, expressDeliverySurcharge: parseFloat(e.target.value) || 0 }))}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: '24px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>Cost Distance Slabs Configuration</span>
+                          <button 
+                            type="button" 
+                            className="company-portal-btn" 
+                            onClick={handleAddSlab}
+                            style={{ height: '32px', fontSize: '0.8rem', padding: '0 12px' }}
+                          >
+                            + Add Slabs
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {adminDeliverySettings.slabs?.map((slab, index) => (
+                            <div key={index} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                              <div className="form-group" style={{ flex: 1 }}>
+                                <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>From Distance (KM)</label>
+                                <input 
+                                  type="number" 
+                                  className="form-input"
+                                  style={{ height: '36px', fontSize: '0.85rem' }}
+                                  value={slab.fromKm}
+                                  onChange={(e) => handleSlabChange(index, 'fromKm', e.target.value)}
+                                  required
+                                />
+                              </div>
+                              <div className="form-group" style={{ flex: 1 }}>
+                                <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>To Distance (KM)</label>
+                                <input 
+                                  type="number" 
+                                  className="form-input"
+                                  style={{ height: '36px', fontSize: '0.85rem' }}
+                                  value={slab.toKm}
+                                  onChange={(e) => handleSlabChange(index, 'toKm', e.target.value)}
+                                  required
+                                />
+                              </div>
+                              <div className="form-group" style={{ flex: 1 }}>
+                                <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Cost (₹)</label>
+                                <input 
+                                  type="number" 
+                                  className="form-input"
+                                  style={{ height: '36px', fontSize: '0.85rem' }}
+                                  value={slab.charge}
+                                  onChange={(e) => handleSlabChange(index, 'charge', e.target.value)}
+                                  required
+                                />
+                              </div>
+                              <button 
+                                type="button" 
+                                className="company-portal-btn"
+                                onClick={() => handleRemoveSlab(index)}
+                                style={{ 
+                                  height: '36px', 
+                                  marginTop: '18px', 
+                                  background: 'var(--color-danger)', 
+                                  borderColor: 'var(--color-danger)',
+                                  color: '#fff', 
+                                  padding: '0 12px', 
+                                  fontSize: '0.8rem'
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '24px 0 0 0', marginTop: '24px' }}>
+                        <button type="submit" className="save-btn">
+                          Save Global Settings
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               </div>
             </div>
@@ -3519,17 +4228,10 @@ export default function EmahuProDashboard() {
 
                 <div className="form-group" style={{ marginTop: '16px' }}>
                   <label className="form-label">Merchandise Category *</label>
-                  <select 
-                    className="select-filter" 
-                    style={{ height: '42px', width: '100%' }}
-                    value={newProductCategory}
-                    onChange={(e) => setNewProductCategory(e.target.value)}
-                    required
-                  >
-                    {getCategoryOptions(sellerUser?.category).map(opt => (
-                      <option key={opt.value + opt.label} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <CategorySelector 
+                    value={newProductCategory} 
+                    onChange={setNewProductCategory} 
+                  />
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                     Helps buyers filter and discover your items.
                   </span>
@@ -4194,6 +4896,58 @@ export default function EmahuProDashboard() {
                       {selectedDetailedOrder.deliveryAddress?.address}<br/>
                       {selectedDetailedOrder.deliveryAddress?.city}, {selectedDetailedOrder.deliveryAddress?.stateName} — {selectedDetailedOrder.deliveryAddress?.pincode}
                     </p>
+                  </div>
+
+                  {/* Distance & Delivery Cost Metrics */}
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '12px' }}>🚚 Distance &amp; Fulfillment Metrics</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#64748b' }}>Transit Distance</span>
+                        <strong style={{ color: '#0f172a' }}>{selectedDetailedOrder.distanceKm !== undefined ? `${selectedDetailedOrder.distanceKm} KM` : '—'}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
+                        <span style={{ color: '#64748b' }}>Delivery Charge</span>
+                        <strong style={{ color: '#0f172a' }}>{selectedDetailedOrder.deliveryCharge !== undefined ? `₹${selectedDetailedOrder.deliveryCharge}` : '—'}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
+                        <span style={{ color: '#64748b' }}>Seller Earnings (Subtotal)</span>
+                        <strong style={{ color: '#16a34a' }}>{selectedDetailedOrder.productAmount !== undefined ? `₹${selectedDetailedOrder.productAmount}` : '—'}</strong>
+                      </div>
+                      {selectedDetailedOrder.buyerLocation?.latitude !== undefined && (
+                        <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px dashed #cbd5e1', paddingTop: '8px', marginTop: '4px', gap: '4px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b' }}>BUYER COORDINATES</span>
+                          <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: '#475569' }}>
+                            Lat: {selectedDetailedOrder.buyerLocation.latitude.toFixed(6)}, Lon: {selectedDetailedOrder.buyerLocation.longitude.toFixed(6)}
+                          </span>
+                          
+                          {selectedDetailedOrder.sellerLocation?.latitude !== undefined && (
+                            <a
+                              href={`https://www.google.com/maps/dir/?api=1&origin=${selectedDetailedOrder.sellerLocation.latitude},${selectedDetailedOrder.sellerLocation.longitude}&destination=${selectedDetailedOrder.buyerLocation.latitude},${selectedDetailedOrder.buyerLocation.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                background: '#e0e7ff',
+                                color: '#4338ca',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                fontSize: '0.78rem',
+                                fontWeight: '700',
+                                textDecoration: 'none',
+                                marginTop: '6px',
+                                width: 'fit-content'
+                              }}
+                            >
+                              🗺️ Compare Locations &amp; Get Route
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Products */}

@@ -21,12 +21,12 @@ const getHeaders = (token = null) => {
 /**
  * Securely register a user (buyer, seller, delivery)
  */
-export async function registerUser({ name, email, password, role, phone, address }) {
+export async function registerUser(userData) {
   try {
     const response = await fetch(`${API_BASE_URL}/register`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ name, email, password, role, phone, address }),
+      body: JSON.stringify(userData),
     });
 
     const data = await response.json();

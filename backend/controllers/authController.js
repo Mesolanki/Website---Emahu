@@ -86,7 +86,13 @@ exports.register = async (req, res) => {
       accountNumber,
       ifscCode,
       bankName,
-      gstNumber
+      gstNumber,
+      city,
+      state,
+      perItemCharge,
+      deliveryScope,
+      operatingLocation,
+      dispatchNotes
     } = req.body;
 
     // Simple validation
@@ -123,7 +129,13 @@ exports.register = async (req, res) => {
       ifscCode,
       bankName,
       gstNumber,
-      status: role === 'seller' ? 'pending' : 'approved'
+      city,
+      state,
+      perItemCharge,
+      deliveryScope,
+      operatingLocation,
+      dispatchNotes,
+      status: (role === 'seller' || role === 'delivery') ? 'pending' : 'approved'
     });
 
     // Notify all admins of new seller registration
@@ -135,6 +147,20 @@ exports.register = async (req, res) => {
           recipient: admin._id,
           title: 'New Seller Registration',
           message: `Seller "${name}" (${storeName || 'N/A'}) has registered and is pending approval.`,
+          type: 'info'
+        });
+      }
+    }
+
+    // Notify all admins of new delivery partner registration
+    if (role === 'delivery') {
+      const admins = await User.find({ role: 'admin' });
+      const Notification = require('../models/Notification');
+      for (const admin of admins) {
+        await Notification.create({
+          recipient: admin._id,
+          title: 'New Delivery Partner Registration',
+          message: `Delivery partner "${name}" (${operatingLocation || 'N/A'}) has registered and is pending approval.`,
           type: 'info'
         });
       }
@@ -411,6 +437,8 @@ exports.getMe = async (req, res) => {
         bankName: req.user.bankName,
         gstNumber: req.user.gstNumber,
         status: req.user.status,
+        latitude: req.user.latitude,
+        longitude: req.user.longitude,
         createdAt: req.user.createdAt
       }
     });
@@ -431,7 +459,12 @@ exports.updateDetails = async (req, res) => {
     const fieldsToUpdate = {
       name: req.body.name || req.user.name,
       phone: req.body.phone !== undefined ? req.body.phone : req.user.phone,
-      address: req.body.address !== undefined ? req.body.address : req.user.address
+      address: req.body.address !== undefined ? req.body.address : req.user.address,
+      city: req.body.city !== undefined ? req.body.city : req.user.city,
+      state: req.body.state !== undefined ? req.body.state : req.user.state,
+      storeName: req.body.storeName !== undefined ? req.body.storeName : req.user.storeName,
+      latitude: req.body.latitude !== undefined ? req.body.latitude : req.user.latitude,
+      longitude: req.body.longitude !== undefined ? req.body.longitude : req.user.longitude
     };
 
     const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
@@ -448,7 +481,12 @@ exports.updateDetails = async (req, res) => {
         email: user.email,
         role: user.role,
         phone: user.phone,
-        address: user.address
+        address: user.address,
+        city: user.city,
+        state: user.state,
+        storeName: user.storeName,
+        latitude: user.latitude,
+        longitude: user.longitude
       }
     });
   } catch (error) {
@@ -834,6 +872,21 @@ exports.verifySellerDocument = async (req, res) => {
     doc.feedback = feedback || '';
     await doc.save();
 
+    // Auto-approve seller account if both required documents are approved
+    if (status === 'approved') {
+      const allDocs = await SellerDocument.find({ seller: doc.seller });
+      const businessReg = allDocs.find(d => d.documentType === 'business_registration');
+      const idProof = allDocs.find(d => d.documentType === 'id_proof');
+      
+      const isBusinessRegApproved = businessReg && (businessReg._id.equals(doc._id) ? status === 'approved' : businessReg.status === 'approved');
+      const isIdProofApproved = idProof && (idProof._id.equals(doc._id) ? status === 'approved' : idProof.status === 'approved');
+      
+      if (isBusinessRegApproved && isIdProofApproved) {
+        const User = require('../models/User');
+        await User.findByIdAndUpdate(doc.seller, { status: 'approved', verificationFeedback: '' });
+      }
+    }
+
     // Log admin action to AuditLog
     const AuditLog = require('../models/AuditLog');
     await AuditLog.create({
@@ -854,3 +907,95 @@ exports.verifySellerDocument = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// @desc    Get all delivery partners for admin review
+// @route   GET /api/auth/admin/delivery-partners
+// @access  Private (Admin only)
+exports.getDeliveryPartners = async (req, res) => {
+  try {
+    const deliveryPartners = await User.find({ role: 'delivery' }).lean();
+    res.status(200).json({
+      success: true,
+      deliveryPartners
+    });
+  } catch (error) {
+    console.error('Get Delivery Partners Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error retrieving delivery partners list'
+    });
+  }
+};
+
+// @desc    Admin approve or reject delivery partner account
+// @route   PUT /api/auth/admin/delivery-partners/:id/decision
+// @access  Private (Admin only)
+exports.deliveryPartnerDecision = async (req, res) => {
+  try {
+    const { decision, feedback } = req.body; // 'approve', 'reject'
+    const partner = await User.findById(req.params.id);
+    
+    if (!partner || partner.role !== 'delivery') {
+      return res.status(404).json({ success: false, error: 'Delivery partner not found' });
+    }
+
+    if (decision === 'approve') {
+      partner.status = 'approved';
+      partner.verificationFeedback = '';
+    } else if (decision === 'reject') {
+      partner.status = 'rejected';
+      partner.verificationFeedback = feedback || '';
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid decision type' });
+    }
+
+    await partner.save();
+
+    // Create Notification for the delivery partner
+    const Notification = require('../models/Notification');
+    await Notification.create({
+      recipient: partner._id,
+      title: `Delivery Partner Account ${partner.status === 'approved' ? 'Approved' : 'Rejected'}`,
+      message: partner.status === 'approved'
+        ? 'Congratulations! Your delivery partner account has been approved.'
+        : `Delivery Verification Status: rejected. Admin Feedback: ${feedback || 'None'}`,
+      type: partner.status === 'approved' ? 'success' : 'warning'
+    });
+
+    // Create Audit Log
+    const AuditLog = require('../models/AuditLog');
+    await AuditLog.create({
+      admin: req.user._id,
+      action: `DECISION_DELIVERY_${partner.status.toUpperCase()}`,
+      targetType: 'User',
+      targetId: partner._id,
+      details: { decision, feedback }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Delivery partner status updated to ${partner.status} successfully`,
+      deliveryPartner: partner
+    });
+  } catch (error) {
+    console.error('Delivery Partner Decision Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// @desc    Get approved delivery partners for seller selection
+// @route   GET /api/auth/delivery-partners
+// @access  Private
+exports.getApprovedDeliveryPartners = async (req, res) => {
+  try {
+    const partners = await User.find({ role: 'delivery', status: 'approved' }).lean();
+    res.status(200).json({
+      success: true,
+      partners
+    });
+  } catch (error) {
+    console.error('Get Approved Delivery Partners Error:', error);
+    res.status(500).json({ success: false, error: 'Server error fetching delivery partners' });
+  }
+};
+

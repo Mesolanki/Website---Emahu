@@ -46,6 +46,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    latitude: {
+      type: Number
+    },
+    longitude: {
+      type: Number
+    },
     category: {
       type: String,
       trim: true
@@ -76,6 +82,31 @@ const userSchema = new mongoose.Schema(
       trim: true
     },
     gstNumber: {
+      type: String,
+      trim: true
+    },
+    city: {
+      type: String,
+      trim: true
+    },
+    state: {
+      type: String,
+      trim: true
+    },
+    perItemCharge: {
+      type: Number,
+      default: 0
+    },
+    deliveryScope: {
+      type: String,
+      enum: ['local', 'interstate'],
+      default: 'local'
+    },
+    operatingLocation: {
+      type: String,
+      trim: true
+    },
+    dispatchNotes: {
       type: String,
       trim: true
     },

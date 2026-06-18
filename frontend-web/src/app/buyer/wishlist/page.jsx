@@ -6,7 +6,7 @@ import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import './wishlist.css';
 
-const ALL_PRODUCTS = [];
+import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 
 function Stars({ rating }) {
   return (
@@ -28,39 +28,53 @@ export default function WishlistPage() {
   useEffect(() => {
     const loadWishlistData = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
-        const data = await res.json();
         let formattedList = [];
-        if (data.success) {
-          formattedList = data.products.map(p => {
-            let mappedCategory = p.category;
-            if (p.category === 'Electronics') mappedCategory = 'Tech';
-            else if (p.category === 'Fitness' || p.category === 'Furniture') mappedCategory = 'Lifestyle';
+        try {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
+          const data = await res.json();
+          if (data.success && data.products) {
+            formattedList = data.products.map(p => {
+              let mappedCategory = p.category;
+              if (p.category === 'Electronics') mappedCategory = 'Tech';
+              else if (p.category === 'Fitness' || p.category === 'Furniture') mappedCategory = 'Lifestyle';
 
-            return {
-              id: p.id || p._id,
-              name: p.name,
-              brand: p.brand || p.seller?.name || 'Emahu Seller',
-              category: mappedCategory,
-              price: p.price,
-              original: p.comparePrice || p.price,
-              discount: p.comparePrice ? Math.round(((p.comparePrice - p.price) / p.comparePrice) * 100) : 0,
-              rating: p.rating || 4.7,
-              reviews: p.reviews || 84,
-              img: p.image || '📦',
-              verified: true,
-              isNew: true,
-              isHot: false,
-              onSale: p.comparePrice ? (p.price < p.comparePrice) : false
-            };
-          });
+              return {
+                id: p.id || p._id,
+                name: p.name,
+                brand: p.brand || p.seller?.name || 'Emahu Seller',
+                category: mappedCategory,
+                price: p.price,
+                original: p.comparePrice || p.price,
+                discount: p.comparePrice ? Math.round(((p.comparePrice - p.price) / p.comparePrice) * 100) : 0,
+                rating: p.rating || 4.7,
+                reviews: p.reviews || 84,
+                img: p.image || '📦',
+                verified: true,
+                isNew: true,
+                isHot: false,
+                onSale: p.comparePrice ? (p.price < p.comparePrice) : false
+              };
+            });
+          }
+        } catch (fetchErr) {
+          console.warn('Backend offline, loading wishlist from local storage fallback:', fetchErr);
         }
+
+        // Combine database products with static mock products
+        const allProducts = [...formattedList, ...STATIC_PRODUCTS];
+        const seen = new Set();
+        const uniqueProducts = allProducts.filter(p => {
+          const pid = p.id.toString();
+          if (seen.has(pid)) return false;
+          seen.add(pid);
+          return true;
+        });
 
         const storedWish = localStorage.getItem('emahu_wishlist');
         if (storedWish) {
           const ids = JSON.parse(storedWish).map(id => id.toString());
           // Map ids to matching product objects
-          const matched = formattedList.filter(p => ids.includes(p.id.toString()));
+          const matched = uniqueProducts.filter(p => ids.includes(p.id.toString()));
           setWishlistItems(matched);
 
           if (matched.length < ids.length) {

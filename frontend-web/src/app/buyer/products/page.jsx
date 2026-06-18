@@ -6,6 +6,8 @@ import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import './products.css';
 
+import { STATIC_PRODUCTS } from '@/utils/mockProducts';
+
 /* ─── DATA ─── */
 const CATEGORY_TILES = [
   { label: 'Tech & Gadgets', value: 'Tech',      img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&q=80' },
@@ -15,7 +17,7 @@ const CATEGORY_TILES = [
   { label: 'Lifestyle',       value: 'Lifestyle', img: 'https://images.unsplash.com/photo-1608181831718-c9e37e3b9d70?w=400&q=80' },
 ];
 
-const ALL_PRODUCTS = [];
+const ALL_PRODUCTS = STATIC_PRODUCTS;
 
 
 function Stars({ rating }) {

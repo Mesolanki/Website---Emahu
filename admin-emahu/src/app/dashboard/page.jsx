@@ -23,6 +23,12 @@ export default function AdminDashboard() {
   const [actionLoading, setActionLoading] = useState({});
   const [toasts, setToasts] = useState([]);
 
+  // Delivery Partners State
+  const [deliveryPartners, setDeliveryPartners] = useState([]);
+  const [loadingDeliveryPartners, setLoadingDeliveryPartners] = useState(false);
+  const [deliveryPartnersError, setDeliveryPartnersError] = useState(false);
+  const [selectedDetailPartner, setSelectedDetailPartner] = useState(null);
+
   // Notifications states
   const [notifications, setNotifications] = useState([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
@@ -292,6 +298,41 @@ export default function AdminDashboard() {
       triggerToast('Error', 'Network error fetching orders.', 'danger');
     } finally {
       setLoadingOrders(false);
+    }
+  };
+
+  // Fetch Delivery Partners List
+  const fetchDeliveryPartners = async () => {
+    setLoadingDeliveryPartners(true);
+    setDeliveryPartnersError(false);
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      if (!token) return;
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/delivery-partners`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json();
+      
+      if (data.success) {
+        setDeliveryPartners(data.deliveryPartners || []);
+        setDeliveryPartnersError(false);
+      } else {
+        setDeliveryPartnersError(true);
+        triggerToast('Error', data.error || 'Failed to fetch delivery partners.', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      setDeliveryPartnersError(true);
+      triggerToast('Error', 'Network error fetching delivery partners.', 'danger');
+    } finally {
+      setLoadingDeliveryPartners(false);
     }
   };
 
@@ -670,6 +711,8 @@ export default function AdminDashboard() {
       }, 0);
     } else if (activeTab === 'orders') {
       setTimeout(() => fetchOrders(), 0);
+    } else if (activeTab === 'delivery-partners') {
+      setTimeout(() => fetchDeliveryPartners(), 0);
     } else if (activeTab === 'notifications') {
       setTimeout(() => fetchNotifications(), 0);
     }
@@ -710,9 +753,39 @@ export default function AdminDashboard() {
       } else {
         triggerToast('Error', data.error || 'Failed to update seller.', 'danger');
       }
+    } finally {
+      setActionLoading(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  // Admin Delivery Partner Account Decision
+  const handleDeliveryPartnerDecision = async (id, decision, feedback = '') => {
+    setActionLoading(prev => ({ ...prev, [id]: true }));
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/delivery-partners/${id}/decision`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ decision, feedback })
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        setSelectedDetailPartner(null);
+        setDeliveryPartners(prev => prev.map(p => p._id === id ? data.deliveryPartner : p));
+        triggerToast('Partner Updated', `Delivery partner status updated to '${decision}' successfully.`, 'success');
+      } else {
+        triggerToast('Error', data.error || 'Failed to update delivery partner.', 'danger');
+      }
     } catch (err) {
       console.error(err);
-      triggerToast('Error', 'Network error updating seller status.', 'danger');
+      triggerToast('Error', 'Network error updating delivery partner status.', 'danger');
     } finally {
       setActionLoading(prev => ({ ...prev, [id]: false }));
     }
@@ -774,6 +847,8 @@ export default function AdminDashboard() {
     setIsFeedbackModalOpen(false);
     if (feedbackType === 'product') {
       handleProductDecision(feedbackTargetId, feedbackDecision, feedbackText);
+    } else if (feedbackType === 'delivery') {
+      handleDeliveryPartnerDecision(feedbackTargetId, feedbackDecision, feedbackText);
     } else {
       handleSellerDecision(feedbackTargetId, feedbackDecision, feedbackText);
     }
@@ -827,6 +902,134 @@ export default function AdminDashboard() {
               <button className="ad-btn-sec" onClick={() => setIsFeedbackModalOpen(false)}>Cancel</button>
               <button className="ad-btn-danger" onClick={submitFeedback} disabled={!feedbackText.trim()}>
                 Submit Decision
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Delivery Partner Detail Drawer/Modal */}
+      {selectedDetailPartner && (
+        <div className="ad-modal-overlay" onClick={() => setSelectedDetailPartner(null)}>
+          <div className="ad-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="ad-detail-close" onClick={() => setSelectedDetailPartner(null)}>✕</button>
+            
+            <div className="ad-detail-header-block">
+              <div className="ad-detail-title-section">
+                <h3 className="ad-detail-store-name">{selectedDetailPartner.name || 'Delivery Partner'}</h3>
+                <div className="ad-detail-store-meta">
+                  <span>📍 Hub: {selectedDetailPartner.operatingLocation || 'Unspecified Hub'}</span>
+                  <span>•</span>
+                  <span>📞 Phone: {selectedDetailPartner.phone || 'N/A'}</span>
+                </div>
+              </div>
+              <span className={`ad-status-badge ${selectedDetailPartner.status}`} style={{ fontSize: '0.85rem', padding: '6px 14px' }}>
+                {selectedDetailPartner.status?.toUpperCase()}
+              </span>
+            </div>
+
+            <div style={{ flex: 1, minHeight: '300px', display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
+              <div className="ad-detail-info-grid">
+                <div className="ad-detail-info-section">
+                  <h4>Fleet Parameters</h4>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Agency / Driver Name</span>
+                    <span className="ad-detail-row-val">{selectedDetailPartner.name}</span>
+                  </div>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Operating Location Hub</span>
+                    <span className="ad-detail-row-val">{selectedDetailPartner.operatingLocation}</span>
+                  </div>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Custom rate per KM</span>
+                    <span className="ad-detail-row-val" style={{ color: '#10b981', fontWeight: 'bold' }}>
+                      ₹{selectedDetailPartner.perItemCharge || '0.00'}/km
+                    </span>
+                  </div>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Delivery Scope</span>
+                    <span className="ad-detail-row-val" style={{ textTransform: 'capitalize' }}>
+                      {selectedDetailPartner.deliveryScope === 'local' ? 'Local Same-City' : 'State-to-State'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="ad-detail-info-section">
+                  <h4>Compliance Information</h4>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Registered Email</span>
+                    <span className="ad-detail-row-val">{selectedDetailPartner.email}</span>
+                  </div>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Registered Phone</span>
+                    <span className="ad-detail-row-val">{selectedDetailPartner.phone}</span>
+                  </div>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Verification Standing</span>
+                    <span className="ad-detail-row-val">{selectedDetailPartner.status}</span>
+                  </div>
+                </div>
+              </div>
+
+              {selectedDetailPartner.dispatchNotes && (
+                <div className="ad-detail-info-section" style={{ width: '100%' }}>
+                  <h4>Dispatch Remarks & Route Notes</h4>
+                  <p style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.5', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-admin-border)', margin: '6px 0 0 0' }}>
+                    {selectedDetailPartner.dispatchNotes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="ad-detail-decision-bar" style={{ marginTop: '20px' }}>
+              {selectedDetailPartner.status === 'pending' ? (
+                <>
+                  <button
+                    className="ad-btn-action approve"
+                    style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem' }}
+                    onClick={() => {
+                      handleDeliveryPartnerDecision(selectedDetailPartner._id, 'approve');
+                    }}
+                    disabled={actionLoading[selectedDetailPartner._id]}
+                  >
+                    {actionLoading[selectedDetailPartner._id] ? 'Updating...' : 'Approve Profile'}
+                  </button>
+                  <button
+                    className="ad-btn-action reject"
+                    style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem' }}
+                    onClick={() => {
+                      openFeedbackModal('delivery', selectedDetailPartner._id, 'reject');
+                    }}
+                    disabled={actionLoading[selectedDetailPartner._id]}
+                  >
+                    Reject Application
+                  </button>
+                </>
+              ) : selectedDetailPartner.status === 'approved' ? (
+                <button
+                  className="ad-btn-danger"
+                  style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem' }}
+                  onClick={() => {
+                    openFeedbackModal('delivery', selectedDetailPartner._id, 'reject');
+                  }}
+                  disabled={actionLoading[selectedDetailPartner._id]}
+                >
+                  Block/Suspend Partner
+                </button>
+              ) : (
+                <button
+                  className="ad-btn-action approve"
+                  style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem' }}
+                  onClick={() => {
+                    handleDeliveryPartnerDecision(selectedDetailPartner._id, 'approve');
+                  }}
+                  disabled={actionLoading[selectedDetailPartner._id]}
+                >
+                  Re-Approve Partner
+                </button>
+              )}
+              <button className="ad-btn-sec" style={{ height: '42px', padding: '0 20px', fontSize: '0.9rem' }} onClick={() => setSelectedDetailPartner(null)}>
+                Close Profile
               </button>
             </div>
           </div>
@@ -916,6 +1119,54 @@ export default function AdminDashboard() {
                       <span className="ad-detail-row-label">Telephone Line</span>
                       <span className="ad-detail-row-val">{selectedDetailSeller.phone || 'N/A'}</span>
                     </div>
+                  </div>
+
+                  <div className="ad-detail-info-section">
+                    <h4>Geographic Location</h4>
+                    <div className="ad-detail-row">
+                      <span className="ad-detail-row-label">Shop Address</span>
+                      <span className="ad-detail-row-val">{selectedDetailSeller.address || 'Not Set'}</span>
+                    </div>
+                    <div className="ad-detail-row">
+                      <span className="ad-detail-row-label">City &amp; State</span>
+                      <span className="ad-detail-row-val">
+                        {[selectedDetailSeller.city, selectedDetailSeller.state].filter(Boolean).join(', ') || 'Not Set'}
+                      </span>
+                    </div>
+                    {selectedDetailSeller.latitude !== undefined && selectedDetailSeller.longitude !== undefined && (
+                      <>
+                        <div className="ad-detail-row">
+                          <span className="ad-detail-row-label">GPS Coordinates</span>
+                          <span className="ad-detail-row-val" style={{ fontFamily: 'monospace' }}>
+                            {selectedDetailSeller.latitude.toFixed(6)}, {selectedDetailSeller.longitude.toFixed(6)}
+                          </span>
+                        </div>
+                        <div style={{ marginTop: '10px' }}>
+                          <a
+                            href={`https://www.google.com/maps?q=${selectedDetailSeller.latitude},${selectedDetailSeller.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              background: 'rgba(65, 105, 225, 0.1)',
+                              color: '#4169e1',
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: '700',
+                              textDecoration: 'none',
+                              width: '100%',
+                              textAlign: 'center'
+                            }}
+                          >
+                            🗺️ View Shop on Google Maps
+                          </a>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -1469,6 +1720,57 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* Transit Location Details */}
+                <div className="ad-detail-info-section">
+                  <h4>Transit Location Details</h4>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Transit Distance</span>
+                    <span className="ad-detail-row-val">{selectedDetailOrder.distanceKm !== undefined ? `${selectedDetailOrder.distanceKm} KM` : 'N/A'}</span>
+                  </div>
+                  {selectedDetailOrder.buyerLocation?.latitude !== undefined && (
+                    <div className="ad-detail-row">
+                      <span className="ad-detail-row-label">Buyer Coordinates</span>
+                      <span className="ad-detail-row-val" style={{ fontFamily: 'monospace' }}>
+                        {selectedDetailOrder.buyerLocation.latitude.toFixed(6)}, {selectedDetailOrder.buyerLocation.longitude.toFixed(6)}
+                      </span>
+                    </div>
+                  )}
+                  {selectedDetailOrder.sellerLocation?.latitude !== undefined && (
+                    <div className="ad-detail-row">
+                      <span className="ad-detail-row-label">Seller Coordinates</span>
+                      <span className="ad-detail-row-val" style={{ fontFamily: 'monospace' }}>
+                        {selectedDetailOrder.sellerLocation.latitude.toFixed(6)}, {selectedDetailOrder.sellerLocation.longitude.toFixed(6)}
+                      </span>
+                    </div>
+                  )}
+                  {selectedDetailOrder.buyerLocation?.latitude !== undefined && selectedDetailOrder.sellerLocation?.latitude !== undefined && (
+                    <div style={{ marginTop: '10px' }}>
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&origin=${selectedDetailOrder.sellerLocation.latitude},${selectedDetailOrder.sellerLocation.longitude}&destination=${selectedDetailOrder.buyerLocation.latitude},${selectedDetailOrder.buyerLocation.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          background: 'rgba(65, 105, 225, 0.1)',
+                          color: '#4169e1',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          fontSize: '0.78rem',
+                          fontWeight: '700',
+                          textDecoration: 'none',
+                          width: '100%',
+                          textAlign: 'center'
+                        }}
+                      >
+                        🗺️ Compare GPS Locations &amp; Get Route
+                      </a>
+                    </div>
+                  )}
+                </div>
+
                 {/* Items list */}
                 <div className="ad-detail-info-section">
                   <h4>Ordered Products Checklist</h4>
@@ -1790,6 +2092,15 @@ export default function AdminDashboard() {
             </button>
           </li>
           <li>
+            <button className={`ad-sidebar-btn ${activeTab === 'delivery-partners' ? 'active' : ''}`} onClick={() => setActiveTab('delivery-partners')}>
+              🏍️ Delivery Partners {deliveryPartners.filter(p => p.status === 'pending').length > 0 && (
+                <span style={{ background: '#f59e0b', color: '#000', borderRadius: '50%', padding: '2px 8px', fontSize: '0.7rem', marginLeft: '6px', fontWeight: 'bold' }}>
+                  {deliveryPartners.filter(p => p.status === 'pending').length}
+                </span>
+              )}
+            </button>
+          </li>
+          <li>
             <button className={`ad-sidebar-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>
               📈 System Stats
             </button>
@@ -1824,6 +2135,154 @@ export default function AdminDashboard() {
 
         <main className="ad-view-container">
           
+          {/* TAB: DELIVERY PARTNERS MANAGEMENT */}
+          {activeTab === 'delivery-partners' && (
+            <div>
+              <div className="ad-view-header">
+                <h3>Central Central central central Logistics Carrier Management</h3>
+                <p>Verify fleet registrations, custom per-kilometer rates, and active territories to dispatch order shipments.</p>
+              </div>
+
+              {deliveryPartnersError ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Connection Timeout / Cold Start</div>
+                  <div className="ad-error-message">
+                    Failed to communicate with the database. Click below to retry.
+                  </div>
+                  <button className="ad-btn-sec" onClick={fetchDeliveryPartners}>
+                    🔄 Retry Loading Delivery Partners
+                  </button>
+                </div>
+              ) : loadingDeliveryPartners ? (
+                <div className="ad-loading">Fetching logistics carriers from database...</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                  {/* Sub-section 1: Pending Approvals */}
+                  <div>
+                    <h4 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      ⏳ Pending Fleet Registrations ({deliveryPartners.filter(p => p.status === 'pending' || p.status === 'more_info_requested').length})
+                    </h4>
+                    <div className="ad-table-wrapper">
+                      <table className="ad-table">
+                        <thead>
+                          <tr>
+                            <th>Fleet details</th>
+                            <th>Contact Phone</th>
+                            <th>Scope &amp; Rates</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {deliveryPartners.filter(p => p.status === 'pending' || p.status === 'more_info_requested').map((partner) => (
+                            <tr key={partner._id}>
+                              <td>
+                                <div className="ad-bold">{partner.name}</div>
+                                <div className="ad-muted">📍 {partner.operatingLocation}</div>
+                              </td>
+                              <td>
+                                <div className="ad-bold">{partner.phone}</div>
+                                <div className="ad-muted">{partner.email}</div>
+                              </td>
+                              <td>
+                                <div className="ad-bold" style={{ textTransform: 'capitalize' }}>
+                                  Scope: {partner.deliveryScope === 'local' ? 'Local Same-City' : 'State-to-State'}
+                                </div>
+                                <div className="ad-muted" style={{ color: '#10b981', fontWeight: 'bold' }}>
+                                  ₹{partner.perItemCharge || '0.00'}/km
+                                </div>
+                              </td>
+                              <td>
+                                <span className={`ad-status-badge ${partner.status}`}>
+                                  {partner.status?.toUpperCase()}
+                                </span>
+                              </td>
+                              <td>
+                                <button
+                                  className="ad-btn-sec"
+                                  style={{ fontSize: '0.8rem', height: '34px', padding: '0 16px', fontWeight: '600' }}
+                                  onClick={() => setSelectedDetailPartner(partner)}
+                                >
+                                  Audit Application
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {deliveryPartners.filter(p => p.status === 'pending' || p.status === 'more_info_requested').length === 0 && (
+                            <tr>
+                              <td colSpan="5" className="ad-empty">No pending delivery partner onboarding requests.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Sub-section 2: Approved Partners */}
+                  <div>
+                    <h4 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      🏍️ Approved Dispatch Carriers ({deliveryPartners.filter(p => p.status === 'approved' || p.status === 'rejected').length})
+                    </h4>
+                    <div className="ad-table-wrapper">
+                      <table className="ad-table">
+                        <thead>
+                          <tr>
+                            <th>Fleet details</th>
+                            <th>Contact Phone</th>
+                            <th>Scope &amp; Rates</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {deliveryPartners.filter(p => p.status === 'approved' || p.status === 'rejected').map((partner) => (
+                            <tr key={partner._id}>
+                              <td>
+                                <div className="ad-bold">{partner.name}</div>
+                                <div className="ad-muted">📍 {partner.operatingLocation}</div>
+                              </td>
+                              <td>
+                                <div className="ad-bold">{partner.phone}</div>
+                                <div className="ad-muted">{partner.email}</div>
+                              </td>
+                              <td>
+                                <div className="ad-bold" style={{ textTransform: 'capitalize' }}>
+                                  Scope: {partner.deliveryScope === 'local' ? 'Local Same-City' : 'State-to-State'}
+                                </div>
+                                <div className="ad-muted" style={{ color: '#10b981', fontWeight: 'bold' }}>
+                                  ₹{partner.perItemCharge || '0.00'}/km
+                                </div>
+                              </td>
+                              <td>
+                                <span className={`ad-status-badge ${partner.status}`}>
+                                  {partner.status?.toUpperCase()}
+                                </span>
+                              </td>
+                              <td>
+                                <button
+                                  className="ad-btn-sec"
+                                  style={{ fontSize: '0.8rem', height: '34px', padding: '0 16px', fontWeight: '600' }}
+                                  onClick={() => setSelectedDetailPartner(partner)}
+                                >
+                                  Manage Partner
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {deliveryPartners.filter(p => p.status === 'approved' || p.status === 'rejected').length === 0 && (
+                            <tr>
+                              <td colSpan="5" className="ad-empty">No active delivery carriers registered in system.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* TAB: NEW SELLERS VERIFICATION */}
           {activeTab === 'new-sellers' && (
             <div>

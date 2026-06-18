@@ -1,4 +1,7 @@
 const Order = require('../models/Order');
+const User = require('../models/User');
+const DeliverySetting = require('../models/DeliverySetting');
+const { getHaversineDistance, resolveCharge } = require('./deliveryController');
 
 // @desc    Create a new order
 // @route   POST /api/orders
@@ -7,15 +10,120 @@ exports.createOrder = async (req, res) => {
   try {
     const orderData = req.body;
     
+    // Calculate and verify delivery charges
+    let distanceKm = 0;
+    let deliveryCharge = 0;
+    
+    const settings = await DeliverySetting.findOne() || {
+      maxDeliveryDistance: 100,
+      freeShippingThreshold: 2000,
+      expressDeliverySurcharge: 100,
+      slabs: [
+        { fromKm: 0, toKm: 5, charge: 30 },
+        { fromKm: 5, toKm: 10, charge: 50 },
+        { fromKm: 10, toKm: 20, charge: 80 },
+        { fromKm: 20, toKm: 50, charge: 120 },
+        { fromKm: 50, toKm: 100, charge: 200 },
+        { fromKm: 100, toKm: 9999, charge: 300 }
+      ]
+    };
+
+    // Calculate product amount from DB prices rather than relying on client input
+    let productAmount = 0;
+    if (orderData.items && orderData.items.length > 0) {
+      const Product = require('../models/Product');
+      for (const item of orderData.items) {
+        const product = await Product.findById(item.productId);
+        if (product) {
+          productAmount += product.price * (item.quantity || 1);
+        } else {
+          // Fallback if product not found in DB
+          productAmount += (item.price || 0) * (item.quantity || 1);
+        }
+      }
+    }
+
+    // Resolve Seller Location
+    let sLat = 23.0225; // Default Ahmedabad
+    let sLon = 72.5714;
+    let sAddress = 'Ahmedabad, Gujarat';
+    let sName = 'Emahu Seller';
+    
+    if (orderData.sellerId) {
+      const seller = await User.findById(orderData.sellerId);
+      if (seller) {
+        if (seller.latitude !== undefined && seller.latitude !== null) sLat = seller.latitude;
+        if (seller.longitude !== undefined && seller.longitude !== null) sLon = seller.longitude;
+        if (seller.address) sAddress = seller.address;
+        if (seller.storeName || seller.name) sName = seller.storeName || seller.name;
+      }
+    }
+
+    // Resolve Buyer Location
+    let bLat = orderData.buyerLocation?.latitude;
+    let bLon = orderData.buyerLocation?.longitude;
+    let bAddr = orderData.buyerLocation?.address || orderData.deliveryAddress?.address || '';
+
+    // If coordinates are missing, fallback to seller location to avoid crashes and give 0 distance
+    if (bLat === undefined || bLat === null || bLon === undefined || bLon === null) {
+      bLat = sLat;
+      bLon = sLon;
+    }
+
+    // Compute distance and charge
+    distanceKm = getHaversineDistance(bLat, bLon, sLat, sLon);
+    
+    // Validate Max Distance
+    if (distanceKm > settings.maxDeliveryDistance) {
+      return res.status(400).json({
+        success: false,
+        error: `Delivery distance (${distanceKm.toFixed(1)} KM) exceeds the maximum allowed distance of ${settings.maxDeliveryDistance} KM`
+      });
+    }
+
+    const chargeResult = resolveCharge(distanceKm, productAmount, settings);
+    if (chargeResult.error) {
+      return res.status(400).json({
+        success: false,
+        error: chargeResult.error
+      });
+    }
+
+    deliveryCharge = chargeResult.charge;
+
+    // Save audited details
+    orderData.sellerLocation = {
+      shopName: sName,
+      latitude: sLat,
+      longitude: sLon,
+      address: sAddress
+    };
+    orderData.buyerLocation = {
+      latitude: bLat,
+      longitude: bLon,
+      address: bAddr
+    };
+    orderData.distanceKm = parseFloat(distanceKm.toFixed(2));
+    orderData.deliveryCharge = deliveryCharge;
+    orderData.productAmount = productAmount;
+    
+    // Add express surcharge if express delivery selected
+    if (orderData.shippingSpeed === 'express') {
+      deliveryCharge += settings.expressDeliverySurcharge || 100;
+      orderData.deliveryCharge = deliveryCharge;
+    }
+
+    // Recalculate escrow grand total (subtotal + deliveryCharge + 18% GST of subtotal)
+    const taxAmount = Math.round(productAmount * 0.18);
+    orderData.total = productAmount + deliveryCharge + taxAmount;
+    orderData.totalPaid = orderData.total;
+
     // Log payment response/order payload as required
-    console.log('--- ORDER CREATION ATTEMPT ---');
+    console.log('--- ORDER CREATION ATTEMPT (VERIFIED) ---');
     console.log('Payment Status:', orderData.paymentStatus || 'COMPLETED');
-    console.log('Order Payload:', JSON.stringify(orderData, null, 2));
     console.log('Seller ID:', orderData.sellerId);
     console.log('User ID:', orderData.userId);
-    if (orderData.items && orderData.items[0]) {
-      console.log('Product ID:', orderData.items[0].productId);
-    }
+    console.log(`Verified Subtotal: ₹${productAmount}, Distance: ${distanceKm.toFixed(2)} KM, Delivery Charge: ₹${deliveryCharge}, Total: ₹${orderData.total}`);
     
     // Ensure database insert runs every time
     const order = await Order.create(orderData);

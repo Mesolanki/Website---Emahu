@@ -86,6 +86,29 @@ const orderSchema = new mongoose.Schema(
         date: String
       }
     ],
+    sellerLocation: {
+      shopName: String,
+      latitude: Number,
+      longitude: Number,
+      address: String
+    },
+    buyerLocation: {
+      latitude: Number,
+      longitude: Number,
+      address: String
+    },
+    distanceKm: {
+      type: Number
+    },
+    deliveryCharge: {
+      type: Number
+    },
+    productAmount: {
+      type: Number
+    },
+    totalPaid: {
+      type: Number
+    },
     deliveryAddress: {
       fullName: String,
       phone: String,

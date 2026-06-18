@@ -17,7 +17,10 @@ const {
   uploadDocument,
   getOwnDocuments,
   getSellerDocumentsForAdmin,
-  verifySellerDocument
+  verifySellerDocument,
+  getDeliveryPartners,
+  deliveryPartnerDecision,
+  getApprovedDeliveryPartners
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -33,9 +36,16 @@ router.get('/me', protect, getMe);
 router.put('/update-details', protect, updateDetails);
 router.put('/update-password', protect, updatePassword);
 
+// Delivery partner endpoints for sellers/buyers
+router.get('/delivery-partners', protect, getApprovedDeliveryPartners);
+
 // Admin-only endpoints
 router.get('/admin/sellers', protect, authorize('admin'), getSellers);
 router.put('/admin/sellers/:id/decision', protect, authorize('admin'), sellerDecision);
+
+// Admin delivery-partner endpoints
+router.get('/admin/delivery-partners', protect, authorize('admin'), getDeliveryPartners);
+router.put('/admin/delivery-partners/:id/decision', protect, authorize('admin'), deliveryPartnerDecision);
 
 // 2FA Admin routes
 router.get('/admin/2fa/setup', protect, authorize('admin'), setup2FA);

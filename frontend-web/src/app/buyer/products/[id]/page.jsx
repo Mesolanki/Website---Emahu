@@ -6,8 +6,9 @@ import { useParams, useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import './product-detail.css';
+import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 
-const ALL_PRODUCTS = [];
+const ALL_PRODUCTS = STATIC_PRODUCTS;
 
 const REVIEWS = [
   { id:1, name:'Rahul M.',   rating:5, date:'May 2025', text:'Absolutely premium quality! Packaging was immaculate and delivery was super fast. EMAHU verification seal was intact. 100% legit product.', tags:['Fast Delivery','Authentic'], color:'#4169e1', verified:true },
@@ -176,6 +177,7 @@ export default function ProductDetailPage() {
   // Load product details from database
   useEffect(() => {
     const fetchDbProduct = async () => {
+      let fetchedSuccessfully = false;
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/${id}`);
         const data = await res.json();
@@ -223,12 +225,51 @@ export default function ProductDetailPage() {
             productId: p.id || p._id,
             sellerId: p.seller?._id || p.seller?.id || p.seller
           });
+          fetchedSuccessfully = true;
         }
       } catch (err) {
-        console.error('Error fetching database product:', err);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching database product, falling back to static:', err);
       }
+
+      if (!fetchedSuccessfully) {
+        // Fallback to STATIC_PRODUCTS
+        const staticProd = STATIC_PRODUCTS.find(p => String(p.id) === String(id));
+        if (staticProd) {
+          let mappedCategory = staticProd.category;
+          if (staticProd.category === 'Electronics' || staticProd.category === 'tech') mappedCategory = 'Tech';
+          else if (staticProd.category === 'Fitness' || staticProd.category === 'Furniture' || staticProd.category === 'lifestyle') mappedCategory = 'Lifestyle';
+
+          setProduct({
+            id: staticProd.id,
+            name: staticProd.name,
+            brand: staticProd.brand || (typeof staticProd.seller === 'string' ? staticProd.seller : 'Emahu Brand'),
+            category: mappedCategory,
+            price: staticProd.price,
+            original: staticProd.originalPrice || staticProd.price,
+            discount: staticProd.originalPrice ? Math.round(((staticProd.originalPrice - staticProd.price) / staticProd.originalPrice) * 100) : 0,
+            rating: staticProd.rating || 4.7,
+            reviews: staticProd.reviews || 84,
+            imgs: staticProd.image && staticProd.image.startsWith('http') ? [staticProd.image] : [],
+            imageEmoji: (!staticProd.image || !staticProd.image.startsWith('http')) ? staticProd.image : null,
+            colors: [],
+            sizes: [],
+            desc: staticProd.desc || 'Premium quality product listing verified by EMAHU.',
+            stock: 10,
+            status: 'in-stock',
+            specs: [
+              ['Category', staticProd.category],
+              ['Available Inventory', '10 units'],
+              ['Status', 'In Stock'],
+              ['Seller Name', typeof staticProd.seller === 'string' ? staticProd.seller : 'Authorized Merchant']
+            ],
+            verified: true,
+            isHot: false,
+            onSale: staticProd.originalPrice ? (staticProd.price < staticProd.originalPrice) : false,
+            seller: typeof staticProd.seller === 'string' ? { name: staticProd.seller, id: 'static-seller-' + staticProd.id } : staticProd.seller
+          });
+        }
+      }
+      setLoading(false);
     };
     fetchDbProduct();
   }, [id]);

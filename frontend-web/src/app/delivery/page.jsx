@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import Link from 'next/link';
 import './delivery.css'; // Premium logistics landing page styles
+import { registerUser } from '@/utils/auth';
 
 /**
  * Enterprise Logistics & Delivery Partner Landing Page ("Main Page")
@@ -20,9 +21,12 @@ export default function DeliveryLandingPage() {
 
   // --- Registration States ---
   const [deliveryName, setDeliveryName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [operatingLocation, setOperatingLocation] = useState('');
-  const [perItemCharge, setPerItemCharge] = useState('2.50');
+  const [perItemCharge, setPerItemCharge] = useState('80');
+  const [deliveryScope, setDeliveryScope] = useState('local');
   const [dispatchNotes, setDispatchNotes] = useState('');
 
   const [errors, setErrors] = useState({});
@@ -68,6 +72,19 @@ export default function DeliveryLandingPage() {
       newErrors.deliveryName = 'Name must be at least 3 characters';
     }
 
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*\.\w{2,3}$/;
+    if (!email.trim()) {
+      newErrors.email = 'Email address is required';
+    } else if (!emailRegex.test(email.trim())) {
+      newErrors.email = 'Enter a valid email address';
+    }
+
+    if (!password) {
+      newErrors.password = 'Password is required';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
     const phoneRegex = /^[+]?[0-9\s\-()]{7,15}$/;
     if (!phoneNumber.trim()) {
       newErrors.phoneNumber = 'Phone number is required for dispatch alerts';
@@ -84,7 +101,7 @@ export default function DeliveryLandingPage() {
     } else {
       const chargeVal = parseFloat(perItemCharge);
       if (isNaN(chargeVal) || chargeVal <= 0) {
-        newErrors.perItemCharge = 'Enter a valid rate greater than $0';
+        newErrors.perItemCharge = 'Enter a valid rate greater than 0';
       }
     }
 
@@ -92,15 +109,45 @@ export default function DeliveryLandingPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     setLoading(true);
-    setTimeout(() => {
+    setErrors({});
+
+    let city = '';
+    let state = '';
+    if (operatingLocation.includes(',')) {
+      const parts = operatingLocation.split(',');
+      city = parts[0].trim();
+      state = parts[1].trim();
+    } else {
+      city = operatingLocation.trim();
+      state = operatingLocation.trim();
+    }
+
+    try {
+      await registerUser({
+        name: deliveryName,
+        email: email.trim(),
+        password: password,
+        role: 'delivery',
+        phone: phoneNumber.trim(),
+        address: operatingLocation,
+        city: city,
+        state: state,
+        perItemCharge: parseFloat(perItemCharge),
+        deliveryScope: deliveryScope,
+        operatingLocation: operatingLocation,
+        dispatchNotes: dispatchNotes
+      });
       setLoading(false);
       setSubmitted(true);
-    }, 1500);
+    } catch (err) {
+      setLoading(false);
+      setErrors({ apiError: err.message || 'Registration failed' });
+    }
   };
 
   return (
@@ -234,6 +281,11 @@ export default function DeliveryLandingPage() {
           <div className="form-card-wrapper">
             {!submitted ? (
               <form className="lp-form" onSubmit={handleSubmit} noValidate>
+                {errors.apiError && (
+                  <div style={{ padding: '12px 16px', backgroundColor: 'rgba(220, 38, 38, 0.15)', border: '1px solid #dc2626', borderRadius: '8px', color: '#f87171', marginBottom: '20px', fontSize: '0.9rem', textAlign: 'center' }}>
+                    ⚠️ {errors.apiError}
+                  </div>
+                )}
                 <div className="form-grid">
                   
                   {/* Driver/Agency Name */}
@@ -270,6 +322,42 @@ export default function DeliveryLandingPage() {
                       disabled={loading}
                     />
                     {errors.phoneNumber && <span className="form-error">{errors.phoneNumber}</span>}
+                  </div>
+
+                  {/* Email */}
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="email">Email Address</label>
+                    <input 
+                      type="email" 
+                      id="email"
+                      className={`form-input ${errors.email ? 'form-input--error' : ''}`}
+                      placeholder="e.g. partner@emahu.com"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (errors.email) setErrors({ ...errors, email: '' });
+                      }}
+                      disabled={loading}
+                    />
+                    {errors.email && <span className="form-error">{errors.email}</span>}
+                  </div>
+
+                  {/* Password */}
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="password">Password</label>
+                    <input 
+                      type="password" 
+                      id="password"
+                      className={`form-input ${errors.password ? 'form-input--error' : ''}`}
+                      placeholder="Min. 6 characters"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (errors.password) setErrors({ ...errors, password: '' });
+                      }}
+                      disabled={loading}
+                    />
+                    {errors.password && <span className="form-error">{errors.password}</span>}
                   </div>
 
                   {/* Searchable Hub Location Dropdown */}
@@ -325,18 +413,34 @@ export default function DeliveryLandingPage() {
                     {errors.operatingLocation && <span className="form-error">{errors.operatingLocation}</span>}
                   </div>
 
+                  {/* Delivery Scope */}
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="deliveryScope">Delivery Scope</label>
+                    <select 
+                      id="deliveryScope"
+                      className="form-input"
+                      style={{ height: '46px', cursor: 'pointer', appearance: 'auto', backgroundColor: '#1e1e24', color: '#fff' }}
+                      value={deliveryScope}
+                      onChange={(e) => setDeliveryScope(e.target.value)}
+                      disabled={loading}
+                    >
+                      <option value="local">Same City (Local)</option>
+                      <option value="interstate">State to State (Interstate)</option>
+                    </select>
+                  </div>
+
                   {/* Rate Per KM */}
                   <div className="form-group">
-                    <label className="form-label" htmlFor="perItemCharge">Custom Rate Per KM ($ / km)</label>
+                    <label className="form-label" htmlFor="perItemCharge">Custom Rate Per KM (₹ / km)</label>
                     <div className="form-input-group">
-                      <span className="form-input-prefix">$</span>
+                      <span className="form-input-prefix">₹</span>
                       <input 
                         type="number" 
-                        step="0.01"
-                        min="0.10"
+                        step="1"
+                        min="1"
                         id="perItemCharge"
                         className={`form-input form-input--has-prefix ${errors.perItemCharge ? 'form-input--error' : ''}`}
-                        placeholder="2.50"
+                        placeholder="80"
                         value={perItemCharge}
                         onChange={(e) => {
                           setPerItemCharge(e.target.value);
@@ -377,19 +481,26 @@ export default function DeliveryLandingPage() {
             ) : (
               /* ================= SUCCESS PROFILE INVOICE CARD ================= */
               <div className="lp-success-card">
-                <div className="success-badge">✓</div>
-                <h2 className="success-title">Profile Registered Successfully!</h2>
-                <p className="success-subtitle">Your dispatcher onboarding configuration is active on the EMAHU Logistics network.</p>
+                <div className="success-badge" style={{ backgroundColor: 'orange' }}>⏳</div>
+                <h2 className="success-title">Onboarding Registration Submitted!</h2>
+                <p className="success-subtitle" style={{ color: '#cbd5e1' }}>
+                  Your profile has been created successfully and is **pending administrative approval**. 
+                  Once our central team approves your application, you will be active on the logistics grid.
+                </p>
 
                 <div className="success-ticket">
                   <div className="ticket-header">
-                    <span>Active Partner Profile</span>
-                    <span className="ticket-status">ACTIVE</span>
+                    <span>Partner Registration Details</span>
+                    <span className="ticket-status" style={{ backgroundColor: '#b45309', color: '#fef3c7' }}>PENDING REVIEW</span>
                   </div>
                   <div className="ticket-body">
                     <div className="ticket-row">
                       <span className="ticket-label">Fleet/Driver Name</span>
                       <span className="ticket-val">{deliveryName}</span>
+                    </div>
+                    <div className="ticket-row">
+                      <span className="ticket-label">Email Address</span>
+                      <span className="ticket-val">{email}</span>
                     </div>
                     <div className="ticket-row">
                       <span className="ticket-label">Contact Phone</span>
@@ -400,8 +511,12 @@ export default function DeliveryLandingPage() {
                       <span className="ticket-val ticket-val--teal">{operatingLocation}</span>
                     </div>
                     <div className="ticket-row">
+                      <span className="ticket-label">Scope</span>
+                      <span className="ticket-val" style={{ textTransform: 'capitalize' }}>{deliveryScope}</span>
+                    </div>
+                    <div className="ticket-row">
                       <span className="ticket-label">Custom rate per KM</span>
-                      <span className="ticket-val ticket-val--teal">${parseFloat(perItemCharge).toFixed(2)} / km</span>
+                      <span className="ticket-val ticket-val--teal">₹{parseFloat(perItemCharge).toFixed(2)} / km</span>
                     </div>
                     {dispatchNotes.trim() && (
                       <div className="ticket-row ticket-row--vertical">

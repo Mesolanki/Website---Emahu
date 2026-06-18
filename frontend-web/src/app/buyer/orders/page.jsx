@@ -454,23 +454,41 @@ export default function OrdersPage() {
                     </div>
 
                     {/* Delivery details if exist */}
-                    {ord.deliveryAddress && (
-                      <div className="order-card-delivery">
-                        <h4 className="delivery-card-title">🔐 Destination & Transit Guarantee</h4>
-                        <div className="delivery-info-grid">
-                          <div>
-                            <span>Recipient</span>
-                            <strong>{ord.deliveryAddress.fullName} ({ord.deliveryAddress.phone})</strong>
-                          </div>
-                          <div>
-                            <span>Shipping Route</span>
-                            <strong style={{ textTransform: 'capitalize' }}>Emahu EV Priority {ord.shippingSpeed || 'Express'} Speed</strong>
-                          </div>
-                          <div className="grid-full-width">
-                            <span>Secured Address</span>
-                            <strong>{ord.deliveryAddress.address}, {ord.deliveryAddress.city}, {ord.deliveryAddress.stateName} - {ord.deliveryAddress.pincode}</strong>
+                    {ord.deliveryAddress && (() => {
+                      const totalDistance = ord.ordersList.reduce((sum, o) => sum + (o.distanceKm || 0), 0);
+                      const totalDeliveryCharge = ord.ordersList.reduce((sum, o) => sum + (o.deliveryCharge || 0), 0);
+                      return (
+                        <div className="order-card-delivery">
+                          <h4 className="delivery-card-title">🔐 Destination & Transit Guarantee</h4>
+                          <div className="delivery-info-grid">
+                            <div>
+                              <span>Recipient</span>
+                              <strong>{ord.deliveryAddress.fullName} ({ord.deliveryAddress.phone})</strong>
+                            </div>
+                            <div>
+                              <span>Shipping Route</span>
+                              <strong style={{ textTransform: 'capitalize' }}>Emahu EV Priority {ord.shippingSpeed || 'Express'} Speed</strong>
+                            </div>
+                            {totalDistance > 0 && (
+                              <div>
+                                <span>Calculated Distance</span>
+                                <strong>{totalDistance.toFixed(2)} KM</strong>
+                              </div>
+                            )}
+                            {totalDeliveryCharge > 0 && (
+                              <div>
+                                <span>Delivery Fee Paid</span>
+                                <strong style={{ color: '#16a34a' }}>₹{totalDeliveryCharge}</strong>
+                              </div>
+                            )}
+                            <div className="grid-full-width">
+                              <span>Secured Address</span>
+                              <strong>{ord.deliveryAddress.address}, {ord.deliveryAddress.city}, {ord.deliveryAddress.stateName} - {ord.deliveryAddress.pincode}</strong>
+                            </div>
                           </div>
                         </div>
+                      );
+                    })()}
 
                         <div className="delivery-info-grid" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1' }}>
                           <div className="grid-full-width">
@@ -487,9 +505,7 @@ export default function OrdersPage() {
                               ))}
                             </div>
                           </div>
-                        </div>
                       </div>
-                    )}
                   </div>
 
                   {/* Escrow assurance operations */}
