@@ -60,6 +60,10 @@ export default function SellerLogin() {
 
   const handleGoogleSignIn = () => triggerGoogleSignIn();
 
+  const handleAppleSignIn = () => {
+    setError('Apple Sign-In is not supported yet.');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {
