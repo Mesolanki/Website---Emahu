@@ -4675,9 +4675,9 @@ export default function EmahuProDashboard() {
               ) : (
                 availablePartners.map((partner) => {
                   const order = orders.find(o => o.id === selectedOrderId);
-                  const buyerAddr = order ? (order.deliveryAddress?.address || order.buyerLocation?.address || '') : '';
-                  const sellerAddr = order ? (order.sellerLocation?.address || '') : '';
-                  const messageText = `Hello! I am a seller on Emahu. I want to assign you to deliver Order #${selectedOrderId}.\n\nPickup address: ${sellerAddr}\nDrop address: ${buyerAddr}\nDistance: ${order?.distanceKm || 0} KM\nEstimated charge: ₹${partner.totalCost}.\n\nPlease confirm if you can take this order.`;
+                  const buyerAddr = order ? (order.raw?.deliveryAddress?.address || order.raw?.buyerLocation?.address || '') : '';
+                  const sellerAddr = order ? (order.raw?.sellerLocation?.address || '') : '';
+                  const messageText = `Hello! I am a seller on Emahu. I want to assign you to deliver Order #${selectedOrderId}.\n\nPickup address: ${sellerAddr}\nDrop address: ${buyerAddr}\nDistance: ${order?.raw?.distanceKm || 0} KM\nEstimated charge: ₹${partner.totalCost}.\n\nPlease confirm if you can take this order.`;
                   const whatsappUrl = `https://wa.me/${partner.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(messageText)}`;
                   const isSelected = selectedPartnerId === partner._id;
 
