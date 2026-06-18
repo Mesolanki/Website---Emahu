@@ -80,7 +80,7 @@ export default function DeliveryPortal() {
     if (!userToken) return;
     setDashLoading(true);
     try {
-      const res = await fetch('/api/delivery/my-orders', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/my-orders`, {
         headers: {
           'Authorization': `Bearer ${userToken}`
         }
@@ -233,7 +233,7 @@ export default function DeliveryPortal() {
   const handleUpdateJobStatus = async (orderId, newStatus) => {
     if (!token) return;
     try {
-      const res = await fetch('/api/delivery/status', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -262,7 +262,7 @@ export default function DeliveryPortal() {
     e.preventDefault();
     setProfileSuccessMsg('');
     try {
-      const res = await fetch('/api/delivery/profile', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -300,7 +300,7 @@ export default function DeliveryPortal() {
     if (!token || !user) return;
     const newActiveState = !user.isActivePartner;
     try {
-      const res = await fetch('/api/delivery/profile', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

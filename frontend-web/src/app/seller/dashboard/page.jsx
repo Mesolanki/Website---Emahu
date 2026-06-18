@@ -185,7 +185,7 @@ export default function EmahuProDashboard() {
     setAvailablePartnersError('');
     try {
       const token = localStorage.getItem('emahu_seller_token');
-      const res = await fetch(`/api/delivery/available-partners/${orderId}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/available-partners/${orderId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1331,7 +1331,7 @@ export default function EmahuProDashboard() {
       setOrderLoading(prev => ({ ...prev, [orderId]: true }));
       const token = localStorage.getItem('emahu_seller_token');
       
-      const res = await fetch('/api/delivery/assign', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/assign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
