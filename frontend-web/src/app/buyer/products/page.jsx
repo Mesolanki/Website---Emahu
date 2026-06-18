@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import './products.css';
@@ -33,6 +34,24 @@ function Stars({ rating }) {
 }
 
 export default function ProductsPage() {
+  const router = useRouter();
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  useEffect(() => {
+    setIsUserLoggedIn(!!localStorage.getItem('emahu_buyer_token'));
+    if (typeof window !== 'undefined') {
+      setIsOffline(!navigator.onLine);
+      const goOnline = () => setIsOffline(false);
+      const goOffline = () => setIsOffline(true);
+      window.addEventListener('online', goOnline);
+      window.addEventListener('offline', goOffline);
+      return () => {
+        window.removeEventListener('online', goOnline);
+        window.removeEventListener('offline', goOffline);
+      };
+    }
+  }, []);
+
   const [category, setCategory]         = useState('All');
   const [sortBy, setSortBy]             = useState('popular');
   const [maxPrice, setMaxPrice]         = useState(160000);
@@ -120,6 +139,10 @@ export default function ProductsPage() {
   const addToCart = (e, id) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!isUserLoggedIn) {
+      router.push('/buyer/login');
+      return;
+    }
     if (cartAdded.includes(id)) return;
     
     setCartAdded(prev => [...prev, id]);
@@ -153,6 +176,10 @@ export default function ProductsPage() {
   const toggleBrand = b =>
     setBrands(p => p.includes(b) ? p.filter(x => x !== b) : [...p, b]);
   const toggleWishlist = id => {
+    if (!isUserLoggedIn) {
+      router.push('/buyer/login');
+      return;
+    }
     const next = wishlist.includes(id) ? wishlist.filter(x => x !== id) : [...wishlist, id];
     setWishlist(next);
     try {
@@ -389,8 +416,15 @@ export default function ProductsPage() {
         {/* ── MAIN ── */}
         <main className="bp-main">
 
+          {/* Offline Warning Banner */}
+          {isOffline && (
+            <div style={{ padding: '12px 16px', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>⚠️ No internet connection detected. Displaying offline YouTube-style skeleton grids.</span>
+            </div>
+          )}
+
           {/* Active filter tags */}
-          {activeTags.length > 0 && (
+          {activeTags.length > 0 && !isOffline && (
             <div className="bp-active-tags">
               {activeTags.map((tag, i) => (
                 <button key={i} className="bp-active-tag" onClick={tag.clear}>
@@ -404,7 +438,72 @@ export default function ProductsPage() {
 
           {/* Grid */}
           <div className={`bp-grid ${viewMode==='list' ? 'bp-grid--list' : ''}`}>
-            {paged.length === 0 ? (
+            {isOffline ? (
+              <>
+                <style>{`
+                  @keyframes skeleton-pulse {
+                    0% { opacity: 0.6; }
+                    50% { opacity: 1; }
+                    100% { opacity: 0.6; }
+                  }
+                  .sk-pulse {
+                    animation: skeleton-pulse 1.5s infinite ease-in-out;
+                    background-color: rgba(255, 255, 255, 0.08);
+                    border-radius: 8px;
+                  }
+                  .sk-card {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    padding: 16px;
+                    background: rgba(255, 255, 255, 0.02);
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    border-radius: 12px;
+                  }
+                  .sk-thumb {
+                    width: 100%;
+                    aspect-ratio: 16/10;
+                  }
+                  .sk-row {
+                    display: flex;
+                    gap: 12px;
+                    align-items: flex-start;
+                  }
+                  .sk-avatar {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    flex-shrink: 0;
+                  }
+                  .sk-text-container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    width: 100%;
+                  }
+                  .sk-title {
+                    height: 14px;
+                    width: 80%;
+                  }
+                  .sk-sub {
+                    height: 10px;
+                    width: 50%;
+                  }
+                `}</style>
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <div key={n} className="sk-card">
+                    <div className="sk-pulse sk-thumb" />
+                    <div className="sk-row">
+                      <div className="sk-pulse sk-avatar" />
+                      <div className="sk-text-container">
+                        <div className="sk-pulse sk-title" />
+                        <div className="sk-pulse sk-sub" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : paged.length === 0 ? (
               <div className="bp-empty">
                 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
                   <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>

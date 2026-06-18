@@ -29,6 +29,40 @@ export default function AdminDashboard() {
   const [deliveryPartnersError, setDeliveryPartnersError] = useState(false);
   const [selectedDetailPartner, setSelectedDetailPartner] = useState(null);
 
+  // Delivery Settings states
+  const [deliverySettings, setDeliverySettings] = useState({ slabs: [] });
+  const [loadingSettings, setLoadingSettings] = useState(false);
+  const [newSlabFrom, setNewSlabFrom] = useState('');
+  const [newSlabTo, setNewSlabTo] = useState('');
+  const [newSlabCharge, setNewSlabCharge] = useState('');
+
+  // Add Partner form states
+  const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
+  const [newPartnerName, setNewPartnerName] = useState('');
+  const [newPartnerEmail, setNewPartnerEmail] = useState('');
+  const [newPartnerPassword, setNewPartnerPassword] = useState('');
+  const [newPartnerPhone, setNewPartnerPhone] = useState('');
+  const [newPartnerCity, setNewPartnerCity] = useState('Ahmedabad');
+  const [newPartnerArea, setNewPartnerArea] = useState('Gota');
+  const [newPartnerPincode, setNewPartnerPincode] = useState('382481');
+  const [newPartnerRadius, setNewPartnerRadius] = useState('15');
+  const [newPartnerRate, setNewPartnerRate] = useState('10');
+  const [newPartnerVehicleType, setNewPartnerVehicleType] = useState('bike');
+  const [newPartnerVehicleNumber, setNewPartnerVehicleNumber] = useState('');
+  const [newPartnerLat, setNewPartnerLat] = useState('23.0225');
+  const [newPartnerLon, setNewPartnerLon] = useState('72.5714');
+  const [newPartnerLoading, setNewPartnerLoading] = useState(false);
+
+  // Edit Partner states inside detail modal
+  const [editPartnerRate, setEditPartnerRate] = useState('');
+  const [editPartnerRadius, setEditPartnerRadius] = useState('');
+  const [editPartnerCity, setEditPartnerCity] = useState('');
+  const [editPartnerArea, setEditPartnerArea] = useState('');
+  const [editPartnerPincode, setEditPartnerPincode] = useState('');
+  const [editPartnerVehicleType, setEditPartnerVehicleType] = useState('');
+  const [editPartnerVehicleNumber, setEditPartnerVehicleNumber] = useState('');
+  const [editPartnerIsActive, setEditPartnerIsActive] = useState(true);
+
   // Notifications states
   const [notifications, setNotifications] = useState([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
@@ -713,10 +747,176 @@ export default function AdminDashboard() {
       setTimeout(() => fetchOrders(), 0);
     } else if (activeTab === 'delivery-partners') {
       setTimeout(() => fetchDeliveryPartners(), 0);
+    } else if (activeTab === 'settings') {
+      setTimeout(() => fetchDeliverySettings(), 0);
     } else if (activeTab === 'notifications') {
       setTimeout(() => fetchNotifications(), 0);
     }
   }, [isAuthorized, activeTab]);
+
+  useEffect(() => {
+    if (selectedDetailPartner) {
+      setEditPartnerRate(selectedDetailPartner.perItemCharge || '10');
+      setEditPartnerRadius(selectedDetailPartner.serviceRadius || '15');
+      setEditPartnerCity(selectedDetailPartner.currentCity || selectedDetailPartner.city || 'Ahmedabad');
+      setEditPartnerArea(selectedDetailPartner.currentArea || selectedDetailPartner.address || 'Gota');
+      setEditPartnerPincode(selectedDetailPartner.pincode || '');
+      setEditPartnerVehicleType(selectedDetailPartner.vehicleType || 'bike');
+      setEditPartnerVehicleNumber(selectedDetailPartner.vehicleNumber || '');
+      setEditPartnerIsActive(selectedDetailPartner.isActivePartner !== false);
+    }
+  }, [selectedDetailPartner]);
+
+  const fetchDeliverySettings = async () => {
+    setLoadingSettings(true);
+    try {
+      const res = await fetch('/api/delivery/settings');
+      const data = await res.json();
+      if (data.success) {
+        setDeliverySettings(data.settings || { slabs: [] });
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to fetch delivery settings', 'danger');
+    } finally {
+      setLoadingSettings(false);
+    }
+  };
+
+  const handleSaveDeliverySettings = async (updatedSettings) => {
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      const res = await fetch('/api/delivery/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updatedSettings)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDeliverySettings(data.settings);
+        triggerToast('Success', 'Delivery settings updated successfully', 'success');
+      } else {
+        triggerToast('Error', data.error || 'Failed to update settings', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to update delivery settings', 'danger');
+    }
+  };
+
+  const handleAddSlab = () => {
+    if (!newSlabFrom || !newSlabTo || !newSlabCharge) {
+      alert('Please fill out all slab fields');
+      return;
+    }
+    const updatedSlabs = [...(deliverySettings.slabs || []), {
+      fromKm: Number(newSlabFrom),
+      toKm: Number(newSlabTo),
+      charge: Number(newSlabCharge)
+    }];
+    const updatedSettings = { ...deliverySettings, slabs: updatedSlabs };
+    handleSaveDeliverySettings(updatedSettings);
+    setNewSlabFrom('');
+    setNewSlabTo('');
+    setNewSlabCharge('');
+  };
+
+  const handleDeleteSlab = (indexToDelete) => {
+    const updatedSlabs = (deliverySettings.slabs || []).filter((_, idx) => idx !== indexToDelete);
+    const updatedSettings = { ...deliverySettings, slabs: updatedSlabs };
+    handleSaveDeliverySettings(updatedSettings);
+  };
+
+  const handleAddPartnerSubmit = async (e) => {
+    e.preventDefault();
+    if (!newPartnerName || !newPartnerEmail || !newPartnerPassword || !newPartnerPhone) {
+      alert('Please fill Name, Email, Password, and Mobile Number');
+      return;
+    }
+    setNewPartnerLoading(true);
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      const res = await fetch('/api/delivery/partners', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: newPartnerName,
+          email: newPartnerEmail,
+          password: newPartnerPassword,
+          phone: newPartnerPhone,
+          operatingLocation: `${newPartnerArea}, ${newPartnerCity}`,
+          currentCity: newPartnerCity,
+          currentArea: newPartnerArea,
+          pincode: newPartnerPincode,
+          serviceRadius: parseFloat(newPartnerRadius),
+          perItemCharge: parseFloat(newPartnerRate),
+          vehicleType: newPartnerVehicleType,
+          vehicleNumber: newPartnerVehicleNumber,
+          latitude: parseFloat(newPartnerLat),
+          longitude: parseFloat(newPartnerLon)
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        triggerToast('Success', 'Delivery partner added successfully', 'success');
+        setIsAddPartnerOpen(false);
+        setNewPartnerName('');
+        setNewPartnerEmail('');
+        setNewPartnerPassword('');
+        setNewPartnerPhone('');
+        setNewPartnerVehicleNumber('');
+        fetchDeliveryPartners();
+      } else {
+        triggerToast('Error', data.error || 'Failed to create partner', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to add delivery partner', 'danger');
+    } finally {
+      setNewPartnerLoading(false);
+    }
+  };
+
+  const handleSavePartnerChanges = async (partnerId) => {
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      const res = await fetch(`/api/delivery/partners/${partnerId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          perItemCharge: parseFloat(editPartnerRate),
+          serviceRadius: parseFloat(editPartnerRadius),
+          currentCity: editPartnerCity,
+          currentArea: editPartnerArea,
+          pincode: editPartnerPincode,
+          vehicleType: editPartnerVehicleType,
+          vehicleNumber: editPartnerVehicleNumber,
+          isActivePartner: editPartnerIsActive,
+          operatingLocation: `${editPartnerArea}, ${editPartnerCity}`
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        triggerToast('Success', 'Partner details updated successfully', 'success');
+        setSelectedDetailPartner(null);
+        fetchDeliveryPartners();
+      } else {
+        triggerToast('Error', data.error || 'Failed to update partner', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to update partner details', 'danger');
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -905,10 +1105,7 @@ export default function AdminDashboard() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Premium Delivery Partner Detail Drawer/Modal */}
+            {/* Premium Delivery Partner Detail Drawer/Modal */}
       {selectedDetailPartner && (
         <div className="ad-modal-overlay" onClick={() => setSelectedDetailPartner(null)}>
           <div className="ad-detail-modal" onClick={(e) => e.stopPropagation()}>
@@ -931,42 +1128,104 @@ export default function AdminDashboard() {
             <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', minHeight: '300px', display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
               <div className="ad-detail-info-grid">
                 <div className="ad-detail-info-section">
-                  <h4>Fleet Parameters</h4>
-                  <div className="ad-detail-row">
-                    <span className="ad-detail-row-label">Agency / Driver Name</span>
-                    <span className="ad-detail-row-val">{selectedDetailPartner.name}</span>
+                  <h4>Edit Fleet Parameters</h4>
+                  
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Rate Per KM (₹)</label>
+                    <input 
+                      type="number" 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={editPartnerRate} 
+                      onChange={(e) => setEditPartnerRate(e.target.value)} 
+                    />
                   </div>
-                  <div className="ad-detail-row">
-                    <span className="ad-detail-row-label">Operating Location Hub</span>
-                    <span className="ad-detail-row-val">{selectedDetailPartner.operatingLocation}</span>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Service Radius (KM)</label>
+                    <input 
+                      type="number" 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={editPartnerRadius} 
+                      onChange={(e) => setEditPartnerRadius(e.target.value)} 
+                    />
                   </div>
-                  <div className="ad-detail-row">
-                    <span className="ad-detail-row-label">Custom rate per KM</span>
-                    <span className="ad-detail-row-val" style={{ color: '#10b981', fontWeight: 'bold' }}>
-                      ₹{selectedDetailPartner.perItemCharge || '0.00'}/km
-                    </span>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Vehicle Type</label>
+                    <select 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                      value={editPartnerVehicleType} 
+                      onChange={(e) => setEditPartnerVehicleType(e.target.value)}
+                    >
+                      <option value="bike">Bike</option>
+                      <option value="scooter">Scooter</option>
+                      <option value="car">Car</option>
+                      <option value="truck">Truck</option>
+                      <option value="other">Other</option>
+                    </select>
                   </div>
-                  <div className="ad-detail-row">
-                    <span className="ad-detail-row-label">Delivery Scope</span>
-                    <span className="ad-detail-row-val" style={{ textTransform: 'capitalize' }}>
-                      {selectedDetailPartner.deliveryScope === 'local' ? 'Local Same-City' : 'State-to-State'}
-                    </span>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Vehicle Number</label>
+                    <input 
+                      type="text" 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={editPartnerVehicleNumber} 
+                      onChange={(e) => setEditPartnerVehicleNumber(e.target.value)} 
+                    />
                   </div>
                 </div>
 
                 <div className="ad-detail-info-section">
-                  <h4>Compliance Information</h4>
-                  <div className="ad-detail-row">
-                    <span className="ad-detail-row-label">Registered Email</span>
-                    <span className="ad-detail-row-val">{selectedDetailPartner.email}</span>
+                  <h4>Edit Service Territory</h4>
+                  
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Service City</label>
+                    <input 
+                      type="text" 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={editPartnerCity} 
+                      onChange={(e) => setEditPartnerCity(e.target.value)} 
+                    />
                   </div>
-                  <div className="ad-detail-row">
-                    <span className="ad-detail-row-label">Registered Phone</span>
-                    <span className="ad-detail-row-val">{selectedDetailPartner.phone}</span>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Service Area</label>
+                    <input 
+                      type="text" 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={editPartnerArea} 
+                      onChange={(e) => setEditPartnerArea(e.target.value)} 
+                    />
                   </div>
-                  <div className="ad-detail-row">
-                    <span className="ad-detail-row-label">Verification Standing</span>
-                    <span className="ad-detail-row-val">{selectedDetailPartner.status}</span>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Pincode</label>
+                    <input 
+                      type="text" 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={editPartnerPincode} 
+                      onChange={(e) => setEditPartnerPincode(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px' }}>
+                    <input 
+                      type="checkbox" 
+                      id="editPartnerIsActive"
+                      checked={editPartnerIsActive} 
+                      onChange={(e) => setEditPartnerIsActive(e.target.checked)} 
+                    />
+                    <label htmlFor="editPartnerIsActive" style={{ fontSize: '0.85rem', color: '#fff', cursor: 'pointer' }}>
+                      Carrier Active & Available for Orders
+                    </label>
                   </div>
                 </div>
               </div>
@@ -982,11 +1241,19 @@ export default function AdminDashboard() {
             </div>
 
             <div className="ad-detail-decision-bar" style={{ marginTop: '20px' }}>
+              <button
+                className="ad-btn-action approve"
+                style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem' }}
+                onClick={() => handleSavePartnerChanges(selectedDetailPartner._id)}
+              >
+                Save Settings Changes
+              </button>
+
               {selectedDetailPartner.status === 'pending' ? (
                 <>
                   <button
                     className="ad-btn-action approve"
-                    style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem' }}
+                    style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem', background: '#3182ce' }}
                     onClick={() => {
                       handleDeliveryPartnerDecision(selectedDetailPartner._id, 'approve');
                     }}
@@ -1029,7 +1296,7 @@ export default function AdminDashboard() {
                 </button>
               )}
               <button className="ad-btn-sec" style={{ height: '42px', padding: '0 20px', fontSize: '0.9rem' }} onClick={() => setSelectedDetailPartner(null)}>
-                Close Profile
+                Cancel
               </button>
             </div>
           </div>

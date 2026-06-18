@@ -115,6 +115,40 @@ const userSchema = new mongoose.Schema(
       enum: ['pending', 'approved', 'rejected', 'more_info_requested'],
       default: 'approved'
     },
+    vehicleType: {
+      type: String,
+      enum: ['bike', 'scooter', 'car', 'truck', 'other'],
+      default: 'bike'
+    },
+    vehicleNumber: {
+      type: String,
+      trim: true
+    },
+    profilePhoto: {
+      type: String,
+      trim: true,
+      default: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80'
+    },
+    isActivePartner: {
+      type: Boolean,
+      default: true
+    },
+    currentCity: {
+      type: String,
+      trim: true
+    },
+    currentArea: {
+      type: String,
+      trim: true
+    },
+    pincode: {
+      type: String,
+      trim: true
+    },
+    serviceRadius: {
+      type: Number,
+      default: 15
+    },
     verificationFeedback: {
       type: String,
       default: ''

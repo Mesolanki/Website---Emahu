@@ -96,6 +96,33 @@ const server = app.listen(PORT, () => {
   );
 });
 
+// Integrate Socket.io for Real-time delivery tracking
+const { Server } = require('socket.io');
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true
+  }
+});
+
+// Attach socketio instance to Express app context
+app.set('socketio', io);
+
+io.on('connection', (socket) => {
+  console.log('Client connected to WebSockets:', socket.id);
+  
+  // Client can join a specific order room to receive granular updates
+  socket.on('join-order', (orderId) => {
+    socket.join(orderId);
+    console.log(`Socket ${socket.id} joined order room: ${orderId}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+
 // Handle unhandled promise rejections safely
 process.on('unhandledRejection', (err, promise) => {
   console.error(`Unhandled Promise Rejection Error: ${err.message}`);

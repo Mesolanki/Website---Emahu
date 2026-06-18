@@ -173,6 +173,37 @@ export default function EmahuProDashboard() {
   const [inputDocUrl, setInputDocUrl] = useState('');
   const [inlineSubmitting, setInlineSubmitting] = useState(false);
 
+  // Available Delivery Partners State
+  const [availablePartners, setAvailablePartners] = useState([]);
+  const [availablePartnersLoading, setAvailablePartnersLoading] = useState(false);
+  const [availablePartnersError, setAvailablePartnersError] = useState('');
+  const [selectedPartnerId, setSelectedPartnerId] = useState('');
+  const [isConfirmChecked, setIsConfirmChecked] = useState(false);
+
+  const fetchAvailablePartners = async (orderId) => {
+    setAvailablePartnersLoading(true);
+    setAvailablePartnersError('');
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      const res = await fetch(`/api/delivery/available-partners/${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAvailablePartners(data.availablePartners || []);
+      } else {
+        setAvailablePartnersError(data.error || 'Failed to fetch available partners');
+      }
+    } catch (err) {
+      console.error(err);
+      setAvailablePartnersError('Error loading available partners');
+    } finally {
+      setAvailablePartnersLoading(false);
+    }
+  };
+
   const [settingsForm, setSettingsForm] = useState({
     storeName: '',
     phone: '',
@@ -1102,6 +1133,14 @@ export default function EmahuProDashboard() {
     return found ? found.raw : null;
   }, [selectedDetailedOrderId, orders]);
 
+  useEffect(() => {
+    if (isDeliveryModalOpen && selectedOrderId) {
+      fetchAvailablePartners(selectedOrderId);
+      setSelectedPartnerId('');
+      setIsConfirmChecked(false);
+    }
+  }, [isDeliveryModalOpen, selectedOrderId]);
+
   const fetchNotifications = async () => {
     try {
       const token = localStorage.getItem('emahu_seller_token');
@@ -1286,14 +1325,33 @@ export default function EmahuProDashboard() {
     }
   };
 
-  const handleSelectDeliveryPartner = async (orderId, partnerName, estDays, cost) => {
+  const handleSelectDeliveryPartner = async (orderId, partnerId, partnerName, cost) => {
     if (orderLoading[orderId]) return;
     try {
       setOrderLoading(prev => ({ ...prev, [orderId]: true }));
+      const token = localStorage.getItem('emahu_seller_token');
+      
+      const res = await fetch('/api/delivery/assign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId,
+          deliveryPartnerId: partnerId
+        })
+      });
+      
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to assign delivery partner');
+      }
+
+      // Sync local storage so UI updates instantly
       const storedOrders = localStorage.getItem('emahu_orders');
       if (storedOrders) {
         const parsed = JSON.parse(storedOrders);
-        const trackingId = `EMH-TRK-${getRandomNumberStr(100000, 999999)}`;
         const updated = parsed.map(o => {
           if (o.orderId === orderId) {
             const timeline = o.timeline || [];
@@ -1301,7 +1359,7 @@ export default function EmahuProDashboard() {
             filteredTimeline.push({
               status: 'DELIVERY_ASSIGNED',
               label: 'Delivery Assigned',
-              desc: `🚚 Assigned to ${partnerName}. Tracking ID: ${trackingId}`,
+              desc: `🚚 Assigned to ${partnerName}.`,
               date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
             });
             return {
@@ -1309,23 +1367,21 @@ export default function EmahuProDashboard() {
               status: 'DELIVERY_ASSIGNED',
               timeline: filteredTimeline,
               carrier: partnerName,
-              trackingId,
               deliveryCost: cost,
-              estDays: estDays
+              deliveryPartnerId: partnerId,
+              deliveryStatus: 'assigned'
             };
           }
           return o;
         });
         localStorage.setItem('emahu_orders', JSON.stringify(updated));
         window.dispatchEvent(new Event('storage'));
-        pushNotification('Shipment Assigned', `Your shipment for Order #${orderId} has been assigned to ${partnerName}.`, 'buyer');
-        pushNotification('Courier Assigned', `Courier ${partnerName} has been assigned to Order #${orderId}.`, 'seller');
-        triggerToast('Delivery Assigned', `Courier ${partnerName} assigned to Order #${orderId}.`, 'success');
-        await syncOrderToDatabase(orderId, updated);
       }
+      
+      triggerToast('Delivery Assigned', `Courier ${partnerName} assigned to Order #${orderId}.`, 'success');
     } catch (err) {
       console.error(err);
-      triggerToast('Error', 'Failed to assign delivery partner.', 'danger');
+      triggerToast('Error', err.message || 'Failed to assign delivery partner.', 'danger');
     } finally {
       setOrderLoading(prev => ({ ...prev, [orderId]: false }));
     }
@@ -4599,41 +4655,169 @@ export default function EmahuProDashboard() {
               </button>
             </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' }}>
-              {[
-                { name: 'Delhivery', time: '2-4 Days', cost: 80, rating: 4.8 },
-                { name: 'Blue Dart', time: '1-3 Days', cost: 120, rating: 4.9 },
-                { name: 'XpressBees', time: '2-5 Days', cost: 75, rating: 4.6 },
-                { name: 'Ecom Express', time: '3-5 Days', cost: 70, rating: 4.5 }
-              ].map((partner) => (
-                <div 
-                  key={partner.name} 
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px', maxHeight: '400px', overflowY: 'auto' }}>
+              {availablePartnersLoading ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: '#fff' }}>
+                  <div style={{ width: '24px', height: '24px', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
+                  <span>Scanning local city hubs for active carriers...</span>
+                </div>
+              ) : availablePartnersError ? (
+                <div style={{ padding: '12px', color: '#f87171', background: 'rgba(220,38,38,0.1)', border: '1px solid #ef4444', borderRadius: '8px', fontSize: '0.9rem', textAlign: 'center' }}>
+                  ⚠️ {availablePartnersError}
+                </div>
+              ) : availablePartners.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+                  <span style={{ fontSize: '2.5rem' }}>🛵</span>
+                  <p style={{ marginTop: '10px', fontSize: '0.9rem' }}>No active delivery partners found in the buyer's city hub whose service radius covers the shipping address.</p>
+                </div>
+              ) : (
+                availablePartners.map((partner) => {
+                  const order = orders.find(o => o.id === selectedOrderId);
+                  const buyerAddr = order ? (order.deliveryAddress?.address || order.buyerLocation?.address || '') : '';
+                  const sellerAddr = order ? (order.sellerLocation?.address || '') : '';
+                  const messageText = `Hello! I am a seller on Emahu. I want to assign you to deliver Order #${selectedOrderId}.\n\nPickup address: ${sellerAddr}\nDrop address: ${buyerAddr}\nDistance: ${order?.distanceKm || 0} KM\nEstimated charge: ₹${partner.totalCost}.\n\nPlease confirm if you can take this order.`;
+                  const whatsappUrl = `https://wa.me/${partner.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(messageText)}`;
+                  const isSelected = selectedPartnerId === partner._id;
+
+                  return (
+                    <div 
+                      key={partner._id} 
+                      style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        gap: '8px',
+                        padding: '16px', 
+                        borderRadius: '10px', 
+                        backgroundColor: isSelected ? 'rgba(49, 151, 149, 0.08)' : 'rgba(255,255,255,0.03)', 
+                        border: isSelected ? '1px solid #319795' : '1px solid rgba(255,255,255,0.08)',
+                        cursor: orderLoading[selectedOrderId] ? 'not-allowed' : 'pointer',
+                        opacity: orderLoading[selectedOrderId] ? 0.6 : 1,
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={() => {
+                        if (orderLoading[selectedOrderId]) return;
+                        setSelectedPartnerId(partner._id);
+                        setIsConfirmChecked(false);
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <h4 style={{ margin: '0 0 4px 0', color: '#fff', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {partner.name}
+                            {isSelected && <span style={{ color: '#319795', fontSize: '0.8rem' }}>● Selected</span>}
+                          </h4>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            📍 Location: {partner.currentArea}, {partner.currentCity} ({partner.pincode})
+                          </div>
+                          {partner.latitude && partner.longitude && (
+                            <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>🧭 Coordinates: {partner.latitude}, {partner.longitude}</span>
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${partner.latitude},${partner.longitude}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: '#319795', textDecoration: 'underline', fontSize: '0.75rem' }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                View on Map
+                              </a>
+                            </div>
+                          )}
+                          <div style={{ fontSize: '0.78rem', color: '#a0aec0', marginTop: '4px' }}>
+                            Vehicle: {partner.vehicleType?.toUpperCase()} | Radius: {partner.serviceRadius} KM | Rate: ₹{partner.ratePerKm}/KM
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <strong style={{ color: 'var(--color-success)', fontSize: '1.25rem', display: 'block' }}>₹{partner.totalCost}</strong>
+                          <span style={{ fontSize: '0.75rem', color: '#718096' }}>Total Cost</span>
+                        </div>
+                      </div>
+
+                      {/* Direct Contact Buttons */}
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }} onClick={(e) => e.stopPropagation()}>
+                        <a 
+                          href={`tel:${partner.phone}`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            backgroundColor: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            color: '#fff',
+                            fontSize: '0.78rem',
+                            textDecoration: 'none',
+                            transition: 'background-color 0.2s'
+                          }}
+                        >
+                          📞 Call Partner ({partner.phone})
+                        </a>
+                        <a 
+                          href={whatsappUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            backgroundColor: '#25D366',
+                            color: '#fff',
+                            fontSize: '0.78rem',
+                            fontWeight: '600',
+                            textDecoration: 'none',
+                            transition: 'opacity 0.2s'
+                          }}
+                        >
+                          💬 Send WhatsApp Request
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Checkbox Confirmation & Action Button */}
+            {selectedPartnerId && (
+              <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(0,0,0,0.1)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '0.85rem', cursor: 'pointer', marginBottom: '12px' }}>
+                  <input
+                    type="checkbox"
+                    checked={isConfirmChecked}
+                    onChange={(e) => setIsConfirmChecked(e.target.checked)}
+                    style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#319795' }}
+                  />
+                  <span>Confirm to assign <strong>{availablePartners.find(p => p._id === selectedPartnerId)?.name}</strong> for delivery</span>
+                </label>
+                <button
+                  className="form-btn"
                   style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    padding: '16px', 
-                    borderRadius: '10px', 
-                    backgroundColor: 'rgba(255,255,255,0.03)', 
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    cursor: orderLoading[selectedOrderId] ? 'not-allowed' : 'pointer',
-                    opacity: orderLoading[selectedOrderId] ? 0.6 : 1,
-                    transition: 'all 0.2s ease'
+                    width: '100%', 
+                    margin: 0, 
+                    padding: '10px', 
+                    borderRadius: '8px',
+                    backgroundColor: isConfirmChecked ? '#319795' : 'rgba(255,255,255,0.08)', 
+                    cursor: isConfirmChecked ? 'pointer' : 'not-allowed', 
+                    color: isConfirmChecked ? '#fff' : '#4a5568',
+                    border: 'none',
+                    fontWeight: '600'
                   }}
+                  disabled={!isConfirmChecked || orderLoading[selectedOrderId]}
                   onClick={() => {
-                    if (orderLoading[selectedOrderId]) return;
-                    handleSelectDeliveryPartner(selectedOrderId, partner.name, partner.time, partner.cost);
-                    setIsDeliveryModalOpen(false);
+                    const partner = availablePartners.find(p => p._id === selectedPartnerId);
+                    if (partner) {
+                      handleSelectDeliveryPartner(selectedOrderId, partner._id, partner.name, partner.totalCost);
+                      setIsDeliveryModalOpen(false);
+                    }
                   }}
                 >
-                  <div>
-                    <h4 style={{ margin: '0 0 4px 0', color: '#fff', fontSize: '1rem' }}>{partner.name}</h4>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>🕒 Est. delivery: {partner.time} | â­ {partner.rating} Rating</span>
-                  </div>
-                  <strong style={{ color: 'var(--color-success)', fontSize: '1.1rem' }}>₹{partner.cost}</strong>
-                </div>
-              ))}
-            </div>
+                  Approve & Assign Partner
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

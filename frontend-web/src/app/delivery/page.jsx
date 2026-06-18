@@ -1,162 +1,332 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import './delivery.css'; // Premium logistics landing page styles
-import { registerUser } from '@/utils/auth';
+import { io } from 'socket.io-client';
+import './delivery.css'; 
+import { registerUser, loginUser, saveAuthSession, clearAuthSession, checkIsLoggedIn } from '@/utils/auth';
 
-/**
- * Enterprise Logistics & Delivery Partner Landing Page ("Main Page")
- * A high-end single landing page featuring:
- * 1. Premium Header (Navigation, Logo, Active CTA)
- * 2. Visual Hero Grid (Pitch, Taglines, Scroll CTA)
- * 3. Partner Benefits (Value Propositions)
- * 4. Interactive Earnings Calculator (Live drag sliders)
- * 5. Onboarding Registration Form (Searchable Hub dropdown)
- * 6. FAQ Accordions (Interactive drop list)
- * 7. Beautiful Footer
- */
-export default function DeliveryLandingPage() {
+export default function DeliveryPortal() {
   const formSectionRef = useRef(null);
 
-  // --- Registration States ---
+  // --- Session State ---
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [portalMode, setPortalMode] = useState('landing'); // 'landing', 'login', 'dashboard'
+
+  // --- Registration / Onboarding States ---
   const [deliveryName, setDeliveryName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [operatingLocation, setOperatingLocation] = useState('');
-  const [perItemCharge, setPerItemCharge] = useState('80');
-  const [deliveryScope, setDeliveryScope] = useState('local');
+  const [currentCity, setCurrentCity] = useState('Ahmedabad');
+  const [currentArea, setCurrentArea] = useState('Gota');
+  const [pincode, setPincode] = useState('382481');
+  const [serviceRadius, setServiceRadius] = useState('20');
+  const [perItemCharge, setPerItemCharge] = useState('10'); // Rate per KM
+  const [vehicleType, setVehicleType] = useState('bike');
+  const [vehicleNumber, setVehicleNumber] = useState('');
+  const [latitude, setLatitude] = useState('23.0225');
+  const [longitude, setLongitude] = useState('72.5714');
   const [dispatchNotes, setDispatchNotes] = useState('');
 
   const [errors, setErrors] = useState({});
-  const [showDropdown, setShowDropdown] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // --- Login States ---
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
 
-  // --- FAQ Accordion States ---
-  const [activeFaq, setActiveFaq] = useState(null);
+  // --- Dashboard States ---
+  const [orders, setOrders] = useState([]);
+  const [stats, setStats] = useState({ total: 0, pending: 0, earnings: 0 });
+  const [dashLoading, setDashLoading] = useState(false);
+  const [editProfileMode, setEditProfileMode] = useState(false);
+  const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
+  const [faqActive, setFaqActive] = useState(null);
 
-  // --- Searchable Hub List ---
-  const AVAILABLE_HUBS = [
-    { city: 'Mumbai', region: 'Maharashtra, IN' },
-    { city: 'Delhi NCR', region: 'National Capital Region, IN' },
-    { city: 'Bangalore', region: 'Karnataka, IN' },
-    { city: 'London', region: 'Greater London, UK' },
-    { city: 'New York', region: 'NY State, USA' },
-    { city: 'Dubai', region: 'Jebel Ali, UAE' },
-    { city: 'Nairobi', region: 'East Africa, KE' },
-    { city: 'Addis Ababa', region: 'Shewa, ET' }
-  ];
+  // Auto-set Lat/Lon when city changes for Ahmedabad & Surat defaults
+  useEffect(() => {
+    if (currentCity.toLowerCase() === 'ahmedabad') {
+      setLatitude('23.0225');
+      setLongitude('72.5714');
+    } else if (currentCity.toLowerCase() === 'surat') {
+      setLatitude('21.1702');
+      setLongitude('72.8311');
+    }
+  }, [currentCity]);
 
-  const filteredHubs = AVAILABLE_HUBS.filter(hub => 
-    hub.city.toLowerCase().includes(operatingLocation.toLowerCase()) ||
-    hub.region.toLowerCase().includes(operatingLocation.toLowerCase())
-  );
+  // Load session on startup
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const logged = checkIsLoggedIn('delivery');
+      if (logged) {
+        setIsLoggedIn(true);
+        const storedUser = JSON.parse(localStorage.getItem('emahu_delivery_user') || '{}');
+        const storedToken = localStorage.getItem('emahu_delivery_token');
+        setUser(storedUser);
+        setToken(storedToken);
+        setPortalMode('dashboard');
+      }
+    }
+  }, []);
 
-  const toggleFaq = (index) => {
-    setActiveFaq(activeFaq === index ? null : index);
+  // Fetch Dashboard Orders
+  const fetchDashboardData = async (userToken) => {
+    if (!userToken) return;
+    setDashLoading(true);
+    try {
+      const res = await fetch('/api/delivery/my-orders', {
+        headers: {
+          'Authorization': `Bearer ${userToken}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        const jobs = data.orders || [];
+        setOrders(jobs);
+        
+        // Calculate Stats
+        const deliveredJobs = jobs.filter(j => j.deliveryStatus === 'delivered');
+        const pendingJobs = jobs.filter(j => j.deliveryStatus !== 'delivered' && j.deliveryStatus !== 'rejected');
+        
+        const totalEarnings = deliveredJobs.reduce((acc, curr) => {
+          // Earnings = distanceKm * userRate
+          const rate = user?.perItemCharge || 10;
+          return acc + ((curr.distanceKm || 0) * rate);
+        }, 0);
+
+        setStats({
+          total: jobs.length,
+          pending: pendingJobs.length,
+          earnings: parseFloat(totalEarnings.toFixed(2))
+        });
+      }
+    } catch (err) {
+      console.error('Fetch dashboard jobs failed:', err);
+    } finally {
+      setDashLoading(false);
+    }
   };
 
-  const scrollToForm = () => {
-    formSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Socket.io integration for real-time order alerts
+  useEffect(() => {
+    if (!token) return;
+    fetchDashboardData(token);
+
+    // Connect to websocket
+    const socket = io();
+    socket.on('connect', () => {
+      console.log('Connected to logistics socket grid');
+    });
+
+    socket.on('delivery-status-changed', (payload) => {
+      console.log('Received socket status update:', payload);
+      // Refresh dashboard
+      fetchDashboardData(token);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [token]);
+
+  // --- Auth Handlers ---
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    if (!loginEmail.trim() || !loginPassword) {
+      setLoginError('Please enter both email and password');
+      return;
+    }
+    setLoginLoading(true);
+    try {
+      const data = await loginUser(loginEmail.trim(), loginPassword);
+      if (data.user.role !== 'delivery') {
+        throw new Error('This login portal is restricted to Delivery Partners only.');
+      }
+      saveAuthSession(data, 'delivery');
+      setUser(data.user);
+      setToken(data.accessToken);
+      setIsLoggedIn(true);
+      setPortalMode('dashboard');
+    } catch (err) {
+      setLoginError(err.message || 'Invalid credentials');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    clearAuthSession('delivery');
+    setIsLoggedIn(false);
+    setUser(null);
+    setToken(null);
+    setPortalMode('landing');
   };
 
   // Form Validation
   const validateForm = () => {
     const newErrors = {};
-    if (!deliveryName.trim()) {
-      newErrors.deliveryName = 'Delivery Service or Driver Name is required';
-    } else if (deliveryName.trim().length < 3) {
-      newErrors.deliveryName = 'Name must be at least 3 characters';
-    }
-
-    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*\.\w{2,3}$/;
-    if (!email.trim()) {
-      newErrors.email = 'Email address is required';
-    } else if (!emailRegex.test(email.trim())) {
-      newErrors.email = 'Enter a valid email address';
-    }
-
-    if (!password) {
-      newErrors.password = 'Password is required';
-    } else if (password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-
-    const phoneRegex = /^[+]?[0-9\s\-()]{7,15}$/;
-    if (!phoneNumber.trim()) {
-      newErrors.phoneNumber = 'Phone number is required for dispatch alerts';
-    } else if (!phoneRegex.test(phoneNumber.trim())) {
-      newErrors.phoneNumber = 'Enter a valid mobile number (7-15 digits)';
-    }
-
-    if (!operatingLocation.trim()) {
-      newErrors.operatingLocation = 'Operating Location Hub is required';
-    }
-
-    if (!perItemCharge.trim()) {
-      newErrors.perItemCharge = 'Rate per kilometer is required';
-    } else {
-      const chargeVal = parseFloat(perItemCharge);
-      if (isNaN(chargeVal) || chargeVal <= 0) {
-        newErrors.perItemCharge = 'Enter a valid rate greater than 0';
-      }
-    }
-
+    if (!deliveryName.trim()) newErrors.deliveryName = 'Name is required';
+    if (!email.trim()) newErrors.email = 'Email is required';
+    if (!password || password.length < 6) newErrors.password = 'Password must be >= 6 chars';
+    if (!phoneNumber.trim()) newErrors.phoneNumber = 'Mobile number is required';
+    if (!currentCity.trim()) newErrors.currentCity = 'City is required';
+    if (!currentArea.trim()) newErrors.currentArea = 'Area is required';
+    if (!pincode.trim()) newErrors.pincode = 'Pincode is required';
+    if (!serviceRadius.trim() || isNaN(serviceRadius)) newErrors.serviceRadius = 'Enter valid radius (KM)';
+    if (!perItemCharge.trim() || isNaN(perItemCharge)) newErrors.perItemCharge = 'Enter rate per KM';
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     setLoading(true);
     setErrors({});
 
-    let city = '';
-    let state = '';
-    if (operatingLocation.includes(',')) {
-      const parts = operatingLocation.split(',');
-      city = parts[0].trim();
-      state = parts[1].trim();
-    } else {
-      city = operatingLocation.trim();
-      state = operatingLocation.trim();
-    }
-
     try {
-      await registerUser({
+      const payload = {
         name: deliveryName,
         email: email.trim(),
-        password: password,
+        password,
         role: 'delivery',
         phone: phoneNumber.trim(),
-        address: operatingLocation,
-        city: city,
-        state: state,
+        operatingLocation: `${currentArea}, ${currentCity}`,
+        vehicleType,
+        vehicleNumber,
+        currentCity,
+        currentArea,
+        pincode,
+        serviceRadius: parseFloat(serviceRadius),
         perItemCharge: parseFloat(perItemCharge),
-        deliveryScope: deliveryScope,
-        operatingLocation: operatingLocation,
-        dispatchNotes: dispatchNotes
-      });
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        dispatchNotes,
+        status: 'approved' // Auto approve for instant testing flow
+      };
+
+      await registerUser(payload);
       setLoading(false);
       setSubmitted(true);
+      // Wait a bit, then redirect to login view
+      setTimeout(() => {
+        setPortalMode('login');
+        setLoginEmail(email);
+        setSubmitted(false);
+      }, 3000);
     } catch (err) {
       setLoading(false);
       setErrors({ apiError: err.message || 'Registration failed' });
     }
   };
 
+  // --- Action Handlers ---
+  const handleUpdateJobStatus = async (orderId, newStatus) => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/delivery/status', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId,
+          status: newStatus,
+          remarks: `Status updated to ${newStatus} by partner ${user?.name}`
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchDashboardData(token);
+      } else {
+        alert(data.error || 'Failed to update status');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating status');
+    }
+  };
+
+  // Partner self-profile update
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setProfileSuccessMsg('');
+    try {
+      const res = await fetch('/api/delivery/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentCity,
+          currentArea,
+          pincode,
+          serviceRadius: parseFloat(serviceRadius),
+          perItemCharge: parseFloat(perItemCharge),
+          vehicleType,
+          vehicleNumber,
+          isActivePartner: user?.isActivePartner
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUser(data.partner);
+        localStorage.setItem('emahu_delivery_user', JSON.stringify(data.partner));
+        setProfileSuccessMsg('Profile settings updated successfully!');
+        setEditProfileMode(false);
+        fetchDashboardData(token);
+      } else {
+        alert(data.error || 'Failed to update profile');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating profile');
+    }
+  };
+
+  // Toggle active availability status
+  const handleToggleActiveStatus = async () => {
+    if (!token || !user) return;
+    const newActiveState = !user.isActivePartner;
+    try {
+      const res = await fetch('/api/delivery/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          isActivePartner: newActiveState
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUser(data.partner);
+        localStorage.setItem('emahu_delivery_user', JSON.stringify(data.partner));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // --- Rendering ---
   return (
     <div className="lp-wrapper">
-      {/* Visual Background Glow Overlays */}
       <div className="lp-glow lp-glow--1" />
       <div className="lp-glow lp-glow--2" />
 
-      {/* ================= 1. PREMIUM HEADER ================= */}
+      {/* --- HEADER --- */}
       <header className="lp-header">
         <div className="lp-header-container">
           <Link href="/" className="lp-logo">
@@ -164,444 +334,565 @@ export default function DeliveryLandingPage() {
               <rect width="32" height="32" rx="10" fill="#319795" />
               <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
             </svg>
-            <span className="lp-logo-text">EMAHU</span>
+            <span className="lp-logo-text">EMAHU PORTAL</span>
           </Link>
+          
           <nav className="lp-nav">
-            <a href="#benefits" className="lp-nav-link">Benefits</a>
-            <a href="#onboard" className="lp-nav-link">Register Profile</a>
-            <a href="#faq" className="lp-nav-link">FAQs</a>
+            {isLoggedIn ? (
+              <>
+                <span className="lp-nav-user">👋 {user?.name} ({user?.currentCity})</span>
+                <button onClick={() => setEditProfileMode(!editProfileMode)} className="lp-nav-link-btn">
+                  Edit Fleet Profile
+                </button>
+                <button onClick={handleLogout} className="lp-logout-btn">Logout</button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setPortalMode('landing')} className="lp-nav-link-btn">Landing</button>
+                <button onClick={() => {
+                  setPortalMode('landing');
+                  setTimeout(() => formSectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+                }} className="lp-nav-link-btn">Register</button>
+                <button onClick={() => setPortalMode('login')} className="lp-login-trigger-btn">Partner Sign In</button>
+              </>
+            )}
           </nav>
-
-          <button onClick={scrollToForm} className="lp-header-cta">
-            Join as Partner
-          </button>
         </div>
       </header>
 
-      {/* ================= 2. HERO SECTION ================= */}
-      <section className="lp-hero">
-        <div className="lp-section-container lp-hero-grid">
-          
-          <div className="lp-hero-text">
-            <div className="lp-badge">LOGISTICS & DISPATCH PARTNERSHIP</div>
-            <h1 className="lp-hero-title">
-              Scale Your Fleet. <br />
-              <span>Deliver with EMAHU.</span>
-            </h1>
-            <p className="lp-hero-subtitle">
-              Onboard as an independent dispatch agency or individual logistics carrier. Set your own per-kilometer rates, access optimal grid routes, and earn steady revenue.
-            </p>
-            <div className="lp-hero-actions">
-              <button onClick={scrollToForm} className="lp-btn lp-btn--primary">
-                Register Your Profile
-              </button>
-            </div>
-          </div>
-
-          {/* Hero Visual Card / Grid Block */}
-          <div className="lp-hero-visual">
-            <div className="visual-card">
-              <div className="visual-badge">Logistics Grid</div>
-              <div className="visual-icon-box">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#319795" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="1" y="3" width="15" height="13"></rect>
-                  <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                  <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                  <circle cx="18.5" cy="18.5" r="2.5"></circle>
-                </svg>
-              </div>
-              <h3>Smart Hub Routing</h3>
-              <p>{"Optimize your carrier mileage with EMAHU's automated hub dispatch routes."}</p>
-              <div className="visual-stats">
-                <div className="stat-item">
-                  <span className="stat-num">8+</span>
-                  <span className="stat-label">Global Hubs</span>
+      {/* --- LANDING MODE --- */}
+      {portalMode === 'landing' && (
+        <>
+          <section className="lp-hero">
+            <div className="lp-section-container lp-hero-grid">
+              <div className="lp-hero-text">
+                <div className="lp-badge">GRID-LOCATION LOGISTICS</div>
+                <h1 className="lp-hero-title">
+                  Location-Based Courier. <br />
+                  <span>Your City. Your Rates.</span>
+                </h1>
+                <p className="lp-hero-subtitle">
+                  Set custom per-KM rates and choose your service radius. We automatically route orders in your city to your dashboard. Accept or decline jobs instantly.
+                </p>
+                <div className="lp-hero-actions">
+                  <button onClick={() => formSectionRef.current?.scrollIntoView({ behavior: 'smooth' })} className="lp-btn lp-btn--primary">
+                    Register Your Fleet
+                  </button>
+                  <button onClick={() => setPortalMode('login')} className="lp-btn lp-btn--secondary">
+                    Courier Login
+                  </button>
                 </div>
-                <div className="stat-item">
-                  <span className="stat-num">100%</span>
-                  <span className="stat-label">Transparent Payouts</span>
+              </div>
+              
+              <div className="lp-hero-visual">
+                <div className="visual-card">
+                  <div className="visual-badge">Active Zones</div>
+                  <h3>Smart Radius Matching</h3>
+                  <p>{"Ahmedabad, Surat, Mumbai logistics grids are live. Sellers assign local couriers based on real-time calculated distance."}</p>
+                  <div className="visual-stats">
+                    <div className="stat-item">
+                      <span className="stat-num">₹10/KM</span>
+                      <span className="stat-label">Custom Rates</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-num">100%</span>
+                      <span className="stat-label">Local Dispatch</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
-        </div>
-      </section>
-
-      {/* ================= 3. BENEFITS SECTION ================= */}
-      <section id="benefits" className="lp-benefits">
-        <div className="lp-section-container">
-          
-          <div className="section-header">
-            <h2 className="section-title">Why Partner with EMAHU?</h2>
-            <p className="section-subtitle">We empower logistics carriers with custom pricing tools, route optimization, and robust dispatch frameworks.</p>
-          </div>
-
-          <div className="benefits-grid">
-            
-            <div className="benefit-card">
-              <div className="benefit-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          {/* Onboarding Register */}
+          <section id="onboard" ref={formSectionRef} className="lp-form-section">
+            <div className="lp-section-container">
+              <div className="section-header">
+                <h2 className="section-title">Logistics Partner Onboarding</h2>
+                <p className="section-subtitle">Add your fleet specs, set custom rates per kilometer, and select your service coverage.</p>
               </div>
-              <h4>Flexible Schedules</h4>
-              <p>Work whenever you want. You select your routes, delivery frequency, and operating timing windows.</p>
-            </div>
 
-            <div className="benefit-card">
-              <div className="benefit-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
-              </div>
-              <h4>Direct Payouts</h4>
-              <p>Enjoy stable weekly settlements directly to your bank account or company wallet with 0% extra processing fees.</p>
-            </div>
+              <div className="form-card-wrapper">
+                {!submitted ? (
+                  <form className="lp-form" onSubmit={handleRegisterSubmit} noValidate>
+                    {errors.apiError && (
+                      <div className="form-alert-error">⚠️ {errors.apiError}</div>
+                    )}
+                    
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="deliveryName">Fleet/Driver Name</label>
+                        <input 
+                          type="text" 
+                          id="deliveryName"
+                          className={`form-input ${errors.deliveryName ? 'form-input--error' : ''}`}
+                          placeholder="e.g. Ahmedabad Express"
+                          value={deliveryName}
+                          onChange={(e) => setDeliveryName(e.target.value)}
+                        />
+                        {errors.deliveryName && <span className="form-error">{errors.deliveryName}</span>}
+                      </div>
 
-            <div className="benefit-card">
-              <div className="benefit-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-              </div>
-              <h4>Custom Per-KM Rates</h4>
-              <p>Set your own rate per kilometer. We match you with bulk merchant deliveries that align with your pricing.</p>
-            </div>
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="phoneNumber">Mobile Number</label>
+                        <input 
+                          type="text" 
+                          id="phoneNumber"
+                          className={`form-input ${errors.phoneNumber ? 'form-input--error' : ''}`}
+                          placeholder="e.g. +91 98989 89898"
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                        />
+                        {errors.phoneNumber && <span className="form-error">{errors.phoneNumber}</span>}
+                      </div>
 
-          </div>
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="email">Email Address</label>
+                        <input 
+                          type="email" 
+                          id="email"
+                          className={`form-input ${errors.email ? 'form-input--error' : ''}`}
+                          placeholder="e.g. partner@emahu.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                        {errors.email && <span className="form-error">{errors.email}</span>}
+                      </div>
 
-        </div>
-      </section>
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="password">Password</label>
+                        <input 
+                          type="password" 
+                          id="password"
+                          className={`form-input ${errors.password ? 'form-input--error' : ''}`}
+                          placeholder="Min 6 characters"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                        />
+                        {errors.password && <span className="form-error">{errors.password}</span>}
+                      </div>
 
+                      {/* City Dropdown */}
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="currentCity">Service City</label>
+                        <select 
+                          id="currentCity" 
+                          className={`form-input ${errors.currentCity ? 'form-input--error' : ''}`}
+                          value={currentCity}
+                          onChange={(e) => setCurrentCity(e.target.value)}
+                        >
+                          <option value="Ahmedabad">Ahmedabad</option>
+                          <option value="Surat">Surat</option>
+                          <option value="Rajkot">Rajkot</option>
+                          <option value="Vadodara">Vadodara</option>
+                          <option value="Mumbai">Mumbai</option>
+                          <option value="Delhi">Delhi</option>
+                        </select>
+                        {errors.currentCity && <span className="form-error">{errors.currentCity}</span>}
+                      </div>
 
-      {/* ================= 5. REGISTRATION FORM SECTION ================= */}
-      <section id="onboard" ref={formSectionRef} className="lp-form-section">
-        <div className="lp-section-container">
-          
-          <div className="section-header">
-            <h2 className="section-title">Logistics Partner Registration</h2>
-            <p className="section-subtitle">Set up your profile, choose your dispatch hub, and apply for onboarding in minutes.</p>
-          </div>
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="currentArea">Service Area</label>
+                        <input 
+                          type="text" 
+                          id="currentArea"
+                          className={`form-input ${errors.currentArea ? 'form-input--error' : ''}`}
+                          placeholder="e.g. Gota or Adajan"
+                          value={currentArea}
+                          onChange={(e) => setCurrentArea(e.target.value)}
+                        />
+                        {errors.currentArea && <span className="form-error">{errors.currentArea}</span>}
+                      </div>
 
-          <div className="form-card-wrapper">
-            {!submitted ? (
-              <form className="lp-form" onSubmit={handleSubmit} noValidate>
-                {errors.apiError && (
-                  <div style={{ padding: '12px 16px', backgroundColor: 'rgba(220, 38, 38, 0.15)', border: '1px solid #dc2626', borderRadius: '8px', color: '#f87171', marginBottom: '20px', fontSize: '0.9rem', textAlign: 'center' }}>
-                    ⚠️ {errors.apiError}
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="pincode">Pincode</label>
+                        <input 
+                          type="text" 
+                          id="pincode"
+                          className={`form-input ${errors.pincode ? 'form-input--error' : ''}`}
+                          placeholder="e.g. 380060"
+                          value={pincode}
+                          onChange={(e) => setPincode(e.target.value)}
+                        />
+                        {errors.pincode && <span className="form-error">{errors.pincode}</span>}
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="serviceRadius">Service Radius (KM)</label>
+                        <input 
+                          type="number" 
+                          id="serviceRadius"
+                          className={`form-input ${errors.serviceRadius ? 'form-input--error' : ''}`}
+                          placeholder="e.g. 20"
+                          value={serviceRadius}
+                          onChange={(e) => setServiceRadius(e.target.value)}
+                        />
+                        {errors.serviceRadius && <span className="form-error">{errors.serviceRadius}</span>}
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="perItemCharge">Custom Rate Per KM (₹)</label>
+                        <input 
+                          type="number" 
+                          id="perItemCharge"
+                          className={`form-input ${errors.perItemCharge ? 'form-input--error' : ''}`}
+                          placeholder="e.g. 10"
+                          value={perItemCharge}
+                          onChange={(e) => setPerItemCharge(e.target.value)}
+                        />
+                        {errors.perItemCharge && <span className="form-error">{errors.perItemCharge}</span>}
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="vehicleType">Vehicle Type</label>
+                        <select 
+                          id="vehicleType"
+                          className="form-input"
+                          value={vehicleType}
+                          onChange={(e) => setVehicleType(e.target.value)}
+                        >
+                          <option value="bike">Bike (Standard)</option>
+                          <option value="scooter">Scooter</option>
+                          <option value="car">Car (Express)</option>
+                          <option value="truck">Truck (Heavy Payload)</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="vehicleNumber">Vehicle Number</label>
+                        <input 
+                          type="text" 
+                          id="vehicleNumber"
+                          className="form-input"
+                          placeholder="e.g. GJ-01-XX-9999"
+                          value={vehicleNumber}
+                          onChange={(e) => setVehicleNumber(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Location Coordinates</label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input 
+                            type="text" 
+                            className="form-input"
+                            placeholder="Lat" 
+                            value={latitude} 
+                            onChange={(e) => setLatitude(e.target.value)} 
+                          />
+                          <input 
+                            type="text" 
+                            className="form-input"
+                            placeholder="Lon" 
+                            value={longitude} 
+                            onChange={(e) => setLongitude(e.target.value)} 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group form-group--full">
+                        <label className="form-label" htmlFor="dispatchNotes">Dispatch remarks & Route Notes</label>
+                        <textarea 
+                          id="dispatchNotes"
+                          className="form-textarea"
+                          placeholder="e.g. Standard 10% volume discount, heavy payload trucks available..."
+                          value={dispatchNotes}
+                          onChange={(e) => setDispatchNotes(e.target.value)}
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+
+                    <button type="submit" className="form-btn" disabled={loading}>
+                      {loading ? 'Submitting Registration...' : 'Register Dispatch Partner'}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="lp-success-card">
+                    <div className="success-badge">✅</div>
+                    <h2>Registration Successful!</h2>
+                    <p>Redirecting you to the Partner Login screen to enter your new credentials...</p>
                   </div>
                 )}
-                <div className="form-grid">
-                  
-                  {/* Driver/Agency Name */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="deliveryName">Delivery Service / Driver Name</label>
-                    <input 
-                      type="text" 
-                      id="deliveryName"
-                      className={`form-input ${errors.deliveryName ? 'form-input--error' : ''}`}
-                      placeholder="e.g. Mumbai Express or John Logistics"
-                      value={deliveryName}
-                      onChange={(e) => {
-                        setDeliveryName(e.target.value);
-                        if (errors.deliveryName) setErrors({ ...errors, deliveryName: '' });
-                      }}
-                      disabled={loading}
-                    />
-                    {errors.deliveryName && <span className="form-error">{errors.deliveryName}</span>}
-                  </div>
+              </div>
+            </div>
+          </section>
+        </>
+      )}
 
-                  {/* Phone Number */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="phoneNumber">Dispatch Mobile Number</label>
-                    <input 
-                      type="tel" 
-                      id="phoneNumber"
-                      className={`form-input ${errors.phoneNumber ? 'form-input--error' : ''}`}
-                      placeholder="e.g. +91 98765 43210"
-                      value={phoneNumber}
-                      onChange={(e) => {
-                        setPhoneNumber(e.target.value);
-                        if (errors.phoneNumber) setErrors({ ...errors, phoneNumber: '' });
-                      }}
-                      disabled={loading}
-                    />
-                    {errors.phoneNumber && <span className="form-error">{errors.phoneNumber}</span>}
-                  </div>
-
-                  {/* Email */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="email">Email Address</label>
-                    <input 
-                      type="email" 
-                      id="email"
-                      className={`form-input ${errors.email ? 'form-input--error' : ''}`}
-                      placeholder="e.g. partner@emahu.com"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (errors.email) setErrors({ ...errors, email: '' });
-                      }}
-                      disabled={loading}
-                    />
-                    {errors.email && <span className="form-error">{errors.email}</span>}
-                  </div>
-
-                  {/* Password */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="password">Password</label>
-                    <input 
-                      type="password" 
-                      id="password"
-                      className={`form-input ${errors.password ? 'form-input--error' : ''}`}
-                      placeholder="Min. 6 characters"
-                      value={password}
-                      onChange={(e) => {
-                        setPassword(e.target.value);
-                        if (errors.password) setErrors({ ...errors, password: '' });
-                      }}
-                      disabled={loading}
-                    />
-                    {errors.password && <span className="form-error">{errors.password}</span>}
-                  </div>
-
-                  {/* Searchable Hub Location Dropdown */}
-                  <div className="form-group" style={{ position: 'relative' }}>
-                    <label className="form-label" htmlFor="operatingLocation">Operating Location / City Hub</label>
-                    <input 
-                      type="text" 
-                      id="operatingLocation"
-                      className={`form-input ${errors.operatingLocation ? 'form-input--error' : ''}`}
-                      placeholder="Search hub (e.g. Mumbai, Bangalore...)"
-                      value={operatingLocation}
-                      onChange={(e) => {
-                        setOperatingLocation(e.target.value);
-                        if (errors.operatingLocation) setErrors({ ...errors, operatingLocation: '' });
-                      }}
-                      onFocus={() => setShowDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                      disabled={loading}
-                      autoComplete="off"
-                    />
-
-                    {showDropdown && (
-                      <div className="lp-dropdown">
-                        <div className="lp-dropdown-title">Available EMAHU Logistics Hubs</div>
-                        {filteredHubs.length > 0 ? (
-                          filteredHubs.map((hub, idx) => (
-                            <div 
-                              key={idx} 
-                              className="lp-dropdown-item"
-                              onMouseDown={() => {
-                                setOperatingLocation(`${hub.city}, ${hub.region}`);
-                                setShowDropdown(false);
-                                if (errors.operatingLocation) setErrors({ ...errors, operatingLocation: '' });
-                              }}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#319795" strokeWidth="2.5" style={{ marginRight: '8px', flexShrink: 0 }}>
-                                <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"></path>
-                                <circle cx="12" cy="10" r="3"></circle>
-                              </svg>
-                              <div>
-                                <strong style={{ color: '#0f172a' }}>{hub.city}</strong>
-                                <span style={{ color: '#64748b', fontSize: '0.8rem' }}> - {hub.region}</span>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="lp-dropdown-item lp-dropdown-item--custom" style={{ cursor: 'default' }}>
-                            <span>Use custom: &quot;{operatingLocation}&quot;</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {errors.operatingLocation && <span className="form-error">{errors.operatingLocation}</span>}
-                  </div>
-
-                  {/* Delivery Scope */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="deliveryScope">Delivery Scope</label>
-                    <select 
-                      id="deliveryScope"
-                      className="form-input"
-                      style={{ height: '46px', cursor: 'pointer', appearance: 'auto', backgroundColor: '#1e1e24', color: '#fff' }}
-                      value={deliveryScope}
-                      onChange={(e) => setDeliveryScope(e.target.value)}
-                      disabled={loading}
-                    >
-                      <option value="local">Same City (Local)</option>
-                      <option value="interstate">State to State (Interstate)</option>
-                    </select>
-                  </div>
-
-                  {/* Rate Per KM */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="perItemCharge">Custom Rate Per KM (₹ / km)</label>
-                    <div className="form-input-group">
-                      <span className="form-input-prefix">₹</span>
-                      <input 
-                        type="number" 
-                        step="1"
-                        min="1"
-                        id="perItemCharge"
-                        className={`form-input form-input--has-prefix ${errors.perItemCharge ? 'form-input--error' : ''}`}
-                        placeholder="80"
-                        value={perItemCharge}
-                        onChange={(e) => {
-                          setPerItemCharge(e.target.value);
-                          if (errors.perItemCharge) setErrors({ ...errors, perItemCharge: '' });
-                        }}
-                        disabled={loading}
-                      />
-                    </div>
-                    {errors.perItemCharge && <span className="form-error">{errors.perItemCharge}</span>}
-                  </div>
-
-                  {/* Custom Dispatch Notes */}
-                  <div className="form-group form-group--full">
-                    <label className="form-label" htmlFor="dispatchNotes">Dispatch remarks & Route Notes</label>
-                    <textarea 
-                      id="dispatchNotes"
-                      className="form-textarea"
-                      placeholder="e.g. Standard 10% volume discount, heavy payload trucks available..."
-                      value={dispatchNotes}
-                      onChange={(e) => setDispatchNotes(e.target.value)}
-                      disabled={loading}
-                    />
-                  </div>
-
+      {/* --- LOGIN MODE --- */}
+      {portalMode === 'login' && (
+        <section className="lp-form-section" style={{ minHeight: '70vh', display: 'flex', alignItems: 'center' }}>
+          <div className="lp-section-container" style={{ maxWidth: '480px' }}>
+            <div className="form-card-wrapper" style={{ padding: '40px' }}>
+              <h2 className="section-title" style={{ marginBottom: '8px' }}>Partner Sign In</h2>
+              <p className="section-subtitle" style={{ marginBottom: '24px' }}>Access your logistics queue and status grid.</p>
+              
+              {loginError && <div className="form-alert-error" style={{ marginBottom: '16px' }}>⚠️ {loginError}</div>}
+              
+              <form className="lp-form" onSubmit={handleLoginSubmit}>
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label className="form-label">Email Address</label>
+                  <input 
+                    type="email" 
+                    className="form-input" 
+                    value={loginEmail} 
+                    onChange={(e) => setLoginEmail(e.target.value)} 
+                    placeholder="partner@emahu.com"
+                  />
                 </div>
-
-                <button type="submit" className={`form-btn ${loading ? 'form-btn--loading' : ''}`} disabled={loading}>
-                  {loading ? (
-                    <>
-                      <div className="form-spinner" />
-                      <span>Registering Fleet Profile...</span>
-                    </>
-                  ) : (
-                    <span>Register Dispatch Profile &nbsp; ➔</span>
-                  )}
+                <div className="form-group" style={{ marginBottom: '24px' }}>
+                  <label className="form-label">Password</label>
+                  <input 
+                    type="password" 
+                    className="form-input" 
+                    value={loginPassword} 
+                    onChange={(e) => setLoginPassword(e.target.value)} 
+                    placeholder="••••••••"
+                  />
+                </div>
+                <button type="submit" className="form-btn" disabled={loginLoading}>
+                  {loginLoading ? 'Signing In...' : 'Access Dashboard'}
                 </button>
               </form>
-            ) : (
-              /* ================= SUCCESS PROFILE INVOICE CARD ================= */
-              <div className="lp-success-card">
-                <div className="success-badge" style={{ backgroundColor: 'orange' }}>⏳</div>
-                <h2 className="success-title">Onboarding Registration Submitted!</h2>
-                <p className="success-subtitle" style={{ color: '#cbd5e1' }}>
-                  Your profile has been created successfully and is **pending administrative approval**. 
-                  Once our central team approves your application, you will be active on the logistics grid.
-                </p>
+            </div>
+          </div>
+        </section>
+      )}
 
-                <div className="success-ticket">
-                  <div className="ticket-header">
-                    <span>Partner Registration Details</span>
-                    <span className="ticket-status" style={{ backgroundColor: '#b45309', color: '#fef3c7' }}>PENDING REVIEW</span>
+      {/* --- DASHBOARD MODE --- */}
+      {portalMode === 'dashboard' && (
+        <section className="lp-section-container" style={{ padding: '40px 24px' }}>
+          
+          {/* Header Stats Grid */}
+          <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+            <div className="benefit-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Active Status</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
+                <span className={`status-pill ${user?.isActivePartner ? 'status-pill--active' : 'status-pill--inactive'}`}>
+                  {user?.isActivePartner ? 'Active (Ready)' : 'Inactive (Offline)'}
+                </span>
+                <button onClick={handleToggleActiveStatus} className="lp-btn lp-btn--secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
+                  Toggle
+                </button>
+              </div>
+            </div>
+
+            <div className="benefit-card" style={{ padding: '24px' }}>
+              <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Assigned Jobs</span>
+              <h3 style={{ fontSize: '2rem', margin: '8px 0 0 0', color: '#0f172a' }}>{stats.total}</h3>
+            </div>
+
+            <div className="benefit-card" style={{ padding: '24px' }}>
+              <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Pending Dispatch</span>
+              <h3 style={{ fontSize: '2rem', margin: '8px 0 0 0', color: '#e53e3e' }}>{stats.pending}</h3>
+            </div>
+
+            <div className="benefit-card" style={{ padding: '24px' }}>
+              <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Earnings</span>
+              <h3 style={{ fontSize: '2rem', margin: '8px 0 0 0', color: '#319795' }}>₹{stats.earnings}</h3>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>At rate ₹{user?.perItemCharge || 10}/KM</span>
+            </div>
+          </div>
+
+          {/* Edit Profile Panel */}
+          {editProfileMode && (
+            <div className="form-card-wrapper" style={{ marginBottom: '32px', padding: '32px' }}>
+              <h3 style={{ fontSize: '1.25rem', marginBottom: '16px', color: '#0f172a' }}>Update Fleet Profile Settings</h3>
+              <form onSubmit={handleUpdateProfile}>
+                <div className="form-grid" style={{ marginBottom: '16px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Service City</label>
+                    <input type="text" className="form-input" value={currentCity} onChange={(e) => setCurrentCity(e.target.value)} />
                   </div>
-                  <div className="ticket-body">
-                    <div className="ticket-row">
-                      <span className="ticket-label">Fleet/Driver Name</span>
-                      <span className="ticket-val">{deliveryName}</span>
-                    </div>
-                    <div className="ticket-row">
-                      <span className="ticket-label">Email Address</span>
-                      <span className="ticket-val">{email}</span>
-                    </div>
-                    <div className="ticket-row">
-                      <span className="ticket-label">Contact Phone</span>
-                      <span className="ticket-val">{phoneNumber}</span>
-                    </div>
-                    <div className="ticket-row">
-                      <span className="ticket-label">Operating Hub</span>
-                      <span className="ticket-val ticket-val--teal">{operatingLocation}</span>
-                    </div>
-                    <div className="ticket-row">
-                      <span className="ticket-label">Scope</span>
-                      <span className="ticket-val" style={{ textTransform: 'capitalize' }}>{deliveryScope}</span>
-                    </div>
-                    <div className="ticket-row">
-                      <span className="ticket-label">Custom rate per KM</span>
-                      <span className="ticket-val ticket-val--teal">₹{parseFloat(perItemCharge).toFixed(2)} / km</span>
-                    </div>
-                    {dispatchNotes.trim() && (
-                      <div className="ticket-row ticket-row--vertical">
-                        <span className="ticket-label">Special Remarks</span>
-                        <div className="ticket-remarks">{dispatchNotes}</div>
-                      </div>
-                    )}
+                  <div className="form-group">
+                    <label className="form-label">Service Area</label>
+                    <input type="text" className="form-input" value={currentArea} onChange={(e) => setCurrentArea(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Pincode</label>
+                    <input type="text" className="form-input" value={pincode} onChange={(e) => setPincode(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Service Radius (KM)</label>
+                    <input type="number" className="form-input" value={serviceRadius} onChange={(e) => setServiceRadius(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Rate per KM (₹)</label>
+                    <input type="number" className="form-input" value={perItemCharge} onChange={(e) => setPerItemCharge(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Vehicle Type</label>
+                    <select className="form-input" value={vehicleType} onChange={(e) => setVehicleType(e.target.value)}>
+                      <option value="bike">Bike</option>
+                      <option value="scooter">Scooter</option>
+                      <option value="car">Car</option>
+                      <option value="truck">Truck</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Vehicle Number</label>
+                    <input type="text" className="form-input" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} />
                   </div>
                 </div>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button type="submit" className="lp-btn lp-btn--primary" style={{ padding: '8px 16px' }}>Save Profile</button>
+                  <button type="button" onClick={() => setEditProfileMode(false)} className="lp-btn lp-btn--secondary" style={{ padding: '8px 16px' }}>Cancel</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {profileSuccessMsg && (
+            <div className="form-alert-success" style={{ marginBottom: '20px', padding: '12px', backgroundColor: '#e6fffa', border: '1px solid #319795', color: '#234e52', borderRadius: '8px' }}>
+              {profileSuccessMsg}
+            </div>
+          )}
+
+          {/* Active Job Queues */}
+          <div className="form-card-wrapper" style={{ padding: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 600 }}>Your Delivery Queue</h3>
+              <button onClick={() => fetchDashboardData(token)} className="lp-btn lp-btn--secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
+                🔄 Refresh Queue
+              </button>
+            </div>
+
+            {dashLoading ? (
+              <p style={{ textAlign: 'center', color: '#64748b' }}>Refreshing logistics queue...</p>
+            ) : orders.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                <span style={{ fontSize: '3rem' }}>📦</span>
+                <h4 style={{ fontSize: '1.1rem', margin: '16px 0 8px 0', color: '#0f172a' }}>No assignments found</h4>
+                <p>Ensure your status toggle is set to Active and that merchants in {user?.currentCity} have placed orders.</p>
+              </div>
+            ) : (
+              <div className="orders-table-wrapper" style={{ overflowX: 'auto' }}>
+                <table className="orders-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '0.85rem' }}>
+                      <th style={{ padding: '12px' }}>Order ID</th>
+                      <th style={{ padding: '12px' }}>Addresses</th>
+                      <th style={{ padding: '12px' }}>Distance</th>
+                      <th style={{ padding: '12px' }}>Cost Details</th>
+                      <th style={{ padding: '12px' }}>Current Status</th>
+                      <th style={{ padding: '12px', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((order) => {
+                      const cost = parseFloat(((order.distanceKm || 0) * (user?.perItemCharge || 10)).toFixed(2));
+                      return (
+                        <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
+                          <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
+                          <td style={{ padding: '12px' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                              <strong>Pickup:</strong> {order.sellerLocation?.address || 'Seller Hub'}
+                              {order.sellerLocation?.latitude && order.sellerLocation?.longitude && (
+                                <a 
+                                  href={`https://www.google.com/maps/search/?api=1&query=${order.sellerLocation.latitude},${order.sellerLocation.longitude}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{ color: '#319795', textDecoration: 'underline', marginLeft: '6px', fontSize: '0.75rem' }}
+                                >
+                                  📍 Map
+                                </a>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                              <strong>Delivery:</strong> {order.deliveryAddress?.address || order.buyerLocation?.address}
+                              {order.buyerLocation?.latitude && order.buyerLocation?.longitude && (
+                                <a 
+                                  href={`https://www.google.com/maps/search/?api=1&query=${order.buyerLocation.latitude},${order.buyerLocation.longitude}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{ color: '#319795', textDecoration: 'underline', marginLeft: '6px', fontSize: '0.75rem' }}
+                                >
+                                  📍 Map
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
+                          <td style={{ padding: '12px' }}>
+                            <div style={{ fontWeight: 600, color: '#319795' }}>₹{cost}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>₹{user?.perItemCharge || 10}/KM</div>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <span className={`status-pill status-pill--${order.deliveryStatus}`}>
+                              {order.deliveryStatus || order.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                              {(order.deliveryStatus === 'assigned' || order.assignmentStatus === 'unassigned') && (
+                                <>
+                                  <button onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')} className="lp-btn lp-btn--primary" style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: '#2b6cb0' }}>
+                                    Accept
+                                  </button>
+                                  <button onClick={() => handleUpdateJobStatus(order.orderId, 'rejected')} className="lp-btn lp-btn--secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#e53e3e' }}>
+                                    Reject
+                                  </button>
+                                </>
+                              )}
+                              {order.deliveryStatus === 'accepted' && (
+                                <button onClick={() => handleUpdateJobStatus(order.orderId, 'picked_up')} className="lp-btn lp-btn--primary" style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: '#dd6b20' }}>
+                                  Mark Picked Up
+                                </button>
+                              )}
+                              {order.deliveryStatus === 'picked_up' && (
+                                <button onClick={() => handleUpdateJobStatus(order.orderId, 'out_for_delivery')} className="lp-btn lp-btn--primary" style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: '#319795' }}>
+                                  Mark Out For Delivery
+                                </button>
+                              )}
+                              {order.deliveryStatus === 'out_for_delivery' && (
+                                <button onClick={() => handleUpdateJobStatus(order.orderId, 'delivered')} className="lp-btn lp-btn--primary" style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: '#38a169' }}>
+                                  Mark Delivered
+                                </button>
+                              )}
+                              {order.deliveryStatus === 'delivered' && (
+                                <span style={{ color: '#38a169', fontWeight: 600 }}>🎉 Done</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
+        </section>
+      )}
 
-        </div>
-      </section>
-
-      {/* ================= 6. FAQs SECTION ================= */}
-      <section id="faq" className="lp-faq">
-        <div className="lp-section-container">
-          
-          <div className="section-header">
-            <h2 className="section-title">Frequently Asked Questions</h2>
-            <p className="section-subtitle">Here are the answers to the most common questions from our delivery and dispatch partners.</p>
+      {/* --- FAQs --- */}
+      {portalMode === 'landing' && (
+        <section id="faq" className="lp-faq">
+          <div className="lp-section-container">
+            <div className="section-header">
+              <h2 className="section-title">Logistics FAQ</h2>
+            </div>
+            <div className="faq-list">
+              <div className={`faq-item ${faqActive === 0 ? 'faq-item--active' : ''}`} onClick={() => setFaqActive(faqActive === 0 ? null : 0)}>
+                <div className="faq-question">How does city filtering work?</div>
+                <div className="faq-answer">Ahmedabad orders only show Ahmedabad partners. Your Service Radius must cover the buyer location to receive jobs.</div>
+              </div>
+              <div className={`faq-item ${faqActive === 1 ? 'faq-item--active' : ''}`} onClick={() => setFaqActive(faqActive === 1 ? null : 1)}>
+                <div className="faq-question">How is distance calculated?</div>
+                <div className="faq-answer">Distance is calculated between seller shop address and buyer address. Your payout is Distance × your custom rate per KM.</div>
+              </div>
+            </div>
           </div>
+        </section>
+      )}
 
-          <div className="faq-list">
-            
-            <div className={`faq-item ${activeFaq === 0 ? 'faq-item--active' : ''}`} onClick={() => toggleFaq(0)}>
-              <div className="faq-question">
-                <span>How do weekly payouts work?</span>
-                <span className="faq-toggle-icon"></span>
-              </div>
-              <div className="faq-answer">
-                Payouts are calculated every Sunday at midnight and directly transferred to your registered bank account or digital ledger wallet by Wednesday morning. No hidden transaction fees apply.
-              </div>
-            </div>
-
-            <div className={`faq-item ${activeFaq === 1 ? 'faq-item--active' : ''}`} onClick={() => toggleFaq(1)}>
-              <div className="faq-question">
-                <span>Can I operate in multiple locations?</span>
-                <span className="faq-toggle-icon"></span>
-              </div>
-              <div className="faq-answer">
-                Yes! You can register multiple fleet profiles or configure broader dispatch territories under a single dispatch agency profile by contacting our operational support team.
-              </div>
-            </div>
-
-            <div className={`faq-item ${activeFaq === 2 ? 'faq-item--active' : ''}`} onClick={() => toggleFaq(2)}>
-              <div className="faq-question">
-                <span>How is the custom rate per kilometer verified?</span>
-                <span className="faq-toggle-icon"></span>
-              </div>
-              <div className="faq-answer">
-                Your rate is presented directly to merchant sellers in your operating territory. Sellers choose partners based on rates and delivery dispatch history ratings, ensuring fair competition.
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* ================= 7. BEAUTIFUL FOOTER ================= */}
       <footer className="lp-footer">
         <div className="lp-section-container">
-          <div className="footer-top">
-            <div className="footer-brand">
-              <svg width="24" height="24" viewBox="0 0 32 32" fill="none" style={{ marginRight: '8px' }}>
-                <rect width="32" height="32" rx="10" fill="#319795" />
-                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-              </svg>
-              <span>EMAHU LOGISTICS</span>
-            </div>
-            <div className="footer-links">
-              <Link href="/">Back to Selector</Link>
-              <a href="#benefits">Benefits</a>
-              <a href="#faq">FAQs</a>
-            </div>
-          </div>
-          <div className="footer-bottom">
-            <p>© 2026 EMAHU Inc. All logistics and partner rights reserved.</p>
-          </div>
+          <p>© 2026 Emahu Logistics Network. All rights reserved.</p>
         </div>
       </footer>
-
     </div>
   );
 }

@@ -133,6 +133,18 @@ const orderSchema = new mongoose.Schema(
     rejectionReason: String,
     sellerConfirmed: Boolean,
     sellerRejected: Boolean,
+    deliveryPartnerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    deliveryStatus: {
+      type: String,
+      enum: ['unassigned', 'assigned', 'accepted', 'rejected', 'picked_up', 'out_for_delivery', 'delivered'],
+      default: 'unassigned'
+    },
+    deliveredAt: {
+      type: Date
+    },
     couponCode: {
       type: String,
       default: ''

@@ -66,6 +66,12 @@ export default function ProductDetailPage() {
   const [reviewSubmitted,setReviewSubmitted]= useState(false);
   const [reviewError,    setReviewError]    = useState('');
 
+  // Check buyer login session
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
+  useEffect(() => {
+    setIsUserLoggedIn(!!localStorage.getItem('emahu_buyer_token'));
+  }, []);
+
   // Sync wishlist on mount
   useEffect(() => {
     try {
@@ -275,6 +281,10 @@ export default function ProductDetailPage() {
   }, [id]);
 
   const handleAddCart = () => {
+    if (!isUserLoggedIn) {
+      router.push('/buyer/login');
+      return;
+    }
     try {
       const storedCartStr = localStorage.getItem('emahu_cart') || '[]';
       const storedCart = JSON.parse(storedCartStr);
@@ -303,6 +313,10 @@ export default function ProductDetailPage() {
   };
 
   const handleBuyNow = () => {
+    if (!isUserLoggedIn) {
+      router.push('/buyer/login');
+      return;
+    }
     try {
       const storedCartStr = localStorage.getItem('emahu_cart') || '[]';
       const storedCart = JSON.parse(storedCartStr);
@@ -330,6 +344,10 @@ export default function ProductDetailPage() {
   };
 
   const handleToggleWishlist = () => {
+    if (!isUserLoggedIn) {
+      router.push('/buyer/login');
+      return;
+    }
     try {
       const storedWish = localStorage.getItem('emahu_wishlist') || '[]';
       let ids = JSON.parse(storedWish);
@@ -417,6 +435,13 @@ export default function ProductDetailPage() {
 
         {/* ── RIGHT: Info ── */}
         <div className="pd-info">
+          {!isUserLoggedIn && (
+            <div style={{ padding: '12px 16px', backgroundColor: 'rgba(49, 151, 149, 0.1)', color: '#319795', border: '1px solid rgba(49, 151, 149, 0.2)', borderRadius: '10px', fontSize: '0.85rem', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🔒 You are browsing as a guest.</span>
+              <Link href="/buyer/login" style={{ textDecoration: 'underline', fontWeight: '700', color: '#319795' }}>Sign in</Link>
+              <span>to purchase or save items.</span>
+            </div>
+          )}
           <p className="pd-info__brand">{product.brand}</p>
           <h1 className="pd-info__name">{product.name}</h1>
 
