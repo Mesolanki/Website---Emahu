@@ -4,6 +4,7 @@ const {
   register,
   login,
   googleLogin,
+  appleLogin,
   refresh,
   logout,
   getMe,
@@ -28,6 +29,7 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 router.post('/register', register);
 router.post('/login', login);
 router.post('/google', googleLogin);
+router.post('/apple', appleLogin);
 router.post('/refresh', refresh);
 router.post('/logout', logout);
 

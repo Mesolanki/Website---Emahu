@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './login.css';
-import { loginUser, saveAuthSession, googleLoginUser } from '@/utils/auth';
+import { loginUser, saveAuthSession, googleLoginUser, appleLoginUser } from '@/utils/auth';
 
 /**
  * SellerLogin Component
@@ -59,6 +59,40 @@ export default function SellerLogin() {
         } catch (err) {
           setLoading(false);
           setError(err.message || 'Google Sign-In failed');
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+  };
+
+  const handleAppleSignIn = () => {
+    const width = 500;
+    const height = 600;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    
+    const popup = window.open(
+      '/buyer/apple-auth?role=seller',
+      'apple_auth_popup',
+      `width=${width},height=${height},top=${top},left=${left}`
+    );
+
+    const handleMessage = async (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'APPLE_AUTH_SUCCESS' && event.data?.role === 'seller') {
+        window.removeEventListener('message', handleMessage);
+        const { email, name, role } = event.data;
+        setLoading(true);
+        setError('');
+        try {
+          const data = await appleLoginUser({ email, name, role });
+          saveAuthSession(data, 'seller');
+          setLoading(false);
+          router.replace('/seller/dashboard');
+        } catch (err) {
+          setLoading(false);
+          setError(err.message || 'Apple ID Sign-In failed');
         }
       }
     };
@@ -261,7 +295,7 @@ export default function SellerLogin() {
               </svg>
               <span>Google</span>
             </button>
-            <button className="sl-social-btn" aria-label="Sign in with Apple">
+            <button className="sl-social-btn" aria-label="Sign in with Apple" onClick={handleAppleSignIn} type="button">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M18.7 18.5C17.5 20.3 16.3 22 14.5 22c-1.8 0-2.3-1.1-4.3-1.1-2.1 0-2.6 1.1-4.3 1.1-1.7 0-3.1-1.8-4.2-3.4C-.6 15 1.1 9.4 3.7 9.4c1.8 0 2.8 1.1 3.9 1.1 1.1 0 2.3-1.1 4.4-1.1 1.8 0 3.2 1 4.1 2.2-3.8 2.2-3.2 7.7.3 9.4-.7 1.9-1.9 3.5-3.7 3.5zM15.8 6.4c1-1.2 1.6-2.8 1.4-4.4-1.4.1-3 1-4 2.1-1 1.1-1.8 2.8-1.5 4.3 1.5.1 3-1 4.1-2z" />
               </svg>

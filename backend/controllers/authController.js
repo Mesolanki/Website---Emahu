@@ -318,6 +318,65 @@ exports.googleLogin = async (req, res) => {
   }
 };
 
+// @desc    Authenticate user via Apple (OAuth Simulation / JWT parsing)
+// @route   POST /api/auth/apple
+// @access  Public
+exports.appleLogin = async (req, res) => {
+  try {
+    const { email, name, role } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide a valid Apple email'
+      });
+    }
+
+    // Find if user exists
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create user if not exists (Sign up)
+      console.log(`Apple user not found. Creating new user with email ${email} and role ${role || 'buyer'}`);
+      
+      user = await User.create({
+        name: name || email.split('@')[0],
+        email,
+        password: `apple_${Math.random().toString(36).substring(2, 12)}`, // randomized dummy password
+        role: role || 'buyer',
+        phone: '+91 99999 99999',
+        address: 'Apple Account Address',
+        status: role === 'seller' ? 'pending' : 'approved'
+      });
+
+      // Notify all admins of new Apple seller registration
+      if (role === 'seller') {
+        const admins = await User.find({ role: 'admin' });
+        const Notification = require('../models/Notification');
+        for (const admin of admins) {
+          await Notification.create({
+            recipient: admin._id,
+            title: 'New Seller Registration (Apple)',
+            message: `Seller "${user.name}" has registered via Apple and is pending approval.`,
+            type: 'info'
+          });
+        }
+      }
+    } else {
+      console.log(`Apple user found: ${user.name} (${user.email})`);
+    }
+
+    // Send JWT and store refresh session
+    await sendTokenResponse(user, 200, req, res);
+  } catch (error) {
+    console.error('Apple Auth Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Server Error during Apple authentication'
+    });
+  }
+};
+
 // @desc    Refresh session and get a new access token (Refresh Token Rotation)
 // @route   POST /api/auth/refresh
 // @access  Public

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './register.css';
-import { registerUser, saveAuthSession, googleLoginUser } from '@/utils/auth';
+import { registerUser, saveAuthSession, googleLoginUser, appleLoginUser } from '@/utils/auth';
 
 /**
  * SellerRegister Component
@@ -51,6 +51,40 @@ export default function SellerRegister() {
         } catch (err) {
           setLoading(false);
           setErrors({ general: err.message || 'Google Sign-In failed' });
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+  };
+
+  const handleAppleSignIn = () => {
+    const width = 500;
+    const height = 600;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    
+    const popup = window.open(
+      '/buyer/apple-auth?role=seller',
+      'apple_auth_popup',
+      `width=${width},height=${height},top=${top},left=${left}`
+    );
+
+    const handleMessage = async (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'APPLE_AUTH_SUCCESS' && event.data?.role === 'seller') {
+        window.removeEventListener('message', handleMessage);
+        const { email, name, role } = event.data;
+        setLoading(true);
+        setErrors({});
+        try {
+          const data = await appleLoginUser({ email, name, role });
+          saveAuthSession(data, 'seller');
+          setLoading(false);
+          router.replace('/seller/dashboard');
+        } catch (err) {
+          setLoading(false);
+          setErrors({ general: err.message || 'Apple ID Sign-In failed' });
         }
       }
     };
@@ -463,38 +497,68 @@ export default function SellerRegister() {
                 <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
               </div>
 
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px',
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#fff',
-                  border: '1px solid #dadce0',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '0.95rem',
-                  fontWeight: '500',
-                  color: '#3c4043',
-                  transition: 'background-color 0.2s',
-                  marginBottom: '16px'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18">
-                  <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
-                  <path d="M9 18c2.43 0 4.47-.806 5.96-2.18l-2.908-2.258c-.806.54-1.837.86-3.052.86-2.352 0-4.341-1.587-5.05-3.72H1.026v2.332C2.51 15.98 5.534 18 9 18z" fill="#34A853"/>
-                  <path d="M3.95 10.702c-.18-.54-.282-1.117-.282-1.702s.102-1.162.282-1.702V4.966H1.026C.371 6.273 0 7.761 0 9s.371 2.727 1.026 4.034l2.924-2.332z" fill="#FBBC05"/>
-                  <path d="M9 3.58c1.32 0 2.5.454 3.435 1.348l2.58-2.58C13.464.896 11.428 0 9 0 5.534 0 2.51 2.02 1.026 4.966L3.95 7.298C4.659 5.165 6.648 3.58 9 3.58z" fill="#EA4335"/>
-                </svg>
-                Continue with Google
-              </button>
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={loading}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    flex: 1,
+                    padding: '12px',
+                    backgroundColor: '#fff',
+                    border: '1px solid #dadce0',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.95rem',
+                    fontWeight: '500',
+                    color: '#3c4043',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18">
+                    <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+                    <path d="M9 18c2.43 0 4.47-.806 5.96-2.18l-2.908-2.258c-.806.54-1.837.86-3.052.86-2.352 0-4.341-1.587-5.05-3.72H1.026v2.332C2.51 15.98 5.534 18 9 18z" fill="#34A853"/>
+                    <path d="M3.95 10.702c-.18-.54-.282-1.117-.282-1.702s.102-1.162.282-1.702V4.966H1.026C.371 6.273 0 7.761 0 9s.371 2.727 1.026 4.034l2.924-2.332z" fill="#FBBC05"/>
+                    <path d="M9 3.58c1.32 0 2.5.454 3.435 1.348l2.58-2.58C13.464.896 11.428 0 9 0 5.534 0 2.51 2.02 1.026 4.966L3.95 7.298C4.659 5.165 6.648 3.58 9 3.58z" fill="#EA4335"/>
+                  </svg>
+                  <span>Google</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAppleSignIn}
+                  disabled={loading}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    flex: 1,
+                    padding: '12px',
+                    backgroundColor: '#fff',
+                    border: '1px solid #dadce0',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.95rem',
+                    fontWeight: '500',
+                    color: '#3c4043',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.7 18.5C17.5 20.3 16.3 22 14.5 22c-1.8 0-2.3-1.1-4.3-1.1-2.1 0-2.6 1.1-4.3 1.1-1.7 0-3.1-1.8-4.2-3.4C-.6 15 1.1 9.4 3.7 9.4c1.8 0 2.8 1.1 3.9 1.1 1.1 0 2.3-1.1 4.4-1.1 1.8 0 3.2 1 4.1 2.2-3.8 2.2-3.2 7.7.3 9.4-.7 1.9-1.9 3.5-3.7 3.5zM15.8 6.4c1-1.2 1.6-2.8 1.4-4.4-1.4.1-3 1-4 2.1-1 1.1-1.8 2.8-1.5 4.3 1.5.1 3-1 4.1-2z" />
+                  </svg>
+                  <span>Apple</span>
+                </button>
+              </div>
 
               <div className="sr-form-footer">
                 <span>Already registered?</span>

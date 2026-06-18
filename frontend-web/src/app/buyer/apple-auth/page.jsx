@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-function GoogleAuthContent() {
+function AppleAuthContent() {
   const searchParams = useSearchParams();
   const role = searchParams.get('role') || 'buyer';
   const [emailInput, setEmailInput] = useState('');
@@ -12,11 +12,11 @@ function GoogleAuthContent() {
   const [loadingAccount, setLoadingAccount] = useState(null);
 
   const testAccounts = role === 'seller' ? [
-    { name: 'Emahu Certified Seller', email: 'seller.verified@emahu.com', img: '🏪' },
-    { name: 'Premium Merchant', email: 'merchant.verified@emahu.com', img: '🏪' }
+    { name: 'Emahu Certified Apple Seller', email: 'seller.apple@emahu.com', img: '' },
+    { name: 'Premium Apple Merchant', email: 'merchant.apple@emahu.com', img: '' }
   ] : [
-    { name: 'Verified Buyer One', email: 'buyer.verified@emahu.com', img: '👤' },
-    { name: 'John Doe (Verified)', email: 'johndoe@emahu.com', img: '👤' }
+    { name: 'Apple Buyer One', email: 'buyer.apple@emahu.com', img: '' },
+    { name: 'Jane Doe (Apple ID)', email: 'janedoe.apple@emahu.com', img: '' }
   ];
 
   const handleSelectAccount = (account) => {
@@ -24,7 +24,7 @@ function GoogleAuthContent() {
     setTimeout(() => {
       if (window.opener) {
         window.opener.postMessage({
-          type: 'GOOGLE_AUTH_SUCCESS',
+          type: 'APPLE_AUTH_SUCCESS',
           email: account.email,
           name: account.name,
           role: role
@@ -51,50 +51,46 @@ function GoogleAuthContent() {
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: '100vh',
-      backgroundColor: '#f0f4f9',
-      fontFamily: 'Roboto, Arial, sans-serif',
-      color: '#1f1f1f',
+      backgroundColor: '#000000',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      color: '#ffffff',
       padding: '20px'
     }}>
       <div style={{
-        backgroundColor: '#fff',
+        backgroundColor: '#1c1c1e',
         width: '100%',
         maxWidth: '450px',
-        borderRadius: '28px',
+        borderRadius: '20px',
         padding: '40px',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+        boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
         boxSizing: 'border-box',
-        textAlign: 'center'
+        textAlign: 'center',
+        border: '1px solid #2c2c2e'
       }}>
-        {/* Google Multi-Color Logo */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '2px', fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '24px' }}>
-          <span style={{ color: '#4285F4' }}>G</span>
-          <span style={{ color: '#EA4335' }}>o</span>
-          <span style={{ color: '#FBBC05' }}>o</span>
-          <span style={{ color: '#4285F4' }}>g</span>
-          <span style={{ color: '#34A853' }}>l</span>
-          <span style={{ color: '#EA4335' }}>e</span>
+        {/* Apple Logo */}
+        <div style={{ display: 'flex', justifyContent: 'center', fontSize: '3rem', marginBottom: '20px', color: '#ffffff' }}>
+          
         </div>
 
-        <h1 style={{ fontSize: '1.5rem', fontWeight: '400', margin: '0 0 8px 0' }}>Choose an account</h1>
-        <p style={{ fontSize: '0.9rem', color: '#5f6368', margin: '0 0 32px 0' }}>to continue to <strong style={{ color: '#4285F4' }}>Emahu</strong></p>
+        <h1 style={{ fontSize: '1.4rem', fontWeight: '600', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>Sign in with Apple ID</h1>
+        <p style={{ fontSize: '0.9rem', color: '#8e8e93', margin: '0 0 32px 0' }}>Use your Apple ID to continue to <strong>Emahu</strong></p>
 
         {loadingAccount ? (
           <div style={{ padding: '40px 0', textAlign: 'center' }}>
             <div style={{
               width: '32px',
               height: '32px',
-              border: '3.5px solid #e8f0fe',
-              borderTopColor: '#1a73e8',
+              border: '3.5px solid #2c2c2e',
+              borderTopColor: '#ffffff',
               borderRadius: '50%',
               animation: 'spin 0.8s linear infinite',
               margin: '0 auto 20px'
             }} />
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <p style={{ fontSize: '0.9rem', color: '#5f6368', margin: 0 }}>Signing in as {loadingAccount}...</p>
+            <p style={{ fontSize: '0.9rem', color: '#8e8e93', margin: 0 }}>Connecting Apple ID securely...</p>
           </div>
         ) : !showManual ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
             {testAccounts.map((acc, i) => (
               <button
                 key={i}
@@ -105,38 +101,39 @@ function GoogleAuthContent() {
                   gap: '16px',
                   width: '100%',
                   padding: '16px',
-                  background: 'none',
+                  backgroundColor: '#2c2c2e',
                   border: 'none',
                   borderRadius: '12px',
                   cursor: 'pointer',
                   transition: 'background-color 0.2s',
                   fontSize: '0.95rem',
-                  color: '#3c4043'
+                  color: '#ffffff'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3a3a3c'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2c2c2e'}
               >
                 <div style={{
                   width: '36px',
                   height: '36px',
                   borderRadius: '50%',
-                  backgroundColor: '#e8f0fe',
-                  color: '#1a73e8',
+                  backgroundColor: '#1c1c1e',
+                  color: '#ffffff',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '1.1rem'
+                  fontSize: '1.2rem',
+                  border: '1px solid #3a3a3c'
                 }}>
                   {acc.img}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: '500', color: '#3c4043' }}>{acc.name}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#5f6368' }}>{acc.email}</div>
+                  <div style={{ fontWeight: '600', color: '#ffffff' }}>{acc.name}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#8e8e93' }}>{acc.email}</div>
                 </div>
               </button>
             ))}
 
-            <div style={{ borderBottom: '1px solid #dadce0', margin: '12px 0' }} />
+            <div style={{ borderBottom: '1px solid #2c2c2e', margin: '12px 0' }} />
 
             <button
               onClick={() => setShowManual(true)}
@@ -146,23 +143,29 @@ function GoogleAuthContent() {
                 gap: '16px',
                 width: '100%',
                 padding: '16px',
-                background: 'none',
-                border: 'none',
+                backgroundColor: 'transparent',
+                border: '1px dashed #48484a',
                 borderRadius: '12px',
                 cursor: 'pointer',
-                transition: 'background-color 0.2s',
+                transition: 'all 0.2s',
                 fontSize: '0.95rem',
-                color: '#1a73e8'
+                color: '#0a84ff'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(10, 132, 255, 0.05)';
+                e.currentTarget.style.borderColor = '#0a84ff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.borderColor = '#48484a';
+              }}
             >
               <div style={{
                 width: '36px',
                 height: '36px',
                 borderRadius: '50%',
-                backgroundColor: '#f1f3f4',
-                color: '#5f6368',
+                backgroundColor: 'transparent',
+                color: '#8e8e93',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -170,46 +173,46 @@ function GoogleAuthContent() {
               }}>
                 ➕
               </div>
-              <span style={{ fontWeight: '500' }}>Use another account</span>
+              <span style={{ fontWeight: '500' }}>Use another Apple ID</span>
             </button>
           </div>
         ) : (
           <form onSubmit={handleManualSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#5f6368' }}>Name (Optional)</label>
+              <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#8e8e93' }}>Name (Optional)</label>
               <input
                 type="text"
-                placeholder="Google User"
+                placeholder="Apple User"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
                 style={{
                   padding: '12px 16px',
                   borderRadius: '8px',
-                  border: '1px solid #dadce0',
+                  border: '1px solid #3a3a3c',
                   fontSize: '0.95rem',
                   outline: 'none',
-                  backgroundColor: '#fff',
-                  color: '#1f1f1f'
+                  backgroundColor: '#2c2c2e',
+                  color: '#ffffff'
                 }}
               />
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#5f6368' }}>Email Address *</label>
+              <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#8e8e93' }}>Apple ID Email *</label>
               <input
                 type="email"
-                placeholder="user@gmail.com"
+                placeholder="user@icloud.com"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
                 required
                 style={{
                   padding: '12px 16px',
                   borderRadius: '8px',
-                  border: '1px solid #dadce0',
+                  border: '1px solid #3a3a3c',
                   fontSize: '0.95rem',
                   outline: 'none',
-                  backgroundColor: '#fff',
-                  color: '#1f1f1f'
+                  backgroundColor: '#2c2c2e',
+                  color: '#ffffff'
                 }}
               />
             </div>
@@ -221,11 +224,11 @@ function GoogleAuthContent() {
                 style={{
                   padding: '10px 20px',
                   borderRadius: '100px',
-                  border: '1px solid #dadce0',
-                  background: '#fff',
+                  border: '1px solid #3a3a3c',
+                  background: 'transparent',
                   cursor: 'pointer',
                   fontSize: '0.9rem',
-                  color: '#1a73e8',
+                  color: '#8e8e93',
                   fontWeight: '500'
                 }}
               >
@@ -237,7 +240,7 @@ function GoogleAuthContent() {
                   padding: '10px 24px',
                   borderRadius: '100px',
                   border: 'none',
-                  background: '#1a73e8',
+                  background: '#0a84ff',
                   color: '#fff',
                   cursor: 'pointer',
                   fontSize: '0.9rem',
@@ -251,18 +254,18 @@ function GoogleAuthContent() {
           </form>
         )}
 
-        <div style={{ marginTop: '40px', fontSize: '0.75rem', color: '#5f6368', lineHeight: '1.4', textAlign: 'left' }}>
-          To continue, Google will share your name, email address, language preference, and profile picture with Emahu. Before using this app, you can review Emahu&apos;s <span style={{ color: '#1a73e8', cursor: 'pointer' }}>privacy policy</span> and <span style={{ color: '#1a73e8', cursor: 'pointer' }}>terms of service</span>.
+        <div style={{ marginTop: '40px', fontSize: '0.75rem', color: '#8e8e93', lineHeight: '1.4', textAlign: 'left' }}>
+          Your Apple ID is protected by Apple two-factor authentication. Apple will share your contact email and name with Emahu to setup your secure merchant or buyer profile.
         </div>
       </div>
     </div>
   );
 }
 
-export default function GoogleAuthPage() {
+export default function AppleAuthPage() {
   return (
-    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif', color: '#666' }}>Loading Google Sign-In Chooser...</div>}>
-      <GoogleAuthContent />
+    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#000000', fontFamily: 'sans-serif', color: '#8e8e93' }}>Loading Apple ID Login...</div>}>
+      <AppleAuthContent />
     </Suspense>
   );
 }
