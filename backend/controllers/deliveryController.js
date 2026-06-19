@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const DeliverySetting = require('../models/DeliverySetting');
 const Product = require('../models/Product');
 const User = require('../models/User');
@@ -303,6 +304,62 @@ exports.assignOrderToPartner = async (req, res) => {
     const order = await Order.findOne({ orderId });
     if (!order) {
       return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    const isManualCarrier = !mongoose.Types.ObjectId.isValid(deliveryPartnerId);
+
+    if (isManualCarrier) {
+      // Manual/3rd party carrier assignment (Delhivery, Blue Dart, EmahuXpress, FedEx, etc.)
+      order.carrier = deliveryPartnerId;
+      order.deliveryPartnerId = undefined;
+      order.deliveryStatus = 'assigned';
+      order.status = 'DELIVERY_ASSIGNED';
+
+      // Default tracking details if not set
+      if (!order.trackingId) {
+        order.trackingId = `EMH-TRK-${Math.floor(100000 + Math.random() * 900000)}`;
+        order.shipmentId = `EMH-SHIP-${Math.floor(100000 + Math.random() * 900000)}`;
+        order.packageWeight = '1.2 kg';
+        order.deliveryCost = deliveryPartnerId === 'Blue Dart' ? 120 : (deliveryPartnerId === 'Delhivery' ? 80 : 75);
+        order.estDays = deliveryPartnerId === 'Blue Dart' ? '1-3 Days' : (deliveryPartnerId === 'Delhivery' ? '2-4 Days' : '2-5 Days');
+      }
+
+      const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      order.timeline.push({
+        status: 'DELIVERY_ASSIGNED',
+        label: 'Delivery Assigned',
+        desc: `Order assigned to courier partner: ${deliveryPartnerId}`,
+        date: dateStr
+      });
+
+      await order.save();
+
+      // Notify Buyer
+      await Notification.create({
+        recipient: order.userId,
+        recipientModel: 'User',
+        title: 'Delivery Partner Assigned',
+        message: `Your order #${orderId} has been assigned to ${deliveryPartnerId}.`,
+        isRead: false
+      });
+
+      // Broadcast Real-time event
+      const io = req.app.get('socketio');
+      if (io) {
+        io.emit('delivery-status-changed', {
+          orderId,
+          status: 'DELIVERY_ASSIGNED',
+          deliveryStatus: 'assigned',
+          partner: { name: deliveryPartnerId, phone: 'N/A' }
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Delivery partner assigned successfully',
+        order,
+        assignment: null
+      });
     }
 
     const partner = await User.findOne({ _id: deliveryPartnerId, role: 'delivery' });

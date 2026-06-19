@@ -45,6 +45,26 @@ const isRealImage = (img) => {
   return clean.startsWith('http') || clean.startsWith('data:image');
 };
 
+const decodeToken = (token) => {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const padLen = (4 - (base64.length % 4)) % 4;
+    const padded = base64 + '='.repeat(padLen);
+    const jsonPayload = decodeURIComponent(
+      atob(padded)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Safe JWT Decode Error:', e);
+    return null;
+  }
+};
+
 const INITIAL_PRODUCTS = [
   {
     id: 'prod-1',
@@ -191,7 +211,22 @@ export default function EmahuProDashboard() {
     router.replace('/seller/login?expired=true');
   };
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const storedUser = localStorage.getItem('emahu_seller_user');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          if (parsed && parsed.status === 'approved') {
+            return 'overview';
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing stored seller user for activeTab initialization:', e);
+      }
+    }
+    return 'status';
+  });
   const [newProductCategory, setNewProductCategory] = useState('Electronics & Tech');
   const [sellerUser, setSellerUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -606,8 +641,10 @@ export default function EmahuProDashboard() {
     let isTokenExpired = false;
     if (token) {
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
+        const payload = decodeToken(token);
+        if (!payload) {
+          isTokenExpired = true;
+        } else if (payload.exp && payload.exp * 1000 < Date.now()) {
           isTokenExpired = true;
         }
       } catch (e) {
@@ -738,15 +775,24 @@ export default function EmahuProDashboard() {
     }
   }, [sellerUser]);
 
-  // Lock user to status tab if not approved and documents not fully verified
+  // Lock/Unlock tabs based on seller approval status
   useEffect(() => {
     const allDocsApproved = ['business_registration', 'id_proof'].every(type =>
       sellerDocuments.some(doc => doc.documentType === type && doc.status === 'approved')
     );
-    if (sellerUser && sellerUser.status !== 'approved' && !allDocsApproved) {
-      setTimeout(() => setActiveTab('status'), 0);
+    const isApproved = sellerUser?.status === 'approved' || allDocsApproved;
+    if (sellerUser) {
+      if (!isApproved) {
+        if (activeTab !== 'status') {
+          setTimeout(() => setActiveTab('status'), 0);
+        }
+      } else {
+        if (activeTab === 'status') {
+          setTimeout(() => setActiveTab('overview'), 0);
+        }
+      }
     }
-  }, [sellerUser, sellerDocuments]);
+  }, [sellerUser, sellerDocuments, activeTab]);
 
   const fetchSellerDocuments = async () => {
     try {
@@ -1190,11 +1236,47 @@ export default function EmahuProDashboard() {
   const [verifyingEscrow, setVerifyingEscrow] = useState({});
   const [verifiedEscrow, setVerifiedEscrow] = useState({});
 
+  // States for delivery partner selection modal
+  const [availablePartners, setAvailablePartners] = useState([]);
+  const [availablePartnersLoading, setAvailablePartnersLoading] = useState(false);
+  const [availablePartnersError, setAvailablePartnersError] = useState('');
+  const [selectedPartnerId, setSelectedPartnerId] = useState('');
+  const [isConfirmChecked, setIsConfirmChecked] = useState(false);
+  const [hasContactedPartner, setHasContactedPartner] = useState(false);
+
   const selectedDetailedOrder = useMemo(() => {
     if (!selectedDetailedOrderId) return null;
     const found = orders.find(o => o.id === selectedDetailedOrderId);
     return found ? found.raw : null;
   }, [selectedDetailedOrderId, orders]);
+
+  const fetchAvailablePartners = async (orderId) => {
+    setAvailablePartnersLoading(true);
+    setAvailablePartnersError('');
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      const res = await fetch(`${getDynamicApiUrl()}/api/delivery/available-partners/${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        setAvailablePartners(data.availablePartners || []);
+      } else {
+        setAvailablePartnersError(data.error || 'Failed to fetch available delivery partners.');
+      }
+    } catch (err) {
+      console.error('Error fetching available partners:', err);
+      setAvailablePartnersError('Network or server error while querying active carriers.');
+    } finally {
+      setAvailablePartnersLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (isDeliveryModalOpen && selectedOrderId) {
@@ -5867,7 +5949,28 @@ export default function EmahuProDashboard() {
                           })()}
                         </span>
                       </div>
-                      
+
+                      {/* Payout Details */}
+                      {selectedDetailedOrder.paymentStatus === 'paid' && (
+                        <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '12px', marginTop: '8px', background: 'rgba(22,163,74,0.02)', border: '1px solid rgba(22,163,74,0.1)', borderRadius: '8px', padding: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '6px' }}>
+                            <span>✓ Payout Completed (Funds Released)</span>
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '8px' }}>
+                            Paid on: {selectedDetailedOrder.transactionDate ? new Date(selectedDetailedOrder.transactionDate).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}
+                          </div>
+                          {selectedDetailedOrder.transactionFile && (
+                            <a 
+                              href={selectedDetailedOrder.transactionFile} 
+                              download={`payout_receipt_${selectedDetailedOrder.orderId}.png`}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', color: '#3b82f6', textDecoration: 'underline', fontWeight: '600' }}
+                            >
+                              📄 View Payout Receipt
+                            </a>
+                          )}
+                        </div>
+                      )}
+
                       {/* Interactive Verification Action */}
                       <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '12px', marginTop: '4px' }}>
                         {verifiedEscrow[selectedDetailedOrder.orderId] ? (

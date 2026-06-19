@@ -35,6 +35,13 @@ export default function DeliveryPortal() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // OTP Verification States
+  const [emailOtp, setEmailOtp] = useState('');
+  const [isEmailOtpSent, setIsEmailOtpSent] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [devOtp, setDevOtp] = useState('');
+
   // --- Login States ---
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -119,7 +126,7 @@ export default function DeliveryPortal() {
     fetchDashboardData(token);
 
     // Connect to websocket
-    const socket = io();
+    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
     socket.on('connect', () => {
       console.log('Connected to logistics socket grid');
     });
@@ -169,11 +176,83 @@ export default function DeliveryPortal() {
     setPortalMode('landing');
   };
 
+  const handleSendEmailOtp = async () => {
+    if (!email.trim()) {
+      setErrors((prev) => ({ ...prev, email: 'Email address is required to send OTP' }));
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setErrors((prev) => ({ ...prev, email: 'Enter a valid email address' }));
+      return;
+    }
+    setOtpLoading(true);
+    setErrors((prev) => ({ ...prev, email: '', general: '' }));
+    setDevOtp('');
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: email })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsEmailOtpSent(true);
+        if (data.devOtp) {
+          setDevOtp(data.devOtp);
+        }
+        setErrors((prev) => ({ ...prev, general: '' }));
+      } else {
+        setErrors((prev) => ({ ...prev, email: data.error || 'Failed to send OTP' }));
+      }
+    } catch (err) {
+      console.error(err);
+      setErrors((prev) => ({ ...prev, email: 'Network error sending OTP code.' }));
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    if (!emailOtp.trim()) {
+      setErrors((prev) => ({ ...prev, otp: 'Please enter the verification code' }));
+      return;
+    }
+    setOtpLoading(true);
+    setErrors((prev) => ({ ...prev, otp: '', general: '' }));
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: email, otp: emailOtp })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsEmailVerified(true);
+        setErrors((prev) => ({ ...prev, general: '' }));
+      } else {
+        setErrors((prev) => ({ ...prev, otp: data.error || 'Invalid OTP code' }));
+      }
+    } catch (err) {
+      console.error(err);
+      setErrors((prev) => ({ ...prev, otp: 'Network error verifying OTP code.' }));
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
   // Form Validation
   const validateForm = () => {
     const newErrors = {};
     if (!deliveryName.trim()) newErrors.deliveryName = 'Name is required';
-    if (!email.trim()) newErrors.email = 'Email is required';
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!isEmailVerified) {
+      newErrors.email = 'Please verify your email address via OTP first';
+    }
     if (!password || password.length < 6) newErrors.password = 'Password must be >= 6 chars';
     if (!phoneNumber.trim()) newErrors.phoneNumber = 'Mobile number is required';
     if (!currentCity.trim()) newErrors.currentCity = 'City is required';
@@ -448,15 +527,74 @@ export default function DeliveryPortal() {
 
                       <div className="form-group">
                         <label className="form-label" htmlFor="email">Email Address</label>
-                        <input 
-                          type="email" 
-                          id="email"
-                          className={`form-input ${errors.email ? 'form-input--error' : ''}`}
-                          placeholder="e.g. partner@emahu.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                        />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input 
+                            type="email" 
+                            id="email"
+                            className={`form-input ${errors.email ? 'form-input--error' : ''}`}
+                            placeholder="e.g. partner@emahu.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            readOnly={isEmailVerified}
+                            style={{ flex: 1 }}
+                          />
+                          {!isEmailVerified && (
+                            <button
+                              type="button"
+                              className="form-btn"
+                              style={{ padding: '0 12px', height: '40px', fontSize: '0.78rem', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap', width: 'auto', margin: 0 }}
+                              onClick={handleSendEmailOtp}
+                              disabled={otpLoading}
+                            >
+                              {otpLoading ? '...' : isEmailOtpSent ? 'Resend' : 'Send Code'}
+                            </button>
+                          )}
+                        </div>
                         {errors.email && <span className="form-error">{errors.email}</span>}
+
+                        {/* OTP Input UI */}
+                        {isEmailOtpSent && !isEmailVerified && (
+                          <div style={{ marginTop: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', padding: '10px', borderRadius: '8px' }}>
+                            <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>Verification Code</label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Enter 6-digit OTP"
+                                value={emailOtp}
+                                onChange={(e) => setEmailOtp(e.target.value)}
+                                style={{ flex: 1, height: '36px', fontSize: '0.85rem' }}
+                              />
+                              <button
+                                type="button"
+                                className="form-btn"
+                                style={{ padding: '0 12px', height: '36px', fontSize: '0.78rem', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', width: 'auto', margin: 0 }}
+                                onClick={handleVerifyEmailOtp}
+                                disabled={otpLoading}
+                              >
+                                Verify
+                              </button>
+                            </div>
+                            {errors.otp && <span className="form-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
+                            {devOtp && (
+                              <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '6px', fontWeight: 'bold' }}>
+                                [DEV ONLY] Code: {devOtp} (Click to auto-fill)
+                                <span 
+                                  onClick={() => setEmailOtp(devOtp)} 
+                                  style={{ textDecoration: 'underline', cursor: 'pointer', marginLeft: '6px', color: '#38bdf8' }}
+                                >
+                                  [Fill]
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {isEmailVerified && (
+                          <div style={{ color: '#10b981', fontSize: '0.75rem', marginTop: '6px', fontWeight: 'bold' }}>
+                            ✓ Email Address Verified Successfully
+                          </div>
+                        )}
                       </div>
 
                       <div className="form-group">

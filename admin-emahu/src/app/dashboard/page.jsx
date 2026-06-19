@@ -34,11 +34,35 @@ const isRealImage = (img) => {
   return clean.startsWith('http') || clean.startsWith('data:image');
 };
 
+const decodeToken = (token) => {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const padLen = (4 - (base64.length % 4)) % 4;
+    const padded = base64 + '='.repeat(padLen);
+    const jsonPayload = decodeURIComponent(
+      atob(padded)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Safe JWT Decode Error:', e);
+    return null;
+  }
+};
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [adminUser, setAdminUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [activeTab, setActiveTab] = useState('sellers');
+
+  // Payout states
+  const [payoutReceiptFile, setPayoutReceiptFile] = useState('');
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false);
 
   // Sellers and Products State
   const [sellers, setSellers] = useState([]);
@@ -135,6 +159,44 @@ export default function AdminDashboard() {
   const [deliveryCost, setDeliveryCost] = useState('');
   const [estDays, setEstDays] = useState('');
 
+  const handleCarrierChange = (selectedCarrier) => {
+    setCarrier(selectedCarrier);
+    let defaults = { trackingId: '', packageWeight: '', deliveryCost: '', estDays: '' };
+    if (selectedCarrier === 'Delhivery') {
+      defaults = {
+        trackingId: `DLV${Math.floor(100000000 + Math.random() * 900000000)}`,
+        packageWeight: '1.2 kg',
+        deliveryCost: '120',
+        estDays: '3-5 Days'
+      };
+    } else if (selectedCarrier === 'Blue Dart') {
+      defaults = {
+        trackingId: `BD${Math.floor(100000000 + Math.random() * 900000000)}`,
+        packageWeight: '1.5 kg',
+        deliveryCost: '180',
+        estDays: '1-2 Days'
+      };
+    } else if (selectedCarrier === 'EmahuXpress') {
+      defaults = {
+        trackingId: `EMH-TRK-${Math.floor(100 + Math.random() * 900)}`,
+        packageWeight: '0.8 kg',
+        deliveryCost: '80',
+        estDays: '2-4 Days'
+      };
+    } else if (selectedCarrier === 'FedEx') {
+      defaults = {
+        trackingId: `FDX${Math.floor(100000000 + Math.random() * 900000000)}`,
+        packageWeight: '2.0 kg',
+        deliveryCost: '250',
+        estDays: '2-3 Days'
+      };
+    }
+    setTrackingId(defaults.trackingId);
+    setPackageWeight(defaults.packageWeight);
+    setDeliveryCost(defaults.deliveryCost);
+    setEstDays(defaults.estDays);
+  };
+
   // Feedback modals states (generic for reject / request changes / request more info)
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [feedbackType, setFeedbackType] = useState('product'); // 'seller' or 'product'
@@ -192,13 +254,10 @@ export default function AdminDashboard() {
     
     let isTokenExpired = false;
     if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
-          isTokenExpired = true;
-        }
-      } catch (e) {
-        console.error('Failed to parse token payload:', e);
+      const payload = decodeToken(token);
+      if (!payload) {
+        isTokenExpired = true;
+      } else if (payload.exp && payload.exp * 1000 < Date.now()) {
         isTokenExpired = true;
       }
     } else {
@@ -429,6 +488,55 @@ export default function AdminDashboard() {
       triggerToast('Error', 'Network error updating order.', 'danger');
     } finally {
       setActionLoadingOrder(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handlePayoutFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPayoutReceiptFile(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const submitMerchantPayout = async (orderId) => {
+    if (!payoutReceiptFile) {
+      triggerToast('Error', 'Please attach a transaction receipt file.', 'danger');
+      return;
+    }
+    setPayoutSubmitting(true);
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          paymentStatus: 'paid',
+          transactionFile: payoutReceiptFile,
+          transactionDate: new Date()
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        triggerToast('Success', 'Merchant payout confirmed and receipt saved.', 'success');
+        // Update the orders state list
+        setOrders(prev => prev.map(o => o.orderId === orderId ? data.order : o));
+        // Update the selected order details state
+        setSelectedDetailOrder(data.order);
+        setPayoutReceiptFile('');
+      } else {
+        triggerToast('Error', data.error || 'Failed to update payout status.', 'danger');
+      }
+    } catch (err) {
+      console.error('Error submitting payout:', err);
+      triggerToast('Error', 'Network error confirming merchant payout.', 'danger');
+    } finally {
+      setPayoutSubmitting(false);
     }
   };
 
@@ -2119,6 +2227,40 @@ export default function AdminDashboard() {
                     <span className="ad-detail-row-label">Escrow Release Method</span>
                     <span className="ad-detail-row-val">{selectedDetailOrder.escrowMethod || 'Standard Escrow Vault'}</span>
                   </div>
+
+                  {/* Merchant Payout Bill Breakdown */}
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', marginTop: '12px' }}>
+                    <div style={{ fontWeight: '600', fontSize: '0.78rem', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                      🪙 MERCHANT PAYOUT BILL (0% Commission)
+                    </div>
+                    <div style={{ background: 'rgba(99,102,241,0.02)', border: '1px solid rgba(99,102,241,0.08)', borderRadius: '6px', padding: '10px' }}>
+                      <div className="ad-detail-row" style={{ marginBottom: '6px' }}>
+                        <span className="ad-detail-row-label" style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Product Cost Subtotal</span>
+                        <span className="ad-detail-row-val" style={{ fontSize: '0.75rem' }}>
+                          ₹{(selectedDetailOrder.productAmount || selectedDetailOrder.items?.reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="ad-detail-row" style={{ marginBottom: '6px' }}>
+                        <span className="ad-detail-row-label" style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Platform Commission</span>
+                        <span className="ad-detail-row-val" style={{ fontSize: '0.75rem', color: '#10b981' }}>₹0.00</span>
+                      </div>
+                      {selectedDetailOrder.discountAmount > 0 && (
+                        <div className="ad-detail-row" style={{ marginBottom: '6px' }}>
+                          <span className="ad-detail-row-label" style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Coupon Discount ({selectedDetailOrder.couponCode || 'Promo'})</span>
+                          <span className="ad-detail-row-val" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
+                            - ₹{selectedDetailOrder.discountAmount.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      )}
+                      <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', margin: '6px 0' }} />
+                      <div className="ad-detail-row">
+                        <span className="ad-detail-row-label" style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#fff' }}>Net Merchant Payout</span>
+                        <span className="ad-detail-row-val" style={{ fontSize: '0.88rem', fontWeight: 'bold', color: '#818cf8' }}>
+                          ₹{Math.max(0, (selectedDetailOrder.productAmount || selectedDetailOrder.items?.reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0) - (selectedDetailOrder.discountAmount || 0)).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Order Transit History (Timeline Log) */}
@@ -2180,7 +2322,7 @@ export default function AdminDashboard() {
                             className="ad-modal-input" 
                             style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px' }}
                             value={carrier}
-                            onChange={(e) => setCarrier(e.target.value)}
+                            onChange={(e) => handleCarrierChange(e.target.value)}
                           >
                             <option value="Delhivery">Delhivery Logistics</option>
                             <option value="Blue Dart">Blue Dart Premium</option>
@@ -2329,8 +2471,70 @@ export default function AdminDashboard() {
                       )}
 
                       {['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].some(s => selectedDetailOrder.status?.includes(s)) && (
-                        <div style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', padding: '14px', color: '#10b981', fontSize: '0.82rem', textAlign: 'center', fontWeight: 'bold' }}>
-                          ✓ Fulfillment Cycle Completed Successfully
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px', marginTop: '4px' }}>
+                          <div style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', padding: '14px', color: '#10b981', fontSize: '0.82rem', textAlign: 'center', fontWeight: 'bold' }}>
+                            ✓ Fulfillment Cycle Completed Successfully
+                          </div>
+
+                          {/* Payout Flow */}
+                          {selectedDetailOrder.paymentStatus === 'paid' ? (
+                            <div style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: '8px', padding: '14px', fontSize: '0.82rem', color: '#60a5fa' }}>
+                              <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                                💳 Payout Status: PAID (Verified)
+                              </div>
+                              <div style={{ color: '#94a3b8', fontSize: '0.76rem', marginBottom: '6px' }}>
+                                Date: {selectedDetailOrder.transactionDate ? new Date(selectedDetailOrder.transactionDate).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}
+                              </div>
+                              {selectedDetailOrder.transactionFile && (
+                                <a 
+                                  href={selectedDetailOrder.transactionFile} 
+                                  download={`receipt_${selectedDetailOrder.orderId}.png`} 
+                                  style={{ color: '#38bdf8', textDecoration: 'underline', fontWeight: '500', display: 'inline-block', marginTop: '4px' }}
+                                >
+                                  📄 View Attached Receipt File
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '14px' }}>
+                              <div style={{ fontWeight: 'bold', fontSize: '0.82rem', color: '#fff', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                💰 Confirm Merchant Payout
+                              </div>
+                              <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: '#94a3b8', lineHeight: '1.4' }}>
+                                Confirm that you have transferred the net payout amount to the seller's bank account and upload the transaction receipt/screenshot below.
+                              </p>
+
+                              {/* Premium Uploader */}
+                              <div style={{ position: 'relative', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: '6px', padding: '12px 10px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', cursor: 'pointer', marginBottom: '12px' }}>
+                                <input 
+                                  type="file" 
+                                  accept="image/*,application/pdf"
+                                  onChange={handlePayoutFileChange}
+                                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                                />
+                                {payoutReceiptFile ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: '500' }}>✓ Receipt File Loaded</span>
+                                    <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Click or drag to change file</span>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ fontSize: '0.75rem', color: '#38bdf8' }}>📁 Upload Transfer Receipt</span>
+                                    <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Supports image or document screenshot</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <button
+                                className="ad-btn-action approve"
+                                style={{ height: '36px', fontSize: '0.82rem', width: '100%', margin: 0, background: payoutReceiptFile ? 'var(--color-admin-primary)' : 'rgba(255,255,255,0.05)', borderColor: payoutReceiptFile ? 'var(--color-admin-primary)' : 'rgba(255,255,255,0.08)', cursor: payoutReceiptFile ? 'pointer' : 'not-allowed', color: payoutReceiptFile ? '#fff' : '#64748b' }}
+                                disabled={!payoutReceiptFile || payoutSubmitting}
+                                onClick={() => submitMerchantPayout(selectedDetailOrder.orderId)}
+                              >
+                                {payoutSubmitting ? 'Confirming...' : '💰 Confirm Transfer & Release Funds'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -3250,11 +3454,49 @@ export default function AdminDashboard() {
                                     style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem' }}
                                     onClick={() => {
                                       setSelectedDetailOrder(order);
-                                      setCarrier(order.carrier || 'Delhivery');
-                                      setTrackingId(order.trackingId || '');
-                                      setPackageWeight(order.packageWeight || '');
-                                      setDeliveryCost(order.deliveryCost || '');
-                                      setEstDays(order.estDays || '');
+                                      const defaultCarrier = order.carrier || 'Delhivery';
+                                      setCarrier(defaultCarrier);
+                                      if (order.trackingId) {
+                                        setTrackingId(order.trackingId);
+                                        setPackageWeight(order.packageWeight || '');
+                                        setDeliveryCost(order.deliveryCost || '');
+                                        setEstDays(order.estDays || '');
+                                      } else {
+                                        let defaults = { trackingId: '', packageWeight: '', deliveryCost: '', estDays: '' };
+                                        if (defaultCarrier === 'Delhivery') {
+                                          defaults = {
+                                            trackingId: `DLV${Math.floor(100000000 + Math.random() * 900000000)}`,
+                                            packageWeight: '1.2 kg',
+                                            deliveryCost: '120',
+                                            estDays: '3-5 Days'
+                                          };
+                                        } else if (defaultCarrier === 'Blue Dart') {
+                                          defaults = {
+                                            trackingId: `BD${Math.floor(100000000 + Math.random() * 900000000)}`,
+                                            packageWeight: '1.5 kg',
+                                            deliveryCost: '180',
+                                            estDays: '1-2 Days'
+                                          };
+                                        } else if (defaultCarrier === 'EmahuXpress') {
+                                          defaults = {
+                                            trackingId: `EMH-TRK-${Math.floor(100 + Math.random() * 900)}`,
+                                            packageWeight: '0.8 kg',
+                                            deliveryCost: '80',
+                                            estDays: '2-4 Days'
+                                          };
+                                        } else if (defaultCarrier === 'FedEx') {
+                                          defaults = {
+                                            trackingId: `FDX${Math.floor(100000000 + Math.random() * 900000000)}`,
+                                            packageWeight: '2.0 kg',
+                                            deliveryCost: '250',
+                                            estDays: '2-3 Days'
+                                          };
+                                        }
+                                        setTrackingId(defaults.trackingId);
+                                        setPackageWeight(defaults.packageWeight);
+                                        setDeliveryCost(defaults.deliveryCost);
+                                        setEstDays(defaults.estDays);
+                                      }
                                     }}
                                   >
                                     Track &amp; Fulfill

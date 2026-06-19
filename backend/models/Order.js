@@ -152,6 +152,18 @@ const orderSchema = new mongoose.Schema(
     discountAmount: {
       type: Number,
       default: 0
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['unpaid', 'paid'],
+      default: 'unpaid'
+    },
+    transactionFile: {
+      type: String,
+      default: ''
+    },
+    transactionDate: {
+      type: Date
     }
   },
   {

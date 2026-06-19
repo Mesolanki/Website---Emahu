@@ -35,6 +35,13 @@ export default function BuyerRegister() {
 
   const [errors, setErrors] = useState({});
 
+  // OTP Verification States
+  const [emailOtp, setEmailOtp] = useState('');
+  const [isEmailOtpSent, setIsEmailOtpSent] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [devOtp, setDevOtp] = useState('');
+
   // If already logged in, redirect directly to the buyer account marketplace home
   useEffect(() => {
     if (localStorage.getItem('emahu_buyer_logged_in') === 'true') {
@@ -109,6 +116,74 @@ export default function BuyerRegister() {
 
 
 
+  const handleSendEmailOtp = async () => {
+    if (!formData.email.trim()) {
+      setErrors((prev) => ({ ...prev, email: 'Email address is required to send OTP' }));
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      setErrors((prev) => ({ ...prev, email: 'Enter a valid email address' }));
+      return;
+    }
+    setOtpLoading(true);
+    setErrors((prev) => ({ ...prev, email: '', general: '' }));
+    setDevOtp('');
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: formData.email })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsEmailOtpSent(true);
+        if (data.devOtp) {
+          setDevOtp(data.devOtp);
+        }
+        setErrors((prev) => ({ ...prev, general: '' }));
+      } else {
+        setErrors((prev) => ({ ...prev, email: data.error || 'Failed to send OTP' }));
+      }
+    } catch (err) {
+      console.error(err);
+      setErrors((prev) => ({ ...prev, email: 'Network error sending OTP code.' }));
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    if (!emailOtp.trim()) {
+      setErrors((prev) => ({ ...prev, otp: 'Please enter the verification code' }));
+      return;
+    }
+    setOtpLoading(true);
+    setErrors((prev) => ({ ...prev, otp: '', general: '' }));
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: formData.email, otp: emailOtp })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsEmailVerified(true);
+        setErrors((prev) => ({ ...prev, general: '' }));
+      } else {
+        setErrors((prev) => ({ ...prev, otp: data.error || 'Invalid OTP code' }));
+      }
+    } catch (err) {
+      console.error(err);
+      setErrors((prev) => ({ ...prev, otp: 'Network error verifying OTP code.' }));
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -128,6 +203,8 @@ export default function BuyerRegister() {
       newErrors.email = 'Email address is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Enter a valid email address';
+    } else if (!isEmailVerified) {
+      newErrors.email = 'Please verify your email address via OTP first';
     }
 
     if (!formData.phone.trim()) {
@@ -310,16 +387,75 @@ export default function BuyerRegister() {
 
                     <div className="br-field">
                       <label className="br-label" htmlFor="email">Email Address</label>
-                      <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        className={`br-input ${errors.email ? 'br-input--error' : ''}`}
-                        placeholder="rahul@example.com"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                      />
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="email"
+                          id="email"
+                          name="email"
+                          className={`br-input ${errors.email ? 'br-input--error' : ''}`}
+                          placeholder="rahul@example.com"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          readOnly={isEmailVerified}
+                          style={{ flex: 1 }}
+                        />
+                        {!isEmailVerified && (
+                          <button
+                            type="button"
+                            className="br-btn-sub"
+                            style={{ padding: '0 12px', height: '42px', fontSize: '0.78rem', background: '#4169e1', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            onClick={handleSendEmailOtp}
+                            disabled={otpLoading}
+                          >
+                            {otpLoading ? '...' : isEmailOtpSent ? 'Resend' : 'Send Code'}
+                          </button>
+                        )}
+                      </div>
                       {errors.email && <span className="br-error">{errors.email}</span>}
+
+                      {/* OTP Code Input */}
+                      {isEmailOtpSent && !isEmailVerified && (
+                        <div style={{ marginTop: '8px', background: 'rgba(65,105,225,0.03)', border: '1px solid rgba(65,105,225,0.08)', padding: '10px', borderRadius: '8px' }}>
+                          <label className="br-label" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>Verification Code</label>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <input
+                              type="text"
+                              className="br-input"
+                              placeholder="Enter 6-digit OTP"
+                              value={emailOtp}
+                              onChange={(e) => setEmailOtp(e.target.value)}
+                              style={{ flex: 1, height: '36px', fontSize: '0.85rem' }}
+                            />
+                            <button
+                              type="button"
+                              className="br-btn-sub"
+                              style={{ padding: '0 12px', height: '36px', fontSize: '0.78rem', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                              onClick={handleVerifyEmailOtp}
+                              disabled={otpLoading}
+                            >
+                              Verify
+                            </button>
+                          </div>
+                          {errors.otp && <span className="br-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
+                          {devOtp && (
+                            <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '6px', fontWeight: 'bold' }}>
+                              [DEV ONLY] Code: {devOtp} (Click to auto-fill)
+                              <span 
+                                onClick={() => setEmailOtp(devOtp)} 
+                                style={{ textDecoration: 'underline', cursor: 'pointer', marginLeft: '6px', color: '#3b82f6' }}
+                              >
+                                [Fill]
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {isEmailVerified && (
+                        <div style={{ color: '#10b981', fontSize: '0.75rem', marginTop: '6px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          ✓ Email Address Verified Successfully
+                        </div>
+                      )}
                     </div>
 
                     <div className="br-field">
