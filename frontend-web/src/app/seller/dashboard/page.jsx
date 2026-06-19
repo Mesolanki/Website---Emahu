@@ -4654,15 +4654,6 @@ export default function EmahuProDashboard() {
                                       ✗ Email Unverified
                                     </span>
                                   )}
-                                  {seller.isPhoneVerified ? (
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
-                                      ✓ Phone Verified
-                                    </span>
-                                  ) : (
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
-                                      ✗ Phone Unverified
-                                    </span>
-                                  )}
                                 </div>
                               </div>
                             </td>
@@ -4899,15 +4890,6 @@ export default function EmahuProDashboard() {
                     ) : (
                       <span style={{ fontSize: '0.72rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
                         ✗ Email Unverified
-                      </span>
-                    )}
-                    {selectedDetailedSeller.isPhoneVerified ? (
-                      <span style={{ fontSize: '0.72rem', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
-                        ✓ Phone Number Verified
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '0.72rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
-                        ✗ Phone Number Unverified
                       </span>
                     )}
                   </div>

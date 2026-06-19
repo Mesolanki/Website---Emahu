@@ -48,13 +48,7 @@ export default function SellerRegister() {
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [devEmailOtp, setDevEmailOtp] = useState('');
 
-  // Phone OTP States
-  const [isPhoneOtpVerifying, setIsPhoneOtpVerifying] = useState(false);
-  const [phoneOtpInput, setPhoneOtpInput] = useState('');
-  const [phoneOtpError, setPhoneOtpError] = useState('');
-  const [phoneOtpSending, setPhoneOtpSending] = useState(false);
-  const [phoneOtpCooldown, setPhoneOtpCooldown] = useState(0);
-  const [devPhoneOtp, setDevPhoneOtp] = useState('');
+
 
   // If already logged in, redirect directly to the seller dashboard
   useEffect(() => {
@@ -91,13 +85,7 @@ export default function SellerRegister() {
     return () => clearTimeout(timer);
   }, [otpCooldown]);
 
-  useEffect(() => {
-    let timer;
-    if (phoneOtpCooldown > 0) {
-      timer = setTimeout(() => setPhoneOtpCooldown(prev => prev - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [phoneOtpCooldown]);
+
 
   const triggerSendOtp = async (isResend = false) => {
     setOtpSending(true);
@@ -130,36 +118,7 @@ export default function SellerRegister() {
     }
   };
 
-  const triggerSendPhoneOtp = async (isResend = false) => {
-    setPhoneOtpSending(true);
-    setPhoneOtpError('');
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const res = await fetch(`${apiUrl}/api/auth/send-phone-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: formData.phone })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setIsPhoneOtpVerifying(true);
-        setPhoneOtpCooldown(60);
-        if (data.devOtp) {
-          setDevPhoneOtp(data.devOtp);
-        }
-        if (isResend) {
-          setPhoneOtpError('OTP has been resent to your phone.');
-        }
-      } else {
-        setErrors({ general: data.error || 'Failed to send phone OTP. Please check phone number.' });
-      }
-    } catch (err) {
-      console.error(err);
-      setErrors({ general: 'Network error sending phone OTP. Please try again.' });
-    } finally {
-      setPhoneOtpSending(false);
-    }
-  };
+
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
@@ -191,35 +150,7 @@ export default function SellerRegister() {
     }
   };
 
-  const handleVerifyPhoneOtp = async (e) => {
-    e.preventDefault();
-    if (!phoneOtpInput || phoneOtpInput.trim().length !== 6) {
-      setPhoneOtpError('Please enter a valid 6-digit OTP code.');
-      return;
-    }
-    setLoading(true);
-    setPhoneOtpError('');
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const res = await fetch(`${apiUrl}/api/auth/verify-phone-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: formData.phone, otp: phoneOtpInput.trim() })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setIsPhoneOtpVerifying(false);
-        setStep(2);
-      } else {
-        setPhoneOtpError(data.error || 'Invalid OTP code. Please try again.');
-      }
-    } catch (err) {
-      console.error(err);
-      setPhoneOtpError('Network error verifying phone OTP. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
 
 
@@ -820,13 +751,6 @@ export default function SellerRegister() {
                 <ul className="sr-next-steps__list">
                   <li>
                     <span className="sr-next-steps__badge">1</span>
-                    <div>
-                      <strong>Verify Phone Number</strong>
-                      <span>Humne aapke mobile pe verification OTP code send kiya hai.</span>
-                    </div>
-                  </li>
-                  <li>
-                    <span className="sr-next-steps__badge">2</span>
                     <div>
                       <strong>Add Products</strong>
                       <span>Aap listing drafts save kar sakte hain jab tak KYC status pending hai.</span>
