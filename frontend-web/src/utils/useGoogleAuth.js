@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 
-const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim();
+const RAW_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const CLIENT_ID = (RAW_CLIENT_ID || '').trim();
+const isGoogleEnabled = !!(CLIENT_ID && CLIENT_ID !== 'undefined' && CLIENT_ID !== 'null');
 
 /**
  * Reusable hook to trigger Google Sign-In natively on the current page.
@@ -28,8 +30,15 @@ export function useGoogleAuth(onSuccess, onError) {
 
   // Load GIS script once and initialize on mount
   useEffect(() => {
-    if (!CLIENT_ID) {
-      console.error("Google Client ID missing");
+    if (typeof window === 'undefined') return;
+
+    const currentOrigin = window.location.origin;
+    console.log("[GIS_DIAGNOSTIC] Current origin:", currentOrigin);
+    console.log("[GIS_DIAGNOSTIC] Loaded Client ID:", CLIENT_ID || "(missing/empty)");
+    console.log("[GIS_DIAGNOSTIC] Google Sign-In enabled state:", isGoogleEnabled);
+
+    if (!isGoogleEnabled) {
+      console.warn("[GIS_DIAGNOSTIC] Google Sign-In is disabled because NEXT_PUBLIC_GOOGLE_CLIENT_ID is not properly configured in .env files.");
       return;
     }
 
@@ -38,16 +47,22 @@ export function useGoogleAuth(onSuccess, onError) {
     const initGis = () => {
       if (!active) return;
       if (!window.google?.accounts?.id) {
+        console.log("[GIS_DIAGNOSTIC] Waiting for window.google.accounts.id to load...");
         setTimeout(initGis, 150);
         return;
       }
 
-      if (initializedRef.current) return;
+      if (initializedRef.current) {
+        console.log("[GIS_DIAGNOSTIC] Google Identity Services already initialized.");
+        return;
+      }
 
       try {
+        console.log("[GIS_DIAGNOSTIC] Initializing Google Identity Services with client ID:", CLIENT_ID);
         window.google.accounts.id.initialize({
           client_id: CLIENT_ID,
           callback: (response) => {
+            console.log("[GIS_DIAGNOSTIC] Authentication response received from Google.");
             const idToken = response.credential;
             try {
               const base64Url = idToken.split('.')[1];
@@ -60,12 +75,14 @@ export function useGoogleAuth(onSuccess, onError) {
                     .join('')
                 )
               );
+              console.log("[GIS_DIAGNOSTIC] Auth token successfully decoded for email:", payload.email);
               onSuccessRef.current?.({
                 email: payload.email,
                 name: payload.name || payload.given_name || payload.email?.split('@')[0],
                 idToken,
               });
             } catch (e) {
+              console.error('[GIS_DIAGNOSTIC] Failed to read/decode Google account info from credential token:', e);
               onErrorRef.current?.('Failed to read Google account info.');
             }
           },
@@ -73,13 +90,15 @@ export function useGoogleAuth(onSuccess, onError) {
           cancel_on_tap_outside: true,
         });
         initializedRef.current = true;
+        console.log("[GIS_DIAGNOSTIC] Google Sign-In initialization status: SUCCESS");
       } catch (err) {
-        console.error('GIS initialization error:', err);
+        console.error('[GIS_DIAGNOSTIC] GIS initialization error:', err);
       }
     };
 
     // Load GIS script if not present
     if (!document.getElementById('gis-script')) {
+      console.log("[GIS_DIAGNOSTIC] Creating and appending GIS script tag...");
       const script = document.createElement('script');
       script.id = 'gis-script';
       script.src = 'https://accounts.google.com/gsi/client';
@@ -88,6 +107,7 @@ export function useGoogleAuth(onSuccess, onError) {
       script.onload = initGis;
       document.body.appendChild(script);
     } else {
+      console.log("[GIS_DIAGNOSTIC] GIS script tag already present in DOM. Initializing directly.");
       initGis();
     }
 
@@ -97,22 +117,30 @@ export function useGoogleAuth(onSuccess, onError) {
       if (typeof window !== 'undefined' && window.google?.accounts?.id) {
         try {
           window.google.accounts.id.cancel();
+          console.log("[GIS_DIAGNOSTIC] Canceled outstanding Google Sign-In prompts on unmount.");
         } catch (_) {}
       }
     };
   }, []);
 
   const triggerGoogleSignIn = useCallback(() => {
-    if (!CLIENT_ID) {
-      onErrorRef.current?.('Google Client ID is not configured.');
+    if (typeof window === 'undefined') return;
+
+    const currentOrigin = window.location.origin;
+    if (!isGoogleEnabled) {
+      const errorMsg = 'Google Client ID is not configured.';
+      console.error("[GIS_DIAGNOSTIC] " + errorMsg);
+      onErrorRef.current?.(errorMsg);
       return;
     }
 
-    console.log("Origin:", typeof window !== 'undefined' ? window.location.origin : 'undefined');
-    console.log("Client ID:", CLIENT_ID);
+    console.log("[GIS_DIAGNOSTIC] Google Sign-In triggered.");
+    console.log("[GIS_DIAGNOSTIC] Check origin allowed: Make sure '" + currentOrigin + "' is added to your Authorized JavaScript Origins under client ID " + CLIENT_ID + " in the Google Cloud Console.");
 
     if (!window.google?.accounts?.id) {
-      onErrorRef.current?.('Google Sign-In is loading, please try again.');
+      const errorMsg = 'Google Sign-In is loading, please try again.';
+      console.warn("[GIS_DIAGNOSTIC] window.google.accounts.id not found. Still loading client library.");
+      onErrorRef.current?.(errorMsg);
       return;
     }
 
@@ -122,14 +150,28 @@ export function useGoogleAuth(onSuccess, onError) {
         window.google.accounts.id.cancel();
       } catch (_) {}
 
+      console.log("[GIS_DIAGNOSTIC] Prompting Google One Tap / Sign-In popup...");
       window.google.accounts.id.prompt((notification) => {
-        console.log("Google prompt notification:", notification);
+        console.log("[GIS_DIAGNOSTIC] Google prompt notification status:", notification);
+        if (notification.isNotDisplayed()) {
+          const reason = notification.getNotDisplayedReason();
+          console.warn("[GIS_DIAGNOSTIC] Google Sign-In prompt not displayed. Reason:", reason);
+          if (reason === 'suppressed_by_user' || reason === 'opt_out') {
+            onErrorRef.current?.("Google Sign-In prompt was closed. Please try again.");
+          } else if (reason === 'origin_mismatch') {
+            onErrorRef.current?.("Unauthorized origin. Check if the current URL is allowed in Google Cloud Console.");
+          }
+        } else if (notification.isSkippedMoment()) {
+          console.warn("[GIS_DIAGNOSTIC] Google Sign-In prompt skipped. Reason:", notification.getSkippedReason());
+        } else if (notification.isDismissedMoment()) {
+          console.warn("[GIS_DIAGNOSTIC] Google Sign-In prompt dismissed. Reason:", notification.getDismissedReason());
+        }
       });
     } catch (err) {
-      console.error('GIS prompt error:', err);
+      console.error('[GIS_DIAGNOSTIC] GIS prompt error:', err);
       onErrorRef.current?.('Google Sign-In failed. Please try again.');
     }
   }, []);
 
-  return { triggerGoogleSignIn };
+  return { triggerGoogleSignIn, isGoogleEnabled };
 }

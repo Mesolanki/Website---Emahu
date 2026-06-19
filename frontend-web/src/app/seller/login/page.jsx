@@ -56,7 +56,7 @@ export default function SellerLogin() {
     setError(msg);
   }, []);
 
-  const { triggerGoogleSignIn } = useGoogleAuth(onGoogleSuccess, onGoogleError);
+  const { triggerGoogleSignIn, isGoogleEnabled } = useGoogleAuth(onGoogleSuccess, onGoogleError);
 
   const handleGoogleSignIn = () => triggerGoogleSignIn();
 
@@ -241,46 +241,52 @@ export default function SellerLogin() {
             </button>
           </form>
 
-          {/* Social login divider */}
-          <div className="sl-social-divider">
-            <span className="sl-social-divider__line" />
-            <span className="sl-social-divider__text">or sign in with</span>
-            <span className="sl-social-divider__line" />
-          </div>
+          {isGoogleEnabled && (
+            <>
+              {/* Social login divider */}
+              <div className="sl-social-divider">
+                <span className="sl-social-divider__line" />
+                <span className="sl-social-divider__text">or sign in with</span>
+                <span className="sl-social-divider__line" />
+              </div>
+            </>
+          )}
 
           {/* Social Sign-In buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
-            <button 
-              onClick={handleGoogleSignIn} 
-              type="button"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px',
-                width: '100%',
-                height: '44px',
-                borderRadius: '8px',
-                border: '1px solid #dadce0',
-                backgroundColor: '#ffffff',
-                color: '#3c4043',
-                fontSize: '0.9rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s, box-shadow 0.2s',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f8f9fa'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ffffff'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)'; }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path fill="#EA4335" d="M12.2 10.3v3.4h5.7c-.2 1.3-1 2.4-2.2 3.1v2.6h3.6c2.1-1.9 3.3-4.7 3.3-8.1 0-.6-.1-1.1-.2-1.6H12.2z" />
-                <path fill="#4285F4" d="M12.2 24c3.2 0 6-1.1 7.9-2.9l-3.6-2.6c-1 .7-2.3 1.1-4.3 1.1-3.3 0-6.1-2.2-7.1-5.2H1.4v2.8C3.4 20.3 7.5 24 12.2 24z" />
-                <path fill="#FBBC05" d="M5.1 14.4c-.3-.8-.4-1.7-.4-2.6 0-.9.1-1.8.4-2.6V6.4H1.4C.5 8.2 0 10.2 0 12.2s.5 4 1.4 5.8l3.7-3.6z" />
-                <path fill="#34A853" d="M12.2 4.7c1.8 0 3.3.6 4.6 1.8l3.4-3.4C18.2 1.1 15.4 0 12.2 0 7.5 0 3.4 3.7 1.4 7.7l3.7 2.8c1-3 3.8-5.8 7.1-5.8z" />
-              </svg>
-              <span>Continue with Google</span>
-            </button>
+            {isGoogleEnabled && (
+              <button 
+                onClick={handleGoogleSignIn} 
+                type="button"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  height: '44px',
+                  borderRadius: '8px',
+                  border: '1px solid #dadce0',
+                  backgroundColor: '#ffffff',
+                  color: '#3c4043',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s, box-shadow 0.2s',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f8f9fa'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ffffff'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)'; }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12.2 10.3v3.4h5.7c-.2 1.3-1 2.4-2.2 3.1v2.6h3.6c2.1-1.9 3.3-4.7 3.3-8.1 0-.6-.1-1.1-.2-1.6H12.2z" />
+                  <path fill="#4285F4" d="M12.2 24c3.2 0 6-1.1 7.9-2.9l-3.6-2.6c-1 .7-2.3 1.1-4.3 1.1-3.3 0-6.1-2.2-7.1-5.2H1.4v2.8C3.4 20.3 7.5 24 12.2 24z" />
+                  <path fill="#FBBC05" d="M5.1 14.4c-.3-.8-.4-1.7-.4-2.6 0-.9.1-1.8.4-2.6V6.4H1.4C.5 8.2 0 10.2 0 12.2s.5 4 1.4 5.8l3.7-3.6z" />
+                  <path fill="#34A853" d="M12.2 4.7c1.8 0 3.3.6 4.6 1.8l3.4-3.4C18.2 1.1 15.4 0 12.2 0 7.5 0 3.4 3.7 1.4 7.7l3.7 2.8c1-3 3.8-5.8 7.1-5.8z" />
+                </svg>
+                <span>Continue with Google</span>
+              </button>
+            )}
             <button 
               onClick={handleAppleSignIn} 
               type="button"
