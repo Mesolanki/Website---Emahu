@@ -172,7 +172,7 @@ export default function BuyerLogin() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-8px' }}>
-                <Link href="#forgot" className="br-btn-sub text-buyer" style={{ fontSize: '0.75rem' }}>
+                <Link href="/forgot-password?role=buyer" className="br-btn-sub text-buyer" style={{ fontSize: '0.75rem' }}>
                   Forgot password?
                 </Link>
               </div>

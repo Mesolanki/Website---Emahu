@@ -191,7 +191,7 @@ export default function SellerLogin() {
             <div className="sl-input-group">
               <div className="sl-label-row">
                 <label className="sl-label" htmlFor="sl-password">Password</label>
-                <a href="#forgot" className="sl-forgot-link">Forgot Password?</a>
+                <Link href="/forgot-password?role=seller" className="sl-forgot-link">Forgot Password?</Link>
               </div>
               <div className="sl-input-wrapper">
                 <svg className="sl-input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">

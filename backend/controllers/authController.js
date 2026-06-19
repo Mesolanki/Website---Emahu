@@ -1161,14 +1161,52 @@ exports.verifyOtp = async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const otpCode = otp.trim();
 
-    const Otp = require('../models/Otp');
+    // Check if user exists (forgot password verification)
+    const user = await User.findOne({ email: cleanEmail });
+    if (user && user.otpCode) {
+      if (user.otpAttempts >= 5) {
+        return res.status(400).json({ success: false, error: 'Too many failed attempts. Verification locked. Please request a new OTP.' });
+      }
 
+      if (user.otpExpiry && new Date(user.otpExpiry) < new Date()) {
+        return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
+      }
+
+      if (user.otpCode !== otpCode) {
+        user.otpAttempts += 1;
+        await user.save();
+        const remaining = 5 - user.otpAttempts;
+        return res.status(400).json({ 
+          success: false, 
+          error: `Invalid OTP code. ${remaining > 0 ? `${remaining} attempts remaining.` : 'Verification locked.'}` 
+        });
+      }
+
+      // Generate a secure reset token
+      const crypto = require('crypto');
+      const resetToken = crypto.randomBytes(20).toString('hex');
+      
+      user.otpVerified = true;
+      user.passwordResetToken = resetToken;
+      user.passwordResetExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+      user.otpCode = undefined; // clear otpCode so it can only be verified once
+      user.otpAttempts = 0;
+      await user.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'OTP verified successfully',
+        passwordResetToken: resetToken
+      });
+    }
+
+    // Default registration OTP verify flow
+    const Otp = require('../models/Otp');
     const otpRecord = await Otp.findOne({ email: cleanEmail });
     if (!otpRecord) {
       return res.status(400).json({ success: false, error: 'OTP has expired or does not exist. Please request a new one.' });
     }
 
-    // Strict Javascript validation to prevent database TTL index clock skew issues
     if (otpRecord.expiresAt && new Date(otpRecord.expiresAt) < new Date()) {
       await Otp.deleteOne({ _id: otpRecord._id });
       return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
@@ -1178,7 +1216,6 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid OTP code. Please try again.' });
     }
 
-    // OTP verified successfully - delete it so it can't be reused
     await Otp.deleteOne({ _id: otpRecord._id });
 
     res.status(200).json({
@@ -1286,6 +1323,195 @@ exports.verifyPhoneOtp = async (req, res) => {
   } catch (error) {
     console.error('Verify Phone OTP Error:', error);
     res.status(500).json({ success: false, error: 'Server error verifying phone OTP' });
+  }
+};
+
+// @desc    Initiate forgot password OTP flow
+// @route   POST /api/auth/forgot-password
+// @access  Public
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, error: 'Please provide an email address' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    
+    // Check if user exists
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'No user registered with this email address' });
+    }
+
+    // Generate secure 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes validity
+
+    // Update user fields
+    user.otpCode = otpCode;
+    user.otpExpiry = expiresAt;
+    user.otpAttempts = 0;
+    user.otpResendAttempts = 0;
+    user.otpVerified = false;
+    user.lastOtpSentAt = new Date();
+    
+    await user.save();
+
+    // Send email using Nodemailer utility
+    const sendEmail = require('../utils/sendEmail');
+    sendEmail({
+      to: cleanEmail,
+      subject: 'Password Reset OTP',
+      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`
+    }).catch(err => console.error('Background forgotPassword sendEmail error:', err));
+
+    const host = process.env.EMAIL_HOST || '';
+    const emailUser = process.env.EMAIL_USER || '';
+    const pass = process.env.EMAIL_PASS || '';
+    const isSimulated = !host || !emailUser || !pass;
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent successfully.',
+      ...(isSimulated && process.env.NODE_ENV === 'development' && { devOtp: otpCode })
+    });
+  } catch (error) {
+    console.error('Forgot Password API Error:', error);
+    res.status(500).json({ success: false, error: 'Server error while sending password reset OTP' });
+  }
+};
+
+// @desc    Resend password reset OTP
+// @route   POST /api/auth/resend-otp
+// @access  Public
+exports.resendOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, error: 'Please provide an email address' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check if user exists
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'No user registered with this email address' });
+    }
+
+    // Check rate limit: 60 seconds
+    if (user.lastOtpSentAt && (new Date() - new Date(user.lastOtpSentAt) < 60 * 1000)) {
+      const waitTime = Math.ceil((60 * 1000 - (new Date() - new Date(user.lastOtpSentAt))) / 1000);
+      return res.status(429).json({ success: false, error: `Please wait ${waitTime} seconds before requesting a new OTP.` });
+    }
+
+    // Check maximum resend attempts (3 attempts limit)
+    if (user.otpResendAttempts >= 3) {
+      return res.status(400).json({ success: false, error: 'Maximum OTP resend attempts (3) exceeded. Please try again later.' });
+    }
+
+    // Generate secure 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes validity
+
+    user.otpCode = otpCode;
+    user.otpExpiry = expiresAt;
+    user.otpAttempts = 0;
+    user.otpResendAttempts += 1;
+    user.otpVerified = false;
+    user.lastOtpSentAt = new Date();
+    
+    await user.save();
+
+    // Send email
+    const sendEmail = require('../utils/sendEmail');
+    sendEmail({
+      to: cleanEmail,
+      subject: 'Password Reset OTP',
+      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`
+    }).catch(err => console.error('Background resendOtp sendEmail error:', err));
+
+    const host = process.env.EMAIL_HOST || '';
+    const emailUser = process.env.EMAIL_USER || '';
+    const pass = process.env.EMAIL_PASS || '';
+    const isSimulated = !host || !emailUser || !pass;
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP resent successfully.',
+      ...(isSimulated && process.env.NODE_ENV === 'development' && { devOtp: otpCode })
+    });
+  } catch (error) {
+    console.error('Resend OTP Error:', error);
+    res.status(500).json({ success: false, error: 'Server error while resending OTP' });
+  }
+};
+
+// @desc    Reset password using reset token
+// @route   POST /api/auth/reset-password
+// @access  Public
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, passwordResetToken, newPassword, confirmPassword } = req.body;
+    if (!email || !passwordResetToken || !newPassword || !confirmPassword) {
+      return res.status(400).json({ success: false, error: 'Please fill in all fields' });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ success: false, error: 'Passwords do not match' });
+    }
+
+    // Password strength validation:
+    // Min 8 characters, 1 uppercase letter, 1 lowercase letter, 1 number, 1 special character
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Find user
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'No user registered with this email address' });
+    }
+
+    // Verify token validity
+    if (!user.otpVerified || user.passwordResetToken !== passwordResetToken) {
+      return res.status(400).json({ success: false, error: 'Invalid or unauthorized password reset attempt.' });
+    }
+
+    if (user.passwordResetExpiry && new Date(user.passwordResetExpiry) < new Date()) {
+      return res.status(400).json({ success: false, error: 'Password reset link has expired. Please verify OTP again.' });
+    }
+
+    // Update password
+    user.password = newPassword;
+    
+    // Clear reset token state
+    user.otpVerified = false;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpiry = undefined;
+    user.otpCode = undefined;
+    user.otpAttempts = 0;
+    user.otpResendAttempts = 0;
+
+    await user.save();
+
+    // Log password reset activity
+    console.log(`[SECURITY] Password reset activity successfully completed for user: ${cleanEmail} at ${new Date().toISOString()}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully. You can now log in with your new password.'
+    });
+  } catch (error) {
+    console.error('Reset Password Error:', error);
+    res.status(500).json({ success: false, error: 'Server error while resetting password' });
   }
 };
 

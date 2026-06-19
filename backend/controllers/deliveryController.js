@@ -82,7 +82,7 @@ exports.getDeliverySettings = async (req, res) => {
 // @access  Private (Admin only)
 exports.updateDeliverySettings = async (req, res) => {
   try {
-    const { maxDeliveryDistance, freeShippingThreshold, expressDeliverySurcharge, slabs } = req.body;
+    const { maxDeliveryDistance, expressDeliverySurcharge, slabs } = req.body;
     
     let settings = await DeliverySetting.findOne();
     if (!settings) {
@@ -90,7 +90,7 @@ exports.updateDeliverySettings = async (req, res) => {
     }
     
     if (maxDeliveryDistance !== undefined) settings.maxDeliveryDistance = maxDeliveryDistance;
-    if (freeShippingThreshold !== undefined) settings.freeShippingThreshold = freeShippingThreshold;
+
     if (expressDeliverySurcharge !== undefined) settings.expressDeliverySurcharge = expressDeliverySurcharge;
     if (slabs !== undefined) settings.slabs = slabs;
     
@@ -104,7 +104,7 @@ exports.updateDeliverySettings = async (req, res) => {
         action: 'UPDATE_DELIVERY_SETTINGS',
         targetType: 'DeliverySetting',
         targetId: settings._id,
-        details: { maxDeliveryDistance, freeShippingThreshold, slabsCount: slabs?.length }
+        details: { maxDeliveryDistance, slabsCount: slabs?.length }
       });
     } catch (logErr) {
       console.error('Failed to log update delivery settings to AuditLog:', logErr);
@@ -161,7 +161,6 @@ exports.calculateDeliveryCharge = async (req, res) => {
     if (!settings) {
       settings = await DeliverySetting.create({
         maxDeliveryDistance: 100,
-        freeShippingThreshold: 2000,
         expressDeliverySurcharge: 100,
         slabs: [
           { fromKm: 0, toKm: 5, charge: 30 },
@@ -177,7 +176,7 @@ exports.calculateDeliveryCharge = async (req, res) => {
     const results = [];
     let overallError = null;
     
-    // Process items. Group them by seller to determine if seller subtotal qualifies for free shipping
+    // Process items. Group them by seller for distance-based delivery charge
     const sellerGroups = {};
     
     for (const item of cartItems) {
@@ -268,7 +267,7 @@ exports.calculateDeliveryCharge = async (req, res) => {
         sellerName: group.sellerName,
         distanceKm: parseFloat(distance.toFixed(2)),
         deliveryCharge: appliedCharge,
-        freeShippingApplied: !isFurthestSeller,
+
         subtotal: group.subtotal,
         items: group.items
       });
@@ -279,7 +278,7 @@ exports.calculateDeliveryCharge = async (req, res) => {
       buyerLocation: { latitude: buyerLat, longitude: buyerLon },
       maxDistanceKm: parseFloat(maxDistance.toFixed(2)),
       totalDeliveryCharge,
-      freeShippingThreshold: settings.freeShippingThreshold,
+
       maxDeliveryDistance: settings.maxDeliveryDistance,
       expressDeliverySurcharge: settings.expressDeliverySurcharge,
       breakdown: results

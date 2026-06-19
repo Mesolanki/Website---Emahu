@@ -24,7 +24,10 @@ const {
   sendOtp,
   verifyOtp,
   sendPhoneOtp,
-  verifyPhoneOtp
+  verifyPhoneOtp,
+  forgotPassword,
+  resendOtp,
+  resetPassword
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -38,6 +41,9 @@ router.post('/send-otp', sendOtp);
 router.post('/verify-otp', verifyOtp);
 router.post('/send-phone-otp', sendPhoneOtp);
 router.post('/verify-phone-otp', verifyPhoneOtp);
+router.post('/forgot-password', forgotPassword);
+router.post('/resend-otp', resendOtp);
+router.post('/reset-password', resetPassword);
 
 // Protected endpoints (requires valid JWT token in Authorization header)
 router.get('/me', protect, getMe);

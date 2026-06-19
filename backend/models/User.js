@@ -168,6 +168,33 @@ const userSchema = new mongoose.Schema(
     isTwoFactorEnabled: {
       type: Boolean,
       default: false
+    },
+    otpCode: {
+      type: String
+    },
+    otpExpiry: {
+      type: Date
+    },
+    otpAttempts: {
+      type: Number,
+      default: 0
+    },
+    otpResendAttempts: {
+      type: Number,
+      default: 0
+    },
+    otpVerified: {
+      type: Boolean,
+      default: false
+    },
+    passwordResetToken: {
+      type: String
+    },
+    passwordResetExpiry: {
+      type: Date
+    },
+    lastOtpSentAt: {
+      type: Date
     }
   },
   {

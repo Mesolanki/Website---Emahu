@@ -54,6 +54,44 @@ const CATEGORIES = [
   }
 ];
 
+// Image URL cleaning utilities (handles extra quotes, brackets from DB)
+const cleanImageUrl = (img) => {
+  if (!img || typeof img !== 'string') return '';
+  let clean = img.trim();
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  if (clean.startsWith('[') && clean.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(clean);
+      if (Array.isArray(parsed) && parsed.length > 0) return cleanImageUrl(parsed[0]);
+    } catch (e) {
+      clean = clean.slice(1, -1).trim();
+      if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+        clean = clean.slice(1, -1).trim();
+      }
+    }
+  }
+  return clean;
+};
+
+const isRealImage = (img) => {
+  const clean = cleanImageUrl(img);
+  return clean.startsWith('http') || clean.startsWith('data:image');
+};
+
+// Default icon/accent palette for dynamically loaded categories
+const DYNAMIC_CATEGORY_ICONS = {
+  'electronics': '💻', 'tech': '💻', 'computers': '🖥️', 'mobile': '📱', 'phones': '📱',
+  'shoes': '👟', 'footwear': '👟', 'kitchen': '🍳', 'dining': '🍽️', 'food': '🍔',
+  'apparel': '👕', 'fashion': '👗', 'clothing': '👔', 'lifestyle': '🏠', 'home': '🏡',
+  'beauty': '💄', 'cosmetics': '💅', 'sports': '⚽', 'fitness': '🏋️', 'books': '📚',
+  'toys': '🧸', 'games': '🎮', 'automotive': '🚗', 'jewelry': '💍', 'watches': '⌚',
+  'grocery': '🛒', 'health': '💊', 'music': '🎵', 'pets': '🐾', 'garden': '🌱',
+  'baby': '👶', 'tools': '🔧', 'art': '🎨', 'travel': '✈️', 'stationery': '📝', 'office': '🖊️'
+};
+const DYNAMIC_ACCENTS = ['#0ea5e9', '#d946ef', '#14b8a6', '#f97316', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16', '#e11d48', '#7c3aed'];
+
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 
 function Stars({ rating, reviews }) {
@@ -92,6 +130,7 @@ export default function RoleSelector() {
   const [activeSubcategory, setActiveSubcategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [dbProducts, setDbProducts] = useState([]);
+  const [dbCategories, setDbCategories] = useState([]);
   
   // Portal & Dropdown States
   const [deliveryDropdownOpen, setDeliveryDropdownOpen] = useState(false);
@@ -140,6 +179,22 @@ export default function RoleSelector() {
     fetchDbProducts();
   }, []);
 
+  // Fetch dynamic categories from Backend API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories?status=approved`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          setDbCategories(data.data);
+        }
+      } catch (err) {
+        console.error('Error fetching backend categories:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   // Close delivery dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -151,12 +206,116 @@ export default function RoleSelector() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Merge hardcoded + dynamic backend categories for the welcome screen
+  const mergedCategories = useMemo(() => {
+    if (!dbCategories.length) return CATEGORIES;
+    
+    const hardcodedSlugs = CATEGORIES.map(c => c.id);
+    const hardcodedNamesLC = CATEGORIES.map(c => c.name.toLowerCase());
+    
+    const dynamicCats = [];
+    let accentIdx = 0;
+    
+    dbCategories.forEach(dbCat => {
+      const nameLC = dbCat.name.toLowerCase();
+      const slug = dbCat.slug || nameLC.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      
+      // Skip if this DB category already matches a hardcoded one
+      const matchesHardcoded = hardcodedSlugs.includes(slug) ||
+        hardcodedNamesLC.some(hn => hn.includes(nameLC) || nameLC.includes(hn));
+      
+      if (!matchesHardcoded) {
+        let icon = '📦';
+        for (const [key, emoji] of Object.entries(DYNAMIC_CATEGORY_ICONS)) {
+          if (nameLC.includes(key)) { icon = emoji; break; }
+        }
+        
+        const accent = DYNAMIC_ACCENTS[accentIdx % DYNAMIC_ACCENTS.length];
+        accentIdx++;
+        const r = parseInt(accent.slice(1, 3), 16);
+        const g = parseInt(accent.slice(3, 5), 16);
+        const b = parseInt(accent.slice(5, 7), 16);
+        
+        const subcats = ['All ' + dbCat.name];
+        if (dbCat.children && dbCat.children.length > 0) {
+          dbCat.children.forEach(child => subcats.push(child.name));
+        }
+        
+        dynamicCats.push({
+          id: slug,
+          name: dbCat.name,
+          icon,
+          desc: `Browse ${dbCat.name} products from verified sellers on EMAHU.`,
+          subcategories: subcats,
+          gradient: `linear-gradient(135deg, rgba(${r}, ${g}, ${b}, 0.08) 0%, rgba(${r}, ${g}, ${b}, 0.04) 100%)`,
+          accent
+        });
+      }
+    });
+    
+    return [...CATEGORIES, ...dynamicCats];
+  }, [dbCategories]);
+
+  // Build category name → root category ID lookup for product mapping
+  const categoryNameToId = useMemo(() => {
+    const lookup = {};
+    
+    // Hardcoded mappings (legacy support)
+    lookup['electronics'] = 'tech';
+    lookup['furniture'] = 'lifestyle';
+    lookup['fitness'] = 'lifestyle';
+    
+    // Map DB root categories to hardcoded IDs where they overlap
+    const dbRootToResolvedId = {};
+    dbCategories.forEach(dbCat => {
+      const nameLC = dbCat.name.toLowerCase();
+      const slug = dbCat.slug || nameLC.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      if (lookup[nameLC]) {
+        dbRootToResolvedId[slug] = lookup[nameLC];
+      } else {
+        for (const hc of CATEGORIES) {
+          const hcNameLC = hc.name.toLowerCase();
+          if (hcNameLC.includes(nameLC) || nameLC.includes(hcNameLC)) {
+            dbRootToResolvedId[slug] = hc.id;
+            break;
+          }
+        }
+      }
+    });
+    
+    // Map all DB categories (at any depth) → resolved root category ID
+    const mapTree = (cats, rootId) => {
+      cats.forEach(cat => {
+        const catSlug = cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        const nameLC = cat.name.toLowerCase();
+        const effectiveRootId = rootId || dbRootToResolvedId[catSlug] || catSlug;
+        if (!lookup[nameLC]) {
+          lookup[nameLC] = effectiveRootId;
+        }
+        if (cat.children && cat.children.length > 0) {
+          mapTree(cat.children, effectiveRootId);
+        }
+      });
+    };
+    mapTree(dbCategories, null);
+    
+    return lookup;
+  }, [dbCategories]);
+
   // Combine DB & static products
   const allProducts = useMemo(() => {
     const mappedDb = dbProducts.map(p => {
       let cat = p.category ? p.category.toLowerCase() : '';
-      if (cat === 'electronics') cat = 'tech';
-      else if (cat === 'furniture' || cat === 'fitness') cat = 'lifestyle';
+      // Use dynamic category lookup, then hardcoded fallbacks
+      if (categoryNameToId[cat]) {
+        cat = categoryNameToId[cat];
+      } else if (cat === 'electronics') {
+        cat = 'tech';
+      } else if (cat === 'furniture' || cat === 'fitness') {
+        cat = 'lifestyle';
+      }
+      
+      const cleanedImg = cleanImageUrl(p.image);
       
       return {
         id: p.id || p._id,
@@ -169,7 +328,7 @@ export default function RoleSelector() {
         rating: p.rating || 4.7,
         reviews: p.reviews || 84,
         seller: p.seller?.name || p.brand || 'Emahu Seller',
-        image: p.image || '📦',
+        image: isRealImage(p.image) ? cleanedImg : (p.image || '📦'),
         stock: p.stock
       };
     });
@@ -181,7 +340,7 @@ export default function RoleSelector() {
       seen.add(p.id);
       return true;
     });
-  }, [dbProducts]);
+  }, [dbProducts, categoryNameToId]);
 
   // Filtered products based on active categories and search
   const filteredProducts = useMemo(() => {
@@ -312,7 +471,7 @@ export default function RoleSelector() {
             <div className="sel-categories-view">
               <h2 className="sel-section-title">Explore Main Categories</h2>
               <div className="sel-cat-grid">
-                {CATEGORIES.map((cat) => (
+                {mergedCategories.map((cat) => (
                   <button
                     key={cat.id}
                     className="sel-cat-card"
@@ -419,7 +578,7 @@ export default function RoleSelector() {
                         className="sel-prod-card"
                       >
                         <div className="sel-prod-card__img-wrap">
-                          {typeof p.image === 'string' && p.image.startsWith('http') ? (
+                          {typeof p.image === 'string' && (p.image.startsWith('http') || p.image.startsWith('data:image')) ? (
                             <img src={p.image} alt={p.name} className="sel-prod-card__img" loading="lazy" />
                           ) : (
                             <div className="sel-prod-card__placeholder">{p.image || '📦'}</div>
@@ -559,9 +718,12 @@ export default function RoleSelector() {
         </div>
 
         {/* Footer */}
-        <footer className="sel-footer animate-fade-in-delayed">
+        <footer className="sel-footer animate-fade-in-delayed" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
           <p>© 2026 EMAHU Inc. All professional rights reserved.</p>
-          <div className="sel-footer__links">
+          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+            Developed by <a href="https://sanmora.in" target="_blank" rel="noopener noreferrer" style={{ color: '#4169e1', fontWeight: '600', textDecoration: 'none' }}>sanmora.in</a>
+          </p>
+          <div className="sel-footer__links" style={{ marginTop: '4px' }}>
             <Link href="#help">Get Portal Support</Link>
             <span className="sel-footer__dot" />
             <Link href="#terms">Terms & Partner Conditions</Link>
