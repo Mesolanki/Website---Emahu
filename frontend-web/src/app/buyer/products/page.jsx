@@ -21,6 +21,33 @@ const CATEGORY_TILES = [
 const ALL_PRODUCTS = STATIC_PRODUCTS;
 
 
+const cleanImageUrl = (img) => {
+  if (!img || typeof img !== 'string') return '';
+  let clean = img.trim();
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  if (clean.startsWith('[') && clean.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(clean);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return cleanImageUrl(parsed[0]);
+      }
+    } catch (e) {
+      clean = clean.slice(1, -1).trim();
+      if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+        clean = clean.slice(1, -1).trim();
+      }
+    }
+  }
+  return clean;
+};
+
+const isRealImage = (img) => {
+  const clean = cleanImageUrl(img);
+  return clean.startsWith('http') || clean.startsWith('data:image');
+};
+
 function Stars({ rating }) {
   return (
     <div className="bp-card__stars">
@@ -90,6 +117,9 @@ export default function ProductsPage() {
       if (p.category === 'Electronics') mappedCategory = 'Tech';
       else if (p.category === 'Fitness' || p.category === 'Furniture') mappedCategory = 'Lifestyle';
 
+      const cleanedImg = cleanImageUrl(p.image);
+      const imageToShow = isRealImage(p.image) ? cleanedImg : (p.image || '📦');
+
       return {
         id: p.id || p._id,
         name: p.name,
@@ -100,7 +130,7 @@ export default function ProductsPage() {
         discount: p.comparePrice ? Math.round(((p.comparePrice - p.price) / p.comparePrice) * 100) : 0,
         rating: p.rating || 4.7,
         reviews: p.reviews || 84,
-        img: p.image || '📦',
+        img: imageToShow,
         stock: p.stock,
         status: p.status,
         verified: true,
@@ -514,7 +544,7 @@ export default function ProductsPage() {
             ) : paged.map(p => (
               <Link key={p.id} href={`/buyer/products/${p.id}`} className="bp-card" style={{textDecoration:'none',color:'inherit'}}>
                 <div className="bp-card__img-wrap">
-                  {(!p.img || !p.img.startsWith('http')) ? (
+                  {!isRealImage(p.img) ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', fontSize: '4.5rem', background: '#f4f4f5' }}>
                       {p.img || '📦'}
                     </div>

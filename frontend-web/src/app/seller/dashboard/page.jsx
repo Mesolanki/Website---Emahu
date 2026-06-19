@@ -314,7 +314,6 @@ export default function EmahuProDashboard() {
 
   const [adminDeliverySettings, setAdminDeliverySettings] = useState({
     maxDeliveryDistance: 100,
-    freeShippingThreshold: 2000,
     expressDeliverySurcharge: 100,
     slabs: []
   });

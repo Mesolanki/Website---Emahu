@@ -55,7 +55,6 @@ exports.getDeliverySettings = async (req, res) => {
       // Create defaults
       settings = await DeliverySetting.create({
         maxDeliveryDistance: 100,
-        freeShippingThreshold: 2000,
         expressDeliverySurcharge: 100,
         slabs: [
           { fromKm: 0, toKm: 5, charge: 30 },

@@ -8,6 +8,33 @@ import './checkout.css';
 
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 
+const cleanImageUrl = (img) => {
+  if (!img || typeof img !== 'string') return '';
+  let clean = img.trim();
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  if (clean.startsWith('[') && clean.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(clean);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return cleanImageUrl(parsed[0]);
+      }
+    } catch (e) {
+      clean = clean.slice(1, -1).trim();
+      if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+        clean = clean.slice(1, -1).trim();
+      }
+    }
+  }
+  return clean;
+};
+
+const isRealImage = (img) => {
+  const clean = cleanImageUrl(img);
+  return clean.startsWith('http') || clean.startsWith('data:image');
+};
+
 export default function CheckoutPage() {
   const [cartItems, setCartItems] = useState([]);
   const [shippingSpeed, setShippingSpeed] = useState('standard'); // standard | express
@@ -35,7 +62,6 @@ export default function CheckoutPage() {
   const [buyerCoordinates, setBuyerCoordinates] = useState({ latitude: '', longitude: '' });
   const [deliverySettings, setDeliverySettings] = useState({
     maxDeliveryDistance: 100,
-    freeShippingThreshold: 2000,
     expressDeliverySurcharge: 100
   });
   const [leafletLoaded, setLeafletLoaded] = useState(false);
@@ -295,6 +321,9 @@ export default function CheckoutPage() {
             if (p.category === 'Electronics') mappedCategory = 'Tech';
             else if (p.category === 'Fitness' || p.category === 'Furniture') mappedCategory = 'Lifestyle';
 
+            const cleanedImg = cleanImageUrl(p.image);
+            const imageToShow = isRealImage(p.image) ? cleanedImg : (p.image || '📦');
+
             return {
               id: p.id || p._id,
               name: p.name,
@@ -305,7 +334,7 @@ export default function CheckoutPage() {
               discount: p.comparePrice ? Math.round(((p.comparePrice - p.price) / p.comparePrice) * 100) : 0,
               rating: p.rating || 4.7,
               reviews: p.reviews || 84,
-              img: p.image || '📦',
+              img: imageToShow,
               verified: true,
               isNew: true,
               isHot: false,
@@ -987,7 +1016,13 @@ export default function CheckoutPage() {
                     cartItems.map((p, idx) => (
                       <div key={idx} className="co-item-row">
                         <div className="co-item-img-wrap">
-                          <img src={p.img} alt={p.name} />
+                          {isRealImage(p.img) ? (
+                            <img src={p.img} alt={p.name} />
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', background: '#f4f4f5', fontSize: '1.5rem' }}>
+                              {p.img || '📦'}
+                            </div>
+                          )}
                           <span className="co-item-qty-badge">{p.quantity}</span>
                         </div>
                         <div className="co-item-desc">
@@ -1015,13 +1050,7 @@ export default function CheckoutPage() {
 
                   <div className="co-breakdown-row">
                     <span>Certified Shipping</span>
-                    <strong>
-                      {shippingFee === 0 ? (
-                        <span style={{ color: '#10b981', fontWeight: '800' }}>🚚 FREE</span>
-                      ) : (
-                        `₹${shippingFee}`
-                      )}
-                    </strong>
+                    <strong>₹{shippingFee}</strong>
                   </div>
 
                   {/* Per-seller breakdown */}
@@ -1031,7 +1060,7 @@ export default function CheckoutPage() {
                       {deliveryBreakdown.map((b, i) => (
                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#475569', padding: '3px 0' }}>
                           <span>{b.sellerName} — {b.distanceKm} km</span>
-                          <span style={{ fontWeight: '600' }}>{b.freeShippingApplied ? 'FREE' : `₹${b.deliveryCharge}`}</span>
+                          <span style={{ fontWeight: '600' }}>₹{b.deliveryCharge}</span>
                         </div>
                       ))}
                     </div>

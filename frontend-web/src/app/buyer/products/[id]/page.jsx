@@ -494,7 +494,7 @@ export default function ProductDetailPage() {
               <span className="pd-price-off">{product.discount}% off</span>
             </>}
           </div>
-          <p className="pd-price-note">Inclusive of all taxes · Free delivery</p>
+          <p className="pd-price-note">Inclusive of all taxes</p>
 
           <div className="pd-divider" />
 
@@ -571,7 +571,7 @@ export default function ProductDetailPage() {
           {/* Delivery info */}
           <div className="pd-delivery-cards">
             {[
-              { icon:'🚚', title:'Free Express Delivery', sub:'Estimated by Tomorrow, 10 AM', tag:'FREE' },
+              { icon:'🚚', title:'Express Delivery', sub:'Estimated by Tomorrow, 10 AM', tag:null },
               { icon:'✅', title:'EMAHU Quality Checked', sub:'Physical inspection completed. Seal verified.', tag:null },
               { icon:'🔄', title:'30-Day Easy Returns', sub:'No questions asked return policy', tag:null },
               { icon:'🔒', title:'Secure Escrow Payment', sub:'Money released only after you confirm receipt', tag:null },

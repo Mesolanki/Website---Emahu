@@ -8,7 +8,7 @@ const deliverySettingSchema = new mongoose.Schema(
     },
     freeShippingThreshold: {
       type: Number,
-      default: 2000
+      default: 0
     },
     expressDeliverySurcharge: {
       type: Number,

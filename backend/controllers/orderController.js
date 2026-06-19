@@ -16,7 +16,6 @@ exports.createOrder = async (req, res) => {
     
     const settings = await DeliverySetting.findOne() || {
       maxDeliveryDistance: 100,
-      freeShippingThreshold: 2000,
       expressDeliverySurcharge: 100,
       slabs: [
         { fromKm: 0, toKm: 5, charge: 30 },

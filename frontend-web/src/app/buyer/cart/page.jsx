@@ -7,6 +7,33 @@ import './cart.css';
 
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 
+const cleanImageUrl = (img) => {
+  if (!img || typeof img !== 'string') return '';
+  let clean = img.trim();
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  if (clean.startsWith('[') && clean.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(clean);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return cleanImageUrl(parsed[0]);
+      }
+    } catch (e) {
+      clean = clean.slice(1, -1).trim();
+      if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+        clean = clean.slice(1, -1).trim();
+      }
+    }
+  }
+  return clean;
+};
+
+const isRealImage = (img) => {
+  const clean = cleanImageUrl(img);
+  return clean.startsWith('http') || clean.startsWith('data:image');
+};
+
 export default function CartPage() {
   const [cartItems, setCartItems] = useState([]);
   const [checkoutStep, setCheckoutStep] = useState('idle'); // idle | securing | success
@@ -22,7 +49,6 @@ export default function CartPage() {
   const [deliveryError, setDeliveryError] = useState('');
   const [deliverySettings, setDeliverySettings] = useState({
     maxDeliveryDistance: 100,
-    freeShippingThreshold: 2000,
     expressDeliverySurcharge: 100
   });
   const [buyerCoordinates, setBuyerCoordinates] = useState({ latitude: '', longitude: '' });
@@ -75,6 +101,9 @@ export default function CartPage() {
             if (p.category === 'Electronics') mappedCategory = 'Tech';
             else if (p.category === 'Fitness' || p.category === 'Furniture') mappedCategory = 'Lifestyle';
 
+            const cleanedImg = cleanImageUrl(p.image);
+            const imageToShow = isRealImage(p.image) ? cleanedImg : (p.image || '📦');
+
             return {
               id: p.id || p._id,
               name: p.name,
@@ -85,7 +114,7 @@ export default function CartPage() {
               discount: p.comparePrice ? Math.round(((p.comparePrice - p.price) / p.comparePrice) * 100) : 0,
               rating: p.rating || 4.7,
               reviews: p.reviews || 84,
-              img: p.image || '📦',
+              img: imageToShow,
               stock: typeof p.stock === 'number' ? p.stock : 99, // ← STOCK FIELD
               verified: true,
               isNew: true,
@@ -464,7 +493,7 @@ export default function CartPage() {
 
                   {/* Thumbnail Image */}
                   <div className="cart-item-row__img-wrap">
-                    {typeof p.img === 'string' && p.img.startsWith('http') ? (
+                    {isRealImage(p.img) ? (
                       <img src={p.img} alt={p.name} className="cart-item-row__img" />
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '80px', height: '80px', background: '#f4f4f5', borderRadius: '8px', fontSize: '2rem' }}>
@@ -682,8 +711,6 @@ export default function CartPage() {
                   <strong>
                     {deliveryCalculating ? (
                       <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>calculating...</span>
-                    ) : shippingFee === 0 ? (
-                      <span style={{ color: '#10b981', fontSize: '0.8rem', fontWeight: '800' }}>🚚 FREE SHIPPING</span>
                     ) : (
                       `₹${shippingFee}`
                     )}
@@ -697,7 +724,7 @@ export default function CartPage() {
                     {deliveryBreakdown.map((b, i) => (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#475569', padding: '3px 0' }}>
                         <span>{b.sellerName} — {b.distanceKm} km</span>
-                        <span style={{ fontWeight: '600' }}>{b.freeShippingApplied ? 'FREE' : `₹${b.deliveryCharge}`}</span>
+                        <span style={{ fontWeight: '600' }}>₹{b.deliveryCharge}</span>
                       </div>
                     ))}
                   </div>
