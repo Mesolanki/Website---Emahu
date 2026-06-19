@@ -173,5 +173,42 @@ export function useGoogleAuth(onSuccess, onError) {
     }
   }, []);
 
-  return { triggerGoogleSignIn, isGoogleEnabled };
+  const renderGoogleButton = useCallback((elementId, options = {}) => {
+    if (typeof window === 'undefined') return;
+
+    const render = () => {
+      const btnContainer = document.getElementById(elementId);
+      if (!btnContainer) {
+        console.warn("[GIS_DIAGNOSTIC] Container element not found for rendering Google button:", elementId);
+        return;
+      }
+      if (!window.google?.accounts?.id) {
+        console.warn("[GIS_DIAGNOSTIC] google.accounts.id not loaded yet. Retrying standard button render...");
+        setTimeout(render, 150);
+        return;
+      }
+      try {
+        console.log("[GIS_DIAGNOSTIC] Rendering standard Google Sign-In button inside:", elementId);
+        window.google.accounts.id.renderButton(
+          btnContainer,
+          {
+            type: "standard",
+            theme: "outline",
+            size: "large",
+            text: "continue_with",
+            shape: "rectangular",
+            logo_alignment: "left",
+            width: btnContainer.offsetWidth || "400",
+            ...options
+          }
+        );
+      } catch (err) {
+        console.error("[GIS_DIAGNOSTIC] Error rendering Google button:", err);
+      }
+    };
+
+    render();
+  }, []);
+
+  return { triggerGoogleSignIn, isGoogleEnabled, renderGoogleButton };
 }
