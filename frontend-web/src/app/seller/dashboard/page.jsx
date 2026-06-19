@@ -18,6 +18,33 @@ if (typeof window !== 'undefined') {
   }
 }
 
+const cleanImageUrl = (img) => {
+  if (!img || typeof img !== 'string') return '';
+  let clean = img.trim();
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  if (clean.startsWith('[') && clean.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(clean);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return cleanImageUrl(parsed[0]);
+      }
+    } catch (e) {
+      clean = clean.slice(1, -1).trim();
+      if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+        clean = clean.slice(1, -1).trim();
+      }
+    }
+  }
+  return clean;
+};
+
+const isRealImage = (img) => {
+  const clean = cleanImageUrl(img);
+  return clean.startsWith('http') || clean.startsWith('data:image');
+};
+
 const INITIAL_PRODUCTS = [
   {
     id: 'prod-1',
@@ -165,7 +192,7 @@ export default function EmahuProDashboard() {
   };
 
   const [activeTab, setActiveTab] = useState('overview');
-  const [newProductCategory, setNewProductCategory] = useState('Electronics');
+  const [newProductCategory, setNewProductCategory] = useState('Electronics & Tech');
   const [sellerUser, setSellerUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [sellerDocuments, setSellerDocuments] = useState([]);
@@ -1706,6 +1733,10 @@ export default function EmahuProDashboard() {
   const handleAddProduct = async (e) => {
     e.preventDefault();
     if (isSubmittingProduct) return;
+    if (newProductImages.length === 0) {
+      setFormError('Please add at least one product image to the gallery');
+      return;
+    }
     if (
       !newProductName.trim() ||
       !newProductBrand.trim() ||
@@ -1817,17 +1848,17 @@ export default function EmahuProDashboard() {
     setNewProductBrand('');
     setNewProductSku('');
     
-    let defaultCat = 'Electronics';
+    let defaultCat = 'Electronics & Tech';
     if (sellerUser?.category) {
       const storeCat = sellerUser.category.toLowerCase();
       if (storeCat === 'electronics') {
-        defaultCat = 'Tech';
+        defaultCat = 'Electronics & Tech';
       } else if (storeCat === 'fashion') {
-        defaultCat = 'Apparel';
+        defaultCat = 'Apparel & Fashion';
       } else if (storeCat === 'home') {
-        defaultCat = 'Kitchen';
+        defaultCat = 'Kitchen & Dining';
       } else {
-        defaultCat = 'Lifestyle';
+        defaultCat = 'Lifestyle & Home';
       }
     }
     setNewProductCategory(defaultCat);
@@ -2720,8 +2751,8 @@ export default function EmahuProDashboard() {
             }}>
               <span style={{ fontSize: '1.5rem' }}>⚠️</span>
               <div>
-                <h4 style={{ margin: 0, color: '#fff', fontSize: '0.95rem', fontWeight: 'bold' }}>Store Account Pending Verification</h4>
-                <p style={{ margin: '4px 0 0 0', color: '#fbbf24', fontSize: '0.9rem', lineHeight: '1.4', fontWeight: '600' }}>
+                <h4 style={{ margin: 0, color: '#92400e', fontSize: '0.95rem', fontWeight: 'bold' }}>Store Account Pending Verification</h4>
+                <p style={{ margin: '4px 0 0 0', color: '#78350f', fontSize: '0.9rem', lineHeight: '1.4', fontWeight: '600' }}>
                   Aapki business registration verification pending hai. Compliance experts details verify kar rahe hain. Tab tak aap product verification requests submit kar sakte hain.
                 </p>
               </div>
@@ -2741,8 +2772,8 @@ export default function EmahuProDashboard() {
             }}>
               <span style={{ fontSize: '1.5rem' }}>❌</span>
               <div>
-                <h4 style={{ margin: 0, color: '#fff', fontSize: '0.95rem', fontWeight: 'bold' }}>Store Registration Rejected</h4>
-                <p style={{ margin: '4px 0 0 0', color: '#fca5a5', fontSize: '0.9rem', lineHeight: '1.4', fontWeight: '600' }}>
+                <h4 style={{ margin: 0, color: '#991b1b', fontSize: '0.95rem', fontWeight: 'bold' }}>Store Registration Rejected</h4>
+                <p style={{ margin: '4px 0 0 0', color: '#7f1d1d', fontSize: '0.9rem', lineHeight: '1.4', fontWeight: '600' }}>
                   Aapki seller profile evaluation standard terms complete nahi kar payi. Please parameters resolve karein or support se clarify karein.
                 </p>
               </div>
@@ -2753,10 +2784,10 @@ export default function EmahuProDashboard() {
           {activeTab === 'status' && (
             <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px 0' }}>
               <div style={{ marginBottom: '32px', textAlign: 'center' }}>
-                <h2 style={{ fontSize: '2rem', fontWeight: '800', color: '#fff' }}>
+                <h2 style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)' }}>
                   Verification Desk
                 </h2>
-                <p style={{ color: '#a1a1aa', marginTop: '8px' }}>Monitor onboarding progress and resubmit compliance credentials.</p>
+                <p style={{ color: 'var(--text-secondary)', marginTop: '8px' }}>Monitor onboarding progress and resubmit compliance credentials.</p>
               </div>
 
               {sellerUser?.status === 'pending' && (
@@ -2766,7 +2797,7 @@ export default function EmahuProDashboard() {
                   borderRadius: '16px',
                   padding: '32px',
                   textAlign: 'center',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
                   backdropFilter: 'blur(10px)',
                   marginBottom: '32px'
                 }}>
@@ -2783,10 +2814,10 @@ export default function EmahuProDashboard() {
                   }}>
                     <span style={{ fontSize: '2rem' }}>⏳</span>
                   </div>
-                  <h3 style={{ fontSize: '1.4rem', color: '#fff', fontWeight: '700', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '1.4rem', color: '#78350f', fontWeight: '700', marginBottom: '12px' }}>
                     Waiting for Admin Approval
                   </h3>
-                  <p style={{ color: '#fbbf24', fontSize: '1rem', lineHeight: '1.6', margin: '0 auto', maxWidth: '600px', fontWeight: '600' }}>
+                  <p style={{ color: '#92400e', fontSize: '1rem', lineHeight: '1.6', margin: '0 auto', maxWidth: '600px', fontWeight: '600' }}>
                     Aapki business registration verification pending hai. Compliance experts details verify kar rahe hain. Tab tak aap product verification requests submit kar sakte hain.
                   </p>
                 </div>
@@ -2799,7 +2830,7 @@ export default function EmahuProDashboard() {
                   borderRadius: '16px',
                   padding: '32px',
                   textAlign: 'center',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
                   backdropFilter: 'blur(10px)',
                   marginBottom: '32px'
                 }}>
@@ -2815,20 +2846,20 @@ export default function EmahuProDashboard() {
                   }}>
                     <span style={{ fontSize: '2rem' }}>❌</span>
                   </div>
-                  <h3 style={{ fontSize: '1.4rem', color: '#fff', fontWeight: '700', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '1.4rem', color: '#7f1d1d', fontWeight: '700', marginBottom: '12px' }}>
                     Store Registration Rejected
                   </h3>
-                  <p style={{ color: '#fca5a5', fontSize: '0.95rem', lineHeight: '1.6', margin: '0 auto', maxWidth: '600px', fontWeight: '600' }}>
+                  <p style={{ color: '#b91c1c', fontSize: '0.95rem', lineHeight: '1.6', margin: '0 auto', maxWidth: '600px', fontWeight: '600' }}>
                     Aapki seller profile evaluation standard terms complete nahi kar payi. Please parameters resolve karein or support se clarify karein.
                   </p>
                   {sellerUser?.verificationFeedback && (
                     <div style={{
                       marginTop: '20px',
-                      background: 'rgba(0,0,0,0.2)',
+                      background: 'rgba(239, 68, 68, 0.05)',
                       border: '1px solid rgba(239,68,68,0.2)',
                       padding: '16px',
                       borderRadius: '8px',
-                      color: '#ef4444',
+                      color: '#991b1b',
                       fontSize: '0.9rem',
                       textAlign: 'left'
                     }}>
@@ -2844,7 +2875,7 @@ export default function EmahuProDashboard() {
                   border: '1px solid rgba(59, 130, 246, 0.3)',
                   borderRadius: '16px',
                   padding: '32px',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
                   backdropFilter: 'blur(10px)',
                   marginBottom: '32px'
                 }}>
@@ -2862,10 +2893,10 @@ export default function EmahuProDashboard() {
                       <span style={{ fontSize: '1.5rem' }}>ℹ️</span>
                     </div>
                     <div>
-                      <h3 style={{ fontSize: '1.3rem', color: '#fff', fontWeight: '700', margin: 0 }}>
+                      <h3 style={{ fontSize: '1.3rem', color: '#1e3a8a', fontWeight: '700', margin: 0 }}>
                         Verification Information Required
                       </h3>
-                      <p style={{ color: '#93c5fd', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+                      <p style={{ color: '#1e40af', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
                         The compliance team has requested more details regarding your registration.
                       </p>
                     </div>
@@ -2873,15 +2904,15 @@ export default function EmahuProDashboard() {
 
                   {sellerUser?.verificationFeedback && (
                     <div style={{
-                      background: 'rgba(0,0,0,0.3)',
+                      background: 'rgba(59, 130, 246, 0.05)',
                       border: '1px solid rgba(59, 130, 246, 0.2)',
                       padding: '16px',
                       borderRadius: '8px',
-                      color: '#cbd5e1',
+                      color: '#1e3a8a',
                       fontSize: '0.9rem',
                       marginBottom: '24px'
                     }}>
-                      <strong style={{ color: '#60a5fa', display: 'block', marginBottom: '4px' }}>Auditor Feedback:</strong>
+                      <strong style={{ color: '#2563eb', display: 'block', marginBottom: '4px' }}>Auditor Feedback:</strong>
                       {sellerUser.verificationFeedback}
                     </div>
                   )}
@@ -2907,8 +2938,8 @@ export default function EmahuProDashboard() {
               )}
 
               {/* Documents status tracker list */}
-              <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '16px', padding: '24px' }}>
-                <h3 style={{ color: '#fff', fontSize: '1.1rem', fontWeight: '700', marginBottom: '16px' }}>Uploaded Documents Status</h3>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', boxShadow: 'var(--shadow-sm)' }}>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: '1.1rem', fontWeight: '700', marginBottom: '16px' }}>Uploaded Documents Status</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {['business_registration', 'id_proof'].map(type => {
                     const doc = sellerDocuments.find(d => d.documentType === type);
@@ -2919,8 +2950,8 @@ export default function EmahuProDashboard() {
                         flexDirection: 'column',
                         gap: '12px',
                         padding: '16px',
-                        background: 'rgba(255,255,255,0.02)',
-                        border: '1px solid #27272a',
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-color)',
                         borderRadius: '12px'
                       }}>
                         <div style={{
@@ -2930,10 +2961,10 @@ export default function EmahuProDashboard() {
                           width: '100%'
                         }}>
                           <div>
-                            <strong style={{ color: '#fff', fontSize: '0.9rem', display: 'block' }}>{docName}</strong>
+                            <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem', display: 'block' }}>{docName}</strong>
                             {doc ? (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
-                                <a href={doc.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#6366f1', fontSize: '0.8rem', textDecoration: 'underline' }}>
+                                <a href={doc.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#4f46e5', fontSize: '0.8rem', textDecoration: 'underline', fontWeight: '500' }}>
                                   View Submitted Document
                                 </a>
                                 {doc.feedback && (
@@ -2941,14 +2972,14 @@ export default function EmahuProDashboard() {
                                 )}
                               </div>
                             ) : (
-                              <span style={{ color: '#71717a', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>Not uploaded</span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>Not uploaded</span>
                             )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             {doc?.status !== 'approved' && editingDocType !== type && (
                               <button 
                                 onClick={() => { setEditingDocType(type); setInputDocUrl(doc ? doc.fileUrl : ''); }}
-                                style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.4)', background: 'rgba(99, 102, 241, 0.1)', color: '#a5b4fc', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
+                                style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(79, 70, 229, 0.4)', background: 'rgba(79, 70, 229, 0.05)', color: '#4f46e5', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
                               >
                                 {doc ? 'Update Link' : 'Provide Document'}
                               </button>
@@ -2971,7 +3002,7 @@ export default function EmahuProDashboard() {
                           <div style={{
                             marginTop: '8px',
                             paddingTop: '12px',
-                            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                            borderTop: '1px solid var(--border-color)',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '12px',
@@ -2992,7 +3023,7 @@ export default function EmahuProDashboard() {
                               </button>
                               <button 
                                 onClick={() => setEditingDocType(null)}
-                                style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#27272a', border: '1px solid #3f3f46', color: '#fff', fontSize: '0.8rem', cursor: 'pointer' }}
+                                style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer' }}
                               >
                                 Cancel
                               </button>
@@ -3371,10 +3402,10 @@ export default function EmahuProDashboard() {
                             <td>
                               <div className="product-cell">
                                 <div className="product-img">
-                                  {(!product.image || !product.image.startsWith('http')) ? (
-                                    product.image || '📦'
+                                  {isRealImage(product.image) ? (
+                                    <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                   ) : (
-                                    <img src={product.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    cleanImageUrl(product.image) || '📦'
                                   )}
                                 </div>
                                 <div className="product-meta-details">
@@ -3599,31 +3630,21 @@ export default function EmahuProDashboard() {
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        <div className="form-group">
-                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Inventory *</label>
-                          <input 
-                            type="number" 
-                            className="form-input" 
-                            style={{ height: '36px', fontSize: '0.85rem' }}
-                            placeholder="20" 
-                            value={newProductStock}
-                            onChange={(e) => setNewProductStock(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Image URL *</label>
-                          <input 
-                            type="url" 
-                            className="form-input" 
-                            style={{ height: '36px', fontSize: '0.85rem' }}
-                            placeholder="https://..." 
-                            value={newProductImage}
-                            onChange={(e) => setNewProductImage(e.target.value)}
-                            required
-                          />
-                        </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Inventory *</label>
+                        <input 
+                          type="number" 
+                          className="form-input" 
+                          style={{ height: '36px', fontSize: '0.85rem' }}
+                          placeholder="20" 
+                          value={newProductStock}
+                          onChange={(e) => setNewProductStock(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        {renderMultiImageSelector()}
                       </div>
 
                       <div className="form-group">
@@ -3676,7 +3697,24 @@ export default function EmahuProDashboard() {
                             <tr key={product.id || product._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                               <td style={{ padding: '12px 10px' }}>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                  <div style={{ fontSize: '1.5rem' }}>{(!product.image || !product.image.startsWith('http')) ? (product.image || '📦') : '📦'}</div>
+                                  <div style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '6px',
+                                    overflow: 'hidden',
+                                    border: '1px solid var(--border-color)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: 'rgba(0,0,0,0.05)',
+                                    flexShrink: 0
+                                  }}>
+                                    {isRealImage(product.image) ? (
+                                      <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                      <span style={{ fontSize: '1.2rem' }}>{cleanImageUrl(product.image) || '📦'}</span>
+                                    )}
+                                  </div>
                                   <div>
                                     <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{product.name}</div>
                                     <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>₹{product.price.toLocaleString('en-IN')}</div>
@@ -4767,10 +4805,10 @@ export default function EmahuProDashboard() {
             <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', color: 'var(--text-primary)', overflowY: 'auto', maxHeight: '70vh' }}>
               <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                 <div style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.1)' }}>
-                  {(!selectedDetailedProduct.image || !selectedDetailedProduct.image.startsWith('http')) ? (
-                    selectedDetailedProduct.image || '📦'
+                  {isRealImage(selectedDetailedProduct.image) ? (
+                    <img src={cleanImageUrl(selectedDetailedProduct.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <img src={selectedDetailedProduct.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    cleanImageUrl(selectedDetailedProduct.image) || '📦'
                   )}
                 </div>
                 <div>
@@ -4977,10 +5015,10 @@ export default function EmahuProDashboard() {
                     {selectedDetailedSeller.products.map((prod) => (
                       <div key={prod._id || prod.id} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ width: '100%', height: '110px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {(!prod.image || !prod.image.startsWith('http')) ? (
-                            <span style={{ fontSize: '2rem' }}>{prod.image || '📦'}</span>
+                          {isRealImage(prod.image) ? (
+                            <img src={cleanImageUrl(prod.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={prod.name} />
                           ) : (
-                            <img src={prod.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={prod.name} />
+                            <span style={{ fontSize: '2rem' }}>{cleanImageUrl(prod.image) || '📦'}</span>
                           )}
                         </div>
                         <div>
@@ -5198,45 +5236,11 @@ export default function EmahuProDashboard() {
                     </span>
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Product Image URL *</label>
-                    <input 
-                      type="url" 
-                      className="form-input" 
-                      placeholder="e.g. https://images.unsplash.com/photo-..." 
-                      value={newProductImage}
-                      onChange={(e) => setNewProductImage(e.target.value)}
-                      required
-                    />
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                      Web URL to a clear picture of the item.
-                    </span>
-                  </div>
                 </div>
 
-                {newProductImage && (
-                  <div className="form-group">
-                    <label className="form-label">Image Preview</label>
-                    <div style={{
-                      marginTop: '8px',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      height: '120px',
-                      border: '1px solid var(--border-color)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'rgba(0, 0, 0, 0.05)'
-                    }}>
-                      <img 
-                        src={newProductImage} 
-                        alt="Product Preview" 
-                        style={{ height: '100%', width: 'auto', objectFit: 'contain', padding: '10px' }} 
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
-                    </div>
-                  </div>
-                )}
+                <div style={{ marginTop: '16px' }}>
+                  {renderMultiImageSelector()}
+                </div>
 
                 {/* --- SECTION 3: MEDIA & SPECIFICATIONS --- */}
                 <div style={{
@@ -6334,10 +6338,10 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
                     <td>
                       <div className="product-cell">
                         <div className="product-img">
-                          {(!p.image || !p.image.startsWith('http')) ? (
-                            p.image || '📦'
+                          {isRealImage(p.image) ? (
+                            <img src={cleanImageUrl(p.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
-                            <img src={p.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            cleanImageUrl(p.image) || '📦'
                           )}
                         </div>
                         <div className="product-meta-details">
@@ -6481,17 +6485,17 @@ function DocumentUploader({ label, value, onChange }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', textAlign: 'left' }}>
-      {label && <label style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 'bold' }}>{label}</label>}
+      {label && <label style={{ color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 'bold' }}>{label}</label>}
       <div
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         style={{
-          border: dragging ? '2px dashed #6366f1' : '2px dashed rgba(255, 255, 255, 0.1)',
+          border: dragging ? '2px dashed #6366f1' : '2px dashed var(--border-color)',
           borderRadius: '12px',
           padding: '24px 16px',
           textAlign: 'center',
-          backgroundColor: dragging ? 'rgba(99, 102, 241, 0.05)' : 'rgba(0, 0, 0, 0.2)',
+          backgroundColor: dragging ? 'rgba(99, 102, 241, 0.05)' : 'var(--bg-secondary)',
           cursor: 'pointer',
           transition: 'all 0.2s ease-in-out',
           position: 'relative'
@@ -6508,9 +6512,9 @@ function DocumentUploader({ label, value, onChange }) {
         
         {uploading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.05)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>Processing {fileName} ({progress}%)</span>
-            <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ width: '40px', height: '40px', border: '3px solid var(--border-color)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Processing {fileName} ({progress}%)</span>
+            <div style={{ width: '100%', height: '4px', backgroundColor: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
               <div style={{ width: `${progress}%`, height: '100%', backgroundColor: '#6366f1', transition: 'width 0.1s ease-in-out' }} />
             </div>
           </div>
@@ -6518,16 +6522,16 @@ function DocumentUploader({ label, value, onChange }) {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.8rem' }}>📄</span>
             <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 'bold' }}>✓ Document Attached</span>
-            {fileName && <span style={{ fontSize: '0.75rem', color: '#a1a1aa', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>}
+            {fileName && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>}
             <span style={{ fontSize: '0.7rem', color: '#6366f1', textDecoration: 'underline' }}>Click to replace file</span>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '2rem', color: '#71717a' }}>📤</span>
-            <span style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: '600' }}>
-              Drag & Drop file here or <span style={{ color: '#818cf8', textDecoration: 'underline' }}>browse</span>
+            <span style={{ fontSize: '2rem', color: 'var(--text-muted)' }}>📤</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
+              Drag & Drop file here or <span style={{ color: '#4f46e5', textDecoration: 'underline' }}>browse</span>
             </span>
-            <span style={{ fontSize: '0.7rem', color: '#71717a' }}>Supports PDF or images (Max 5MB)</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Supports PDF or images (Max 5MB)</span>
           </div>
         )}
       </div>

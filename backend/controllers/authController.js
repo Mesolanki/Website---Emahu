@@ -1107,13 +1107,13 @@ exports.sendOtp = async (req, res) => {
       expiresAt
     });
 
-    // Send email using Nodemailer utility
+    // Send email using Nodemailer utility in the background
     const sendEmail = require('../utils/sendEmail');
-    await sendEmail({
+    sendEmail({
       to: cleanEmail,
       subject: 'EMAHU Account Registration Verification Code',
       text: `Hello,\n\nThank you for choosing EMAHU. Your 6-digit verification code is:\n\n🔑 ${otpCode}\n\nPlease enter this code to confirm your email and complete your registration.\n\nBest regards,\nThe Emahu Team`
-    });
+    }).catch(err => console.error('Background sendEmail error:', err));
 
     const host = process.env.EMAIL_HOST || '';
     const user = process.env.EMAIL_USER || '';
@@ -1149,6 +1149,12 @@ exports.verifyOtp = async (req, res) => {
     const otpRecord = await Otp.findOne({ email: cleanEmail });
     if (!otpRecord) {
       return res.status(400).json({ success: false, error: 'OTP has expired or does not exist. Please request a new one.' });
+    }
+
+    // Strict Javascript validation to prevent database TTL index clock skew issues
+    if (otpRecord.expiresAt && new Date(otpRecord.expiresAt) < new Date()) {
+      await Otp.deleteOne({ _id: otpRecord._id });
+      return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
     }
 
     if (otpRecord.otp !== otpCode) {
@@ -1205,12 +1211,12 @@ exports.sendPhoneOtp = async (req, res) => {
       expiresAt
     });
 
-    // Call sendSms utility to send real SMS
+    // Call sendSms utility to send real SMS in the background
     const sendSms = require('../utils/sendSms');
-    await sendSms({
+    sendSms({
       to: cleanPhone,
       body: `Your Emahu mobile verification code is: ${otpCode}. Valid for 5 minutes.`
-    });
+    }).catch(err => console.error('Background sendSms error:', err));
 
     res.status(200).json({
       success: true,
@@ -1241,6 +1247,12 @@ exports.verifyPhoneOtp = async (req, res) => {
     const otpRecord = await Otp.findOne({ phone: cleanPhone });
     if (!otpRecord) {
       return res.status(400).json({ success: false, error: 'OTP has expired or does not exist. Please request a new one.' });
+    }
+
+    // Strict Javascript validation to prevent database TTL index clock skew issues
+    if (otpRecord.expiresAt && new Date(otpRecord.expiresAt) < new Date()) {
+      await Otp.deleteOne({ _id: otpRecord._id });
+      return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
     }
 
     if (otpRecord.otp !== otpCode) {

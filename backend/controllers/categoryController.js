@@ -110,13 +110,13 @@ exports.requestCategory = async (req, res) => {
       name,
       slug: slugify(name),
       parentId: parentId || null,
-      status: 'pending', // Set status as pending for proposals
+      status: 'approved', // Automatically approved so seller can use it immediately
       createdBy: req.user.id
     });
 
     res.status(201).json({
       success: true,
-      message: 'Category request submitted successfully. Awaiting admin approval.',
+      message: 'Category added successfully.',
       data: category
     });
   } catch (err) {

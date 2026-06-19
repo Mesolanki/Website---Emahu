@@ -80,27 +80,27 @@ export default function RequestCategoryModal({
       zIndex: 99999
     }}>
       <div className="modal-card" style={{
-        backgroundColor: '#1e1e24', // Standard vendor dashboard dark background or fallback dark
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        backgroundColor: 'var(--bg-surface)',
+        border: '1px solid var(--border-color)',
         borderRadius: '16px',
         padding: '24px',
         width: '90%',
         maxWidth: '440px',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
-        color: '#ffffff',
+        boxShadow: 'var(--shadow-lg)',
+        color: 'var(--text-primary)',
         boxSizing: 'border-box'
       }}>
         <div className="modal-header" style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          borderBottom: '1px solid var(--border-color)',
           paddingBottom: '16px',
           marginBottom: '20px'
         }}>
           <div className="modal-title-group" style={{ textAlign: 'left' }}>
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800' }}>Request New Category</h3>
-            <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
               Propose a global category. Requires Admin approval.
             </p>
           </div>
@@ -110,7 +110,7 @@ export default function RequestCategoryModal({
             style={{
               background: 'none',
               border: 'none',
-              color: '#94a3b8',
+              color: 'var(--text-secondary)',
               cursor: 'pointer',
               fontSize: '1.5rem',
               lineHeight: 1,
@@ -125,10 +125,10 @@ export default function RequestCategoryModal({
           {error && (
             <div style={{
               padding: '10px 14px',
-              backgroundColor: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid #ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.05)',
+              border: '1px solid var(--color-danger)',
               borderRadius: '8px',
-              color: '#f87171',
+              color: '#b91c1c',
               fontSize: '0.85rem'
             }}>
               ⚠️ {error}
@@ -138,10 +138,10 @@ export default function RequestCategoryModal({
           {successMsg && (
             <div style={{
               padding: '10px 14px',
-              backgroundColor: 'rgba(16, 185, 129, 0.15)',
-              border: '1px solid #10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.05)',
+              border: '1px solid var(--color-success)',
               borderRadius: '8px',
-              color: '#34d399',
+              color: '#065f46',
               fontSize: '0.85rem'
             }}>
               ✓ {successMsg}
@@ -149,17 +149,17 @@ export default function RequestCategoryModal({
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Parent Category</label>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Parent Category</label>
             <input
               type="text"
               readOnly
               value={parentName || 'Root / None'}
               style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '8px',
                 padding: '10px 14px',
-                color: '#cbd5e1',
+                color: 'var(--text-secondary)',
                 fontSize: '0.9rem',
                 outline: 'none',
                 cursor: 'not-allowed'
@@ -168,7 +168,7 @@ export default function RequestCategoryModal({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Proposed Category Name *</label>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Proposed Category Name *</label>
             <input
               type="text"
               required
@@ -182,11 +182,11 @@ export default function RequestCategoryModal({
                 }
               }}
               style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                backgroundColor: 'var(--bg-surface)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '8px',
                 padding: '10px 14px',
-                color: '#ffffff',
+                color: 'var(--text-primary)',
                 fontSize: '0.9rem',
                 outline: 'none'
               }}
@@ -197,7 +197,7 @@ export default function RequestCategoryModal({
             display: 'flex',
             justifyContent: 'flex-end',
             gap: '12px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            borderTop: '1px solid var(--border-color)',
             paddingTop: '16px',
             marginTop: '8px'
           }}>
@@ -206,11 +206,11 @@ export default function RequestCategoryModal({
               onClick={onClose}
               disabled={loading}
               style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                border: 'none',
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '8px',
                 padding: '10px 20px',
-                color: '#ffffff',
+                color: 'var(--text-secondary)',
                 fontSize: '0.9rem',
                 fontWeight: '600',
                 cursor: 'pointer'
@@ -223,7 +223,7 @@ export default function RequestCategoryModal({
               onClick={handleSubmit}
               disabled={loading}
               style={{
-                backgroundColor: '#f59e0b', // Merchant Orange
+                backgroundColor: '#d97706', // Merchant Orange / Gold
                 border: 'none',
                 borderRadius: '8px',
                 padding: '10px 20px',

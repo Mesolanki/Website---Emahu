@@ -4,16 +4,16 @@ import { useState, useEffect, useMemo } from 'react';
 import RequestCategoryModal from './RequestCategoryModal';
 
 /**
- * Helper to trace the list of ancestor IDs for a given target category ID in the category tree.
+ * Helper to trace the list of ancestor IDs for a given target category ID or name in the category tree.
  */
-function tracePath(categories, targetId, currentPath = []) {
+function tracePath(categories, target, currentPath = []) {
   for (let cat of categories) {
     const catIdStr = cat.id || cat._id?.toString();
-    if (catIdStr === targetId) {
+    if (catIdStr === target || cat.name === target) {
       return [...currentPath, catIdStr];
     }
     if (cat.children && cat.children.length > 0) {
-      const found = tracePath(cat.children, targetId, [...currentPath, catIdStr]);
+      const found = tracePath(cat.children, target, [...currentPath, catIdStr]);
       if (found) return found;
     }
   }
@@ -21,14 +21,14 @@ function tracePath(categories, targetId, currentPath = []) {
 }
 
 /**
- * Helper to find a category node by ID in the tree
+ * Helper to find a category node by ID or name in the tree
  */
-function findCategoryNode(categories, targetId) {
+function findCategoryNode(categories, target) {
   for (let cat of categories) {
     const catIdStr = cat.id || cat._id?.toString();
-    if (catIdStr === targetId) return cat;
+    if (catIdStr === target || cat.name === target) return cat;
     if (cat.children && cat.children.length > 0) {
-      const found = findCategoryNode(cat.children, targetId);
+      const found = findCategoryNode(cat.children, target);
       if (found) return found;
     }
   }
@@ -107,10 +107,16 @@ export default function CategorySelector({ value, onChange }) {
 
     setSelectedPath(nextPath);
 
-    // Call onChange with the deepest selected category ID, or empty if none
+    // Call onChange with the deepest selected category Name, or empty if none
     const deepestId = nextPath[nextPath.length - 1] || '';
+    let deepestName = '';
+    if (deepestId) {
+      const node = findCategoryNode(categories, deepestId);
+      deepestName = node ? node.name : '';
+    }
+
     if (onChange) {
-      onChange(deepestId);
+      onChange(deepestName);
     }
   };
 
@@ -127,36 +133,29 @@ export default function CategorySelector({ value, onChange }) {
   }, [selectedPath, categories]);
 
   if (loading) {
-    return <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Loading categories...</span>;
+    return <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading categories...</span>;
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
       {levels.map((levelObj) => (
         <div key={levelObj.level} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
             {levelObj.level === 0 ? 'Main Category *' : `Subcategory Level ${levelObj.level} *`}
           </label>
           <select
             className="select-filter"
             style={{
-              height: '38px',
               width: '100%',
-              backgroundColor: 'rgba(0,0,0,0.2)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: '8px',
-              color: '#ffffff',
-              padding: '0 10px',
-              fontSize: '0.85rem',
               outline: 'none'
             }}
             value={levelObj.selectedValue}
             onChange={(e) => handleLevelChange(levelObj.level, e.target.value)}
             required
           >
-            <option value="">Select Option...</option>
+            <option value="" style={{ color: 'var(--text-secondary)', background: 'var(--bg-surface)' }}>Select Option...</option>
             {levelObj.options.map((opt) => (
-              <option key={opt.id} value={opt.id}>
+              <option key={opt.id} value={opt.id} style={{ color: 'var(--text-primary)', background: 'var(--bg-surface)' }}>
                 {opt.name}
               </option>
             ))}
@@ -172,7 +171,7 @@ export default function CategorySelector({ value, onChange }) {
           style={{
             background: 'none',
             border: 'none',
-            color: '#f59e0b', // Merchant Gold / Orange
+            color: '#d97706', // Merchant Gold / Orange (darker for high contrast)
             fontSize: '0.8rem',
             fontWeight: '600',
             cursor: 'pointer',

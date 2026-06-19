@@ -41,6 +41,33 @@ const RATING_DIST = [
   { label:'2★', pct:3  }, { label:'1★', pct:2  },
 ];
 
+const cleanImageUrl = (img) => {
+  if (!img || typeof img !== 'string') return '';
+  let clean = img.trim();
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  if (clean.startsWith('[') && clean.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(clean);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return cleanImageUrl(parsed[0]);
+      }
+    } catch (e) {
+      clean = clean.slice(1, -1).trim();
+      if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+        clean = clean.slice(1, -1).trim();
+      }
+    }
+  }
+  return clean;
+};
+
+const isRealImage = (img) => {
+  const clean = cleanImageUrl(img);
+  return clean.startsWith('http') || clean.startsWith('data:image');
+};
+
 export default function ProductDetailPage() {
   const params = useParams();
   const id = params.id;
@@ -205,8 +232,8 @@ export default function ProductDetailPage() {
             discount: p.comparePrice ? Math.round(((p.comparePrice - p.price) / p.comparePrice) * 100) : 0,
             rating: p.rating || 4.7,
             reviews: p.reviews || 84,
-            imgs: p.image && p.image.startsWith('http') ? [p.image] : [],
-            imageEmoji: (!p.image || !p.image.startsWith('http')) ? p.image : null,
+            imgs: (p.images && p.images.length > 0) ? p.images.map(img => cleanImageUrl(img)).filter(Boolean) : (p.image && isRealImage(p.image)) ? [cleanImageUrl(p.image)] : [],
+            imageEmoji: (!p.image || !isRealImage(p.image)) ? p.image : null,
             colors: [],
             sizes: [],
             desc: p.description || 'Premium quality product listing verified by EMAHU.',
@@ -255,8 +282,8 @@ export default function ProductDetailPage() {
             discount: staticProd.originalPrice ? Math.round(((staticProd.originalPrice - staticProd.price) / staticProd.originalPrice) * 100) : 0,
             rating: staticProd.rating || 4.7,
             reviews: staticProd.reviews || 84,
-            imgs: staticProd.image && staticProd.image.startsWith('http') ? [staticProd.image] : [],
-            imageEmoji: (!staticProd.image || !staticProd.image.startsWith('http')) ? staticProd.image : null,
+            imgs: (staticProd.images && staticProd.images.length > 0) ? staticProd.images.map(img => cleanImageUrl(img)).filter(Boolean) : (staticProd.image && isRealImage(staticProd.image)) ? [cleanImageUrl(staticProd.image)] : [],
+            imageEmoji: (!staticProd.image || !isRealImage(staticProd.image)) ? staticProd.image : null,
             colors: [],
             sizes: [],
             desc: staticProd.desc || 'Premium quality product listing verified by EMAHU.',

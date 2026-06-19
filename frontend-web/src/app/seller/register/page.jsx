@@ -88,6 +88,7 @@ export default function SellerRegister() {
 
 
   const triggerSendOtp = async (isResend = false) => {
+    setIsOtpVerifying(true); // Open the popup immediately!
     setOtpSending(true);
     setOtpError('');
     try {
@@ -99,7 +100,6 @@ export default function SellerRegister() {
       });
       const data = await res.json();
       if (data.success) {
-        setIsOtpVerifying(true);
         setOtpCooldown(60);
         if (data.devOtp) {
           setDevEmailOtp(data.devOtp);
@@ -108,11 +108,11 @@ export default function SellerRegister() {
           setOtpError('OTP has been resent to your email.');
         }
       } else {
-        setErrors({ general: data.error || 'Failed to send OTP. Please check email address.' });
+        setOtpError(data.error || 'Failed to send OTP. Please check email address.');
       }
     } catch (err) {
       console.error(err);
-      setErrors({ general: 'Network error sending OTP. Please try again.' });
+      setOtpError('Network error sending OTP. Please try again.');
     } finally {
       setOtpSending(false);
     }
@@ -813,10 +813,13 @@ export default function SellerRegister() {
               </svg>
             </div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#ffffff', marginBottom: '8px' }}>
-              Confirm Your Email
+              {otpSending ? 'Sending Verification Code...' : 'Confirm Your Email'}
             </h3>
             <p style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: '1.5', marginBottom: '24px' }}>
-              We sent a 6-digit verification code to <strong style={{ color: '#f8fafc' }}>{formData.email}</strong>. Please enter it below.
+              {otpSending 
+                ? 'We are generating and sending a secure OTP to your email...' 
+                : <>We sent a 6-digit verification code to <strong style={{ color: '#f8fafc' }}>{formData.email}</strong>. Please enter it below.</>
+              }
             </p>
 
             {devEmailOtp && (
@@ -858,6 +861,7 @@ export default function SellerRegister() {
                   placeholder="000000"
                   value={otpInput}
                   onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                  disabled={otpSending}
                   style={{
                     width: '100%',
                     height: '50px',
@@ -870,6 +874,7 @@ export default function SellerRegister() {
                     textAlign: 'center',
                     letterSpacing: '8px',
                     outline: 'none',
+                    opacity: otpSending ? 0.5 : 1,
                     transition: 'border-color 0.2s'
                   }}
                   onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
@@ -880,7 +885,7 @@ export default function SellerRegister() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || otpSending}
                 style={{
                   width: '100%',
                   height: '44px',
@@ -890,16 +895,16 @@ export default function SellerRegister() {
                   fontSize: '0.9rem',
                   fontWeight: '600',
                   border: 'none',
-                  cursor: 'pointer',
+                  cursor: (loading || otpSending) ? 'not-allowed' : 'pointer',
                   transition: 'opacity 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  opacity: loading ? 0.7 : 1
+                  opacity: (loading || otpSending) ? 0.7 : 1
                 }}
               >
-                {loading ? 'Verifying...' : 'Verify & Continue'}
+                {loading ? 'Verifying...' : otpSending ? 'Sending...' : 'Verify & Continue'}
               </button>
             </form>
 

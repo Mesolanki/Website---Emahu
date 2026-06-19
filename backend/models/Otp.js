@@ -25,7 +25,8 @@ const otpSchema = new mongoose.Schema(
   }
 );
 
-// Create a TTL index to delete the document after expiresAt
-otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Create a TTL index to delete the document after expiresAt plus 1 hour (3600 seconds)
+// This cleans the DB while preventing clock skew issues. Strict 5-min expiration is checked in JS code.
+otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 3600 });
 
 module.exports = mongoose.model('Otp', otpSchema);

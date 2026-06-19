@@ -82,7 +82,7 @@ export default function BuyerHeader() {
   // Monitor scroll for subtle shadow under header
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 10);
+      setScrolled(window.scrollY > 20);
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
@@ -149,18 +149,6 @@ export default function BuyerHeader() {
           </div>
           <span className="bh-logo__text">EMAHU</span>
         </Link>
-
-        {/* Center Side: Premium "Start Buying Products" Button */}
-        <div className="bh-header__center">
-          <Link href="/buyer/products" className="bh-start-buying-btn" aria-label="Start Buying Products">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="bh-start-buying-btn__icon">
-              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <path d="M16 10a4 4 0 0 1-8 0" />
-            </svg>
-            <span className="bh-start-buying-btn__text">Start Buying Products</span>
-          </Link>
-        </div>
 
         {/* Right Side: Action Icons & Matte Black Login Button */}
         <div className="bh-header__right">

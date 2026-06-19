@@ -9,29 +9,16 @@
   position: sticky;
   top: 0;
   z-index: 1000;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  height: 76px;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  height: 70px; /* Constant height to prevent layout shifting on scroll */
   display: flex;
   align-items: center;
-  animation: headerEntry 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .bh-header--scrolled {
   background-color: #ffffff;
-  height: 64px; /* Beautiful shrink on scroll */
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06); /* Gorgeous shadow on scroll */
   border-bottom-color: rgba(0, 0, 0, 0.1);
-}
-
-@keyframes headerEntry {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .bh-header__container {

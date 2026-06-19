@@ -7,6 +7,33 @@ import './dashboard.css';
 import { logoutUser, clearAuthSession } from '@/utils/auth';
 let toastIdCounter = 0;
 
+const cleanImageUrl = (img) => {
+  if (!img || typeof img !== 'string') return '';
+  let clean = img.trim();
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  if (clean.startsWith('[') && clean.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(clean);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return cleanImageUrl(parsed[0]);
+      }
+    } catch (e) {
+      clean = clean.slice(1, -1).trim();
+      if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+        clean = clean.slice(1, -1).trim();
+      }
+    }
+  }
+  return clean;
+};
+
+const isRealImage = (img) => {
+  const clean = cleanImageUrl(img);
+  return clean.startsWith('http') || clean.startsWith('data:image');
+};
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [adminUser, setAdminUser] = useState(null);
@@ -1105,6 +1132,8 @@ export default function AdminDashboard() {
               </button>
             </div>
           </div>
+        </div>
+      )}
             {/* Premium Delivery Partner Detail Drawer/Modal */}
       {selectedDetailPartner && (
         <div className="ad-modal-overlay" onClick={() => setSelectedDetailPartner(null)}>
@@ -1125,7 +1154,7 @@ export default function AdminDashboard() {
               </span>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', minHeight: '300px', display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', minHeight: '120px', display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
               <div className="ad-detail-info-grid">
                 <div className="ad-detail-info-section">
                   <h4>Edit Fleet Parameters</h4>
@@ -1353,7 +1382,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', minHeight: '300px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', minHeight: '120px' }}>
               {detailTab === 'profile' && (
                 <div className="ad-detail-info-grid">
                   <div className="ad-detail-info-section">
@@ -1439,7 +1468,7 @@ export default function AdminDashboard() {
               )}
 
               {detailTab === 'payout' && (
-                <div className="ad-detail-info-grid" style={{ alignItems: 'center' }}>
+                <div className="ad-detail-info-grid" style={{ alignItems: 'stretch' }}>
                   <div className="ad-detail-bank-card">
                     <div className="ad-detail-bank-logo">
                       <span>🏦 {selectedDetailSeller.bankName || 'Payout Destination'}</span>
@@ -1460,15 +1489,26 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="ad-detail-info-section">
-                    <h4>Tax Details</h4>
-                    <div className="ad-detail-row">
-                      <span className="ad-detail-row-label">GSTIN / Tax Code</span>
-                      <span className="ad-detail-row-val" style={{ fontFamily: 'monospace' }}>{selectedDetailSeller.gstNumber || 'Not Provided'}</span>
+                  <div className="ad-detail-info-section" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <h4 style={{ borderBottom: '1px solid var(--color-admin-border)', paddingBottom: '8px', marginBottom: '16px' }}>Tax Details</h4>
+                      <div className="ad-detail-row">
+                        <span className="ad-detail-row-label">GSTIN / Tax Code</span>
+                        <span className="ad-detail-row-val" style={{ fontFamily: 'monospace' }}>{selectedDetailSeller.gstNumber || 'Not Provided'}</span>
+                      </div>
                     </div>
-                    <div className="ad-detail-row">
+                    <div className="ad-detail-row" style={{ borderTop: '1px dashed rgba(255, 255, 255, 0.04)', paddingTop: '10px', marginTop: '10px' }}>
                       <span className="ad-detail-row-label">Bank Settlement Status</span>
-                      <span className="ad-detail-row-val" style={{ color: '#10b981' }}>Active</span>
+                      <span className="ad-detail-row-val" style={{
+                        color: selectedDetailSeller.status === 'approved' ? '#10b981' : 
+                               (selectedDetailSeller.status === 'suspended' || selectedDetailSeller.status === 'blocked') ? '#ef4444' :
+                               selectedDetailSeller.status === 'rejected' ? '#ef4444' : '#f59e0b',
+                        fontWeight: 'bold'
+                      }}>
+                        {selectedDetailSeller.status === 'approved' ? 'Active' : 
+                         (selectedDetailSeller.status === 'suspended' || selectedDetailSeller.status === 'blocked') ? 'Suspended' :
+                         selectedDetailSeller.status === 'rejected' ? 'Rejected' : 'Pending Verification'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1718,7 +1758,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', minHeight: '300px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', minHeight: '120px' }}>
               {productDetailTab === 'info' && (
                 <div className="ad-detail-info-grid">
                   <div className="ad-detail-info-section" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -1751,10 +1791,10 @@ export default function AdminDashboard() {
 
                   <div className="ad-detail-info-section" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
                     <div style={{ width: '100%', height: '260px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--color-admin-border)', background: '#0a0b10', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {(!selectedDetailProduct.image || !selectedDetailProduct.image.startsWith('http')) ? (
-                        <span style={{ fontSize: '5rem' }}>{selectedDetailProduct.image || '📦'}</span>
+                      {isRealImage(selectedDetailProduct.image) ? (
+                        <img src={cleanImageUrl(selectedDetailProduct.image)} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                       ) : (
-                        <img src={selectedDetailProduct.image} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        <span style={{ fontSize: '5rem' }}>{cleanImageUrl(selectedDetailProduct.image) || '📦'}</span>
                       )}
                     </div>
                   </div>
@@ -2793,10 +2833,10 @@ export default function AdminDashboard() {
                                 <td>
                                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                     <div className="ad-prod-image">
-                                      {(!product.image || !product.image.startsWith('http')) ? (
-                                        product.image || '📦'
+                                      {isRealImage(product.image) ? (
+                                        <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                       ) : (
-                                        <img src={product.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        cleanImageUrl(product.image) || '📦'
                                       )}
                                     </div>
                                     <div>
@@ -2872,10 +2912,10 @@ export default function AdminDashboard() {
                                 <td>
                                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                     <div className="ad-prod-image">
-                                      {(!product.image || !product.image.startsWith('http')) ? (
-                                        product.image || '📦'
+                                      {isRealImage(product.image) ? (
+                                        <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                       ) : (
-                                        <img src={product.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        cleanImageUrl(product.image) || '📦'
                                       )}
                                     </div>
                                     <div>
@@ -2991,10 +3031,10 @@ export default function AdminDashboard() {
                                     <td>
                                       <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                         <div className="ad-prod-image">
-                                          {(!product.image || !product.image.startsWith('http')) ? (
-                                            product.image || '📦'
+                                          {isRealImage(product.image) ? (
+                                            <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                           ) : (
-                                            <img src={product.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            cleanImageUrl(product.image) || '📦'
                                           )}
                                         </div>
                                         <div>

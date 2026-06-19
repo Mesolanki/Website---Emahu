@@ -691,7 +691,7 @@ export default function CheckoutPage() {
                 Continue Shopping
               </Link>
               <Link href="/buyer/orders" className="co-btn-solid">
-                Go to Escrow Vault Transactions
+                Go to My Orders
               </Link>
             </div>
           </div>
