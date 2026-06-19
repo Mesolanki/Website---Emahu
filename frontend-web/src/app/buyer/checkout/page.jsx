@@ -751,7 +751,7 @@ export default function CheckoutPage() {
                   gap: '12px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', fontWeight: '750', fontSize: '0.88rem' }}>
-                    <span>✓ GPS Location Verified: {buyerCoordinates.latitude}, {buyerCoordinates.longitude}</span>
+                    <span>✓ GPS Location Verified</span>
                   </div>
                   <button
                     type="button"

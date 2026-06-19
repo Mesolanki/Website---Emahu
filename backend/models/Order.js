@@ -125,6 +125,7 @@ const orderSchema = new mongoose.Schema(
       type: String
     },
     carrier: String,
+    carrierPhone: String,
     trackingId: String,
     deliveryCost: Number,
     estDays: String,

@@ -92,7 +92,15 @@ exports.register = async (req, res) => {
       perItemCharge,
       deliveryScope,
       operatingLocation,
-      dispatchNotes
+      dispatchNotes,
+      currentCity,
+      currentArea,
+      pincode,
+      serviceRadius,
+      vehicleType,
+      vehicleNumber,
+      latitude,
+      longitude
     } = req.body;
 
     // Simple validation
@@ -137,6 +145,14 @@ exports.register = async (req, res) => {
       deliveryScope,
       operatingLocation,
       dispatchNotes,
+      currentCity,
+      currentArea,
+      pincode,
+      serviceRadius,
+      vehicleType,
+      vehicleNumber,
+      latitude,
+      longitude,
       status: (role === 'seller' || role === 'delivery') ? 'pending' : 'approved'
     });
 
@@ -1015,6 +1031,7 @@ exports.deliveryPartnerDecision = async (req, res) => {
 
     if (decision === 'approve') {
       partner.status = 'approved';
+      partner.isActivePartner = true;
       partner.verificationFeedback = '';
     } else if (decision === 'reject') {
       partner.status = 'rejected';

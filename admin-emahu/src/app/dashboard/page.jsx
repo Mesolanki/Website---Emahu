@@ -1268,7 +1268,7 @@ export default function AdminDashboard() {
                   <h4>Edit Fleet Parameters</h4>
                   
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Rate Per KM (₹)</label>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Rate Per 2KM (₹)</label>
                     <input 
                       type="number" 
                       className="ad-modal-input" 
@@ -2700,7 +2700,7 @@ export default function AdminDashboard() {
                                   Scope: {partner.deliveryScope === 'local' ? 'Local Same-City' : 'State-to-State'}
                                 </div>
                                 <div className="ad-muted" style={{ color: '#10b981', fontWeight: 'bold' }}>
-                                  ₹{partner.perItemCharge || '0.00'}/km
+                                  ₹{partner.perItemCharge || '0.00'}/2km
                                 </div>
                               </td>
                               <td>
@@ -2761,7 +2761,7 @@ export default function AdminDashboard() {
                                   Scope: {partner.deliveryScope === 'local' ? 'Local Same-City' : 'State-to-State'}
                                 </div>
                                 <div className="ad-muted" style={{ color: '#10b981', fontWeight: 'bold' }}>
-                                  ₹{partner.perItemCharge || '0.00'}/km
+                                  ₹{partner.perItemCharge || '0.00'}/2km
                                 </div>
                               </td>
                               <td>

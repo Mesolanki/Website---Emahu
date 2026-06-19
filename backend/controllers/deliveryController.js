@@ -310,10 +310,11 @@ exports.assignOrderToPartner = async (req, res) => {
 
     if (isManualCarrier) {
       // Manual/3rd party carrier assignment (Delhivery, Blue Dart, EmahuXpress, FedEx, etc.)
+      const manualPhone = deliveryPartnerId === 'Blue Dart' ? '+91 1860 233 1234' : (deliveryPartnerId === 'Delhivery' ? '+91 80698 56101' : '+91 99999 99999');
       order.carrier = deliveryPartnerId;
-      order.deliveryPartnerId = undefined;
-      order.deliveryStatus = 'assigned';
-      order.status = 'DELIVERY_ASSIGNED';
+      order.carrierPhone = manualPhone;
+      order.deliveryStatus = 'accepted';
+      order.status = 'LABEL_GENERATED';
 
       // Default tracking details if not set
       if (!order.trackingId) {
@@ -326,8 +327,8 @@ exports.assignOrderToPartner = async (req, res) => {
 
       const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
       order.timeline.push({
-        status: 'DELIVERY_ASSIGNED',
-        label: 'Delivery Assigned',
+        status: 'LABEL_GENERATED',
+        label: 'Delivery Accepted',
         desc: `Order assigned to courier partner: ${deliveryPartnerId}`,
         date: dateStr
       });
@@ -348,9 +349,9 @@ exports.assignOrderToPartner = async (req, res) => {
       if (io) {
         io.emit('delivery-status-changed', {
           orderId,
-          status: 'DELIVERY_ASSIGNED',
-          deliveryStatus: 'assigned',
-          partner: { name: deliveryPartnerId, phone: 'N/A' }
+          status: 'LABEL_GENERATED',
+          deliveryStatus: 'accepted',
+          partner: { name: deliveryPartnerId, phone: manualPhone }
         });
       }
 
@@ -369,14 +370,16 @@ exports.assignOrderToPartner = async (req, res) => {
 
     // Update Order
     order.deliveryPartnerId = deliveryPartnerId;
-    order.deliveryStatus = 'assigned';
-    order.status = 'DELIVERY_ASSIGNED';
+    order.carrier = partner.name;
+    order.carrierPhone = partner.phone;
+    order.deliveryStatus = 'accepted';
+    order.status = 'LABEL_GENERATED';
     
     const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     order.timeline.push({
-      status: 'DELIVERY_ASSIGNED',
-      label: 'Delivery Assigned',
-      desc: `Order assigned to courier partner: ${partner.name}`,
+      status: 'LABEL_GENERATED',
+      label: 'Delivery Accepted',
+      desc: `Order assigned to courier partner: ${partner.name}. Courier accepted the job.`,
       date: dateStr
     });
     
@@ -392,11 +395,11 @@ exports.assignOrderToPartner = async (req, res) => {
         deliveryPartnerId,
         distance: order.distanceKm,
         deliveryCharge: order.deliveryCharge || 0,
-        currentStatus: 'assigned'
+        currentStatus: 'accepted'
       });
     } else {
       assignment.deliveryPartnerId = deliveryPartnerId;
-      assignment.currentStatus = 'assigned';
+      assignment.currentStatus = 'accepted';
     }
     await assignment.save();
 
@@ -404,8 +407,8 @@ exports.assignOrderToPartner = async (req, res) => {
     await DeliveryTracking.create({
       assignmentId: assignment._id,
       orderId,
-      status: 'assigned',
-      remarks: `Assigned to partner ${partner.name}`
+      status: 'accepted',
+      remarks: `Assigned to partner ${partner.name} (Auto-Accepted)`
     });
 
     // Create Notification for Delivery Partner
@@ -431,8 +434,8 @@ exports.assignOrderToPartner = async (req, res) => {
     if (io) {
       io.emit('delivery-status-changed', {
         orderId,
-        status: 'DELIVERY_ASSIGNED',
-        deliveryStatus: 'assigned',
+        status: 'LABEL_GENERATED',
+        deliveryStatus: 'accepted',
         partner: { name: partner.name, phone: partner.phone }
       });
     }
@@ -632,61 +635,23 @@ exports.getPartnerOrders = async (req, res) => {
     const assignedOrderIds = assignments.map(a => a.orderId);
     const assignedOrders = await Order.find({ orderId: { $in: assignedOrderIds } }).lean();
 
-    // Get approved unassigned orders in the partner's service city/radius
-    const unassignedOrders = await Order.find({
-      deliveryStatus: 'unassigned',
-      status: { $in: ['APPROVED', 'READY_FOR_PICKUP'] }
-    }).lean();
-
-    const partnerCity = (partner.currentCity || partner.city || '').trim().toLowerCase();
-    const partnerLat = partner.latitude;
-    const partnerLon = partner.longitude;
-    const radiusLimit = partner.serviceRadius || 15;
-
-    const matchingUnassignedOrders = [];
-    for (const order of unassignedOrders) {
-      // Skip if this partner has already rejected/interacted with it
-      if (assignmentMap[order.orderId]) {
-        continue;
-      }
-
-      const orderCity = (order.deliveryAddress?.city || '').trim().toLowerCase();
-      if (partnerCity && orderCity && partnerCity !== orderCity) {
-        continue;
-      }
-
-      // Check service radius if coordinates are available
-      if (partnerLat !== undefined && partnerLon !== undefined && order.buyerLocation?.latitude !== undefined && order.buyerLocation?.longitude !== undefined) {
-        const distToBuyer = getHaversineDistance(partnerLat, partnerLon, order.buyerLocation.latitude, order.buyerLocation.longitude);
-        if (distToBuyer > radiusLimit) {
-          continue; // outside service radius
-        }
-      }
-
-      matchingUnassignedOrders.push({
-        ...order,
-        assignmentStatus: 'unassigned'
-      });
-    }
-
     const orders = [];
     
-    // Add assigned/interacted orders (excluding purely rejected ones to keep dashboard clean, or keep them if you want but usually keep dashboard clean)
-    assignedOrders.forEach(o => {
+    // Add assigned/interacted orders (excluding purely rejected ones to keep dashboard clean)
+    for (const o of assignedOrders) {
       const status = assignmentMap[o.orderId];
       if (status !== 'rejected') {
+        // Find seller user to get phone number
+        const sellerUser = await User.findById(o.sellerId);
         orders.push({
           ...o,
           assignmentStatus: status,
-          assignedDate: o.createdAt
+          assignedDate: o.createdAt,
+          sellerPhone: sellerUser ? sellerUser.phone : '',
+          sellerName: sellerUser ? (sellerUser.storeName || sellerUser.name) : ''
         });
       }
-    });
-
-    // Add matching unassigned approved orders
-    matchingUnassignedOrders.forEach(o => {
-      orders.push(o);
-    });
+    }
 
     // Sort descending by order ID
     orders.sort((a, b) => String(b.orderId).localeCompare(String(a.orderId)));
@@ -773,11 +738,10 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
     const buyerLat = order.buyerLocation?.latitude;
     const buyerLon = order.buyerLocation?.longitude;
 
-    // Fetch all active, approved delivery partners
+    // Fetch all approved delivery partners
     const partners = await User.find({
       role: 'delivery',
-      status: 'approved',
-      isActivePartner: true
+      status: 'approved'
     });
 
     const availablePartners = [];
@@ -798,23 +762,23 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
     for (const partner of partners) {
       const partnerCity = (partner.currentCity || partner.city || '').trim().toLowerCase();
       
-      // 1. City check
-      if (partnerCity !== orderCity) {
-        continue;
-      }
+      // 1. City match check (non-blocking)
+      const isCityMatch = !orderCity || !partnerCity || partnerCity === orderCity;
 
-      // 2. Service radius check: distance from partner to buyer
+      // 2. Service radius check (non-blocking)
+      let isRadiusMatch = true;
+      let distToBuyer = 0;
       if (buyerLat !== undefined && buyerLon !== undefined && partner.latitude !== undefined && partner.longitude !== undefined) {
-        const distToBuyer = getHaversineDistance(partner.latitude, partner.longitude, buyerLat, buyerLon);
-        if (distToBuyer > (partner.serviceRadius || 15)) {
-          continue; // Out of service radius
-        }
+        distToBuyer = getHaversineDistance(partner.latitude, partner.longitude, buyerLat, buyerLon);
+        isRadiusMatch = distToBuyer <= (partner.serviceRadius || 15);
       }
 
       // 3. Calculate delivery cost for this partner
-      // Formula: Total Delivery Charge = Distance KM * Delivery Partner Rate
-      const rate = partner.perItemCharge || 10; // rate per KM, default ₹10/KM
-      const totalCost = parseFloat((distance * rate).toFixed(2));
+      // Formula: distance_units = ceil(distance_km / 2), delivery_fee = base_fee + (distance_units * rate_per_2km)
+      const baseFee = 0;
+      const ratePer2Km = partner.perItemCharge || 10; // rate per 2KM, default ₹10
+      const distanceUnits = Math.ceil(distance / 2);
+      const totalCost = parseFloat((baseFee + (distanceUnits * ratePer2Km)).toFixed(2));
 
       availablePartners.push({
         _id: partner._id,
@@ -827,10 +791,22 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
         currentArea: partner.currentArea || partner.address,
         pincode: partner.pincode,
         serviceRadius: partner.serviceRadius || 15,
-        ratePerKm: rate,
-        totalCost
+        ratePerKm: ratePer2Km,
+        totalCost,
+        isCityMatch,
+        isRadiusMatch,
+        distanceToBuyer: distToBuyer
       });
     }
+
+    // Sort: Preferred city match + radius match first, then sorted by distance to buyer
+    availablePartners.sort((a, b) => {
+      if (a.isCityMatch && !b.isCityMatch) return -1;
+      if (!a.isCityMatch && b.isCityMatch) return 1;
+      if (a.isRadiusMatch && !b.isRadiusMatch) return -1;
+      if (!a.isRadiusMatch && b.isRadiusMatch) return 1;
+      return a.distanceToBuyer - b.distanceToBuyer;
+    });
 
     res.status(200).json({
       success: true,

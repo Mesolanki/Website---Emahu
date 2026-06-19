@@ -530,21 +530,21 @@ export default function RoleSelector() {
 
                 {deliveryDropdownOpen && (
                   <div className="sel-delivery-dropdown-menu">
-                    <Link href="/delivery?type=single_boy" className="sel-dropdown-item" onClick={() => setDeliveryDropdownOpen(false)}>
+                    <Link href="/delivery" className="sel-dropdown-item" onClick={() => setDeliveryDropdownOpen(false)}>
                       <span className="sel-dropdown-item__emoji">🛵</span>
                       <div className="sel-dropdown-item__text">
                         <strong>Single/Two Boy Delivery</strong>
                         <span>Independent local driver dispatch.</span>
                       </div>
                     </Link>
-                    <Link href="/delivery?type=agency" className="sel-dropdown-item" onClick={() => setDeliveryDropdownOpen(false)}>
+                    <Link href="/delivery" className="sel-dropdown-item" onClick={() => setDeliveryDropdownOpen(false)}>
                       <span className="sel-dropdown-item__emoji">🏢</span>
                       <div className="sel-dropdown-item__text">
                         <strong>Delivery Agency</strong>
                         <span>Fleet dispatcher operations.</span>
                       </div>
                     </Link>
-                    <Link href="/delivery?type=partner" className="sel-dropdown-item" onClick={() => setDeliveryDropdownOpen(false)}>
+                    <Link href="/delivery" className="sel-dropdown-item" onClick={() => setDeliveryDropdownOpen(false)}>
                       <span className="sel-dropdown-item__emoji">🤝</span>
                       <div className="sel-dropdown-item__text">
                         <strong>Delivery Partner</strong>

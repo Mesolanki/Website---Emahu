@@ -370,11 +370,8 @@ export default function EmahuProDashboard() {
         <div style="font-weight:700;font-size:0.95rem;color:#1a1a2e;margin-bottom:4px;">
           🏪 ${shopLabel}
         </div>
-        <div style="font-size:0.78rem;color:#555;line-height:1.5;margin-bottom:8px;">
+        <div style="font-size:0.78rem;color:#555;line-height:1.5;margin-bottom:12px;">
           📍 ${fullAddress}
-        </div>
-        <div style="font-size:0.72rem;color:#888;margin-bottom:10px;">
-          Lat: ${parseFloat(lat).toFixed(5)}, Lon: ${parseFloat(lon).toFixed(5)}
         </div>
         <a
           href="${gmapsUrl}"
@@ -4130,46 +4127,8 @@ export default function EmahuProDashboard() {
                                 </>
                               )}
 
-                              {order.status === 'READY_FOR_PICKUP' && (
-                                <button
-                                  className="order-action-btn carrier"
-                                  onClick={() => handleAdvanceStatus(order.id, 'PICKED_UP')}
-                                  disabled={orderLoading[order.id]}
-                                >
-                                  {orderLoading[order.id] ? 'Processing...' : '🚀 Ship'}
-                                </button>
-                              )}
-
-                              {order.status === 'PICKED_UP' && (
-                                <button
-                                  className="order-action-btn label"
-                                  onClick={() => handleAdvanceStatus(order.id, 'IN_TRANSIT')}
-                                  disabled={orderLoading[order.id]}
-                                >
-                                  {orderLoading[order.id] ? 'Processing...' : '🚛 In Transit'}
-                                </button>
-                              )}
-
-                              {order.status === 'IN_TRANSIT' && (
-                                <button
-                                  className="order-action-btn label"
-                                  onClick={() => handleAdvanceStatus(order.id, 'OUT_FOR_DELIVERY')}
-                                  disabled={orderLoading[order.id]}
-                                >
-                                  {orderLoading[order.id] ? 'Processing...' : '🛵 Out For Delivery'}
-                                </button>
-                              )}
-
-                              {order.status === 'OUT_FOR_DELIVERY' && (
-                                <button
-                                  className="order-action-btn approve"
-                                  onClick={() => handleAdvanceStatus(order.id, 'DELIVERED')}
-                                  disabled={orderLoading[order.id]}
-                                >
-                                  {orderLoading[order.id] ? 'Processing...' : '🎉 Delivered'}
-                                </button>
-                              )}
-
+                              {/* Delivery status changes are handled by the assigned logistics partner */}
+                              
                               {['LABEL_GENERATED', 'READY_FOR_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'].includes(order.status) && order.raw?.trackingId && (
                                 <button
                                   className="btn-secondary"
@@ -5432,7 +5391,7 @@ export default function EmahuProDashboard() {
                   const order = orders.find(o => o.id === selectedOrderId);
                   const buyerAddr = order ? (order.raw?.deliveryAddress?.address || order.raw?.buyerLocation?.address || '') : '';
                   const sellerAddr = order ? (order.raw?.sellerLocation?.address || '') : '';
-                  const messageText = `Hello! I am a seller on Emahu. I want to assign you to deliver Order #${selectedOrderId}.\n\nPickup address: ${sellerAddr}\nDrop address: ${buyerAddr}\nDistance: ${order?.raw?.distanceKm || 0} KM\nEstimated charge: ₹${partner.totalCost}.\n\nPlease confirm if you can take this order.`;
+                  const messageText = `Hello! I have assigned you to deliver Emahu Order #${selectedOrderId}.\n\nPickup address: ${sellerAddr}\nDrop address: ${buyerAddr}\nDistance: ${order?.raw?.distanceKm || 0} KM\nEstimated charge: ₹${partner.totalCost}.\n\nYou can view and update the job delivery progress on your dashboard: ${typeof window !== 'undefined' ? `${window.location.origin}/delivery` : 'http://localhost:3000/delivery'}`;
                   const whatsappUrl = `https://wa.me/${partner.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(messageText)}`;
                   const isSelected = selectedPartnerId === partner._id;
 
@@ -5469,7 +5428,6 @@ export default function EmahuProDashboard() {
                           </div>
                           {partner.latitude && partner.longitude && (
                             <div style={{ fontSize: '0.75rem', color: '#4a5568', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>🧭 Coordinates: {partner.latitude}, {partner.longitude}</span>
                               <a
                                 href={`https://www.google.com/maps/search/?api=1&query=${partner.latitude},${partner.longitude}`}
                                 target="_blank"
@@ -5477,7 +5435,7 @@ export default function EmahuProDashboard() {
                                 style={{ color: '#319795', textDecoration: 'underline', fontSize: '0.75rem' }}
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                View on Map
+                                🧭 View operating map location
                               </a>
                             </div>
                           )}
@@ -6044,37 +6002,30 @@ export default function EmahuProDashboard() {
                         <span style={{ color: '#64748b' }}>Seller Earnings (Subtotal)</span>
                         <strong style={{ color: '#16a34a' }}>{selectedDetailedOrder.productAmount !== undefined ? `₹${selectedDetailedOrder.productAmount}` : '—'}</strong>
                       </div>
-                      {selectedDetailedOrder.buyerLocation?.latitude !== undefined && (
+                      {selectedDetailedOrder.buyerLocation?.latitude !== undefined && selectedDetailedOrder.sellerLocation?.latitude !== undefined && (
                         <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px dashed #cbd5e1', paddingTop: '8px', marginTop: '4px', gap: '4px' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b' }}>BUYER COORDINATES</span>
-                          <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: '#475569' }}>
-                            Lat: {selectedDetailedOrder.buyerLocation.latitude.toFixed(6)}, Lon: {selectedDetailedOrder.buyerLocation.longitude.toFixed(6)}
-                          </span>
-                          
-                          {selectedDetailedOrder.sellerLocation?.latitude !== undefined && (
-                            <a
-                              href={`https://www.google.com/maps/dir/?api=1&origin=${selectedDetailedOrder.sellerLocation.latitude},${selectedDetailedOrder.sellerLocation.longitude}&destination=${selectedDetailedOrder.buyerLocation.latitude},${selectedDetailedOrder.buyerLocation.longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                background: '#e0e7ff',
-                                color: '#4338ca',
-                                padding: '8px 12px',
-                                borderRadius: '8px',
-                                fontSize: '0.78rem',
-                                fontWeight: '700',
-                                textDecoration: 'none',
-                                marginTop: '6px',
-                                width: 'fit-content'
-                              }}
-                            >
-                              🗺️ Compare Locations &amp; Get Route
-                            </a>
-                          )}
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&origin=${selectedDetailedOrder.sellerLocation.latitude},${selectedDetailedOrder.sellerLocation.longitude}&destination=${selectedDetailedOrder.buyerLocation.latitude},${selectedDetailedOrder.buyerLocation.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              background: '#e0e7ff',
+                              color: '#4338ca',
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              fontSize: '0.78rem',
+                              fontWeight: '700',
+                              textDecoration: 'none',
+                              marginTop: '6px',
+                              width: 'fit-content'
+                            }}
+                          >
+                            🗺️ Compare Locations &amp; Get Route
+                          </a>
                         </div>
                       )}
                     </div>
@@ -6153,8 +6104,81 @@ export default function EmahuProDashboard() {
                         </div>
                       )}
 
-                      {/* APPROVED */}
-                      {selectedDetailedOrder.status === 'APPROVED' && (
+                      {/* FEATURE 2: Confirmed status box */}
+                      {(['APPROVED', 'DELIVERY_ASSIGNED', 'LABEL_GENERATED', 'READY_FOR_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].includes(selectedDetailedOrder.status) || selectedDetailedOrder.sellerConfirmed) && (
+                        <div style={{
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          color: '#ffffff',
+                          padding: '16px 20px',
+                          borderRadius: '12px',
+                          boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+                          marginBottom: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', fontSize: '0.95rem' }}>
+                            <span style={{ fontSize: '1.25rem' }}>✓</span> Order Confirmed &amp; Secured
+                          </div>
+                          <div style={{ fontSize: '0.82rem', opacity: 0.9, lineHeight: '1.4' }}>
+                            This order is approved. Escrow funds are locked in custody and protected under Emahu vault terms.
+                          </div>
+                        </div>
+                      )}
+
+                      {/* FEATURE 3: Rejected status box */}
+                      {(selectedDetailedOrder.status === 'REJECTED' || selectedDetailedOrder.sellerRejected || selectedDetailedOrder.timeline?.some(t => t.label === 'Courier Rejected')) && (
+                        <div style={{
+                          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                          color: '#ffffff',
+                          padding: '16px 20px',
+                          borderRadius: '12px',
+                          boxShadow: '0 4px 14px rgba(239, 68, 68, 0.25)',
+                          marginBottom: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', fontSize: '0.95rem' }}>
+                            <span style={{ fontSize: '1.25rem' }}>❌</span> Order Rejected / Assignment Declined
+                          </div>
+                          <div style={{ fontSize: '0.82rem', opacity: 0.9, lineHeight: '1.4' }}>
+                            {selectedDetailedOrder.status === 'REJECTED' || selectedDetailedOrder.sellerRejected ? (
+                              `This order was rejected. Reason: ${selectedDetailedOrder.rejectionReason || 'No reason provided.'}`
+                            ) : (
+                              'The previously assigned courier partner rejected/declined the assignment request. Please select and reassign another carrier partner below.'
+                            )}
+                          </div>
+                          {selectedDetailedOrder.timeline?.some(t => t.label === 'Courier Rejected') && !selectedDetailedOrder.carrier && (
+                            <button
+                              onClick={() => {
+                                setSelectedOrderId(selectedDetailedOrder.orderId);
+                                setIsDeliveryModalOpen(true);
+                              }}
+                              style={{
+                                alignSelf: 'flex-start',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                background: '#ffffff',
+                                color: '#dc2626',
+                                fontWeight: '700',
+                                fontSize: '0.8rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                              }}
+                              onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                              onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
+                            >
+                              🚚 Reassign Carrier Partner
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* APPROVED or READY_FOR_PICKUP (without assigned carrier) */}
+                      {(selectedDetailedOrder.status === 'APPROVED' || (selectedDetailedOrder.status === 'READY_FOR_PICKUP' && !selectedDetailedOrder.carrier)) && (
                         <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '18px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
                             <span style={{ width: '22px', height: '22px', background: '#16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>✓</span>
@@ -6231,20 +6255,19 @@ export default function EmahuProDashboard() {
                         </div>
                       )}
 
-                      {/* READY_FOR_PICKUP */}
-                      {selectedDetailedOrder.status === 'READY_FOR_PICKUP' && (
+                      {/* READY_FOR_PICKUP (with carrier assigned) */}
+                      {selectedDetailedOrder.status === 'READY_FOR_PICKUP' && selectedDetailedOrder.carrier && (
                         <div style={{ background: '#fff7ed', border: '1.5px solid #fdba74', borderRadius: '12px', padding: '18px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
                             <span style={{ width: '22px', height: '22px', background: '#ea580c', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>📦</span>
                             <span style={{ fontSize: '0.82rem', color: '#c2410c', fontWeight: '700' }}>Ready for Carrier Pickup</span>
                           </div>
-                          <p style={{ fontSize: '0.8rem', color: '#9a3412', margin: '0 0 14px 0', lineHeight: '1.4' }}>
-                            The package is sealed and waiting at your dispatch desk. Click below once the carrier agent collects the shipment.
+                          <p style={{ fontSize: '0.8rem', color: '#9a3412', margin: '0 0 4px 0', lineHeight: '1.4' }}>
+                            The package is sealed and waiting at your dispatch desk.
                           </p>
-                          <button onClick={() => handleAdvanceStatus(selectedDetailedOrder.orderId, 'PICKED_UP')} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
-                            style={{ width: '100%', padding: '12px 0', background: '#ea580c', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
-                            {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🚀 Mark Picked Up by Courier'}
-                          </button>
+                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#ea580c', fontWeight: '600', fontStyle: 'italic', marginTop: '6px' }}>
+                            ⌛ Awaiting pickup confirmation from the assigned logistics partner.
+                          </span>
                         </div>
                       )}
 
@@ -6259,29 +6282,14 @@ export default function EmahuProDashboard() {
                               {selectedDetailedOrder.status === 'PICKED_UP' ? 'Package Picked Up' : selectedDetailedOrder.status === 'IN_TRANSIT' ? 'Package In Transit' : 'Package Out For Delivery'}
                             </span>
                           </div>
-                          <p style={{ fontSize: '0.8rem', color: '#6d28d9', margin: '0 0 14px 0', lineHeight: '1.4' }}>
-                            {selectedDetailedOrder.status === 'PICKED_UP' && 'The shipment has been picked up by the courier. Advance status to In Transit once sorted at hub.'}
-                            {selectedDetailedOrder.status === 'IN_TRANSIT' && 'The shipment is in transit on the EV logistics corridor. Advance status to Out For Delivery when arrived at local station.'}
-                            {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && 'The delivery agent is en route. Mark Delivered when final drop-off is complete.'}
+                          <p style={{ fontSize: '0.8rem', color: '#6d28d9', margin: '0 0 4px 0', lineHeight: '1.4' }}>
+                            {selectedDetailedOrder.status === 'PICKED_UP' && 'The shipment has been picked up by the courier.'}
+                            {selectedDetailedOrder.status === 'IN_TRANSIT' && 'The shipment is in transit on the EV logistics corridor.'}
+                            {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && 'The delivery agent is en route.'}
                           </p>
-                          {selectedDetailedOrder.status === 'PICKED_UP' && (
-                            <button onClick={() => handleAdvanceStatus(selectedDetailedOrder.orderId, 'IN_TRANSIT')} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
-                              style={{ width: '100%', padding: '11px 0', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
-                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🚛 Mark In Transit'}
-                            </button>
-                          )}
-                          {selectedDetailedOrder.status === 'IN_TRANSIT' && (
-                            <button onClick={() => handleAdvanceStatus(selectedDetailedOrder.orderId, 'OUT_FOR_DELIVERY')} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
-                              style={{ width: '100%', padding: '11px 0', background: '#a855f7', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
-                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🛵 Mark Out for Delivery'}
-                            </button>
-                          )}
-                          {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && (
-                            <button onClick={() => handleAdvanceStatus(selectedDetailedOrder.orderId, 'DELIVERED')} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
-                              style={{ width: '100%', padding: '11px 0', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
-                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🎉 Mark Delivered'}
-                            </button>
-                          )}
+                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#7c3aed', fontWeight: '600', fontStyle: 'italic', marginTop: '6px' }}>
+                            🚚 Delivery status and tracking updates are managed dynamically by the courier.
+                          </span>
                         </div>
                       )}
 
@@ -6315,6 +6323,54 @@ export default function EmahuProDashboard() {
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#64748b' }}>Partner</span><strong>{selectedDetailedOrder.carrier}</strong></div>
                             {selectedDetailedOrder.trackingId && (
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#64748b' }}>Tracking #</span><strong style={{ color: '#4f46e5', fontFamily: 'monospace', fontSize: '0.78rem' }}>{selectedDetailedOrder.trackingId}</strong></div>
+                            )}
+                            {selectedDetailedOrder.carrierPhone && (
+                              <div style={{ display: 'flex', gap: '8px', marginTop: '10px', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
+                                <a
+                                  href={`tel:${selectedDetailedOrder.carrierPhone}`}
+                                  style={{
+                                    flex: 1,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    padding: '8px 12px',
+                                    borderRadius: '6px',
+                                    backgroundColor: '#2563eb',
+                                    color: '#fff',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '600',
+                                    textDecoration: 'none',
+                                    transition: 'all 0.2s',
+                                    textAlign: 'center'
+                                  }}
+                                >
+                                  📞 Call Carrier
+                                </a>
+                                <a
+                                  href={`https://wa.me/${selectedDetailedOrder.carrierPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello! I am the seller for Emahu Order #${selectedDetailedOrder.orderId}. Please update me on the shipment status.`)}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    flex: 1,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    padding: '8px 12px',
+                                    borderRadius: '6px',
+                                    backgroundColor: '#25d366',
+                                    color: '#fff',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '600',
+                                    textDecoration: 'none',
+                                    transition: 'all 0.2s',
+                                    textAlign: 'center'
+                                  }}
+                                >
+                                  💬 Message
+                                </a>
+                              </div>
                             )}
                           </div>
                         </div>

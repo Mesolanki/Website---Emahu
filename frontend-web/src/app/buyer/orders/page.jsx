@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import './orders.css';
 
@@ -36,11 +37,57 @@ function parseOrderDate(ord) {
 }
 
 export default function OrdersPage() {
+  const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [disputedOrderId, setDisputedOrderId] = useState(null);
   const [disputeReason, setDisputeReason] = useState('');
   const [disputedOrdersList, setDisputedOrdersList] = useState([]);
   const [releasedOrdersList, setReleasedOrdersList] = useState([]);
+
+  const handleRetryOrder = (group) => {
+    const storedCartStr = localStorage.getItem('emahu_cart') || '[]';
+    let storedCart = [];
+    try {
+      storedCart = JSON.parse(storedCartStr);
+    } catch (e) {
+      storedCart = [];
+    }
+
+    // Add items from rejected sub-orders back to cart
+    const subOrdersToRetry = group.rejectedSubOrders && group.rejectedSubOrders.length > 0 
+      ? group.rejectedSubOrders 
+      : group.ordersList;
+
+    subOrdersToRetry.forEach((order) => {
+      order.items.forEach((item) => {
+        const itemPid = item.productId || item.id;
+        const existingIdx = storedCart.findIndex((x) => (typeof x === 'object' ? x.id : x) === itemPid);
+        if (existingIdx > -1) {
+          if (typeof storedCart[existingIdx] === 'object') {
+            storedCart[existingIdx].quantity += item.quantity || 1;
+          } else {
+            storedCart[existingIdx] = { id: itemPid, quantity: (item.quantity || 1) + 1, color: 'Default', size: 'Default' };
+          }
+        } else {
+          storedCart.push({
+            id: itemPid,
+            quantity: item.quantity || 1,
+            color: item.color || 'Default',
+            size: item.size || 'Default'
+          });
+        }
+      });
+    });
+
+    localStorage.setItem('emahu_cart', JSON.stringify(storedCart));
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('cart_update'));
+    }
+
+    router.push('/buyer/cart');
+  };
 
   // Load orders history from database or localStorage on mount
   useEffect(() => {
@@ -529,46 +576,151 @@ export default function OrdersPage() {
                           <span style={{ color: '#ef4444', fontWeight: '600' }}>Transaction disputed! Vault locked indefinitely. Funds will not be sent to seller until inspection dispute resolves.</span>
                         </>
                       ) : ord.allRejected ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="3">
-                              <line x1="18" y1="6" x2="6" y2="18" />
-                              <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                            <span style={{ color: '#ef4444', fontWeight: '700' }}>❌ All Items Rejected by Seller</span>
+                        <div style={{
+                          width: '100%',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1.5px solid #ef4444',
+                          borderRadius: '10px',
+                          padding: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          margin: '8px 0'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              backgroundColor: '#ef4444',
+                              color: '#fff',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold'
+                            }}>✕</span>
+                            <span style={{ color: '#991b1b', fontWeight: '800', fontSize: '0.9rem' }}>Order Rejected by Seller</span>
                           </div>
-                          <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '24px' }}>Escrow Vault Locked: All items were rejected. Capital will be automatically returned to your wallet.</span>
+                          <div style={{ fontSize: '0.78rem', color: '#7f1d1d' }}>
+                            All items in this order group were rejected. The escrow funds will be automatically returned to your wallet.
+                          </div>
+                          {ord.rejectedSubOrders?.[0]?.rejectionReason && (
+                            <div style={{ fontSize: '0.75rem', color: '#7f1d1d', background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                              <strong>Reason:</strong> {ord.rejectedSubOrders[0].rejectionReason}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => handleRetryOrder(ord)}
+                            style={{
+                              alignSelf: 'flex-start',
+                              background: '#ef4444',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '8px 16px',
+                              fontSize: '0.8rem',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'background 0.2s'
+                            }}
+                          >
+                            🔄 Retry Order
+                          </button>
                         </div>
                       ) : ord.someRejected ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="3">
-                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                              <line x1="12" y1="9" x2="12" y2="13"/>
-                              <line x1="12" y1="17" x2="12.01" y2="17"/>
-                            </svg>
-                            <span style={{ color: '#d97706', fontWeight: '700' }}>⚠️ Partial Rejection — {ord.rejectedSubOrders?.length || 0} item group(s) not deliverable</span>
+                        <div style={{
+                          width: '100%',
+                          background: 'rgba(245, 158, 11, 0.08)',
+                          border: '1.5px solid #f59e0b',
+                          borderRadius: '10px',
+                          padding: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          margin: '8px 0'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              backgroundColor: '#f59e0b',
+                              color: '#fff',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold'
+                            }}>!</span>
+                            <span style={{ color: '#78350f', fontWeight: '800', fontSize: '0.9rem' }}>Partial Rejection by Seller</span>
                           </div>
-                          <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '24px' }}>Escrow Protected: Funds for rejected items will be refunded. Other items are still being tracked.</span>
+                          <div style={{ fontSize: '0.78rem', color: '#78350f' }}>
+                            {ord.rejectedSubOrders?.length || 0} item group(s) are not deliverable. Funds for these rejected items will be refunded to your wallet. Other items are still in transit.
+                          </div>
+                          <button
+                            onClick={() => handleRetryOrder(ord)}
+                            style={{
+                              alignSelf: 'flex-start',
+                              background: '#f59e0b',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '8px 16px',
+                              fontSize: '0.8rem',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'background 0.2s'
+                            }}
+                          >
+                            🔄 Retry Rejected Items
+                          </button>
                         </div>
                       ) : ord.ordersList.some(o => o.sellerConfirmed) ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                            <span style={{ color: '#10b981', fontWeight: '700' }}>✓ Delivery Confirmed by Seller</span>
+                        <div style={{
+                          width: '100%',
+                          background: 'rgba(16, 185, 129, 0.08)',
+                          border: '1.5px solid #10b981',
+                          borderRadius: '10px',
+                          padding: '12px 16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          margin: '8px 0'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              backgroundColor: '#10b981',
+                              color: '#fff',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold'
+                            }}>✓</span>
+                            <span style={{ color: '#065f46', fontWeight: '800', fontSize: '0.9rem' }}>Delivery Confirmed by Seller</span>
                           </div>
-                          <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '24px' }}>Escrow Protected: Money remains inside safety vault. Seller cannot withdraw balance.</span>
+                          <span style={{ fontSize: '0.78rem', color: '#047857' }}>
+                            Escrow Protected: Your money is safe in the vault. The seller cannot withdraw balance until you authorize release.
+                          </span>
                         </div>
                       ) : (
-                        <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', margin: '8px 0', border: '1px solid #cbd5e1', borderRadius: '10px', background: '#f8fafc' }}>
                           <svg className="footer-icon-locked" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4169e1" strokeWidth="2.5">
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                           </svg>
-                          <span>Escrow Protected: Money remains inside safety vault. Seller cannot withdraw balance.</span>
-                        </>
+                          <span style={{ fontSize: '0.8rem', color: '#475569' }}>Escrow Protected: Money remains inside safety vault. Seller cannot withdraw balance.</span>
+                        </div>
                       )}
                     </div>
 
