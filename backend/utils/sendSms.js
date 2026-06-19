@@ -2,13 +2,13 @@ const sendSms = async (options) => {
   const { to, body } = options;
   const cleanPhone = to.trim();
 
-  // 1. Try Twilio configuration
-  const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-  const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
-  const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+  // 1. Try Twilio configuration (ignore placeholder values)
+  const twilioSid = (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_ACCOUNT_SID !== 'your-twilio-account-sid') ? process.env.TWILIO_ACCOUNT_SID : '';
+  const twilioAuthToken = (process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_AUTH_TOKEN !== 'your-twilio-auth-token') ? process.env.TWILIO_AUTH_TOKEN : '';
+  const twilioPhone = (process.env.TWILIO_PHONE_NUMBER && process.env.TWILIO_PHONE_NUMBER !== 'your-twilio-phone-number') ? process.env.TWILIO_PHONE_NUMBER : '';
 
-  // 2. Try Fast2SMS configuration
-  const fast2smsKey = process.env.FAST2SMS_API_KEY;
+  // 2. Try Fast2SMS configuration (ignore placeholder values)
+  const fast2smsKey = (process.env.FAST2SMS_API_KEY && process.env.FAST2SMS_API_KEY !== 'your-fast2sms-api-key') ? process.env.FAST2SMS_API_KEY : '';
 
   console.log('\n=================================================');
   console.log(`📱  PREPARING OUTBOUND SMS TO: +91 ${cleanPhone}`);
