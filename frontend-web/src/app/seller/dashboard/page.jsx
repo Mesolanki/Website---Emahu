@@ -173,37 +173,72 @@ export default function EmahuProDashboard() {
   const [inputDocUrl, setInputDocUrl] = useState('');
   const [inlineSubmitting, setInlineSubmitting] = useState(false);
 
-  // Available Delivery Partners State
-  const [availablePartners, setAvailablePartners] = useState([]);
-  const [availablePartnersLoading, setAvailablePartnersLoading] = useState(false);
-  const [availablePartnersError, setAvailablePartnersError] = useState('');
-  const [selectedPartnerId, setSelectedPartnerId] = useState('');
-  const [isConfirmChecked, setIsConfirmChecked] = useState(false);
-  const [hasContactedPartner, setHasContactedPartner] = useState(false);
+  // Admin Seller Management State
+  const [sellersList, setSellersList] = useState([]);
+  const [loadingSellers, setLoadingSellers] = useState(false);
+  const [sellersError, setSellersError] = useState('');
+  const [selectedDetailedSeller, setSelectedDetailedSeller] = useState(null);
+  const [sellerRejectionFeedback, setSellerRejectionFeedback] = useState({});
 
-  const fetchAvailablePartners = async (orderId) => {
-    setAvailablePartnersLoading(true);
-    setAvailablePartnersError('');
+  const fetchSellers = async () => {
+    setLoadingSellers(true);
+    setSellersError('');
     try {
       const token = localStorage.getItem('emahu_seller_token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/available-partners/${orderId}`, {
+      if (!token) return;
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/sellers`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       const data = await res.json();
       if (data.success) {
-        setAvailablePartners(data.availablePartners || []);
+        setSellersList(data.sellers || []);
       } else {
-        setAvailablePartnersError(data.error || 'Failed to fetch available partners');
+        setSellersError(data.error || 'Failed to fetch sellers list');
       }
     } catch (err) {
       console.error(err);
-      setAvailablePartnersError('Error loading available partners');
+      setSellersError('Error fetching sellers list');
     } finally {
-      setAvailablePartnersLoading(false);
+      setLoadingSellers(false);
     }
   };
+
+  const handleSellerDecision = async (sellerId, decision, feedback = '') => {
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      if (!token) return;
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/sellers/${sellerId}/decision`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ decision, feedback })
+      });
+      const data = await res.json();
+      if (data.success) {
+        triggerToast(
+          decision === 'approve' ? 'Seller Approved' : 'Seller Rejected',
+          `The seller status has been updated successfully.`,
+          decision === 'approve' ? 'success' : 'danger'
+        );
+        fetchSellers();
+      } else {
+        triggerToast('Error', data.error || 'Failed to update status', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error', 'danger');
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'sellers_management' && sellerUser?.role === 'admin') {
+      fetchSellers();
+    }
+  }, [activeTab, sellerUser]);
 
   const [settingsForm, setSettingsForm] = useState({
     storeName: '',
@@ -2510,20 +2545,36 @@ export default function EmahuProDashboard() {
             </button>
           </li>
           {sellerUser?.role === 'admin' && (
-            <li>
-              <button 
-                className={`sidebar-item-btn ${activeTab === 'delivery_settings' ? 'active' : ''}`}
-                onClick={() => { setActiveTab('delivery_settings'); setIsSidebarOpen(false); }}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                  <rect x="1" y="3" width="15" height="13" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" strokeLinecap="round" strokeLinejoin="round" />
-                  <circle cx="5.5" cy="18.5" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  <circle cx="18.5" cy="18.5" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>Delivery Settings</span>
-              </button>
-            </li>
+            <>
+              <li>
+                <button 
+                  className={`sidebar-item-btn ${activeTab === 'sellers_management' ? 'active' : ''}`}
+                  onClick={() => { setActiveTab('sellers_management'); setIsSidebarOpen(false); }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                  <span>Sellers Management</span>
+                </button>
+              </li>
+              <li>
+                <button 
+                  className={`sidebar-item-btn ${activeTab === 'delivery_settings' ? 'active' : ''}`}
+                  onClick={() => { setActiveTab('delivery_settings'); setIsSidebarOpen(false); }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                    <rect x="1" y="3" width="15" height="13" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="5.5" cy="18.5" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="18.5" cy="18.5" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>Delivery Settings</span>
+                </button>
+              </li>
+            </>
           )}
         </ul>
 
@@ -4542,6 +4593,165 @@ export default function EmahuProDashboard() {
             </div>
           )}
 
+          {/* TAB: SELLERS MANAGEMENT (ADMIN ONLY) */}
+          {activeTab === 'sellers_management' && sellerUser?.role === 'admin' && (
+            <div>
+              <div className="view-header">
+                <div className="view-title-group">
+                  <h2>Sellers Onboarding & Management</h2>
+                  <p>Audit vendor registrations, review compliance documents, and update status decisions.</p>
+                </div>
+              </div>
+
+              {sellersError && (
+                <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', marginBottom: '20px' }}>
+                  ⚠️ {sellersError}
+                </div>
+              )}
+
+              <div className="table-wrapper" style={{ marginTop: '24px' }}>
+                {loadingSellers ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading sellers directory data...</div>
+                ) : sellersList.length > 0 ? (
+                  <table className="pro-table">
+                    <thead>
+                      <tr>
+                        <th>Store Details</th>
+                        <th>Owner Info</th>
+                        <th>Verification Status</th>
+                        <th>Metrics</th>
+                        <th style={{ textAlign: 'center' }}>Admin Decision</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sellersList.map((seller) => {
+                        const isApproved = seller.status === 'approved';
+                        const isRejected = seller.status === 'rejected';
+                        const isPending = seller.status === 'pending';
+                        
+                        return (
+                          <tr key={seller._id}>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>{seller.storeName || 'Unnamed Store'}</span>
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>Category: {seller.category || 'N/A'}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{seller.name}</span>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
+                                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{seller.email}</span>
+                                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>· {seller.phone}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                  {seller.isEmailVerified ? (
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                                      ✓ Email Verified
+                                    </span>
+                                  ) : (
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                                      ✗ Email Unverified
+                                    </span>
+                                  )}
+                                  {seller.isPhoneVerified ? (
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                                      ✓ Phone Verified
+                                    </span>
+                                  ) : (
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                                      ✗ Phone Unverified
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span className={`status-badge ${
+                                  isApproved ? 'in-stock' :
+                                  isPending ? 'draft' : 'out-of-stock'
+                                }`} style={{ display: 'inline-block', width: 'fit-content' }}>
+                                  {seller.status === 'approved' ? 'Approved & Active' :
+                                   seller.status === 'rejected' ? 'Rejected' :
+                                   seller.status === 'more_info_requested' ? 'More Info' : 'Pending Audit'}
+                                </span>
+                                {seller.verificationFeedback && (
+                                  <span style={{ fontSize: '0.75rem', color: '#f87171', maxWidth: '200px' }}>
+                                    Feedback: {seller.verificationFeedback}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem', gap: '2px' }}>
+                                <span>📦 Products: <strong>{seller.totalProducts || 0}</strong></span>
+                                <span>📈 Sales: <strong>{seller.totalSales || 0} units</strong></span>
+                                <span>💰 Revenue: <strong style={{ color: '#10b981' }}>₹{(seller.totalRevenue || 0).toLocaleString('en-IN')}</strong></span>
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px 0' }}>
+                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                  <button 
+                                    className="company-portal-btn"
+                                    style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', background: isApproved ? 'rgba(255,255,255,0.08)' : 'var(--color-success)', borderColor: isApproved ? 'rgba(255,255,255,0.1)' : 'var(--color-success)' }}
+                                    onClick={() => handleSellerDecision(seller._id, 'approve')}
+                                    disabled={isApproved}
+                                  >
+                                    {isApproved ? 'Approved ✓' : 'Approve'}
+                                  </button>
+
+                                  <button 
+                                    className="company-portal-btn"
+                                    style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+                                    onClick={() => {
+                                      const reason = sellerRejectionFeedback[seller._id] || '';
+                                      if (!reason.trim()) {
+                                        triggerToast('Error', 'Please enter a rejection reason feedback first.', 'danger');
+                                        return;
+                                      }
+                                      handleSellerDecision(seller._id, 'reject', reason);
+                                    }}
+                                  >
+                                    Reject
+                                  </button>
+
+                                  <button 
+                                    className="company-portal-btn"
+                                    style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', background: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: '#fff' }}
+                                    onClick={() => setSelectedDetailedSeller(seller)}
+                                  >
+                                    Details
+                                  </button>
+                                </div>
+                                
+                                <input 
+                                  type="text"
+                                  placeholder="Feedback/rejection reason..."
+                                  className="form-input"
+                                  style={{ height: '28px', fontSize: '0.75rem', background: 'rgba(0,0,0,0.2)', borderColor: 'rgba(255,255,255,0.08)' }}
+                                  value={sellerRejectionFeedback[seller._id] || ''}
+                                  onChange={(e) => setSellerRejectionFeedback(prev => ({ ...prev, [seller._id]: e.target.value }))}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="empty-state">
+                    <div className="empty-icon">👥</div>
+                    <h3>No sellers registered</h3>
+                    <p>There are no vendor accounts in the database.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
 
 
         </main>
@@ -4635,6 +4845,214 @@ export default function EmahuProDashboard() {
 
             <div className="modal-footer">
               <button className="modal-btn cancel" onClick={() => setSelectedDetailedProduct(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- SELLER DETAILS MODAL (ADMIN ONLY) --- */}
+      {selectedDetailedSeller && (
+        <div className="modal-overlay" style={{ zIndex: 99999 }}>
+          <div className="modal-card" style={{ maxWidth: '800px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3 style={{ color: 'var(--text-primary)' }}>Shop & Compliance Audit Details</h3>
+                <p style={{ color: 'var(--text-muted)' }}>Detailed view of the seller registration and KYC verification documents.</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedDetailedSeller(null)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', color: 'var(--text-primary)', overflowY: 'auto', maxHeight: '75vh' }}>
+              
+              {/* Profile Summary Card */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', color: '#fff', fontWeight: '700' }}>
+                    {selectedDetailedSeller.storeName || 'Unnamed Store'}
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.85rem' }}>
+                    <span>👤 Owner: <strong>{selectedDetailedSeller.name}</strong></span>
+                    <span>✉️ Email: <strong>{selectedDetailedSeller.email}</strong></span>
+                    <span>📞 Phone: <strong>{selectedDetailedSeller.phone}</strong></span>
+                    <span>🏷️ Category: <strong style={{ textTransform: 'capitalize' }}>{selectedDetailedSeller.category}</strong></span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <span className={`status-badge ${
+                    selectedDetailedSeller.status === 'approved' ? 'in-stock' :
+                    selectedDetailedSeller.status === 'pending' ? 'draft' : 'out-of-stock'
+                  }`}>
+                    {selectedDetailedSeller.status === 'approved' ? 'Approved' :
+                     selectedDetailedSeller.status === 'rejected' ? 'Rejected' :
+                     selectedDetailedSeller.status === 'more_info_requested' ? 'More Info Requested' : 'Pending Audit'}
+                  </span>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                    {selectedDetailedSeller.isEmailVerified ? (
+                      <span style={{ fontSize: '0.72rem', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                        ✓ Email Verified (OTP)
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.72rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                        ✗ Email Unverified
+                      </span>
+                    )}
+                    {selectedDetailedSeller.isPhoneVerified ? (
+                      <span style={{ fontSize: '0.72rem', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                        ✓ Phone Number Verified
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.72rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                        ✗ Phone Number Unverified
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid: Bank Details & KYC IDs */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                {/* Bank details card */}
+                <div style={{ padding: '14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)' }}>
+                  <h5 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#fff', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>🏦 Bank & Payout Details</h5>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem' }}>
+                    <span>Account Holder: <strong>{selectedDetailedSeller.bankHolder || 'N/A'}</strong></span>
+                    <span>Account Number: <strong>{selectedDetailedSeller.accountNumber || 'N/A'}</strong></span>
+                    <span>Bank Name: <strong>{selectedDetailedSeller.bankName || 'N/A'}</strong></span>
+                    <span>IFSC Code: <strong>{selectedDetailedSeller.ifscCode || 'N/A'}</strong></span>
+                  </div>
+                </div>
+
+                {/* KYC IDs details card */}
+                <div style={{ padding: '14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)' }}>
+                  <h5 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#fff', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>💳 KYC & Compliance Identifiers</h5>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem' }}>
+                    <span style={{ textTransform: 'uppercase' }}>{selectedDetailedSeller.kycType || 'PAN'} Type: <strong>{selectedDetailedSeller.kycType || 'PAN'}</strong></span>
+                    <span style={{ textTransform: 'uppercase' }}>{selectedDetailedSeller.kycType || 'PAN'} Number: <strong>{selectedDetailedSeller.kycNumber || 'N/A'}</strong></span>
+                    <span>GSTIN Number: <strong>{selectedDetailedSeller.gstNumber || 'Not Provided'}</strong></span>
+                    <span>Registration Date: <strong>{selectedDetailedSeller.createdAt ? new Date(selectedDetailedSeller.createdAt).toLocaleDateString('en-IN') : 'N/A'}</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Shop Verification Documents / Images */}
+              <div>
+                <h5 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#fff' }}>📄 Uploaded Shop Documents</h5>
+                {selectedDetailedSeller.documents && selectedDetailedSeller.documents.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    {selectedDetailedSeller.documents.map((doc, idx) => (
+                      <div key={doc._id || idx} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', background: 'rgba(0,0,0,0.2)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.78rem' }}>
+                          <span style={{ fontWeight: 'bold', textTransform: 'capitalize' }}>{doc.documentType?.replace(/_/g, ' ')}</span>
+                          <span className={`status-badge ${doc.status === 'approved' ? 'in-stock' : 'out-of-stock'}`} style={{ fontSize: '0.65rem', padding: '1px 4px' }}>{doc.status}</span>
+                        </div>
+                        
+                        <div style={{ width: '100%', height: '140px', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {doc.fileUrl && doc.fileUrl.startsWith('http') ? (
+                            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                              {/* Document Mockup showing real values overlay */}
+                              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', padding: '12px', color: '#1e293b', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontFamily: 'monospace' }}>
+                                <div>
+                                  <div style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 'bold' }}>GOVERNMENT COMPLIANCE DOCUMENT</div>
+                                  <div style={{ fontSize: '0.8rem', fontWeight: 'bold', marginTop: '6px' }}>{doc.documentType === 'id_proof' ? (selectedDetailedSeller.kycType?.toUpperCase() || 'PAN CARD') : 'BUSINESS REGISTRATION'}</div>
+                                  <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>No: {doc.documentType === 'id_proof' ? selectedDetailedSeller.kycNumber : (selectedDetailedSeller.gstNumber || 'GST-CERT-MOCK')}</div>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', fontSize: '0.65rem', color: '#475569' }}>
+                                  <div>Name: {selectedDetailedSeller.name?.toUpperCase()}</div>
+                                  <div>EMAHU VERIFIED</div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No preview available</span>
+                          )}
+                        </div>
+
+                        <div style={{ marginTop: '8px', textAlign: 'right' }}>
+                          <a href={doc.fileUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', color: 'var(--color-primary)', textDecoration: 'underline' }}>
+                            Download/Open Original File
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ border: '1px dashed var(--border-color)', borderRadius: '8px', padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    No physical compliance files found in database. Relying on verified KYC fields.
+                  </div>
+                )}
+              </div>
+
+              {/* Shop Product Inventory with images */}
+              <div>
+                <h5 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#fff' }}>🛍️ Product Listings Catalogue ({selectedDetailedSeller.products?.length || 0} items)</h5>
+                {selectedDetailedSeller.products && selectedDetailedSeller.products.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px' }}>
+                    {selectedDetailedSeller.products.map((prod) => (
+                      <div key={prod._id || prod.id} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ width: '100%', height: '110px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {(!prod.image || !prod.image.startsWith('http')) ? (
+                            <span style={{ fontSize: '2rem' }}>{prod.image || '📦'}</span>
+                          ) : (
+                            <img src={prod.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={prod.name} />
+                          )}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 'bold', fontSize: '0.82rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#fff' }} title={prod.name}>
+                            {prod.name}
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '0.78rem' }}>
+                            <span style={{ color: '#10b981', fontWeight: 'bold' }}>₹{prod.price?.toLocaleString('en-IN')}</span>
+                            <span style={{ color: 'var(--text-muted)' }}>Stock: {prod.stock}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ border: '1px dashed var(--border-color)', borderRadius: '8px', padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    This seller hasn't uploaded any product catalogue listings yet.
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                {selectedDetailedSeller.status !== 'approved' && (
+                  <button 
+                    className="company-portal-btn" 
+                    style={{ background: 'var(--color-success)', borderColor: 'var(--color-success)', marginRight: '10px' }}
+                    onClick={() => {
+                      handleSellerDecision(selectedDetailedSeller._id, 'approve');
+                      setSelectedDetailedSeller(null);
+                    }}
+                  >
+                    Approve Seller Store
+                  </button>
+                )}
+                <button 
+                  className="company-portal-btn" 
+                  style={{ background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+                  onClick={() => {
+                    const reason = sellerRejectionFeedback[selectedDetailedSeller._id] || '';
+                    if (!reason.trim()) {
+                      triggerToast('Error', 'Please enter a feedback reason below before rejecting.', 'danger');
+                      return;
+                    }
+                    handleSellerDecision(selectedDetailedSeller._id, 'reject', reason);
+                    setSelectedDetailedSeller(null);
+                  }}
+                >
+                  Reject Store Account
+                </button>
+              </div>
+              <button className="modal-btn cancel" onClick={() => setSelectedDetailedSeller(null)}>Close</button>
             </div>
           </div>
         </div>

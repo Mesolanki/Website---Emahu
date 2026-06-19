@@ -119,6 +119,8 @@ exports.register = async (req, res) => {
       password,
       role: role || 'buyer',
       phone,
+      isEmailVerified: (role === 'seller'),
+      isPhoneVerified: (role === 'seller'),
       address,
       storeName,
       category,
@@ -322,6 +324,15 @@ exports.googleLogin = async (req, res) => {
         exists: false,
         email: finalEmail,
         name: finalName
+      });
+    }
+
+    // Check if the existing user's role matches the requested role
+    if (role && user.role !== role) {
+      console.warn(`Role mismatch: existing user has role '${user.role}' but requested role is '${role}'`);
+      return res.status(403).json({
+        success: false,
+        error: `Access denied. This email is already registered as a ${user.role}. Please log in using the correct portal.`
       });
     }
 
@@ -575,15 +586,17 @@ exports.getSellers = async (req, res) => {
   try {
     const Product = require('../models/Product');
     const Order = require('../models/Order');
+    const SellerDocument = require('../models/SellerDocument');
 
     const sellers = await User.find({ role: 'seller' }).lean();
 
-    // Fetch all products and count orders in parallel
-    const [allProducts, orderCounts] = await Promise.all([
+    // Fetch all products, count orders, and get all seller documents in parallel
+    const [allProducts, orderCounts, allDocs] = await Promise.all([
       Product.find({}).lean(),
       Order.aggregate([
         { $group: { _id: "$sellerId", count: { $sum: 1 } } }
-      ])
+      ]),
+      SellerDocument.find({}).lean()
     ]);
 
     // Create maps for fast lookup
@@ -605,6 +618,17 @@ exports.getSellers = async (req, res) => {
       }
     });
 
+    const sellerDocsMap = {};
+    allDocs.forEach(doc => {
+      if (doc.seller) {
+        const sId = doc.seller.toString();
+        if (!sellerDocsMap[sId]) {
+          sellerDocsMap[sId] = [];
+        }
+        sellerDocsMap[sId].push(doc);
+      }
+    });
+
     for (let i = 0; i < sellers.length; i++) {
       const sellerIdStr = sellers[i]._id.toString();
       const productsList = sellerProductsMap[sellerIdStr] || [];
@@ -613,6 +637,8 @@ exports.getSellers = async (req, res) => {
       sellers[i].totalSales = productsList.reduce((acc, p) => acc + (p.sales || 0), 0);
       sellers[i].totalRevenue = productsList.reduce((acc, p) => acc + (p.price * (p.sales || 0)), 0);
       sellers[i].totalOrders = orderCountMap[sellerIdStr] || 0;
+      sellers[i].products = productsList;
+      sellers[i].documents = sellerDocsMap[sellerIdStr] || [];
     }
 
     res.status(200).json({
@@ -675,6 +701,34 @@ exports.sellerDecision = async (req, res) => {
       targetId: seller._id,
       details: { decision, feedback }
     });
+
+    // Send Email to seller
+    try {
+      const sendEmail = require('../utils/sendEmail');
+      let emailSubject = '';
+      let emailText = '';
+      
+      if (seller.status === 'approved') {
+        emailSubject = 'Congratulations! Your Emahu Seller Store Account is Approved';
+        emailText = `Hello ${seller.name},\n\nWe are excited to inform you that your seller account for store "${seller.storeName}" has been approved by the EMAHU admin team!\n\nYou can now log in to the Emahu Seller Dashboard and start listing your products for sale.\n\nBest regards,\nThe Emahu Team`;
+      } else if (seller.status === 'rejected') {
+        emailSubject = 'Update regarding your Emahu Seller Store Account Registration';
+        emailText = `Hello ${seller.name},\n\nThank you for your interest in registering as a seller on EMAHU. After reviewing your store details and documents, our administration team has rejected your application.\n\nReason/Feedback: ${feedback || 'None provided.'}\n\nPlease review the feedback and resubmit your details with corrected documents if applicable.\n\nBest regards,\nThe Emahu Team`;
+      } else if (seller.status === 'more_info_requested') {
+        emailSubject = 'Action Required: More Information Requested for your Emahu Seller Account';
+        emailText = `Hello ${seller.name},\n\nOur admin team reviewed your registration for store "${seller.storeName}" and requires more information to proceed.\n\nAdmin Feedback/Request: ${feedback || 'None provided.'}\n\nPlease log in to your seller dashboard and provide the requested details.\n\nBest regards,\nThe Emahu Team`;
+      }
+
+      if (emailSubject) {
+        await sendEmail({
+          to: seller.email,
+          subject: emailSubject,
+          text: emailText
+        });
+      }
+    } catch (mailErr) {
+      console.error('Failed to send status update email to seller:', mailErr.message);
+    }
 
     res.status(200).json({
       success: true,
@@ -1053,15 +1107,23 @@ exports.sendOtp = async (req, res) => {
       expiresAt
     });
 
-    // Simulated email dispatch: Print to server console
-    console.log('\n=================================================');
-    console.log(`✉️  SIMULATED EMAIL DISPATCH TO: ${cleanEmail}`);
-    console.log(`🔑  YOUR EMAHU REGISTRATION OTP: ${otpCode}`);
-    console.log('=================================================\n');
+    // Send email using Nodemailer utility
+    const sendEmail = require('../utils/sendEmail');
+    await sendEmail({
+      to: cleanEmail,
+      subject: 'EMAHU Account Registration Verification Code',
+      text: `Hello,\n\nThank you for choosing EMAHU. Your 6-digit verification code is:\n\n🔑 ${otpCode}\n\nPlease enter this code to confirm your email and complete your registration.\n\nBest regards,\nThe Emahu Team`
+    });
+
+    const host = process.env.EMAIL_HOST || '';
+    const user = process.env.EMAIL_USER || '';
+    const pass = process.env.EMAIL_PASS || '';
+    const isSimulated = !host || !user || !pass;
 
     res.status(200).json({
       success: true,
-      message: `OTP sent successfully to ${cleanEmail}. Check server console output.`
+      message: `OTP verification email sent successfully to ${cleanEmail}.`,
+      ...(isSimulated && process.env.NODE_ENV === 'development' && { devOtp: otpCode })
     });
   } catch (error) {
     console.error('Send OTP Error:', error);
@@ -1103,6 +1165,98 @@ exports.verifyOtp = async (req, res) => {
   } catch (error) {
     console.error('Verify OTP Error:', error);
     res.status(500).json({ success: false, error: 'Server error verifying OTP' });
+  }
+};
+
+// @desc    Send OTP code to mobile phone
+// @route   POST /api/auth/send-phone-otp
+// @access  Public
+exports.sendPhoneOtp = async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({ success: false, error: 'Please provide a phone number' });
+    }
+
+    const cleanPhone = phone.trim();
+    if (!/^\d{10}$/.test(cleanPhone)) {
+      return res.status(400).json({ success: false, error: 'Please provide a valid 10-digit phone number' });
+    }
+
+    // Check if user with this phone already exists
+    const existingUser = await User.findOne({ phone: cleanPhone });
+    if (existingUser) {
+      return res.status(400).json({ success: false, error: 'A user with this phone number already exists' });
+    }
+
+    // Generate 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes validity
+
+    const Otp = require('../models/Otp');
+    
+    // Delete any old OTP for this phone
+    await Otp.deleteMany({ phone: cleanPhone });
+
+    // Save new OTP
+    await Otp.create({
+      phone: cleanPhone,
+      otp: otpCode,
+      expiresAt
+    });
+
+    // Call sendSms utility to send real SMS
+    const sendSms = require('../utils/sendSms');
+    await sendSms({
+      to: cleanPhone,
+      body: `Your Emahu mobile verification code is: ${otpCode}. Valid for 5 minutes.`
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `OTP verification SMS sent successfully to ${cleanPhone}.`,
+      ...(process.env.NODE_ENV === 'development' && { devOtp: otpCode })
+    });
+  } catch (error) {
+    console.error('Send Phone OTP Error:', error);
+    res.status(500).json({ success: false, error: 'Server error while sending phone OTP' });
+  }
+};
+
+// @desc    Verify Phone OTP code
+// @route   POST /api/auth/verify-phone-otp
+// @access  Public
+exports.verifyPhoneOtp = async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+      return res.status(400).json({ success: false, error: 'Please provide both phone number and OTP code' });
+    }
+
+    const cleanPhone = phone.trim();
+    const otpCode = otp.trim();
+
+    const Otp = require('../models/Otp');
+
+    const otpRecord = await Otp.findOne({ phone: cleanPhone });
+    if (!otpRecord) {
+      return res.status(400).json({ success: false, error: 'OTP has expired or does not exist. Please request a new one.' });
+    }
+
+    if (otpRecord.otp !== otpCode) {
+      return res.status(400).json({ success: false, error: 'Invalid OTP code. Please try again.' });
+    }
+
+    // OTP verified successfully - delete it
+    await Otp.deleteOne({ _id: otpRecord._id });
+
+    res.status(200).json({
+      success: true,
+      message: 'Phone OTP verified successfully'
+    });
+  } catch (error) {
+    console.error('Verify Phone OTP Error:', error);
+    res.status(500).json({ success: false, error: 'Server error verifying phone OTP' });
   }
 };
 

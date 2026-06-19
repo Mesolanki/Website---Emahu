@@ -4,9 +4,12 @@ const otpSchema = new mongoose.Schema(
   {
     email: {
       type: String,
-      required: [true, 'Please provide an email address'],
       trim: true,
       lowercase: true
+    },
+    phone: {
+      type: String,
+      trim: true
     },
     otp: {
       type: String,

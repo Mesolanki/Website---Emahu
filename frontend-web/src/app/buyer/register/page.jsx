@@ -77,6 +77,9 @@ export default function BuyerRegister() {
         setErrors({ general: 'Google account connected! Please enter your phone number and address to register.' });
         return;
       }
+      if (data.user && data.user.role !== 'buyer') {
+        throw new Error('Access denied. Please log in using the correct portal.');
+      }
       saveAuthSession(data, 'buyer');
       setLoading(false);
       setSuccess(true);

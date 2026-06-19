@@ -43,6 +43,9 @@ export default function SellerLogin() {
         router.push(`/seller/register?email=${encodeURIComponent(data.email)}&name=${encodeURIComponent(data.name)}`);
         return;
       }
+      if (data.user && data.user.role !== 'seller') {
+        throw new Error('Access denied. Please log in using the correct portal.');
+      }
       saveAuthSession(data, 'seller');
       setLoading(false);
       router.replace('/seller/dashboard');
@@ -65,10 +68,6 @@ export default function SellerLogin() {
       renderGoogleButton('google-signin-btn');
     }
   }, [isGoogleEnabled, renderGoogleButton]);
-
-  const handleAppleSignIn = () => {
-    setError('Apple Sign-In is not supported yet.');
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -265,33 +264,6 @@ export default function SellerLogin() {
                 <div id="google-signin-btn" style={{ width: '100%' }} />
               </div>
             )}
-            <button 
-              onClick={handleAppleSignIn} 
-              type="button"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px',
-                width: '100%',
-                height: '44px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: '#000000',
-                color: '#ffffff',
-                fontSize: '0.9rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#000000'}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18.7 18.5C17.5 20.3 16.3 22 14.5 22c-1.8 0-2.3-1.1-4.3-1.1-2.1 0-2.6 1.1-4.3 1.1-1.7 0-3.1-1.8-4.2-3.4C-.6 15 1.1 9.4 3.7 9.4c1.8 0 2.8 1.1 3.9 1.1 1.1 0 2.3-1.1 4.4-1.1 1.8 0 3.2 1 4.1 2.2-3.8 2.2-3.2 7.7.3 9.4-.7 1.9-1.9 3.5-3.7 3.5zM15.8 6.4c1-1.2 1.6-2.8 1.4-4.4-1.4.1-3 1-4 2.1-1 1.1-1.8 2.8-1.5 4.3 1.5.1 3-1 4.1-2z" />
-              </svg>
-              <span>Continue with Apple ID</span>
-            </button>
           </div>
 
           {/* Form Footer links */}

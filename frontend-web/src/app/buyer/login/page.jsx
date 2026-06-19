@@ -36,6 +36,9 @@ export default function BuyerLogin() {
         router.push(`/buyer/register?email=${encodeURIComponent(data.email)}&name=${encodeURIComponent(data.name)}`);
         return;
       }
+      if (data.user && data.user.role !== 'buyer') {
+        throw new Error('Access denied. Please log in using the correct portal.');
+      }
       saveAuthSession(data, 'buyer');
       setLoading(false);
       setSuccess(true);

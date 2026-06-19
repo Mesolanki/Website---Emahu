@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './register.css';
-import { registerUser, saveAuthSession, googleLoginUser } from '@/utils/auth';
-import { useGoogleAuth } from '@/utils/useGoogleAuth';
+import { registerUser, saveAuthSession } from '@/utils/auth';
 
 /**
  * SellerRegister Component
@@ -41,11 +40,21 @@ export default function SellerRegister() {
 
   const [errors, setErrors] = useState({});
 
+  // Email OTP States
   const [isOtpVerifying, setIsOtpVerifying] = useState(false);
   const [otpInput, setOtpInput] = useState('');
   const [otpError, setOtpError] = useState('');
   const [otpSending, setOtpSending] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
+  const [devEmailOtp, setDevEmailOtp] = useState('');
+
+  // Phone OTP States
+  const [isPhoneOtpVerifying, setIsPhoneOtpVerifying] = useState(false);
+  const [phoneOtpInput, setPhoneOtpInput] = useState('');
+  const [phoneOtpError, setPhoneOtpError] = useState('');
+  const [phoneOtpSending, setPhoneOtpSending] = useState(false);
+  const [phoneOtpCooldown, setPhoneOtpCooldown] = useState(0);
+  const [devPhoneOtp, setDevPhoneOtp] = useState('');
 
   // If already logged in, redirect directly to the seller dashboard
   useEffect(() => {
@@ -82,6 +91,14 @@ export default function SellerRegister() {
     return () => clearTimeout(timer);
   }, [otpCooldown]);
 
+  useEffect(() => {
+    let timer;
+    if (phoneOtpCooldown > 0) {
+      timer = setTimeout(() => setPhoneOtpCooldown(prev => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [phoneOtpCooldown]);
+
   const triggerSendOtp = async (isResend = false) => {
     setOtpSending(true);
     setOtpError('');
@@ -96,6 +113,9 @@ export default function SellerRegister() {
       if (data.success) {
         setIsOtpVerifying(true);
         setOtpCooldown(60);
+        if (data.devOtp) {
+          setDevEmailOtp(data.devOtp);
+        }
         if (isResend) {
           setOtpError('OTP has been resent to your email.');
         }
@@ -107,6 +127,37 @@ export default function SellerRegister() {
       setErrors({ general: 'Network error sending OTP. Please try again.' });
     } finally {
       setOtpSending(false);
+    }
+  };
+
+  const triggerSendPhoneOtp = async (isResend = false) => {
+    setPhoneOtpSending(true);
+    setPhoneOtpError('');
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiUrl}/api/auth/send-phone-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formData.phone })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsPhoneOtpVerifying(true);
+        setPhoneOtpCooldown(60);
+        if (data.devOtp) {
+          setDevPhoneOtp(data.devOtp);
+        }
+        if (isResend) {
+          setPhoneOtpError('OTP has been resent to your phone.');
+        }
+      } else {
+        setErrors({ general: data.error || 'Failed to send phone OTP. Please check phone number.' });
+      }
+    } catch (err) {
+      console.error(err);
+      setErrors({ general: 'Network error sending phone OTP. Please try again.' });
+    } finally {
+      setPhoneOtpSending(false);
     }
   };
 
@@ -128,7 +179,8 @@ export default function SellerRegister() {
       const data = await res.json();
       if (data.success) {
         setIsOtpVerifying(false);
-        setStep(2);
+        // Prompt phone OTP verification next
+        await triggerSendPhoneOtp();
       } else {
         setOtpError(data.error || 'Invalid OTP code. Please try again.');
       }
@@ -140,44 +192,37 @@ export default function SellerRegister() {
     }
   };
 
-  const onGoogleSuccess = useCallback(async ({ email, name, idToken }) => {
+  const handleVerifyPhoneOtp = async (e) => {
+    e.preventDefault();
+    if (!phoneOtpInput || phoneOtpInput.trim().length !== 6) {
+      setPhoneOtpError('Please enter a valid 6-digit OTP code.');
+      return;
+    }
     setLoading(true);
-    setErrors({});
+    setPhoneOtpError('');
     try {
-      const data = await googleLoginUser({ email, name, role: 'seller', idToken });
-      if (data.exists === false) {
-        setLoading(false);
-        setFormData((prev) => ({
-          ...prev,
-          email: data.email || '',
-          ownerName: data.name || '',
-          password: `GoogleAuthPass_${Math.random().toString(36).substring(2, 10)}`
-        }));
-        setErrors({ general: 'Google account connected! Please enter your store details and complete registration.' });
-        return;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiUrl}/api/auth/verify-phone-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formData.phone, otp: phoneOtpInput.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsPhoneOtpVerifying(false);
+        setStep(2);
+      } else {
+        setPhoneOtpError(data.error || 'Invalid OTP code. Please try again.');
       }
-      saveAuthSession(data, 'seller');
-      setLoading(false);
-      router.replace('/seller/dashboard');
     } catch (err) {
+      console.error(err);
+      setPhoneOtpError('Network error verifying phone OTP. Please try again.');
+    } finally {
       setLoading(false);
-      setErrors({ general: err.message || 'Google Sign-In failed' });
     }
-  }, [router]);
+  };
 
-  const onGoogleError = useCallback((msg) => {
-    setErrors({ general: msg });
-  }, []);
 
-  const { triggerGoogleSignIn, isGoogleEnabled, renderGoogleButton } = useGoogleAuth(onGoogleSuccess, onGoogleError);
-
-  const handleGoogleSignIn = () => triggerGoogleSignIn();
-
-  useEffect(() => {
-    if (isGoogleEnabled) {
-      renderGoogleButton('google-signin-btn');
-    }
-  }, [isGoogleEnabled, renderGoogleButton]);
 
 
   const handleInputChange = (e) => {
@@ -558,19 +603,7 @@ export default function SellerRegister() {
                 </button>
               </div>
 
-              {isGoogleEnabled && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', margin: '16px 0', gap: '10px' }}>
-                    <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>or</span>
-                    <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
-                  </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px', alignItems: 'center' }}>
-                    <div id="google-signin-btn" style={{ width: '100%', minHeight: '44px' }} />
-                  </div>
-                </>
-              )}
 
               <div className="sr-form-footer">
                 <span>Already registered?</span>
@@ -863,6 +896,22 @@ export default function SellerRegister() {
               We sent a 6-digit verification code to <strong style={{ color: '#f8fafc' }}>{formData.email}</strong>. Please enter it below.
             </p>
 
+            {devEmailOtp && (
+              <div style={{
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.2)',
+                color: '#38bdf8',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                marginBottom: '16px',
+                textAlign: 'left',
+                fontWeight: 'bold'
+              }}>
+                🔧 Dev Mode Simulated Email OTP: {devEmailOtp}
+              </div>
+            )}
+
             {otpError && (
               <div style={{
                 backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -959,6 +1008,172 @@ export default function SellerRegister() {
                 }}
               >
                 {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Resend OTP'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPhoneOtpVerifying && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '420px',
+            padding: '32px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            textAlign: 'center',
+            animation: 'fadeIn 0.3s ease-out'
+          }}>
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(56, 189, 248, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px'
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                <line x1="12" y1="18" x2="12.01" y2="18" />
+              </svg>
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#ffffff', marginBottom: '8px' }}>
+              Confirm Your Mobile Number
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: '1.5', marginBottom: '24px' }}>
+              We sent a 6-digit verification code to <strong style={{ color: '#f8fafc' }}>+91 {formData.phone}</strong>. Please enter it below.
+            </p>
+
+            {devPhoneOtp && (
+              <div style={{
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.2)',
+                color: '#38bdf8',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                marginBottom: '16px',
+                textAlign: 'left',
+                fontWeight: 'bold'
+              }}>
+                🔧 Dev Mode Simulated Mobile OTP: {devPhoneOtp}
+              </div>
+            )}
+
+            {phoneOtpError && (
+              <div style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                color: '#f87171',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                marginBottom: '16px',
+                textAlign: 'left'
+              }}>
+                {phoneOtpError}
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyPhoneOtp}>
+              <div style={{ marginBottom: '20px' }}>
+                <input
+                  type="text"
+                  maxLength="6"
+                  placeholder="000000"
+                  value={phoneOtpInput}
+                  onChange={(e) => setPhoneOtpInput(e.target.value.replace(/\D/g, ''))}
+                  style={{
+                    width: '100%',
+                    height: '50px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                    color: '#ffffff',
+                    fontSize: '1.5rem',
+                    fontWeight: '700',
+                    textAlign: 'center',
+                    letterSpacing: '8px',
+                    outline: 'none',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
+                  onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  borderRadius: '8px',
+                  backgroundColor: '#38bdf8',
+                  color: '#0f172a',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'opacity 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  opacity: loading ? 0.7 : 1
+                }}
+              >
+                {loading ? 'Verifying...' : 'Verify & Continue'}
+              </button>
+            </form>
+
+            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+              <button
+                type="button"
+                onClick={() => setIsPhoneOtpVerifying(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerSendPhoneOtp(true)}
+                disabled={phoneOtpCooldown > 0 || phoneOtpSending}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: phoneOtpCooldown > 0 ? '#64748b' : '#38bdf8',
+                  cursor: phoneOtpCooldown > 0 ? 'not-allowed' : 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                {phoneOtpCooldown > 0 ? `Resend in ${phoneOtpCooldown}s` : 'Resend OTP'}
               </button>
             </div>
           </div>
