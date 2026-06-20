@@ -51,6 +51,42 @@ const CATEGORIES = [
     subcategories: ['All Lifestyle', 'Home Decor', 'Aromatherapy', 'Organizers', 'Comfort'],
     gradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%)',
     accent: '#8b5cf6'
+  },
+  {
+    id: 'beauty',
+    name: 'Beauty & Cosmetics',
+    icon: '💄',
+    desc: 'Botanical skincare serums, organic cosmetics, fragrances, and premium haircare.',
+    subcategories: ['All Beauty', 'Skincare', 'Makeup', 'Fragrance', 'Haircare'],
+    gradient: 'linear-gradient(135deg, rgba(217, 70, 239, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%)',
+    accent: '#d946ef'
+  },
+  {
+    id: 'sports',
+    name: 'Sports & Outdoors',
+    icon: '⚽',
+    desc: 'High-performance activewear, premium fitness gear, and outdoor expedition equipment.',
+    subcategories: ['All Sports', 'Fitness Gear', 'Footwear', 'Activewear', 'Outdoor Equipment'],
+    gradient: 'linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%)',
+    accent: '#06b6d4'
+  },
+  {
+    id: 'books',
+    name: 'Books & Stationery',
+    icon: '📚',
+    desc: 'Refined leather journals, premium planner notebooks, fiction, and writing tools.',
+    subcategories: ['All Books', 'Fiction', 'Self-Help', 'Stationery', 'Journals'],
+    gradient: 'linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+    accent: '#a855f7'
+  },
+  {
+    id: 'grocery',
+    name: 'Grocery & Essentials',
+    icon: '🛒',
+    desc: 'Organic matcha tea, healthy nuts mix, gourmet snacks, and daily kitchen pantry essentials.',
+    subcategories: ['All Grocery', 'Snacks', 'Beverages', 'Pantry', 'Organic'],
+    gradient: 'linear-gradient(135deg, rgba(20, 184, 166, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%)',
+    accent: '#14b8a6'
   }
 ];
 
