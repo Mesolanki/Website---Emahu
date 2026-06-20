@@ -63,6 +63,14 @@ export default function AdminDashboard() {
   // Payout states
   const [payoutReceiptFile, setPayoutReceiptFile] = useState('');
   const [payoutSubmitting, setPayoutSubmitting] = useState(false);
+  const [adminPenaltyAmount, setAdminPenaltyAmount] = useState('0');
+  const [adminPenaltyReason, setAdminPenaltyReason] = useState('');
+
+  // Emahu commission settings state
+  const [platformFeePercent, setPlatformFeePercent] = useState(4);
+  const [platformFeeName, setPlatformFeeName] = useState('Emahu Platform Fee');
+  const [loadingPlatformSettings, setLoadingPlatformSettings] = useState(false);
+  const [savingPlatformSettings, setSavingPlatformSettings] = useState(false);
 
   // Sellers and Products State
   const [sellers, setSellers] = useState([]);
@@ -90,29 +98,32 @@ export default function AdminDashboard() {
   // Add Partner form states
   const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
   const [newPartnerName, setNewPartnerName] = useState('');
-  const [newPartnerEmail, setNewPartnerEmail] = useState('');
-  const [newPartnerPassword, setNewPartnerPassword] = useState('');
   const [newPartnerPhone, setNewPartnerPhone] = useState('');
-  const [newPartnerCity, setNewPartnerCity] = useState('Ahmedabad');
-  const [newPartnerArea, setNewPartnerArea] = useState('Gota');
-  const [newPartnerPincode, setNewPartnerPincode] = useState('382481');
-  const [newPartnerRadius, setNewPartnerRadius] = useState('15');
+  const [newPartnerOperatingLocation, setNewPartnerOperatingLocation] = useState('');
+  const [newPartnerSalaryRequirement, setNewPartnerSalaryRequirement] = useState('');
+  const [newPartnerServiceAreaCountry, setNewPartnerServiceAreaCountry] = useState('India');
+  const [newPartnerServiceAreaRegion, setNewPartnerServiceAreaRegion] = useState('');
+  const [newPartnerServiceAreaDistrict, setNewPartnerServiceAreaDistrict] = useState('');
+  const [newPartnerServiceAreaState, setNewPartnerServiceAreaState] = useState('');
+  const [newPartnerServiceAreaCity, setNewPartnerServiceAreaCity] = useState('');
   const [newPartnerRate, setNewPartnerRate] = useState('10');
   const [newPartnerVehicleType, setNewPartnerVehicleType] = useState('bike');
-  const [newPartnerVehicleNumber, setNewPartnerVehicleNumber] = useState('');
   const [newPartnerLat, setNewPartnerLat] = useState('23.0225');
   const [newPartnerLon, setNewPartnerLon] = useState('72.5714');
   const [newPartnerLoading, setNewPartnerLoading] = useState(false);
 
   // Edit Partner states inside detail modal
   const [editPartnerRate, setEditPartnerRate] = useState('');
-  const [editPartnerRadius, setEditPartnerRadius] = useState('');
-  const [editPartnerCity, setEditPartnerCity] = useState('');
-  const [editPartnerArea, setEditPartnerArea] = useState('');
-  const [editPartnerPincode, setEditPartnerPincode] = useState('');
-  const [editPartnerVehicleType, setEditPartnerVehicleType] = useState('');
-  const [editPartnerVehicleNumber, setEditPartnerVehicleNumber] = useState('');
+  const [editPartnerRadius, setEditPartnerRadius] = useState('999');
+  const [editPartnerVehicleType, setEditPartnerVehicleType] = useState('bike');
   const [editPartnerIsActive, setEditPartnerIsActive] = useState(true);
+  const [editPartnerOperatingLocation, setEditPartnerOperatingLocation] = useState('');
+  const [editPartnerSalaryRequirement, setEditPartnerSalaryRequirement] = useState('');
+  const [editPartnerServiceAreaCountry, setEditPartnerServiceAreaCountry] = useState('India');
+  const [editPartnerServiceAreaRegion, setEditPartnerServiceAreaRegion] = useState('');
+  const [editPartnerServiceAreaDistrict, setEditPartnerServiceAreaDistrict] = useState('');
+  const [editPartnerServiceAreaState, setEditPartnerServiceAreaState] = useState('');
+  const [editPartnerServiceAreaCity, setEditPartnerServiceAreaCity] = useState('');
 
   // Notifications states
   const [notifications, setNotifications] = useState([]);
@@ -133,6 +144,12 @@ export default function AdminDashboard() {
   // Premium Seller Detail Drawer Modal States
   const [selectedDetailSeller, setSelectedDetailSeller] = useState(null);
   const [detailTab, setDetailTab] = useState('profile'); // 'profile' | 'payout' | 'kyc' | 'performance'
+  const [sellerOrders, setSellerOrders] = useState([]);
+  const [loadingSellerOrders, setLoadingSellerOrders] = useState(false);
+  const [sellerOrdersError, setSellerOrdersError] = useState(false);
+  const [releasingOrderId, setReleasingOrderId] = useState('');
+  const [releasedReceipt, setReleasedReceipt] = useState(null);
+  const [orderPenalties, setOrderPenalties] = useState({}); // { [orderId]: { amount: '', reason: '' } }
 
   // Inline custom SKUs map
   const [customSkus, setCustomSkus] = useState({});
@@ -509,6 +526,14 @@ export default function AdminDashboard() {
     setPayoutSubmitting(true);
     try {
       const token = localStorage.getItem('emahu_admin_token');
+      
+      const orderTotal = selectedDetailOrder.total || 0;
+      const productAmount = selectedDetailOrder.productAmount || orderTotal;
+      const feePercent = selectedDetailOrder.platformFeePercent !== undefined ? selectedDetailOrder.platformFeePercent : platformFeePercent;
+      const feeAmount = parseFloat(((productAmount * feePercent) / 100).toFixed(2));
+      const penaltyAmt = parseFloat(adminPenaltyAmount) || 0;
+      const netPayout = parseFloat((productAmount - feeAmount - penaltyAmt).toFixed(2));
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}`, {
         method: 'PUT',
         headers: {
@@ -518,7 +543,14 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           paymentStatus: 'paid',
           transactionFile: payoutReceiptFile,
-          transactionDate: new Date()
+          transactionDate: new Date(),
+          penaltyAmount: penaltyAmt,
+          penaltyReason: adminPenaltyReason || '',
+          platformFeePercent: feePercent,
+          platformFeeAmount: feeAmount,
+          sellerNetPayout: netPayout,
+          paymentReleased: true,
+          paymentReleasedAt: new Date()
         })
       });
       const data = await res.json();
@@ -529,6 +561,8 @@ export default function AdminDashboard() {
         // Update the selected order details state
         setSelectedDetailOrder(data.order);
         setPayoutReceiptFile('');
+        setAdminPenaltyAmount('0');
+        setAdminPenaltyReason('');
       } else {
         triggerToast('Error', data.error || 'Failed to update payout status.', 'danger');
       }
@@ -739,6 +773,105 @@ export default function AdminDashboard() {
     }
   };
 
+  // Fetch seller orders for payout settlements tab
+  const fetchSellerOrders = async (sellerId) => {
+    setLoadingSellerOrders(true);
+    setSellerOrdersError(false);
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?sellerId=${sellerId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        setSellerOrders(data.orders || []);
+      } else {
+        setSellerOrdersError(true);
+        triggerToast('Error', data.error || 'Failed to fetch seller orders', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      setSellerOrdersError(true);
+      triggerToast('Error', 'Network error fetching seller orders', 'danger');
+    } finally {
+      setLoadingSellerOrders(false);
+    }
+  };
+
+  // Release payment helper
+  const handleReleasePayment = async (orderId, penaltyAmount, penaltyReason) => {
+    setReleasingOrderId(orderId);
+    setReleasedReceipt(null);
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+
+      // 1. If penaltyAmount is > 0, first save it to the order
+      if (parseFloat(penaltyAmount) > 0) {
+        const orderRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            penaltyAmount: parseFloat(penaltyAmount),
+            penaltyReason: penaltyReason || 'Admin Penalty Deduction'
+          })
+        });
+        const orderData = await orderRes.json();
+        if (!orderData.success) {
+          triggerToast('Error', orderData.error || 'Failed to apply penalty to order', 'danger');
+          setReleasingOrderId('');
+          return;
+        }
+      }
+
+      // 2. Call the release endpoint
+      const releaseRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/release/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (releaseRes.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const releaseData = await releaseRes.json();
+      if (releaseData.success) {
+        triggerToast('Success', `Payment for Order #${orderId} has been successfully released!`, 'success');
+        
+        // Show receipt dialog
+        setReleasedReceipt({
+          orderId: releaseData.orderId,
+          productAmount: releaseData.productAmount,
+          platformFeePercent: releaseData.platformFeePercent,
+          platformFeeAmount: releaseData.platformFeeAmount,
+          penaltyAmount: parseFloat(penaltyAmount) || 0,
+          penaltyReason: penaltyReason || 'None',
+          sellerNetPayout: releaseData.sellerNetPayout
+        });
+
+        // Re-fetch orders list for this seller
+        if (selectedDetailSeller) {
+          fetchSellerOrders(selectedDetailSeller._id);
+          fetchSellers(); // refresh seller stats / total orders
+        }
+      } else {
+        triggerToast('Error', releaseData.error || 'Failed to release payment', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error releasing payment', 'danger');
+    } finally {
+      setReleasingOrderId('');
+    }
+  };
+
   // Verify a single document
   const handleVerifySellerDocument = async (sellerId, docId, status, feedback = '') => {
     try {
@@ -865,42 +998,57 @@ export default function AdminDashboard() {
     }
   };
 
-  // Load active tab data
-  useEffect(() => {
-    if (!isAuthorized) return;
-    if (activeTab === 'sellers' || activeTab === 'new-sellers') {
-      setTimeout(() => fetchSellers(), 0);
-    } else if (activeTab === 'products-hub') {
-      setTimeout(() => fetchProducts(), 0);
-    } else if (activeTab === 'stats') {
-      setTimeout(() => {
-        fetchSellers();
-        fetchProducts();
-        fetchOrders();
-      }, 0);
-    } else if (activeTab === 'orders') {
-      setTimeout(() => fetchOrders(), 0);
-    } else if (activeTab === 'delivery-partners') {
-      setTimeout(() => fetchDeliveryPartners(), 0);
-    } else if (activeTab === 'settings') {
-      setTimeout(() => fetchDeliverySettings(), 0);
-    } else if (activeTab === 'notifications') {
-      setTimeout(() => fetchNotifications(), 0);
+  const fetchPlatformSettings = async () => {
+    setLoadingPlatformSettings(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/settings`);
+      const data = await res.json();
+      if (data.success) {
+        setPlatformFeePercent(data.platformFeePercent);
+        setPlatformFeeName(data.platformFeeName || 'Emahu Platform Fee');
+      }
+    } catch (err) {
+      console.error('fetchPlatformSettings error:', err);
+      triggerToast('Error', 'Failed to fetch platform commission settings', 'danger');
+    } finally {
+      setLoadingPlatformSettings(false);
     }
-  }, [isAuthorized, activeTab]);
+  };
 
-  useEffect(() => {
-    if (selectedDetailPartner) {
-      setEditPartnerRate(selectedDetailPartner.perItemCharge || '10');
-      setEditPartnerRadius(selectedDetailPartner.serviceRadius || '15');
-      setEditPartnerCity(selectedDetailPartner.currentCity || selectedDetailPartner.city || 'Ahmedabad');
-      setEditPartnerArea(selectedDetailPartner.currentArea || selectedDetailPartner.address || 'Gota');
-      setEditPartnerPincode(selectedDetailPartner.pincode || '');
-      setEditPartnerVehicleType(selectedDetailPartner.vehicleType || 'bike');
-      setEditPartnerVehicleNumber(selectedDetailPartner.vehicleNumber || '');
-      setEditPartnerIsActive(selectedDetailPartner.isActivePartner !== false);
+  const handleSavePlatformSettings = async () => {
+    if (platformFeePercent < 0 || platformFeePercent > 100) {
+      triggerToast('Validation Error', 'Commission percentage must be between 0 and 100.', 'warning');
+      return;
     }
-  }, [selectedDetailPartner]);
+    setSavingPlatformSettings(true);
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          platformFeePercent: Number(platformFeePercent),
+          platformFeeName
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPlatformFeePercent(data.platformFeePercent);
+        setPlatformFeeName(data.platformFeeName);
+        triggerToast('Success', `Platform commission updated to ${data.platformFeePercent}%`, 'success');
+      } else {
+        triggerToast('Error', data.error || 'Failed to update commission settings', 'danger');
+      }
+    } catch (err) {
+      console.error('handleSavePlatformSettings error:', err);
+      triggerToast('Error', 'Failed to update commission settings', 'danger');
+    } finally {
+      setSavingPlatformSettings(false);
+    }
+  };
 
   const fetchDeliverySettings = async () => {
     setLoadingSettings(true);
@@ -942,6 +1090,62 @@ export default function AdminDashboard() {
     }
   };
 
+  // Load active tab data
+  useEffect(() => {
+    if (!isAuthorized) return;
+    if (activeTab === 'sellers' || activeTab === 'new-sellers') {
+      setTimeout(() => fetchSellers(), 0);
+    } else if (activeTab === 'products-hub') {
+      setTimeout(() => fetchProducts(), 0);
+    } else if (activeTab === 'stats') {
+      setTimeout(() => {
+        fetchSellers();
+        fetchProducts();
+        fetchOrders();
+      }, 0);
+    } else if (activeTab === 'orders') {
+      setTimeout(() => fetchOrders(), 0);
+    } else if (activeTab === 'delivery-partners') {
+      setTimeout(() => fetchDeliveryPartners(), 0);
+    } else if (activeTab === 'settings') {
+      setTimeout(() => fetchDeliverySettings(), 0);
+      setTimeout(() => fetchPlatformSettings(), 0);
+    } else if (activeTab === 'notifications') {
+      setTimeout(() => fetchNotifications(), 0);
+    }
+  }, [isAuthorized, activeTab]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      if (newPartnerServiceAreaCity.toLowerCase() === 'ahmedabad') {
+        setNewPartnerLat('23.0225');
+        setNewPartnerLon('72.5714');
+      } else if (newPartnerServiceAreaCity.toLowerCase() === 'surat') {
+        setNewPartnerLat('21.1702');
+        setNewPartnerLon('72.8311');
+      }
+    }, 0);
+  }, [newPartnerServiceAreaCity]);
+
+  useEffect(() => {
+    if (selectedDetailPartner) {
+      setTimeout(() => {
+        setEditPartnerRate(selectedDetailPartner.perItemCharge || '10');
+        setEditPartnerRadius(selectedDetailPartner.serviceRadius || '999');
+        setEditPartnerVehicleType(selectedDetailPartner.vehicleType || 'bike');
+        setEditPartnerIsActive(selectedDetailPartner.isActivePartner !== false);
+        setEditPartnerOperatingLocation(selectedDetailPartner.operatingLocation || '');
+        setEditPartnerSalaryRequirement(selectedDetailPartner.salaryRequirement || '');
+        setEditPartnerServiceAreaCountry(selectedDetailPartner.serviceAreaCountry || 'India');
+        setEditPartnerServiceAreaRegion(selectedDetailPartner.serviceAreaRegion || '');
+        setEditPartnerServiceAreaDistrict(selectedDetailPartner.serviceAreaDistrict || '');
+        setEditPartnerServiceAreaState(selectedDetailPartner.serviceAreaState || '');
+        setEditPartnerServiceAreaCity(selectedDetailPartner.serviceAreaCity || '');
+      }, 0);
+    }
+  }, [selectedDetailPartner]);
+
+
   const handleAddSlab = () => {
     if (!newSlabFrom || !newSlabTo || !newSlabCharge) {
       alert('Please fill out all slab fields');
@@ -967,11 +1171,13 @@ export default function AdminDashboard() {
 
   const handleAddPartnerSubmit = async (e) => {
     e.preventDefault();
-    if (!newPartnerName || !newPartnerEmail || !newPartnerPassword || !newPartnerPhone) {
-      alert('Please fill Name, Email, Password, and Mobile Number');
+    if (!newPartnerName || !newPartnerPhone) {
+      alert('Please fill Name and Mobile Number');
       return;
     }
     setNewPartnerLoading(true);
+    const generatedEmail = `delivery_${newPartnerPhone.trim().replace(/[^0-9]/g, '') || Date.now()}_${Math.floor(1000 + Math.random() * 9000)}@emahu.com`;
+    const generatedPassword = 'default_delivery_pass_123';
     try {
       const token = localStorage.getItem('emahu_admin_token');
       const res = await fetch('/api/delivery/partners', {
@@ -982,19 +1188,25 @@ export default function AdminDashboard() {
         },
         body: JSON.stringify({
           name: newPartnerName,
-          email: newPartnerEmail,
-          password: newPartnerPassword,
+          email: generatedEmail,
+          password: generatedPassword,
           phone: newPartnerPhone,
-          operatingLocation: `${newPartnerArea}, ${newPartnerCity}`,
-          currentCity: newPartnerCity,
-          currentArea: newPartnerArea,
-          pincode: newPartnerPincode,
-          serviceRadius: parseFloat(newPartnerRadius),
+          operatingLocation: newPartnerOperatingLocation,
+          currentCity: newPartnerServiceAreaCity,
+          currentArea: newPartnerServiceAreaRegion,
+          pincode: '382481',
+          serviceRadius: 999,
           perItemCharge: parseFloat(newPartnerRate),
           vehicleType: newPartnerVehicleType,
-          vehicleNumber: newPartnerVehicleNumber,
+          vehicleNumber: 'N/A',
           latitude: parseFloat(newPartnerLat),
-          longitude: parseFloat(newPartnerLon)
+          longitude: parseFloat(newPartnerLon),
+          salaryRequirement: newPartnerSalaryRequirement,
+          serviceAreaCountry: newPartnerServiceAreaCountry,
+          serviceAreaRegion: newPartnerServiceAreaRegion,
+          serviceAreaDistrict: newPartnerServiceAreaDistrict,
+          serviceAreaState: newPartnerServiceAreaState,
+          serviceAreaCity: newPartnerServiceAreaCity
         })
       });
       const data = await res.json();
@@ -1002,10 +1214,13 @@ export default function AdminDashboard() {
         triggerToast('Success', 'Delivery partner added successfully', 'success');
         setIsAddPartnerOpen(false);
         setNewPartnerName('');
-        setNewPartnerEmail('');
-        setNewPartnerPassword('');
         setNewPartnerPhone('');
-        setNewPartnerVehicleNumber('');
+        setNewPartnerOperatingLocation('');
+        setNewPartnerSalaryRequirement('');
+        setNewPartnerServiceAreaRegion('');
+        setNewPartnerServiceAreaDistrict('');
+        setNewPartnerServiceAreaState('');
+        setNewPartnerServiceAreaCity('');
         fetchDeliveryPartners();
       } else {
         triggerToast('Error', data.error || 'Failed to create partner', 'danger');
@@ -1030,13 +1245,19 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           perItemCharge: parseFloat(editPartnerRate),
           serviceRadius: parseFloat(editPartnerRadius),
-          currentCity: editPartnerCity,
-          currentArea: editPartnerArea,
-          pincode: editPartnerPincode,
+          currentCity: editPartnerServiceAreaCity,
+          currentArea: editPartnerServiceAreaRegion,
+          pincode: '382481',
           vehicleType: editPartnerVehicleType,
-          vehicleNumber: editPartnerVehicleNumber,
+          vehicleNumber: 'N/A',
           isActivePartner: editPartnerIsActive,
-          operatingLocation: `${editPartnerArea}, ${editPartnerCity}`
+          operatingLocation: editPartnerOperatingLocation,
+          salaryRequirement: editPartnerSalaryRequirement,
+          serviceAreaCountry: editPartnerServiceAreaCountry,
+          serviceAreaRegion: editPartnerServiceAreaRegion,
+          serviceAreaDistrict: editPartnerServiceAreaDistrict,
+          serviceAreaState: editPartnerServiceAreaState,
+          serviceAreaCity: editPartnerServiceAreaCity
         })
       });
       const data = await res.json();
@@ -1216,6 +1437,190 @@ export default function AdminDashboard() {
         ))}
       </div>
 
+      {/* Add Partner Modal */}
+      {isAddPartnerOpen && (
+        <div className="ad-modal-overlay" onClick={() => setIsAddPartnerOpen(false)}>
+          <div className="ad-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="ad-detail-close" onClick={() => setIsAddPartnerOpen(false)}>✕</button>
+            <div className="ad-detail-header-block">
+              <div className="ad-detail-title-section">
+                <h3 className="ad-detail-store-name">Add New Delivery Partner</h3>
+                <div className="ad-detail-store-meta">
+                  <span>Register a new dispatch carrier in the platform.</span>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleAddPartnerSubmit} style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', minHeight: '120px', display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
+              <div className="ad-detail-info-grid">
+                <div className="ad-detail-info-section">
+                  <h4>Carrier Credentials & Specs</h4>
+                  
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Name / Driver Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={newPartnerName} 
+                      onChange={(e) => setNewPartnerName(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Mobile Number</label>
+                    <input 
+                      type="text" 
+                      required
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={newPartnerPhone} 
+                      onChange={(e) => setNewPartnerPhone(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Operating Location / City Hub</label>
+                    <input 
+                      type="text" 
+                      required
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={newPartnerOperatingLocation} 
+                      onChange={(e) => setNewPartnerOperatingLocation(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Salary Requirement</label>
+                    <input 
+                      type="text" 
+                      required
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={newPartnerSalaryRequirement} 
+                      onChange={(e) => setNewPartnerSalaryRequirement(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Rate Per 2KM (₹)</label>
+                    <input 
+                      type="number" 
+                      required
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={newPartnerRate} 
+                      onChange={(e) => setNewPartnerRate(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Vehicle Type</label>
+                    <select 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                      value={newPartnerVehicleType} 
+                      onChange={(e) => setNewPartnerVehicleType(e.target.value)}
+                    >
+                      <option value="bike">Bike</option>
+                      <option value="scooter">Scooter</option>
+                      <option value="car">Car</option>
+                      <option value="truck">Truck</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="ad-detail-info-section">
+                  <h4>Service Territory Hierarchy</h4>
+                  
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Country</label>
+                    <input 
+                      type="text" 
+                      required
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={newPartnerServiceAreaCountry} 
+                      onChange={(e) => setNewPartnerServiceAreaCountry(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Region</label>
+                    <input 
+                      type="text" 
+                      required
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={newPartnerServiceAreaRegion} 
+                      onChange={(e) => setNewPartnerServiceAreaRegion(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>District</label>
+                    <input 
+                      type="text" 
+                      required
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={newPartnerServiceAreaDistrict} 
+                      onChange={(e) => setNewPartnerServiceAreaDistrict(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>State</label>
+                    <input 
+                      type="text" 
+                      required
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={newPartnerServiceAreaState} 
+                      onChange={(e) => setNewPartnerServiceAreaState(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>City</label>
+                    <input 
+                      type="text" 
+                      required
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={newPartnerServiceAreaCity} 
+                      onChange={(e) => setNewPartnerServiceAreaCity(e.target.value)} 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="ad-detail-decision-bar" style={{ marginTop: '20px' }}>
+                <button
+                  type="submit"
+                  className="ad-btn-action approve"
+                  style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem' }}
+                  disabled={newPartnerLoading}
+                >
+                  {newPartnerLoading ? 'Adding Partner...' : 'Create Partner Account'}
+                </button>
+                <button 
+                  type="button"
+                  className="ad-btn-sec" 
+                  style={{ height: '42px', padding: '0 20px', fontSize: '0.9rem' }} 
+                  onClick={() => setIsAddPartnerOpen(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Feedback Modal */}
       {isFeedbackModalOpen && (
         <div className="ad-modal-overlay ad-feedback-overlay">
@@ -1279,17 +1684,6 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Service Radius (KM)</label>
-                    <input 
-                      type="number" 
-                      className="ad-modal-input" 
-                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerRadius} 
-                      onChange={(e) => setEditPartnerRadius(e.target.value)} 
-                    />
-                  </div>
-
-                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Vehicle Type</label>
                     <select 
                       className="ad-modal-input" 
@@ -1306,50 +1700,83 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Vehicle Number</label>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Operating Location / City Hub</label>
                     <input 
                       type="text" 
                       className="ad-modal-input" 
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerVehicleNumber} 
-                      onChange={(e) => setEditPartnerVehicleNumber(e.target.value)} 
+                      value={editPartnerOperatingLocation} 
+                      onChange={(e) => setEditPartnerOperatingLocation(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Salary Requirement</label>
+                    <input 
+                      type="text" 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={editPartnerSalaryRequirement} 
+                      onChange={(e) => setEditPartnerSalaryRequirement(e.target.value)} 
                     />
                   </div>
                 </div>
 
                 <div className="ad-detail-info-section">
-                  <h4>Edit Service Territory</h4>
+                  <h4>Edit Service Territory Hierarchy</h4>
                   
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Service City</label>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Country</label>
                     <input 
                       type="text" 
                       className="ad-modal-input" 
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerCity} 
-                      onChange={(e) => setEditPartnerCity(e.target.value)} 
+                      value={editPartnerServiceAreaCountry} 
+                      onChange={(e) => setEditPartnerServiceAreaCountry(e.target.value)} 
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Service Area</label>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Region</label>
                     <input 
                       type="text" 
                       className="ad-modal-input" 
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerArea} 
-                      onChange={(e) => setEditPartnerArea(e.target.value)} 
+                      value={editPartnerServiceAreaRegion} 
+                      onChange={(e) => setEditPartnerServiceAreaRegion(e.target.value)} 
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Pincode</label>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>District</label>
                     <input 
                       type="text" 
                       className="ad-modal-input" 
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerPincode} 
-                      onChange={(e) => setEditPartnerPincode(e.target.value)} 
+                      value={editPartnerServiceAreaDistrict} 
+                      onChange={(e) => setEditPartnerServiceAreaDistrict(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>State</label>
+                    <input 
+                      type="text" 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={editPartnerServiceAreaState} 
+                      onChange={(e) => setEditPartnerServiceAreaState(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>City</label>
+                    <input 
+                      type="text" 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={editPartnerServiceAreaCity} 
+                      onChange={(e) => setEditPartnerServiceAreaCity(e.target.value)} 
                     />
                   </div>
 
@@ -1487,6 +1914,15 @@ export default function AdminDashboard() {
                 onClick={() => setDetailTab('performance')}
               >
                 Store Analytics
+              </button>
+              <button 
+                className={`ad-detail-tab-trigger ${detailTab === 'settlement' ? 'active' : ''}`}
+                onClick={() => {
+                  setDetailTab('settlement');
+                  fetchSellerOrders(selectedDetailSeller._id);
+                }}
+              >
+                Payment Integration
               </button>
             </div>
 
@@ -1756,6 +2192,362 @@ export default function AdminDashboard() {
                       <span className="ad-detail-row-val">Active and Compliant</span>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {detailTab === 'settlement' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Bank card and financial summary overview */}
+                  <div style={{ display: 'flex', gap: '20px', alignItems: 'stretch', flexWrap: 'wrap' }}>
+                    {/* Bank Account Details */}
+                    <div className="ad-detail-bank-card" style={{ flex: '1 1 350px', marginBottom: 0, height: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div className="ad-detail-bank-logo">
+                        <span>🏦 {selectedDetailSeller.bankName || 'Settlement Bank'}</span>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>PAYOUT DESTINATION</span>
+                      </div>
+                      <div className="ad-detail-bank-number" style={{ fontSize: '1.25rem', margin: '20px 0' }}>
+                        {selectedDetailSeller.accountNumber ? selectedDetailSeller.accountNumber.replace(/.(?=.{4})/g, '•') : '•••• •••• ••••'}
+                      </div>
+                      <div className="ad-detail-bank-holder">
+                        <div>
+                          <span>Account Holder</span>
+                          <div style={{ fontSize: '0.85rem' }}>{selectedDetailSeller.bankHolder || 'Holder N/A'}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span>IFSC Code</span>
+                          <div style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{selectedDetailSeller.ifscCode || 'N/A'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Financial Summary */}
+                    <div style={{ flex: '1.5 1 400px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div className="ad-detail-metric-card" style={{ padding: '14px' }}>
+                        <span style={{ fontSize: '0.75rem' }}>Gross Products Value</span>
+                        <h4 style={{ fontSize: '1.15rem' }}>
+                          ₹{sellerOrders.reduce((sum, o) => sum + (o.productAmount || o.total || 0), 0).toLocaleString('en-IN')}
+                        </h4>
+                        <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>Across {sellerOrders.length} orders</span>
+                      </div>
+                      <div className="ad-detail-metric-card" style={{ padding: '14px' }}>
+                        <span style={{ fontSize: '0.75rem' }}>Platform Fee Deducted</span>
+                        <h4 style={{ fontSize: '1.15rem', color: '#f87171' }}>
+                          ₹{sellerOrders.filter(o => o.paymentReleased).reduce((sum, o) => sum + (o.platformFeeAmount || 0), 0).toLocaleString('en-IN')}
+                        </h4>
+                        <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>Commission ({platformFeePercent}%)</span>
+                      </div>
+                      <div className="ad-detail-metric-card" style={{ padding: '14px' }}>
+                        <span style={{ fontSize: '0.75rem' }}>Total Penalties Applied</span>
+                        <h4 style={{ fontSize: '1.15rem', color: '#f87171' }}>
+                          ₹{sellerOrders.reduce((sum, o) => sum + (o.penaltyAmount || 0), 0).toLocaleString('en-IN')}
+                        </h4>
+                        <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>Violation deductions</span>
+                      </div>
+                      <div className="ad-detail-metric-card" style={{ padding: '14px', border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.02)' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#34d399' }}>Total Net Payout Released</span>
+                        <h4 style={{ fontSize: '1.15rem', color: '#10b981' }}>
+                          ₹{sellerOrders.filter(o => o.paymentReleased).reduce((sum, o) => sum + (o.sellerNetPayout || 0), 0).toLocaleString('en-IN')}
+                        </h4>
+                        <span style={{ fontSize: '0.68rem', opacity: 0.7, color: '#34d399' }}>Successfully Settled</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Receipt display block when payment is newly released */}
+                  {releasedReceipt && (
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(5,150,105,0.15) 100%)',
+                      border: '1.5px solid #10b981',
+                      color: '#ffffff',
+                      padding: '20px',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 20px rgba(16, 185, 129, 0.1)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: '800', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981' }}>
+                          <span>✓</span> Payout Settlement Bill Generated Successfully
+                        </span>
+                        <button 
+                          onClick={() => setReleasedReceipt(null)}
+                          style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', width: '26px', height: '26px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div style={{ background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '16px', fontSize: '0.88rem', fontFamily: 'monospace' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', borderBottom: '1px dashed rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
+                          <span>SETTLEMENT INVOICE ID:</span>
+                          <strong style={{ color: '#6366f1' }}>#REC-{releasedReceipt.orderId}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span>Order Reference:</span>
+                          <span>#{releasedReceipt.orderId}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span>Gross Merchandise Value:</span>
+                          <span>₹{releasedReceipt.productAmount.toFixed(2)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#fb923c' }}>
+                          <span>Emahu Platform Fee ({releasedReceipt.platformFeePercent}%):</span>
+                          <span>- ₹{releasedReceipt.platformFeeAmount.toFixed(2)}</span>
+                        </div>
+                        {releasedReceipt.penaltyAmount > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#f87171' }}>
+                            <span>Merchant Penalty ({releasedReceipt.penaltyReason}):</span>
+                            <span>- ₹{releasedReceipt.penaltyAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid rgba(255,255,255,0.15)', paddingTop: '10px', marginTop: '10px', fontSize: '1rem', fontWeight: '800', color: '#10b981' }}>
+                          <span>TOTAL SETTLED PAYOUT:</span>
+                          <span>₹{releasedReceipt.sellerNetPayout.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#a1a1aa', textAlign: 'center', marginTop: '2px' }}>
+                        📢 Notification & settlement receipt successfully dispatched to vendor ({selectedDetailSeller.email}).
+                      </div>
+                    </div>
+                  )}
+
+                  {loadingSellerOrders ? (
+                    <div className="ad-loading" style={{ padding: '40px 0' }}>
+                      Loading merchant payout settlements...
+                    </div>
+                  ) : sellerOrdersError ? (
+                    <div style={{ color: '#ef4444', textAlign: 'center', padding: '20px 0', fontSize: '0.9rem' }}>
+                      Failed to retrieve settlement orders.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      
+                      {/* SECTION 1: DELIVERED - READY FOR RELEASE */}
+                      <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--color-admin-border)', borderRadius: '12px', padding: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '8px' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1.1rem' }}>📥</span> Delivered - Ready for Settlement Payout
+                          </h4>
+                          <span style={{ fontSize: '0.75rem', background: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                            {sellerOrders.filter(o => !o.paymentReleased && (o.status === 'DELIVERED' || o.status === 'COMPLETED' || o.deliveryStatus === 'delivered')).length} Orders
+                          </span>
+                        </div>
+
+                        {sellerOrders.filter(o => !o.paymentReleased && (o.status === 'DELIVERED' || o.status === 'COMPLETED' || o.deliveryStatus === 'delivered')).length === 0 ? (
+                          <div style={{ color: '#64748b', fontSize: '0.82rem', textAlign: 'center', padding: '20px 0' }}>
+                            No orders are currently waiting for payout settlement.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {sellerOrders.filter(o => !o.paymentReleased && (o.status === 'DELIVERED' || o.status === 'COMPLETED' || o.deliveryStatus === 'delivered')).map(order => {
+                              const penalty = orderPenalties[order.orderId] || { amount: '', reason: '' };
+                              const productVal = order.productAmount || order.total || 0;
+                              const platformFee = parseFloat(((productVal * platformFeePercent) / 100).toFixed(2));
+                              const penaltyVal = parseFloat(penalty.amount) || 0;
+                              const estimatedNet = parseFloat((productVal - platformFee - penaltyVal).toFixed(2));
+
+                              return (
+                                <div key={order.orderId} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <div>
+                                      <div style={{ fontWeight: '700', color: '#fff', fontSize: '0.88rem' }}>Order #{order.orderId}</div>
+                                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                                        Date: {order.date || new Date(order.createdAt).toLocaleDateString()} | Buyer: {order.deliveryAddress?.fullName || 'N/A'}
+                                      </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                      <div style={{ fontWeight: '700', color: '#10b981', fontSize: '0.9rem' }}>₹{productVal.toLocaleString('en-IN')}</div>
+                                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Product Value</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Items details */}
+                                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', background: 'rgba(0,0,0,0.15)', padding: '8px 12px', borderRadius: '6px' }}>
+                                    {(order.items || []).map((it, idx) => (
+                                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>{it.name} x {it.quantity}</span>
+                                        <span>₹{(it.price * it.quantity).toLocaleString('en-IN')}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* Penalty input widgets */}
+                                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                    <div style={{ flex: '1 1 120px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <label style={{ fontSize: '0.7rem', color: '#64748b' }}>Penalty Amount (₹)</label>
+                                      <input 
+                                        type="number"
+                                        placeholder="Optional Penalty (e.g. 50)"
+                                        value={penalty.amount}
+                                        onChange={(e) => setOrderPenalties(prev => ({
+                                          ...prev,
+                                          [order.orderId]: { ...penalty, amount: e.target.value }
+                                        }))}
+                                        style={{ height: '32px', fontSize: '0.78rem', padding: '0 8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', color: '#fff' }}
+                                      />
+                                    </div>
+                                    <div style={{ flex: '2 1 200px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <label style={{ fontSize: '0.7rem', color: '#64748b' }}>Reason for Penalty</label>
+                                      <input 
+                                        type="text"
+                                        placeholder="Optional Reason (e.g. late delivery)"
+                                        value={penalty.reason}
+                                        onChange={(e) => setOrderPenalties(prev => ({
+                                          ...prev,
+                                          [order.orderId]: { ...penalty, reason: e.target.value }
+                                        }))}
+                                        style={{ height: '32px', fontSize: '0.78rem', padding: '0 8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', color: '#fff' }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Settlement Summary Row & Action Button */}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '10px', marginTop: '4px', flexWrap: 'wrap', gap: '10px' }}>
+                                    <div style={{ display: 'flex', gap: '16px', fontSize: '0.78rem', color: '#94a3b8' }}>
+                                      <span>Platform Fee ({platformFeePercent}%): <strong style={{ color: '#fff' }}>₹{platformFee}</strong></span>
+                                      {penaltyVal > 0 && <span>Penalty: <strong style={{ color: '#ef4444' }}>-₹{penaltyVal}</strong></span>}
+                                      <span>Net payout: <strong style={{ color: '#10b981', fontSize: '0.85rem' }}>₹{estimatedNet}</strong></span>
+                                    </div>
+
+                                    <button
+                                      onClick={() => handleReleasePayment(order.orderId, penalty.amount, penalty.reason)}
+                                      disabled={releasingOrderId === order.orderId}
+                                      style={{
+                                        padding: '7px 16px',
+                                        fontSize: '0.78rem',
+                                        background: '#10b981',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        opacity: releasingOrderId === order.orderId ? 0.6 : 1,
+                                        boxShadow: '0 2px 6px rgba(16,185,129,0.2)'
+                                      }}
+                                    >
+                                      {releasingOrderId === order.orderId ? '⌛ Settling...' : '💰 Release Payout'}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* SECTION 2: PENDING TRANSIT (NOT DELIVERED) */}
+                      <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--color-admin-border)', borderRadius: '12px', padding: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '8px' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1.1rem' }}>⌛</span> Pending Delivery / Transit (Not Delivered)
+                          </h4>
+                          <span style={{ fontSize: '0.75rem', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                            {sellerOrders.filter(o => !['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].includes(o.status) && o.status !== 'REJECTED' && !o.sellerRejected && !o.status?.includes('DISPUTED') && !o.status?.includes('FROZEN') && o.deliveryStatus !== 'delivered').length} Orders
+                          </span>
+                        </div>
+
+                        {sellerOrders.filter(o => !['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].includes(o.status) && o.status !== 'REJECTED' && !o.sellerRejected && !o.status?.includes('DISPUTED') && !o.status?.includes('FROZEN') && o.deliveryStatus !== 'delivered').length === 0 ? (
+                          <div style={{ color: '#64748b', fontSize: '0.82rem', textAlign: 'center', padding: '20px 0' }}>
+                            No orders currently pending delivery.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {sellerOrders.filter(o => !['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].includes(o.status) && o.status !== 'REJECTED' && !o.sellerRejected && !o.status?.includes('DISPUTED') && !o.status?.includes('FROZEN') && o.deliveryStatus !== 'delivered').map(order => (
+                              <div key={order.orderId} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                <div>
+                                  <div style={{ fontWeight: '700', color: '#fff', fontSize: '0.82rem' }}>Order #{order.orderId}</div>
+                                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                                    Destination: {order.deliveryAddress?.city || 'N/A'} | Distance: {order.distanceKm ? `${order.distanceKm} KM` : 'N/A'}
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.82rem', fontWeight: '600', color: '#fff' }}>₹{(order.productAmount || order.total).toLocaleString('en-IN')}</span>
+                                  <span className={`ad-status-badge ${order.status?.toLowerCase()?.replace(/\s+/g, '_')}`} style={{ padding: '3px 8px', fontSize: '0.65rem' }}>
+                                    {order.status?.replace(/_/g, ' ')}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* SECTION 3: DISPUTED / ISSUE ORDERS */}
+                      <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--color-admin-border)', borderRadius: '12px', padding: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '8px' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1.1rem' }}>⚠️</span> Disputed / Issue Orders (Payout Suspended)
+                          </h4>
+                          <span style={{ fontSize: '0.75rem', background: 'rgba(239,68,68,0.1)', color: '#ef4444', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                            {sellerOrders.filter(o => o.status === 'REJECTED' || o.sellerRejected || o.status?.includes('DISPUTED') || o.status?.includes('FROZEN')).length} Orders
+                          </span>
+                        </div>
+
+                        {sellerOrders.filter(o => o.status === 'REJECTED' || o.sellerRejected || o.status?.includes('DISPUTED') || o.status?.includes('FROZEN')).length === 0 ? (
+                          <div style={{ color: '#64748b', fontSize: '0.82rem', textAlign: 'center', padding: '20px 0' }}>
+                            No disputed or frozen orders found for this seller.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {sellerOrders.filter(o => o.status === 'REJECTED' || o.sellerRejected || o.status?.includes('DISPUTED') || o.status?.includes('FROZEN')).map(order => (
+                              <div key={order.orderId} style={{ background: 'rgba(239, 68, 68, 0.02)', border: '1px solid rgba(239,68,68,0.08)', borderRadius: '8px', padding: '12px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                  <div>
+                                    <div style={{ fontWeight: '700', color: '#fff', fontSize: '0.82rem' }}>Order #{order.orderId}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '2px' }}>
+                                      Reason/Feedback: <strong style={{ color: '#fca5a5' }}>{order.rejectionReason || 'Escrow dispute raised / Admin Hold'}</strong>
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.82rem', fontWeight: '600', color: '#fff' }}>₹{(order.productAmount || order.total).toLocaleString('en-IN')}</span>
+                                    <span className="ad-status-badge rejected" style={{ padding: '3px 8px', fontSize: '0.65rem' }}>
+                                      Disputed
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* SECTION 4: SETTLED PAYOUTS (RELEASED) */}
+                      <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--color-admin-border)', borderRadius: '12px', padding: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '8px' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1.1rem' }}>✅</span> Completed Payout Settlements
+                          </h4>
+                          <span style={{ fontSize: '0.75rem', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                            {sellerOrders.filter(o => o.paymentReleased || o.status === '🔓 FUNDS RELEASED').length} Settled
+                          </span>
+                        </div>
+
+                        {sellerOrders.filter(o => o.paymentReleased || o.status === '🔓 FUNDS RELEASED').length === 0 ? (
+                          <div style={{ color: '#64748b', fontSize: '0.82rem', textAlign: 'center', padding: '20px 0' }}>
+                            No payouts settled yet.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {sellerOrders.filter(o => o.paymentReleased || o.status === '🔓 FUNDS RELEASED').map(order => (
+                              <div key={order.orderId} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                <div>
+                                  <div style={{ fontWeight: '700', color: '#fff', fontSize: '0.82rem' }}>Order #{order.orderId}</div>
+                                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                                    Platform Fee deducted: ₹{order.platformFeeAmount || 0} ({order.platformFeePercent || platformFeePercent}%) {order.penaltyAmount > 0 ? `| Penalty: ₹${order.penaltyAmount}` : ''}
+                                  </div>
+                                </div>
+                                <div style={{ textAlignment: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#34d399' }}>+ ₹{(order.sellerNetPayout || 0).toLocaleString('en-IN')}</span>
+                                  <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Wired on {order.paymentReleasedAt ? new Date(order.paymentReleasedAt).toLocaleDateString() : 'Settled'}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2229,38 +3021,56 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Merchant Payout Bill Breakdown */}
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', marginTop: '12px' }}>
-                    <div style={{ fontWeight: '600', fontSize: '0.78rem', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                      🪙 MERCHANT PAYOUT BILL (0% Commission)
-                    </div>
-                    <div style={{ background: 'rgba(99,102,241,0.02)', border: '1px solid rgba(99,102,241,0.08)', borderRadius: '6px', padding: '10px' }}>
-                      <div className="ad-detail-row" style={{ marginBottom: '6px' }}>
-                        <span className="ad-detail-row-label" style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Product Cost Subtotal</span>
-                        <span className="ad-detail-row-val" style={{ fontSize: '0.75rem' }}>
-                          ₹{(selectedDetailOrder.productAmount || selectedDetailOrder.items?.reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0).toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                      <div className="ad-detail-row" style={{ marginBottom: '6px' }}>
-                        <span className="ad-detail-row-label" style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Platform Commission</span>
-                        <span className="ad-detail-row-val" style={{ fontSize: '0.75rem', color: '#10b981' }}>₹0.00</span>
-                      </div>
-                      {selectedDetailOrder.discountAmount > 0 && (
-                        <div className="ad-detail-row" style={{ marginBottom: '6px' }}>
-                          <span className="ad-detail-row-label" style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Coupon Discount ({selectedDetailOrder.couponCode || 'Promo'})</span>
-                          <span className="ad-detail-row-val" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
-                            - ₹{selectedDetailOrder.discountAmount.toLocaleString('en-IN')}
+                  {(() => {
+                    const orderTotal = selectedDetailOrder.total || 0;
+                    const productAmount = selectedDetailOrder.productAmount || orderTotal;
+                    const isReleased = selectedDetailOrder.paymentReleased;
+                    const feePercent = isReleased ? (selectedDetailOrder.platformFeePercent !== undefined ? selectedDetailOrder.platformFeePercent : platformFeePercent) : platformFeePercent;
+                    const feeAmount = isReleased ? (selectedDetailOrder.platformFeeAmount !== undefined ? selectedDetailOrder.platformFeeAmount : parseFloat(((productAmount * feePercent) / 100).toFixed(2))) : parseFloat(((productAmount * feePercent) / 100).toFixed(2));
+                    const netPayout = isReleased ? (selectedDetailOrder.sellerNetPayout !== undefined ? selectedDetailOrder.sellerNetPayout : parseFloat((productAmount - feeAmount).toFixed(2))) : parseFloat((productAmount - feeAmount).toFixed(2));
+
+                    return (
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', marginTop: '12px' }}>
+                        <div style={{ fontWeight: '600', fontSize: '0.78rem', color: isReleased ? '#10b981' : '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            🪙 MERCHANT PAYOUT BILL ({feePercent}% Commission)
+                          </span>
+                          <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: isReleased ? 'rgba(16,185,129,0.1)' : 'rgba(129,140,248,0.1)', color: isReleased ? '#10b981' : '#818cf8' }}>
+                            {isReleased ? 'Released' : 'Escrow Locked'}
                           </span>
                         </div>
-                      )}
-                      <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', margin: '6px 0' }} />
-                      <div className="ad-detail-row">
-                        <span className="ad-detail-row-label" style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#fff' }}>Net Merchant Payout</span>
-                        <span className="ad-detail-row-val" style={{ fontSize: '0.88rem', fontWeight: 'bold', color: '#818cf8' }}>
-                          ₹{Math.max(0, (selectedDetailOrder.productAmount || selectedDetailOrder.items?.reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0) - (selectedDetailOrder.discountAmount || 0)).toLocaleString('en-IN')}
-                        </span>
+                        <div style={{ background: 'rgba(99,102,241,0.02)', border: '1px solid rgba(99,102,241,0.08)', borderRadius: '6px', padding: '10px' }}>
+                          <div className="ad-detail-row" style={{ marginBottom: '6px' }}>
+                            <span className="ad-detail-row-label" style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Product Cost Subtotal</span>
+                            <span className="ad-detail-row-val" style={{ fontSize: '0.75rem' }}>
+                              ₹{productAmount.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <div className="ad-detail-row" style={{ marginBottom: '6px', color: '#fca5a5' }}>
+                            <span className="ad-detail-row-label" style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Platform Commission ({feePercent}%)</span>
+                            <span className="ad-detail-row-val">
+                              - ₹{feeAmount.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          {selectedDetailOrder.discountAmount > 0 && (
+                            <div className="ad-detail-row" style={{ marginBottom: '6px' }}>
+                              <span className="ad-detail-row-label" style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Coupon Discount ({selectedDetailOrder.couponCode || 'Promo'})</span>
+                              <span className="ad-detail-row-val" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
+                                - ₹{selectedDetailOrder.discountAmount.toLocaleString('en-IN')}
+                              </span>
+                            </div>
+                          )}
+                          <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', margin: '6px 0' }} />
+                          <div className="ad-detail-row">
+                            <span className="ad-detail-row-label" style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#fff' }}>Net Merchant Payout</span>
+                            <span className="ad-detail-row-val" style={{ fontSize: '0.88rem', fontWeight: 'bold', color: isReleased ? '#10b981' : '#818cf8' }}>
+                              ₹{Math.max(0, netPayout - (selectedDetailOrder.discountAmount || 0)).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Order Transit History (Timeline Log) */}
@@ -2501,8 +3311,35 @@ export default function AdminDashboard() {
                                 💰 Confirm Merchant Payout
                               </div>
                               <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: '#94a3b8', lineHeight: '1.4' }}>
-                                Confirm that you have transferred the net payout amount to the seller's bank account and upload the transaction receipt/screenshot below.
+                                Confirm that you have transferred the net payout amount to the seller&apos;s bank account and upload the transaction receipt/screenshot below.
                               </p>
+
+                              {/* Penalty Inputs */}
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px', marginBottom: '12px' }}>
+                                <div className="form-group" style={{ margin: 0 }}>
+                                  <label style={{ fontSize: '0.72rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Penalty (₹)</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    placeholder="0"
+                                    className="ad-modal-input"
+                                    style={{ margin: 0, height: '36px', background: '#0a0b10', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', padding: '0 8px', width: '100%' }}
+                                    value={adminPenaltyAmount}
+                                    onChange={(e) => setAdminPenaltyAmount(e.target.value)}
+                                  />
+                                </div>
+                                <div className="form-group" style={{ margin: 0 }}>
+                                  <label style={{ fontSize: '0.72rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Reason for penalty</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Delayed dispatch"
+                                    className="ad-modal-input"
+                                    style={{ margin: 0, height: '36px', background: '#0a0b10', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', padding: '0 8px', width: '100%' }}
+                                    value={adminPenaltyReason}
+                                    onChange={(e) => setAdminPenaltyReason(e.target.value)}
+                                  />
+                                </div>
+                              </div>
 
                               {/* Premium Uploader */}
                               <div style={{ position: 'relative', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: '6px', padding: '12px 10px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', cursor: 'pointer', marginBottom: '12px' }}>
@@ -2649,9 +3486,18 @@ export default function AdminDashboard() {
           {/* TAB: DELIVERY PARTNERS MANAGEMENT */}
           {activeTab === 'delivery-partners' && (
             <div>
-              <div className="ad-view-header">
-                <h3>Central Central central central Logistics Carrier Management</h3>
-                <p>Verify fleet registrations, custom per-kilometer rates, and active territories to dispatch order shipments.</p>
+              <div className="ad-view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3>Central Central central central Logistics Carrier Management</h3>
+                  <p>Verify fleet registrations, custom per-kilometer rates, and active territories to dispatch order shipments.</p>
+                </div>
+                <button 
+                  className="ad-btn-action approve" 
+                  style={{ height: '40px', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => setIsAddPartnerOpen(true)}
+                >
+                  ➕ Add Delivery Partner
+                </button>
               </div>
 
               {deliveryPartnersError ? (
@@ -3341,7 +4187,7 @@ export default function AdminDashboard() {
                   if (orderStatusFilter === 'PROCESSING') return ['APPROVED', 'DELIVERY_ASSIGNED', 'LABEL_GENERATED'].includes(order.status);
                   if (orderStatusFilter === 'READY') return order.status === 'READY_FOR_PICKUP';
                   if (orderStatusFilter === 'IN_TRANSIT') return ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(order.status);
-                  if (orderStatusFilter === 'DELIVERED') return ['DELIVERED', 'COMPLETED'].includes(order.status);
+                  if (orderStatusFilter === 'DELIVERED') return ['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].includes(order.status);
                   if (orderStatusFilter === 'DISPUTED') return ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(order.status);
                   return true;
                 });
@@ -3357,7 +4203,7 @@ export default function AdminDashboard() {
                           { key: 'PROCESSING', label: 'Processing', count: orders.filter(o => ['APPROVED', 'DELIVERY_ASSIGNED', 'LABEL_GENERATED'].includes(o.status)).length },
                           { key: 'READY', label: 'Ready', count: orders.filter(o => o.status === 'READY_FOR_PICKUP').length },
                           { key: 'IN_TRANSIT', label: 'In Transit', count: orders.filter(o => ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(o.status)).length },
-                          { key: 'DELIVERED', label: 'Completed', count: orders.filter(o => ['DELIVERED', 'COMPLETED'].includes(o.status)).length },
+                          { key: 'DELIVERED', label: 'Completed', count: orders.filter(o => ['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].includes(o.status)).length },
                           { key: 'DISPUTED', label: 'Cancelled/Disputed', count: orders.filter(o => ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(o.status)).length }
                         ].map(f => (
                           <button
@@ -3406,7 +4252,7 @@ export default function AdminDashboard() {
                           {filteredOrders.map(order => {
                             const isPending = order.status === 'PENDING_APPROVAL';
                             const isDisputed = ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(order.status);
-                            const isCompleted = ['DELIVERED', 'COMPLETED'].includes(order.status);
+                            const isCompleted = ['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].includes(order.status);
                             
                             return (
                               <tr key={order._id || order.orderId}>
@@ -3441,6 +4287,11 @@ export default function AdminDashboard() {
                                     }`} style={{ fontSize: '0.7rem' }}>
                                       {order.status?.replace(/_/g, ' ')}
                                     </span>
+                                    {order.paymentReleased && (
+                                      <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
+                                        💰 Released (Net: ₹{order.sellerNetPayout})
+                                      </span>
+                                    )}
                                     {order.carrier && (
                                       <span style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)' }}>
                                         🚚 {order.carrier} {order.trackingId ? `(${order.trackingId})` : ''}
@@ -3632,11 +4483,69 @@ export default function AdminDashboard() {
           {activeTab === 'settings' && (
             <div>
               <div className="ad-view-header">
-                <h3>Security Settings</h3>
-                <p>Configure administrator credentials, session policies, and two-factor authentication.</p>
+                <h3>System &amp; Security Settings</h3>
+                <p>Configure platform commission fees, administrator credentials, and multi-factor authentication.</p>
               </div>
 
-              <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '16px', padding: '32px', maxWidth: '600px', marginTop: '20px' }}>
+              {/* Emahu Platform Commission Settings */}
+              <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '16px', padding: '32px', maxWidth: '600px', marginBottom: '24px' }}>
+                <h4 style={{ color: '#fff', fontSize: '1.2rem', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>💰</span> Platform Commission Settings
+                </h4>
+                <p style={{ color: '#cbd5e1', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '24px' }}>
+                  Define the default platform commission percentage deducted from merchant order bill totals when releasing payments.
+                </p>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ color: '#e4e4e7', fontSize: '0.85rem', fontWeight: '500', display: 'block', marginBottom: '8px' }}>
+                    Commission Name (Label)
+                  </label>
+                  <input
+                    type="text"
+                    className="ad-modal-input"
+                    style={{ margin: 0, width: '100%', height: '40px', background: '#09090b', border: '1px solid #27272a', borderRadius: '8px', color: '#fff', padding: '0 12px' }}
+                    value={platformFeeName}
+                    onChange={(e) => setPlatformFeeName(e.target.value)}
+                    placeholder="e.g. Emahu Platform Fee"
+                  />
+                </div>
+
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ color: '#e4e4e7', fontSize: '0.85rem', fontWeight: '500', display: 'block', marginBottom: '8px' }}>
+                    Commission Fee Percentage (%)
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        className="ad-modal-input"
+                        style={{ margin: 0, width: '100%', height: '40px', background: '#09090b', border: '1px solid #27272a', borderRadius: '8px', color: '#fff', padding: '0 32px 0 12px' }}
+                        value={platformFeePercent}
+                        onChange={(e) => setPlatformFeePercent(e.target.value)}
+                        placeholder="4"
+                      />
+                      <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa', fontWeight: '600' }}>%</span>
+                    </div>
+                    
+                    <button
+                      className="ad-btn-action approve"
+                      style={{ height: '40px', padding: '0 24px', whiteSpace: 'nowrap', fontWeight: '600', margin: 0 }}
+                      onClick={handleSavePlatformSettings}
+                      disabled={savingPlatformSettings || loadingPlatformSettings}
+                    >
+                      {savingPlatformSettings ? 'Saving...' : 'Update Fee'}
+                    </button>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: '#71717a', display: 'block', marginTop: '6px' }}>
+                    Changes take effect immediately on all future &quot;Release Payment&quot; actions initiated by sellers.
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '16px', padding: '32px', maxWidth: '600px' }}>
                 <h4 style={{ color: '#fff', fontSize: '1.2rem', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>🔐</span> Multi-Factor Authentication (2FA)
                 </h4>

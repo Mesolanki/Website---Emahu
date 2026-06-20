@@ -205,7 +205,116 @@ const getCategoryOptions = (storeCategory) => {
 
 export default function EmahuProDashboard() {
   const router = useRouter();
-  
+
+  const safeSetLocalStorageOrders = (ordersList) => {
+    if (!ordersList || !Array.isArray(ordersList)) return;
+
+    // Helper: strip images to just URLs or emoji (remove all base64)
+    const stripImages = (orders) => orders.map(o => ({
+      ...o,
+      items: (o.items || []).map(item => ({
+        ...item,
+        img: (item.img && item.img.startsWith('data:')) ? '📦' : (item.img || '📦')
+      })),
+      // Remove large transactionFile base64 blobs
+      transactionFile: (o.transactionFile && o.transactionFile.startsWith('data:')) ? '' : (o.transactionFile || '')
+    }));
+
+    // Helper: keep only essential display fields for compact storage
+    const minifyOrders = (orders) => orders.slice(0, 50).map(o => ({
+      orderId: o.orderId,
+      billId: o.billId || '',
+      sellerId: o.sellerId || '',
+      sellerEmail: o.sellerEmail || '',
+      userId: o.userId || '',
+      date: o.date || '',
+      createdAt: o.createdAt || '',
+      status: o.status || 'PENDING_APPROVAL',
+      total: o.total || 0,
+      productAmount: o.productAmount,
+      deliveryCharge: o.deliveryCharge,
+      distanceKm: o.distanceKm,
+      carrier: o.carrier || '',
+      carrierPhone: o.carrierPhone || '',
+      trackingId: o.trackingId || '',
+      rejectionReason: o.rejectionReason || '',
+      sellerConfirmed: o.sellerConfirmed || false,
+      sellerRejected: o.sellerRejected || false,
+      paymentStatus: o.paymentStatus || 'unpaid',
+      escrowMethod: o.escrowMethod || '',
+      shippingSpeed: o.shippingSpeed || '',
+      deliveryStatus: o.deliveryStatus || 'unassigned',
+      deliveryPartnerId: o.deliveryPartnerId || null,
+      items: (o.items || []).map(item => ({
+        productId: item.productId || '',
+        name: item.name || '',
+        price: item.price || 0,
+        quantity: item.quantity || 1,
+        brand: item.brand || '',
+        img: (item.img && item.img.startsWith('data:')) ? '📦' : (item.img || '📦'),
+        seller: item.seller ? {
+          _id: item.seller._id || item.seller.id || '',
+          email: item.seller.email || '',
+          name: item.seller.name || ''
+        } : null
+      })),
+      timeline: (o.timeline || []).slice(-5), // keep only last 5 timeline events
+      deliveryAddress: o.deliveryAddress ? {
+        fullName: o.deliveryAddress.fullName || '',
+        phone: o.deliveryAddress.phone || '',
+        email: o.deliveryAddress.email || '',
+        address: o.deliveryAddress.address || '',
+        city: o.deliveryAddress.city || '',
+        stateName: o.deliveryAddress.stateName || '',
+        pincode: o.deliveryAddress.pincode || ''
+      } : null,
+      buyerLocation: o.buyerLocation || null,
+      sellerLocation: o.sellerLocation || null
+    }));
+
+    // Tier 1: Just strip base64 images
+    try {
+      const tier1 = stripImages(ordersList);
+      localStorage.setItem('emahu_orders', JSON.stringify(tier1));
+      return;
+    } catch (_) { /* quota still exceeded, try next tier */ }
+
+    // Tier 2: Minify to essential fields only, limit 50 orders
+    try {
+      const tier2 = minifyOrders(stripImages(ordersList));
+      localStorage.setItem('emahu_orders', JSON.stringify(tier2));
+      return;
+    } catch (_) { /* still too big */ }
+
+    // Tier 3: Only 20 most recent, absolute minimal fields
+    try {
+      const tier3 = ordersList.slice(0, 20).map(o => ({
+        orderId: o.orderId,
+        status: o.status,
+        total: o.total,
+        date: o.date,
+        createdAt: o.createdAt,
+        sellerId: o.sellerId,
+        sellerEmail: o.sellerEmail,
+        userId: o.userId,
+        carrier: o.carrier || '',
+        trackingId: o.trackingId || '',
+        paymentStatus: o.paymentStatus,
+        items: (o.items || []).map(i => ({ productId: i.productId, name: i.name, price: i.price, quantity: i.quantity, img: '📦', seller: i.seller })),
+        deliveryAddress: o.deliveryAddress,
+        timeline: (o.timeline || []).slice(-3)
+      }));
+      localStorage.setItem('emahu_orders', JSON.stringify(tier3));
+      return;
+    } catch (_) { /* all tiers failed */ }
+
+    // Final fallback: clear and don't cache — API is the source of truth
+    try {
+      localStorage.removeItem('emahu_orders');
+    } catch (_) { }
+    console.warn('[Emahu] localStorage orders cache bypassed — data too large. Orders will be fetched from API only.');
+  };
+
   const handleSessionExpired = () => {
     clearAuthSession('seller');
     router.replace('/seller/login?expired=true');
@@ -234,6 +343,13 @@ export default function EmahuProDashboard() {
   const [editingDocType, setEditingDocType] = useState(null);
   const [inputDocUrl, setInputDocUrl] = useState('');
   const [inlineSubmitting, setInlineSubmitting] = useState(false);
+  const [settingsSubTab, setSettingsSubTab] = useState('general');
+  const [bankDetailsForm, setBankDetailsForm] = useState({
+    bankHolder: '',
+    bankName: '',
+    accountNumber: '',
+    ifscCode: ''
+  });
 
   // Admin Seller Management State
   const [sellersList, setSellersList] = useState([]);
@@ -334,6 +450,12 @@ export default function EmahuProDashboard() {
         state: sellerUser.state || '',
         latitude: sellerUser.latitude !== undefined && sellerUser.latitude !== null ? sellerUser.latitude : '',
         longitude: sellerUser.longitude !== undefined && sellerUser.longitude !== null ? sellerUser.longitude : ''
+      });
+      setBankDetailsForm({
+        bankHolder: sellerUser.bankHolder || '',
+        bankName: sellerUser.bankName || '',
+        accountNumber: sellerUser.accountNumber || '',
+        ifscCode: sellerUser.ifscCode || ''
       });
     }
   }, [sellerUser]);
@@ -458,6 +580,14 @@ export default function EmahuProDashboard() {
       markerRef.current.setLatLng([lat, lon]);
       markerRef.current.setPopupContent(popupHtml).openPopup();
     }
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+      }
+    };
   }, [
     leafletLoaded,
     settingsForm.latitude,
@@ -466,7 +596,8 @@ export default function EmahuProDashboard() {
     settingsForm.address,
     settingsForm.city,
     settingsForm.state,
-    activeTab
+    activeTab,
+    settingsSubTab
   ]);
 
   // Reverse-geocode lat/lon → address fields using Nominatim
@@ -524,7 +655,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      
+
       const payload = {
         storeName: settingsForm.storeName,
         phone: settingsForm.phone,
@@ -534,7 +665,7 @@ export default function EmahuProDashboard() {
         latitude: settingsForm.latitude !== '' ? parseFloat(settingsForm.latitude) : undefined,
         longitude: settingsForm.longitude !== '' ? parseFloat(settingsForm.longitude) : undefined
       };
-      
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/update-details`, {
         method: 'PUT',
         headers: {
@@ -543,7 +674,7 @@ export default function EmahuProDashboard() {
         },
         body: JSON.stringify(payload)
       });
-      
+
       const data = await res.json();
       if (data.success && data.user) {
         setSellerUser(data.user);
@@ -555,6 +686,35 @@ export default function EmahuProDashboard() {
     } catch (err) {
       console.error(err);
       triggerToast('Error', 'Network error while saving settings.', 'danger');
+    }
+  };
+
+  const handleSaveBankDetails = async (e) => {
+    if (e) e.preventDefault();
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      if (!token) return;
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/update-details`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(bankDetailsForm)
+      });
+
+      const data = await res.json();
+      if (data.success && data.user) {
+        setSellerUser(data.user);
+        localStorage.setItem('emahu_seller_user', JSON.stringify(data.user));
+        triggerToast('Bank Details Saved', 'Your payout bank details have been updated successfully.', 'success');
+      } else {
+        triggerToast('Error', data.error || 'Failed to update bank details.', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error while saving bank details.', 'danger');
     }
   };
 
@@ -585,7 +745,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/settings`, {
         method: 'PUT',
         headers: {
@@ -661,7 +821,7 @@ export default function EmahuProDashboard() {
       router.replace('/seller/login?expired=true');
       return;
     }
-    
+
     const storedUser = localStorage.getItem('emahu_seller_user');
     if (storedUser) {
       try {
@@ -690,7 +850,7 @@ export default function EmahuProDashboard() {
               async (position) => {
                 const lat = position.coords.latitude.toFixed(6);
                 const lon = position.coords.longitude.toFixed(6);
-                
+
                 try {
                   const geoRes = await fetch(
                     `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`
@@ -704,7 +864,7 @@ export default function EmahuProDashboard() {
                     const streetLine = [road, suburb, county].filter(Boolean).join(', ') || geoData.display_name || '';
                     const city = a.city || a.town || a.village || a.municipality || '';
                     const state = a.state || '';
-                    
+
                     const payload = {
                       storeName: res.user.storeName,
                       phone: res.user.phone,
@@ -714,7 +874,7 @@ export default function EmahuProDashboard() {
                       latitude: parseFloat(lat),
                       longitude: parseFloat(lon)
                     };
-                    
+
                     const updateRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/update-details`, {
                       method: 'PUT',
                       headers: {
@@ -819,7 +979,7 @@ export default function EmahuProDashboard() {
       return;
     }
     setInlineSubmitting(true);
-    
+
     // 1. Validate token exists before making request
     const token = localStorage.getItem('emahu_seller_token');
     if (!token) {
@@ -916,7 +1076,7 @@ export default function EmahuProDashboard() {
     clearAuthSession('seller');
     router.push('/seller/login');
   };
-  
+
   // Ref for GSTIN text selection to match user screenshot
   const gstinRef = useRef(null);
 
@@ -935,7 +1095,7 @@ export default function EmahuProDashboard() {
       return () => clearTimeout(timer);
     }
   }, [activeTab]);
-  
+
   // Dynamic Product State
   const [products, setProducts] = useState([]);
 
@@ -972,6 +1132,12 @@ export default function EmahuProDashboard() {
   // Dynamic Orders State
   const [orders, setOrders] = useState([]);
 
+  // Emahu commission settings state
+  const [platformFeePercent, setPlatformFeePercent] = useState(4);
+  const [platformFeeName, setPlatformFeeName] = useState('Emahu Platform Fee');
+  const [isReleasingPayment, setIsReleasingPayment] = useState(false);
+  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
+
   // Fetch real-time orders from database and localStorage to sync with buyer checkout
   useEffect(() => {
     const loadRealOrders = async () => {
@@ -979,14 +1145,14 @@ export default function EmahuProDashboard() {
         let storedOrders = '[]';
         const sellerUserIdOpt = sellerUser ? (sellerUser._id || sellerUser.id || '').toString() : '';
         try {
-          const url = sellerUserIdOpt 
+          const url = sellerUserIdOpt
             ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?sellerId=${sellerUserIdOpt}`
             : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders`;
           const res = await fetch(url);
           const data = await res.json();
           if (data.success && data.orders) {
+            safeSetLocalStorageOrders(data.orders);
             storedOrders = JSON.stringify(data.orders);
-            localStorage.setItem('emahu_orders', storedOrders);
           } else {
             storedOrders = localStorage.getItem('emahu_orders') || '[]';
           }
@@ -994,10 +1160,10 @@ export default function EmahuProDashboard() {
           console.warn('API error fetching orders, falling back to localStorage:', apiErr);
           storedOrders = localStorage.getItem('emahu_orders') || '[]';
         }
-        
+
         if (sellerUser) {
           const parsed = JSON.parse(storedOrders);
-          
+
           const sellerUserId = (sellerUser._id || sellerUser.id || '').toString();
           const sellerUserEmail = (sellerUser.email || '').toLowerCase().trim();
           const myProductIds = new Set((products || []).map(p => (p._id || p.id || '').toString()).filter(Boolean));
@@ -1009,7 +1175,7 @@ export default function EmahuProDashboard() {
           console.log('Seller Product IDs:', Array.from(myProductIds));
           console.log('Seller Product Names:', Array.from(myProductNames));
           console.log('Total Orders in localStorage:', parsed.length);
-          
+
           // Filter orders to only show those that contain items belonging to this seller
           let myOrders = parsed.filter(o => {
             // Signal 1: Check order-level sellerId
@@ -1042,7 +1208,7 @@ export default function EmahuProDashboard() {
                     console.log(`Order #${o.orderId} item matches on Signal 3 (item.seller._id: ${itemSellerId})`);
                     return true;
                   }
-                  
+
                   // Signal 4: Match on item's seller email
                   const itemSellerEmail = (item.seller.email || '').toLowerCase().trim();
                   if (itemSellerEmail && sellerUserEmail && itemSellerEmail === sellerUserEmail) {
@@ -1101,10 +1267,10 @@ export default function EmahuProDashboard() {
                 orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
                 date: baseDate,
                 createdAt: new Date().toISOString(),
-                items: [{ name: 'Emahu Smart Luxe Chrono', price: 18999, quantity: 1, brand: 'Emahu Brand', img: '⌚', seller: sellerRef }],
+                items: [{ productId: 'prod_mock_chrono', name: 'Emahu Smart Luxe Chrono', price: 18999, quantity: 1, brand: 'Emahu Brand', img: '⌚', seller: sellerRef }],
                 total: 22419,
                 status: 'PENDING_APPROVAL',
-                timeline: [{ status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: 'â³ Waiting for Seller Approval', date: baseTime }],
+                timeline: [{ status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: baseTime }],
                 deliveryAddress: { fullName: 'Rahul Sharma', phone: '+91 98765 43210', email: 'rahul@example.com', address: 'Flat 402, Royal Residency, Sector 15', city: 'Gandhinagar', stateName: 'Gujarat', pincode: '382016' },
                 shippingSpeed: 'express', escrowMethod: 'wallet'
               },
@@ -1112,10 +1278,10 @@ export default function EmahuProDashboard() {
                 orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
                 date: baseDate,
                 createdAt: new Date().toISOString(),
-                items: [{ name: 'SoundAura Pro Headphones', price: 12500, quantity: 1, brand: 'SoundAura', img: '🎧', seller: sellerRef }],
+                items: [{ productId: 'prod_mock_headphones', name: 'SoundAura Pro Headphones', price: 12500, quantity: 1, brand: 'SoundAura', img: '🎧', seller: sellerRef }],
                 total: 14750,
                 status: 'PENDING_APPROVAL',
-                timeline: [{ status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: 'â³ Waiting for Seller Approval', date: baseTime }],
+                timeline: [{ status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: baseTime }],
                 deliveryAddress: { fullName: 'Priya Mehta', phone: '+91 87654 32100', email: 'priya@example.com', address: 'B-204, Sunrise Apartments', city: 'Pune', stateName: 'Maharashtra', pincode: '411001' },
                 shippingSpeed: 'standard', escrowMethod: 'upi'
               },
@@ -1123,12 +1289,12 @@ export default function EmahuProDashboard() {
                 orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
                 date: baseDate,
                 createdAt: new Date().toISOString(),
-                items: [{ name: 'AuraRing Smart Health Tracker', price: 9500, quantity: 2, brand: 'AuraRing', img: 'ðŸ’', seller: sellerRef }],
+                items: [{ productId: 'prod_mock_tracker', name: 'AuraRing Smart Health Tracker', price: 9500, quantity: 2, brand: 'AuraRing', img: '💍', seller: sellerRef }],
                 total: 22420,
                 status: 'APPROVED',
                 sellerConfirmed: true,
                 timeline: [
-                  { status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: 'â³ Waiting for Seller Approval', date: baseTime },
+                  { status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: baseTime },
                   { status: 'APPROVED', label: 'Seller Approved', desc: '✅ Order approved by seller.', date: baseTime }
                 ],
                 deliveryAddress: { fullName: 'Amit Kumar', phone: '+91 76543 21000', email: 'amit@example.com', address: '12, MG Road', city: 'Bangalore', stateName: 'Karnataka', pincode: '560001' },
@@ -1138,14 +1304,14 @@ export default function EmahuProDashboard() {
                 orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
                 date: baseDate,
                 createdAt: new Date().toISOString(),
-                items: [{ name: 'Minimalist Solid Oak Desk', price: 28000, quantity: 1, brand: 'WoodCraft', img: '🪵', seller: sellerRef }],
+                items: [{ productId: 'prod_mock_desk', name: 'Minimalist Solid Oak Desk', price: 28000, quantity: 1, brand: 'WoodCraft', img: '🪵', seller: sellerRef }],
                 total: 33040,
                 status: 'REJECTED',
                 sellerRejected: true,
                 rejectionReason: 'Out of Stock',
                 timeline: [
-                  { status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: 'â³ Waiting for Seller Approval', date: baseTime },
-                  { status: 'REJECTED', label: 'Seller Rejected', desc: 'âŒ Rejected: Out of Stock', date: baseTime }
+                  { status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: baseTime },
+                  { status: 'REJECTED', label: 'Seller Rejected', desc: '❌ Rejected: Out of Stock', date: baseTime }
                 ],
                 deliveryAddress: { fullName: 'Sneha Reddy', phone: '+91 65432 10000', email: 'sneha@example.com', address: '45, Jubilee Hills', city: 'Hyderabad', stateName: 'Telangana', pincode: '500033' },
                 shippingSpeed: 'express', escrowMethod: 'wallet'
@@ -1153,7 +1319,7 @@ export default function EmahuProDashboard() {
             ];
 
             seedOrders.forEach(o => parsed.push(o));
-            localStorage.setItem('emahu_orders', JSON.stringify(parsed));
+            safeSetLocalStorageOrders(parsed);
             window.dispatchEvent(new Event('storage'));
             return;
           }
@@ -1162,27 +1328,27 @@ export default function EmahuProDashboard() {
             // Only list items in the description that belong to this seller or default fallback
             const itemsList = (o.items || []).filter(item => {
               if (!item.seller) return true;
-              
+
               const sellerUserId = sellerUser._id || sellerUser.id;
-              
+
               // If item.seller is a string
               if (typeof item.seller === 'string') {
                 return sellerUserId && item.seller.toString() === sellerUserId.toString();
               }
-              
+
               // If item.seller is an object
               const itemSellerId = item.seller._id || item.seller.id;
               const isIdMatch = itemSellerId && sellerUserId && itemSellerId.toString() === sellerUserId.toString();
-              const isEmailMatch = item.seller.email && sellerUser.email && 
-                                   item.seller.email.toLowerCase() === sellerUser.email.toLowerCase();
+              const isEmailMatch = item.seller.email && sellerUser.email &&
+                item.seller.email.toLowerCase() === sellerUser.email.toLowerCase();
               const isProductMatch = (item.productId && myProductIds.has(item.productId.toString())) || (item.name && myProductNames.has(item.name.toLowerCase().trim()));
-              const isDefaultFallback = item.seller.email === 'support@emahu.com' || 
-                                        item.brand === 'Emahu Seller';
-                                        
+              const isDefaultFallback = item.seller.email === 'support@emahu.com' ||
+                item.brand === 'Emahu Seller';
+
               return isIdMatch || isEmailMatch || isProductMatch || isDefaultFallback;
             });
             const productName = itemsList.map(item => `${item.name} (x${item.quantity})`).join(', ') || 'Merchandise Item';
-            
+
             // Sum of this seller's items
             const sellerItemsTotal = itemsList.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             const totalSum = (o.items || []).reduce((s, i) => s + (i.price * i.quantity), 0);
@@ -1319,11 +1485,87 @@ export default function EmahuProDashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch Emahu platform fee settings
+  useEffect(() => {
+    const fetchPlatformSettings = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/settings`);
+        const data = await res.json();
+        if (data.success) {
+          setPlatformFeePercent(data.platformFeePercent);
+          setPlatformFeeName(data.platformFeeName || 'Emahu Platform Fee');
+        }
+      } catch (err) {
+        console.error('Failed to fetch platform commission settings:', err);
+      }
+    };
+    fetchPlatformSettings();
+  }, []);
+
+  const handleReleasePayment = async (orderId) => {
+    setIsReleasingPayment(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/release/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Update orders list in localStorage & state
+        const storedOrders = localStorage.getItem('emahu_orders');
+        let updated = [];
+        if (storedOrders) {
+          const parsed = JSON.parse(storedOrders);
+          updated = parsed.map(o => {
+            if (o.orderId === orderId) {
+              const timeline = o.timeline || [];
+              const filteredTimeline = timeline.filter(t => t.status !== '🔓 FUNDS RELEASED');
+              filteredTimeline.push({
+                status: '🔓 FUNDS RELEASED',
+                label: 'Payment Released',
+                desc: `₹${data.sellerNetPayout} released after ${data.platformFeePercent}% Emahu fee (₹${data.platformFeeAmount}).`,
+                date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+              });
+              return {
+                ...o,
+                status: '🔓 FUNDS RELEASED',
+                paymentStatus: 'released',
+                paymentReleased: true,
+                paymentReleasedAt: data.releasedAt,
+                platformFeePercent: data.platformFeePercent,
+                platformFeeAmount: data.platformFeeAmount,
+                sellerNetPayout: data.sellerNetPayout,
+                timeline: filteredTimeline
+              };
+            }
+            return o;
+          });
+          safeSetLocalStorageOrders(updated);
+          window.dispatchEvent(new Event('storage'));
+        }
+
+
+
+        setIsReleaseModalOpen(false);
+        triggerToast('Payment Released', `Payment for Order #${orderId} released successfully!`, 'success');
+      } else {
+        triggerToast('Error', data.error || 'Failed to release payment', 'danger');
+      }
+    } catch (err) {
+      console.error('Error releasing payment:', err);
+      triggerToast('Error', 'Network error releasing payment', 'danger');
+    } finally {
+      setIsReleasingPayment(false);
+    }
+  };
+
   const handleMarkNotifsRead = async () => {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      
+
       const unread = notifications.filter(n => !n.read);
       for (const n of unread) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications/${n.id}/read`, {
@@ -1355,7 +1597,7 @@ export default function EmahuProDashboard() {
         const payload = { ...order };
         delete payload._id;
         delete payload.__v;
-        
+
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}`, {
           method: 'PUT',
           headers: {
@@ -1381,6 +1623,57 @@ export default function EmahuProDashboard() {
       setVerifiedEscrow(prev => ({ ...prev, [orderId]: true }));
       triggerToast('Escrow Verified', `Cryptographic check complete. ₹${amount.toLocaleString('en-IN')} locked in Emahu Secure Vault.`, 'success');
     }, 1200);
+  };
+
+  const handleAdvanceOrderStatus = async (orderId, nextStatus, timelineDesc) => {
+    try {
+      setOrderLoading(prev => ({ ...prev, [orderId]: true }));
+      const storedOrders = localStorage.getItem('emahu_orders');
+      if (storedOrders) {
+        const parsed = JSON.parse(storedOrders);
+        const updated = parsed.map(o => {
+          if (o.orderId === orderId) {
+            const timeline = o.timeline || [];
+            // Remove matching timeline entries to prevent duplicates
+            const filteredTimeline = timeline.filter(t => t.status !== nextStatus);
+            filteredTimeline.push({
+              status: nextStatus,
+              label: nextStatus.replace(/_/g, ' '),
+              desc: timelineDesc,
+              date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+            });
+            const updateObj = {
+              ...o,
+              status: nextStatus,
+              timeline: filteredTimeline
+            };
+            if (nextStatus === 'DELIVERED' || nextStatus === 'COMPLETED') {
+              updateObj.deliveredAt = new Date();
+              updateObj.deliveryStatus = 'delivered';
+            } else if (nextStatus === 'PICKED_UP') {
+              updateObj.deliveryStatus = 'picked_up';
+            } else if (nextStatus === 'OUT_FOR_DELIVERY') {
+              updateObj.deliveryStatus = 'out_for_delivery';
+            }
+            return updateObj;
+          }
+          return o;
+        });
+        
+        safeSetLocalStorageOrders(updated);
+        window.dispatchEvent(new Event('storage'));
+        
+
+
+        triggerToast('Status Updated', `Order #${orderId} marked as ${nextStatus.replace(/_/g, ' ')}.`, 'success');
+        await syncOrderToDatabase(orderId, updated);
+      }
+    } catch (err) {
+      console.error('Error advancing order status:', err);
+      triggerToast('Error', 'Failed to update order status.', 'danger');
+    } finally {
+      setOrderLoading(prev => ({ ...prev, [orderId]: false }));
+    }
   };
 
   const handleApproveOrder = async (orderId) => {
@@ -1411,7 +1704,7 @@ export default function EmahuProDashboard() {
           }
           return o;
         });
-        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        safeSetLocalStorageOrders(updated);
         window.dispatchEvent(new Event('storage'));
         pushNotification('Order Approved', `Your Order #${orderId} has been approved by the seller.`, 'buyer');
         triggerToast('Order Approved', `Order #${orderId} approved successfully.`, 'success');
@@ -1453,7 +1746,7 @@ export default function EmahuProDashboard() {
           }
           return o;
         });
-        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        safeSetLocalStorageOrders(updated);
         window.dispatchEvent(new Event('storage'));
         pushNotification('Order Rejected', `Your Order #${orderId} was rejected by the merchant. Reason: ${reason || 'N/A'}`, 'buyer');
         triggerToast('Order Rejected', `Order #${orderId} rejected.`, 'danger');
@@ -1472,7 +1765,7 @@ export default function EmahuProDashboard() {
     try {
       setOrderLoading(prev => ({ ...prev, [orderId]: true }));
       const token = localStorage.getItem('emahu_seller_token');
-      
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/assign`, {
         method: 'POST',
         headers: {
@@ -1484,7 +1777,7 @@ export default function EmahuProDashboard() {
           deliveryPartnerId: partnerId
         })
       });
-      
+
       const data = await res.json();
       if (!data.success) {
         throw new Error(data.error || 'Failed to assign delivery partner');
@@ -1516,10 +1809,10 @@ export default function EmahuProDashboard() {
           }
           return o;
         });
-        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        safeSetLocalStorageOrders(updated);
         window.dispatchEvent(new Event('storage'));
       }
-      
+
       triggerToast('Delivery Assigned', `Courier ${partnerName} assigned to Order #${orderId}.`, 'success');
     } catch (err) {
       console.error(err);
@@ -1556,7 +1849,7 @@ export default function EmahuProDashboard() {
           }
           return o;
         });
-        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        safeSetLocalStorageOrders(updated);
         window.dispatchEvent(new Event('storage'));
         pushNotification('Shipping Label Created', `Shipping label generated for Order #${orderId}.`, 'buyer');
         pushNotification('Label Created', `Shipping label generated successfully for Order #${orderId}.`, 'seller');
@@ -1587,11 +1880,11 @@ export default function EmahuProDashboard() {
         const packageWeight = getRandomWeightStr();
         const estDays = carrierName === 'Blue Dart' ? '1-3 Days' : (carrierName === 'Delhivery' ? '2-4 Days' : '2-5 Days');
         const cost = carrierName === 'Blue Dart' ? 120 : (carrierName === 'Delhivery' ? 80 : 75);
-        
+
         const updated = parsed.map(o => {
           if (o.orderId === orderId) {
             const timeline = o.timeline || [];
-            
+
             // Add DELIVERY_ASSIGNED timeline
             const filteredTimeline1 = timeline.filter(t => t.status !== 'DELIVERY_ASSIGNED');
             filteredTimeline1.push({
@@ -1600,7 +1893,7 @@ export default function EmahuProDashboard() {
               desc: `🚚 Assigned to ${carrierName}. Tracking ID: ${trackingId}`,
               date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
             });
-            
+
             // Add LABEL_GENERATED timeline
             const filteredTimeline2 = filteredTimeline1.filter(t => t.status !== 'LABEL_GENERATED');
             filteredTimeline2.push({
@@ -1624,14 +1917,14 @@ export default function EmahuProDashboard() {
           }
           return o;
         });
-        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        safeSetLocalStorageOrders(updated);
         window.dispatchEvent(new Event('storage'));
-        
+
         pushNotification('Courier Assigned', `Courier ${carrierName} assigned to Order #${orderId}.`, 'seller');
         pushNotification('Shipping Label Created', `Shipping label generated for Order #${orderId}.`, 'buyer');
         pushNotification('Label Created', `Shipping label generated successfully for Order #${orderId}.`, 'seller');
         triggerToast('Label Generated', `Label generated for Order #${orderId}.`, 'success');
-        
+
         const fresh = updated.find(o => o.orderId === orderId);
         setActiveLabelOrder(fresh);
         setIsLabelModalOpen(true);
@@ -1670,7 +1963,7 @@ export default function EmahuProDashboard() {
           }
           return o;
         });
-        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        safeSetLocalStorageOrders(updated);
         window.dispatchEvent(new Event('storage'));
         pushNotification('Ready for Pickup', `Order #${orderId} is packed and ready for courier pickup.`, 'buyer');
         pushNotification('Pickup Confirmed', `Pickup request sent for Order #${orderId}.`, 'seller');
@@ -1696,7 +1989,7 @@ export default function EmahuProDashboard() {
           if (o.orderId === orderId) {
             const timeline = o.timeline || [];
             const filteredTimeline = timeline.filter(t => t.status !== nextStatus);
-            
+
             let label = nextStatus;
             let desc = `Order state shifted to ${nextStatus}.`;
             if (nextStatus === 'PICKED_UP') {
@@ -1729,7 +2022,7 @@ export default function EmahuProDashboard() {
           }
           return o;
         });
-        localStorage.setItem('emahu_orders', JSON.stringify(updated));
+        safeSetLocalStorageOrders(updated);
         window.dispatchEvent(new Event('storage'));
 
         // Push status change notifications
@@ -1762,10 +2055,10 @@ export default function EmahuProDashboard() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
-  
+
   // Toast notifications state
   const [toasts, setToasts] = useState([]);
-  
+
   // Add Product Modal Form States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newProductName, setNewProductName] = useState('');
@@ -1828,7 +2121,7 @@ export default function EmahuProDashboard() {
       setFormError('Please fill in all required fields');
       return;
     }
-    
+
     // Validate Numeric values
     const priceNum = parseFloat(newProductPrice);
     const comparePriceNum = parseFloat(newProductComparePrice);
@@ -1854,7 +2147,7 @@ export default function EmahuProDashboard() {
     try {
       setIsSubmittingProduct(true);
       const token = localStorage.getItem('emahu_seller_token');
-      const url = resubmitProductId 
+      const url = resubmitProductId
         ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/${resubmitProductId}/resubmit`
         : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`;
       const method = resubmitProductId ? 'PUT' : 'POST';
@@ -1904,7 +2197,7 @@ export default function EmahuProDashboard() {
           'success'
         );
       }
-      
+
       // Close Modal and Reset form fields
       setIsAddModalOpen(false);
       resetAddForm();
@@ -1925,7 +2218,7 @@ export default function EmahuProDashboard() {
     setNewProductName('');
     setNewProductBrand('');
     setNewProductSku('');
-    
+
     let defaultCat = 'Electronics & Tech';
     if (sellerUser?.category) {
       const storeCat = sellerUser.category.toLowerCase();
@@ -1940,7 +2233,7 @@ export default function EmahuProDashboard() {
       }
     }
     setNewProductCategory(defaultCat);
-    
+
     setNewProductPrice('');
     setNewProductComparePrice('');
     setNewProductStock('');
@@ -2043,11 +2336,11 @@ export default function EmahuProDashboard() {
     const handleDrop = (e) => {
       e.preventDefault();
       setIsDragging(false);
-      
+
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
         processFiles(Array.from(e.dataTransfer.files));
       }
-      
+
       const link = e.dataTransfer.getData('text/plain');
       if (link && link.startsWith('http')) {
         setNewProductImages(prev => [...prev, link]);
@@ -2070,7 +2363,7 @@ export default function EmahuProDashboard() {
     return (
       <div style={{ marginTop: '12px', width: '100%' }}>
         <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Product Gallery * (Drag/drop files or links, or click upload)</label>
-        
+
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -2268,7 +2561,7 @@ export default function EmahuProDashboard() {
   // Perform actual deletion
   const handleDeleteProduct = async () => {
     if (!productToDelete) return;
-    
+
     try {
       const token = localStorage.getItem('emahu_seller_token');
       const productId = productToDelete.id || productToDelete._id;
@@ -2308,7 +2601,7 @@ export default function EmahuProDashboard() {
       console.error('Error deleting product:', err);
       triggerToast('Deletion Error', 'Network error during product deletion', 'danger');
     }
-    
+
     setIsDeleteModalOpen(false);
     setProductToDelete(null);
   };
@@ -2322,11 +2615,11 @@ export default function EmahuProDashboard() {
       }
 
       const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            (product.sku || '').toLowerCase().includes(searchQuery.toLowerCase());
-      
+        (product.sku || '').toLowerCase().includes(searchQuery.toLowerCase());
+
       const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
       const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
-      
+
       return matchesSearch && matchesCategory && matchesStatus;
     })
     .sort((a, b) => {
@@ -2358,7 +2651,7 @@ export default function EmahuProDashboard() {
   const chartData = useMemo(() => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const orderedDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    
+
     const revenueByDay = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
     const dispatchesByDay = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
 
@@ -2506,8 +2799,8 @@ export default function EmahuProDashboard() {
     );
   }
 
-  const isApproved = sellerUser?.status === 'approved' || 
-    (['business_registration', 'id_proof'].every(type => 
+  const isApproved = sellerUser?.status === 'approved' ||
+    (['business_registration', 'id_proof'].every(type =>
       sellerDocuments.some(d => d.documentType === type && d.status === 'approved')
     ));
 
@@ -2551,7 +2844,7 @@ export default function EmahuProDashboard() {
         <ul className="sidebar-menu">
           {!isApproved && (
             <li>
-              <button 
+              <button
                 className={`sidebar-item-btn ${activeTab === 'status' ? 'active' : ''}`}
                 onClick={() => { setActiveTab('status'); setIsSidebarOpen(false); }}
               >
@@ -2563,7 +2856,7 @@ export default function EmahuProDashboard() {
             </li>
           )}
           <li>
-            <button 
+            <button
               className={`sidebar-item-btn ${activeTab === 'overview' ? 'active' : ''}`}
               disabled={!isApproved}
               onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }}
@@ -2579,7 +2872,7 @@ export default function EmahuProDashboard() {
             </button>
           </li>
           <li>
-            <button 
+            <button
               className={`sidebar-item-btn ${activeTab === 'products' ? 'active' : ''}`}
               disabled={!isApproved}
               onClick={() => { setActiveTab('products'); setIsSidebarOpen(false); }}
@@ -2592,7 +2885,7 @@ export default function EmahuProDashboard() {
             </button>
           </li>
           <li>
-            <button 
+            <button
               className={`sidebar-item-btn ${activeTab === 'requests' ? 'active' : ''}`}
               disabled={!isApproved}
               onClick={() => { setActiveTab('requests'); setIsSidebarOpen(false); }}
@@ -2609,7 +2902,7 @@ export default function EmahuProDashboard() {
             </button>
           </li>
           <li>
-            <button 
+            <button
               className={`sidebar-item-btn ${activeTab === 'orders' ? 'active' : ''}`}
               disabled={!isApproved}
               onClick={() => { setActiveTab('orders'); setIsSidebarOpen(false); }}
@@ -2627,7 +2920,7 @@ export default function EmahuProDashboard() {
             </button>
           </li>
           <li>
-            <button 
+            <button
               className={`sidebar-item-btn ${activeTab === 'analytics' ? 'active' : ''}`}
               disabled={!isApproved}
               onClick={() => { setActiveTab('analytics'); setIsSidebarOpen(false); }}
@@ -2640,7 +2933,7 @@ export default function EmahuProDashboard() {
             </button>
           </li>
           <li>
-            <button 
+            <button
               className={`sidebar-item-btn ${activeTab === 'settings' ? 'active' : ''}`}
               disabled={!isApproved}
               onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }}
@@ -2654,37 +2947,22 @@ export default function EmahuProDashboard() {
             </button>
           </li>
           {sellerUser?.role === 'admin' && (
-            <>
-              <li>
-                <button 
-                  className={`sidebar-item-btn ${activeTab === 'sellers_management' ? 'active' : ''}`}
-                  onClick={() => { setActiveTab('sellers_management'); setIsSidebarOpen(false); }}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
-                  <span>Sellers Management</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  className={`sidebar-item-btn ${activeTab === 'delivery_settings' ? 'active' : ''}`}
-                  onClick={() => { setActiveTab('delivery_settings'); setIsSidebarOpen(false); }}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                    <rect x="1" y="3" width="15" height="13" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="5.5" cy="18.5" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="18.5" cy="18.5" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span>Delivery Settings</span>
-                </button>
-              </li>
-            </>
+            <li>
+              <button
+                className={`sidebar-item-btn ${activeTab === 'sellers_management' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('sellers_management'); setIsSidebarOpen(false); }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <span>Sellers Management</span>
+              </button>
+            </li>
           )}
+          {/* Delivery Settings tab has been hidden/removed from the seller sidebar as it is a global admin configuration managed in the admin dashboard */}
         </ul>
 
         <div className="sidebar-profile">
@@ -2723,10 +3001,10 @@ export default function EmahuProDashboard() {
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
-            <input 
-              type="text" 
-              className="search-input" 
-              placeholder="Search across analytics & products..." 
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search across analytics & products..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -2765,7 +3043,7 @@ export default function EmahuProDashboard() {
                   alignItems: 'center'
                 }}>
                   <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Notifications Center</strong>
-                  <button 
+                  <button
                     onClick={() => {
                       try {
                         const stored = localStorage.getItem('emahu_notifications') || '[]';
@@ -2996,8 +3274,8 @@ export default function EmahuProDashboard() {
                   )}
 
                   {/* Document resubmission form */}
-                  <SellerDocumentResubmissionForm 
-                    documents={sellerDocuments} 
+                  <SellerDocumentResubmissionForm
+                    documents={sellerDocuments}
                     onSuccess={async () => {
                       triggerToast('Details Resubmitted', 'Your store verification request is now pending review.', 'success');
                       // Re-sync user status by calling getProfile
@@ -3010,7 +3288,7 @@ export default function EmahuProDashboard() {
                         }
                       }
                       fetchSellerDocuments();
-                    }} 
+                    }}
                   />
                 </div>
               )}
@@ -3055,7 +3333,7 @@ export default function EmahuProDashboard() {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             {doc?.status !== 'approved' && editingDocType !== type && (
-                              <button 
+                              <button
                                 onClick={() => { setEditingDocType(type); setInputDocUrl(doc ? doc.fileUrl : ''); }}
                                 style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(79, 70, 229, 0.4)', background: 'rgba(79, 70, 229, 0.05)', color: '#4f46e5', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
                               >
@@ -3092,14 +3370,14 @@ export default function EmahuProDashboard() {
                               onChange={setInputDocUrl}
                             />
                             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                              <button 
+                              <button
                                 onClick={() => handleInlineSubmit(type)}
                                 disabled={inlineSubmitting || !inputDocUrl}
                                 style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', fontSize: '0.8rem', cursor: (inlineSubmitting || !inputDocUrl) ? 'not-allowed' : 'pointer', fontWeight: 'bold', opacity: (inlineSubmitting || !inputDocUrl) ? 0.6 : 1 }}
                               >
                                 {inlineSubmitting ? 'Processing...' : 'Submit Document'}
                               </button>
-                              <button 
+                              <button
                                 onClick={() => setEditingDocType(null)}
                                 style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer' }}
                               >
@@ -3115,7 +3393,7 @@ export default function EmahuProDashboard() {
               </div>
             </div>
           )}
-          
+
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
             <div>
@@ -3207,20 +3485,20 @@ export default function EmahuProDashboard() {
                     <svg className="chart-svg" viewBox="0 0 500 220">
                       <defs>
                         <linearGradient id="revenue-gradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#10b981" stopOpacity="0.3"/>
-                          <stop offset="100%" stopColor="#10b981" stopOpacity="0"/>
+                          <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
                         </linearGradient>
                       </defs>
-                      
+
                       {/* Grid Lines */}
                       <line x1="40" y1="45" x2="480" y2="45" className="chart-grid-line" />
                       <line x1="40" y1="90" x2="480" y2="90" className="chart-grid-line" />
                       <line x1="40" y1="135" x2="480" y2="135" className="chart-grid-line" />
-                      
+
                       {/* Axes */}
                       <line x1="40" y1="20" x2="40" y2="180" className="chart-axis-line" />
                       <line x1="40" y1="180" x2="480" y2="180" className="chart-axis-line" />
-                      
+
                       {/* Axis Labels */}
                       <text x="35" y="180" textAnchor="end" className="chart-axis-text">0</text>
                       <text x="35" y="135" textAnchor="end" className="chart-axis-text">₹{Math.round(maxRevenue / 3).toLocaleString()}</text>
@@ -3251,15 +3529,15 @@ export default function EmahuProDashboard() {
 
                       {/* Interactive Dots for Revenue */}
                       {chartPoints.map((pt, idx) => (
-                        <circle 
-                          key={idx} 
-                          cx={pt.x} 
-                          cy={pt.y} 
-                          r={idx === peakDayIndex ? 5 : 4} 
-                          fill={idx === peakDayIndex ? "#10b981" : "#fff"} 
-                          stroke={idx === peakDayIndex ? "#fff" : "#10b981"} 
-                          strokeWidth={idx === peakDayIndex ? 2 : 2.5} 
-                          className="chart-point" 
+                        <circle
+                          key={idx}
+                          cx={pt.x}
+                          cy={pt.y}
+                          r={idx === peakDayIndex ? 5 : 4}
+                          fill={idx === peakDayIndex ? "#10b981" : "#fff"}
+                          stroke={idx === peakDayIndex ? "#fff" : "#10b981"}
+                          strokeWidth={idx === peakDayIndex ? 2 : 2.5}
+                          className="chart-point"
                         />
                       ))}
 
@@ -3285,10 +3563,10 @@ export default function EmahuProDashboard() {
                     {orders.slice(0, 4).map((order) => (
                       <div key={order.id} className="realtime-item">
                         <div className="realtime-img">
-                          {order.product.includes('Headphones') ? '🎧' : 
-                           order.product.includes('Chrono') ? '⌚' : 
-                           order.product.includes('Desk') ? 'ðŸ–¥ï¸' : 
-                           (order.product.includes('Tracker') || order.product.includes('Ring')) ? 'ðŸ’' : '📦'}
+                          {order.product.includes('Headphones') ? '🎧' :
+                            order.product.includes('Chrono') ? '⌚' :
+                              order.product.includes('Desk') ? 'ðŸ–¥ï¸' :
+                                (order.product.includes('Tracker') || order.product.includes('Ring')) ? 'ðŸ’' : '📦'}
                         </div>
                         <div className="realtime-details">
                           <span className="realtime-title">{order.customer}</span>
@@ -3326,7 +3604,7 @@ export default function EmahuProDashboard() {
                           Category: {highestSellingProduct.category} · Brand: {highestSellingProduct.brand}
                         </div>
                       </div>
-                      
+
                       <div style={{ display: 'flex', gap: '16px' }}>
                         <div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Units Sold</div>
@@ -3407,16 +3685,16 @@ export default function EmahuProDashboard() {
                       <circle cx="11" cy="11" r="8" />
                       <line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
-                    <input 
-                      type="text" 
-                      className="inline-search-input" 
+                    <input
+                      type="text"
+                      className="inline-search-input"
                       placeholder="Search by name or SKU..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
 
-                  <select 
+                  <select
                     className="select-filter"
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
@@ -3432,7 +3710,7 @@ export default function EmahuProDashboard() {
                     <option value="Lifestyle">Lifestyle</option>
                   </select>
 
-                  <select 
+                  <select
                     className="select-filter"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
@@ -3443,7 +3721,7 @@ export default function EmahuProDashboard() {
                     <option value="out-of-stock">Out of Stock</option>
                   </select>
 
-                  <select 
+                  <select
                     className="select-filter"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
@@ -3506,14 +3784,13 @@ export default function EmahuProDashboard() {
                             <td style={{ fontWeight: 600 }}>{product.stock} units</td>
                             <td>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <span className={`status-badge ${
-                                  isApproved ? 'in-stock' :
-                                  (isPending && product.adminCode) ? 'low-stock' :
-                                  isPending ? 'draft' : 'out-of-stock'
-                                }`}>
-                      {isApproved ? 'Approved & Live' :
-                                   (isPending && product.adminCode) ? 'Pending Activation' :
-                                   isPending ? 'Under Admin Review' : 'Rejected'}
+                                <span className={`status-badge ${isApproved ? 'in-stock' :
+                                    (isPending && product.adminCode) ? 'low-stock' :
+                                      isPending ? 'draft' : 'out-of-stock'
+                                  }`}>
+                                  {isApproved ? 'Approved & Live' :
+                                    (isPending && product.adminCode) ? 'Pending Activation' :
+                                      isPending ? 'Under Admin Review' : 'Rejected'}
                                 </span>
                                 {isRejected && product.rejectionReason && (
                                   <span style={{ fontSize: '0.75rem', color: '#ef4444', maxWidth: '200px', wordBreak: 'break-word', display: 'inline-block' }}>
@@ -3601,9 +3878,9 @@ export default function EmahuProDashboard() {
           {/* TAB: VERIFICATION REQUESTS */}
           {activeTab === 'requests' && (
             sellerUser?.role === 'admin' ? (
-              <AdminSimulationHub 
-                products={products} 
-                triggerToast={triggerToast} 
+              <AdminSimulationHub
+                products={products}
+                triggerToast={triggerToast}
                 onRefreshProducts={async () => {
                   try {
                     const token = localStorage.getItem('emahu_seller_token');
@@ -3620,308 +3897,307 @@ export default function EmahuProDashboard() {
                   } catch (e) {
                     console.error('Failed to refresh products:', e);
                   }
-                }} 
+                }}
               />
             ) : (
               <div>
-              <div className="view-header">
-                <div className="view-title-group">
-                  <h2>Verification & Listing Requests</h2>
-                  <p>Submit product listings for administration audit and activate approved listings with security codes.</p>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '24px', alignItems: 'start', marginTop: '24px' }}>
-                
-                {/* LEFT COLUMN: CREATE REQUEST FORM */}
-                <div className="card" style={{ padding: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px' }}>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                    <span>📝</span> Submit New Request
-                  </h3>
-                  
-                  {formError && (
-                    <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', padding: '10px 16px', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '16px', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
-                      ⚠️ {formError}
-                    </div>
-                  )}
-
-                  <form onSubmit={handleAddProduct}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Product Title *</label>
-                        <input 
-                          type="text" 
-                          className="form-input" 
-                          style={{ height: '36px', fontSize: '0.85rem' }}
-                          placeholder="e.g. Aura Wireless Earbuds" 
-                          value={newProductName}
-                          onChange={(e) => setNewProductName(e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Brand Name *</label>
-                        <input 
-                          type="text" 
-                          className="form-input" 
-                          style={{ height: '36px', fontSize: '0.85rem' }}
-                          placeholder="e.g. Aura" 
-                          value={newProductBrand}
-                          onChange={(e) => setNewProductBrand(e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Category *</label>
-                        <CategorySelector 
-                          value={newProductCategory} 
-                          onChange={setNewProductCategory} 
-                        />
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        <div className="form-group">
-                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Price (INR) *</label>
-                          <input 
-                            type="number" 
-                            className="form-input" 
-                            style={{ height: '36px', fontSize: '0.85rem' }}
-                            placeholder="4999" 
-                            value={newProductPrice}
-                            onChange={(e) => setNewProductPrice(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Compare Price *</label>
-                          <input 
-                            type="number" 
-                            className="form-input" 
-                            style={{ height: '36px', fontSize: '0.85rem' }}
-                            placeholder="7999" 
-                            value={newProductComparePrice}
-                            onChange={(e) => setNewProductComparePrice(e.target.value)}
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Inventory *</label>
-                        <input 
-                          type="number" 
-                          className="form-input" 
-                          style={{ height: '36px', fontSize: '0.85rem' }}
-                          placeholder="20" 
-                          value={newProductStock}
-                          onChange={(e) => setNewProductStock(e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        {renderMultiImageSelector()}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Description *</label>
-                        <textarea 
-                          className="form-input" 
-                          style={{ height: '60px', fontSize: '0.85rem', padding: '8px', resize: 'none' }}
-                          placeholder="Short description..." 
-                          value={newProductDescription}
-                          onChange={(e) => setNewProductDescription(e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <button 
-                        type="submit" 
-                        className="company-portal-btn"
-                        style={{ height: '40px', width: '100%', marginTop: '8px', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                        disabled={isSubmittingProduct}
-                      >
-                        {isSubmittingProduct ? 'Submitting...' : 'Submit Request'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                {/* RIGHT COLUMN: REQUESTS HISTORY & STATUS */}
-                <div className="card" style={{ padding: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px' }}>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)' }}>
-                    📋 Verification History
-                  </h3>
-                  
-                  <div style={{ maxHeight: '550px', overflowY: 'auto' }}>
-                    <table className="portal-table" style={{ width: '100%', fontSize: '0.85rem' }}>
-                      <thead>
-                        <tr>
-                          <th style={{ textAlign: 'left', padding: '10px' }}>Product</th>
-                          <th style={{ textAlign: 'left', padding: '10px' }}>Category</th>
-                          <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
-                          <th style={{ textAlign: 'left', padding: '10px' }}>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {products.map((product) => {
-                          const isApproved = product.approvalStatus === 'approved';
-                          const isPending = product.approvalStatus === 'pending';
-                          const isRejected = product.approvalStatus === 'rejected';
-
-                          return (
-                            <tr key={product.id || product._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                              <td style={{ padding: '12px 10px' }}>
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                  <div style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '6px',
-                                    overflow: 'hidden',
-                                    border: '1px solid var(--border-color)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: 'rgba(0,0,0,0.05)',
-                                    flexShrink: 0
-                                  }}>
-                                    {isRealImage(product.image) ? (
-                                      <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    ) : (
-                                      <span style={{ fontSize: '1.2rem' }}>{cleanImageUrl(product.image) || '📦'}</span>
-                                    )}
-                                  </div>
-                                  <div>
-                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{product.name}</div>
-                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>₹{product.price.toLocaleString('en-IN')}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td style={{ padding: '12px 10px' }}>
-                                <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{product.category}</div>
-                              </td>
-                              <td style={{ padding: '12px 10px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                  <span className={`status-badge ${
-                                    isApproved ? 'in-stock' :
-                                    (isPending && product.adminCode) ? 'low-stock' :
-                                    isPending ? 'draft' : 'out-of-stock'
-                                  }`} style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
-                                    {isApproved ? 'Approved & Live' :
-                                     (isPending && product.adminCode) ? 'Pending Activation' :
-                                     isPending ? 'Under Review' : 'Rejected'}
-                                  </span>
-                                  
-                                  {isPending && product.adminCode && (
-                                    <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
-                                      Code Generated!
-                                    </span>
-                                  )}
-
-                                  {isRejected && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      {product.rejectionReason && (
-                                        <span style={{ fontSize: '0.72rem', color: '#ef4444', maxWidth: '140px', wordBreak: 'break-all' }}>
-                                          Reason: {product.rejectionReason}
-                                        </span>
-                                      )}
-                                      <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 'bold' }}>
-                                        Rejections: {product.approvalAttempts || 0} / 3
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                              <td style={{ padding: '12px 10px' }}>
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                  <button
-                                    className="company-portal-btn"
-                                    style={{
-                                      height: '24px',
-                                      fontSize: '0.7rem',
-                                      padding: '0 8px',
-                                      background: 'var(--bg-secondary)',
-                                      border: '1px solid var(--border-color)',
-                                      color: 'var(--text-primary)',
-                                      cursor: 'pointer'
-                                    }}
-                                    onClick={() => setSelectedDetailedProduct(product)}
-                                  >
-                                    Details
-                                  </button>
-
-                                  {isPending && product.adminCode && (
-                                    <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
-                                      <input
-                                        type="text"
-                                        placeholder="Admin Code"
-                                        className="form-input"
-                                        style={{
-                                          height: '24px',
-                                          fontSize: '0.7rem',
-                                          padding: '2px 4px',
-                                          width: '85px',
-                                          borderRadius: '4px',
-                                          background: 'rgba(255,255,255,0.08)',
-                                          borderColor: 'var(--color-success)',
-                                          color: '#10b981',
-                                          fontWeight: 'bold',
-                                          textAlign: 'center',
-                                          cursor: 'not-allowed'
-                                        }}
-                                        value={product.adminCode || ''}
-                                        readOnly={true}
-                                      />
-                                      <button
-                                        className="company-portal-btn"
-                                        style={{
-                                          height: '24px',
-                                          fontSize: '0.7rem',
-                                          padding: '0 4px',
-                                          background: 'var(--color-success)',
-                                          borderColor: 'var(--color-success)',
-                                          width: '85px'
-                                        }}
-                                        onClick={() => handleVerifyProductCode(product.id || product._id)}
-                                      >
-                                        Verify Code
-                                      </button>
-                                    </div>
-                                  )}
-                                  {isPending && !product.adminCode && (
-                                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>Pending Admin</span>
-                                  )}
-                                  {isApproved && (
-                                    <span style={{ fontSize: '0.78rem', color: 'var(--color-success)', fontWeight: '600' }}>
-                                      ✓ Live
-                                    </span>
-                                  )}
-                                  {isRejected && (
-                                    <button className="action-btn" title="Fix and Resubmit" onClick={() => handleOpenResubmitModal(product)}>
-                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                      </svg>
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {products.length === 0 && (
-                          <tr>
-                            <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No requests submitted yet.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+                <div className="view-header">
+                  <div className="view-title-group">
+                    <h2>Verification & Listing Requests</h2>
+                    <p>Submit product listings for administration audit and activate approved listings with security codes.</p>
                   </div>
                 </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '24px', alignItems: 'start', marginTop: '24px' }}>
+
+                  {/* LEFT COLUMN: CREATE REQUEST FORM */}
+                  <div className="card" style={{ padding: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <span>📝</span> Submit New Request
+                    </h3>
+
+                    {formError && (
+                      <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', padding: '10px 16px', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '16px', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                        ⚠️ {formError}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleAddProduct}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Product Title *</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ height: '36px', fontSize: '0.85rem' }}
+                            placeholder="e.g. Aura Wireless Earbuds"
+                            value={newProductName}
+                            onChange={(e) => setNewProductName(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Brand Name *</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ height: '36px', fontSize: '0.85rem' }}
+                            placeholder="e.g. Aura"
+                            value={newProductBrand}
+                            onChange={(e) => setNewProductBrand(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Category *</label>
+                          <CategorySelector
+                            value={newProductCategory}
+                            onChange={setNewProductCategory}
+                          />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div className="form-group">
+                            <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Price (INR) *</label>
+                            <input
+                              type="number"
+                              className="form-input"
+                              style={{ height: '36px', fontSize: '0.85rem' }}
+                              placeholder="4999"
+                              value={newProductPrice}
+                              onChange={(e) => setNewProductPrice(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Compare Price *</label>
+                            <input
+                              type="number"
+                              className="form-input"
+                              style={{ height: '36px', fontSize: '0.85rem' }}
+                              placeholder="7999"
+                              value={newProductComparePrice}
+                              onChange={(e) => setNewProductComparePrice(e.target.value)}
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Inventory *</label>
+                          <input
+                            type="number"
+                            className="form-input"
+                            style={{ height: '36px', fontSize: '0.85rem' }}
+                            placeholder="20"
+                            value={newProductStock}
+                            onChange={(e) => setNewProductStock(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          {renderMultiImageSelector()}
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Description *</label>
+                          <textarea
+                            className="form-input"
+                            style={{ height: '60px', fontSize: '0.85rem', padding: '8px', resize: 'none' }}
+                            placeholder="Short description..."
+                            value={newProductDescription}
+                            onChange={(e) => setNewProductDescription(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="company-portal-btn"
+                          style={{ height: '40px', width: '100%', marginTop: '8px', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                          disabled={isSubmittingProduct}
+                        >
+                          {isSubmittingProduct ? 'Submitting...' : 'Submit Request'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* RIGHT COLUMN: REQUESTS HISTORY & STATUS */}
+                  <div className="card" style={{ padding: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)' }}>
+                      📋 Verification History
+                    </h3>
+
+                    <div style={{ maxHeight: '550px', overflowY: 'auto' }}>
+                      <table className="portal-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: 'left', padding: '10px' }}>Product</th>
+                            <th style={{ textAlign: 'left', padding: '10px' }}>Category</th>
+                            <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
+                            <th style={{ textAlign: 'left', padding: '10px' }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {products.map((product) => {
+                            const isApproved = product.approvalStatus === 'approved';
+                            const isPending = product.approvalStatus === 'pending';
+                            const isRejected = product.approvalStatus === 'rejected';
+
+                            return (
+                              <tr key={product.id || product._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '12px 10px' }}>
+                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <div style={{
+                                      width: '32px',
+                                      height: '32px',
+                                      borderRadius: '6px',
+                                      overflow: 'hidden',
+                                      border: '1px solid var(--border-color)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      backgroundColor: 'rgba(0,0,0,0.05)',
+                                      flexShrink: 0
+                                    }}>
+                                      {isRealImage(product.image) ? (
+                                        <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      ) : (
+                                        <span style={{ fontSize: '1.2rem' }}>{cleanImageUrl(product.image) || '📦'}</span>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{product.name}</div>
+                                      <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>₹{product.price.toLocaleString('en-IN')}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '12px 10px' }}>
+                                  <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{product.category}</div>
+                                </td>
+                                <td style={{ padding: '12px 10px' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <span className={`status-badge ${isApproved ? 'in-stock' :
+                                        (isPending && product.adminCode) ? 'low-stock' :
+                                          isPending ? 'draft' : 'out-of-stock'
+                                      }`} style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
+                                      {isApproved ? 'Approved & Live' :
+                                        (isPending && product.adminCode) ? 'Pending Activation' :
+                                          isPending ? 'Under Review' : 'Rejected'}
+                                    </span>
+
+                                    {isPending && product.adminCode && (
+                                      <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
+                                        Code Generated!
+                                      </span>
+                                    )}
+
+                                    {isRejected && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        {product.rejectionReason && (
+                                          <span style={{ fontSize: '0.72rem', color: '#ef4444', maxWidth: '140px', wordBreak: 'break-all' }}>
+                                            Reason: {product.rejectionReason}
+                                          </span>
+                                        )}
+                                        <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 'bold' }}>
+                                          Rejections: {product.approvalAttempts || 0} / 3
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '12px 10px' }}>
+                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button
+                                      className="company-portal-btn"
+                                      style={{
+                                        height: '24px',
+                                        fontSize: '0.7rem',
+                                        padding: '0 8px',
+                                        background: 'var(--bg-secondary)',
+                                        border: '1px solid var(--border-color)',
+                                        color: 'var(--text-primary)',
+                                        cursor: 'pointer'
+                                      }}
+                                      onClick={() => setSelectedDetailedProduct(product)}
+                                    >
+                                      Details
+                                    </button>
+
+                                    {isPending && product.adminCode && (
+                                      <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
+                                        <input
+                                          type="text"
+                                          placeholder="Admin Code"
+                                          className="form-input"
+                                          style={{
+                                            height: '24px',
+                                            fontSize: '0.7rem',
+                                            padding: '2px 4px',
+                                            width: '85px',
+                                            borderRadius: '4px',
+                                            background: 'rgba(255,255,255,0.08)',
+                                            borderColor: 'var(--color-success)',
+                                            color: '#10b981',
+                                            fontWeight: 'bold',
+                                            textAlign: 'center',
+                                            cursor: 'not-allowed'
+                                          }}
+                                          value={product.adminCode || ''}
+                                          readOnly={true}
+                                        />
+                                        <button
+                                          className="company-portal-btn"
+                                          style={{
+                                            height: '24px',
+                                            fontSize: '0.7rem',
+                                            padding: '0 4px',
+                                            background: 'var(--color-success)',
+                                            borderColor: 'var(--color-success)',
+                                            width: '85px'
+                                          }}
+                                          onClick={() => handleVerifyProductCode(product.id || product._id)}
+                                        >
+                                          Verify Code
+                                        </button>
+                                      </div>
+                                    )}
+                                    {isPending && !product.adminCode && (
+                                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>Pending Admin</span>
+                                    )}
+                                    {isApproved && (
+                                      <span style={{ fontSize: '0.78rem', color: 'var(--color-success)', fontWeight: '600' }}>
+                                        ✓ Live
+                                      </span>
+                                    )}
+                                    {isRejected && (
+                                      <button className="action-btn" title="Fix and Resubmit" onClick={() => handleOpenResubmitModal(product)}>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {products.length === 0 && (
+                            <tr>
+                              <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No requests submitted yet.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                </div>
               </div>
-            </div>
             )
           )}
 
@@ -4023,21 +4299,20 @@ export default function EmahuProDashboard() {
                           <td style={{ fontWeight: 700 }}>₹{order.amount.toLocaleString('en-IN')}</td>
                           <td>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                              <span className={`status-badge ${
-                                order.status === 'COMPLETED' || order.status === 'DELIVERED' ? 'in-stock' :
-                                order.status === 'REJECTED' ? 'out-of-stock' :
-                                order.status === 'PENDING_APPROVAL' ? 'draft' : 'low-stock'
-                              }`}>
+                              <span className={`status-badge ${order.status === 'COMPLETED' || order.status === 'DELIVERED' ? 'in-stock' :
+                                  order.status === 'REJECTED' ? 'out-of-stock' :
+                                    order.status === 'PENDING_APPROVAL' ? 'draft' : 'low-stock'
+                                }`}>
                                 {order.status === 'PENDING_APPROVAL' ? 'Pending Approval' :
-                                 order.status === 'APPROVED' ? 'Approved' :
-                                 order.status === 'REJECTED' ? 'Rejected' :
-                                 order.status === 'DELIVERY_ASSIGNED' ? 'Delivery Assigned' :
-                                 order.status === 'LABEL_GENERATED' ? 'Label Generated' :
-                                 order.status === 'READY_FOR_PICKUP' ? 'Ready For Pickup' :
-                                 order.status === 'PICKED_UP' ? 'Picked Up' :
-                                 order.status === 'IN_TRANSIT' ? 'In Transit' :
-                                 order.status === 'OUT_FOR_DELIVERY' ? 'Out For Delivery' :
-                                 order.status === 'COMPLETED' || order.status === 'DELIVERED' ? 'Delivered' : order.status}
+                                  order.status === 'APPROVED' ? 'Approved' :
+                                    order.status === 'REJECTED' ? 'Rejected' :
+                                      order.status === 'DELIVERY_ASSIGNED' ? 'Delivery Assigned' :
+                                        order.status === 'LABEL_GENERATED' ? 'Label Generated' :
+                                          order.status === 'READY_FOR_PICKUP' ? 'Ready For Pickup' :
+                                            order.status === 'PICKED_UP' ? 'Picked Up' :
+                                              order.status === 'IN_TRANSIT' ? 'In Transit' :
+                                                order.status === 'OUT_FOR_DELIVERY' ? 'Out For Delivery' :
+                                                  order.status === 'COMPLETED' || order.status === 'DELIVERED' ? 'Delivered' : order.status}
                               </span>
                               {order.raw?.rejectionReason && order.status === 'REJECTED' && (
                                 <span style={{ fontSize: '0.7rem', color: 'var(--color-danger)' }}>
@@ -4126,8 +4401,46 @@ export default function EmahuProDashboard() {
                                 </>
                               )}
 
-                              {/* Delivery status changes are handled by the assigned logistics partner */}
-                              
+                              {order.status === 'READY_FOR_PICKUP' && (
+                                <button
+                                  className="order-action-btn carrier"
+                                  onClick={() => handleAdvanceOrderStatus(order.id, 'PICKED_UP', `🚀 Package picked up by ${order.raw?.carrier ? 'courier partner ' + order.raw.carrier : 'Seller (Self-Delivery)'}.`)}
+                                  disabled={orderLoading[order.id]}
+                                >
+                                  {orderLoading[order.id] ? 'Processing...' : '🚀 Dispatch'}
+                                </button>
+                              )}
+
+                              {order.status === 'PICKED_UP' && (
+                                <button
+                                  className="order-action-btn carrier"
+                                  onClick={() => handleAdvanceOrderStatus(order.id, 'IN_TRANSIT', '🚚 Order package is in transit.')}
+                                  disabled={orderLoading[order.id]}
+                                >
+                                  {orderLoading[order.id] ? 'Processing...' : '🚛 In Transit'}
+                                </button>
+                              )}
+
+                              {order.status === 'IN_TRANSIT' && (
+                                <button
+                                  className="order-action-btn carrier"
+                                  onClick={() => handleAdvanceOrderStatus(order.id, 'OUT_FOR_DELIVERY', '🛵 Package is out for delivery.')}
+                                  disabled={orderLoading[order.id]}
+                                >
+                                  {orderLoading[order.id] ? 'Processing...' : '🛵 Out For Delivery'}
+                                </button>
+                              )}
+
+                              {order.status === 'OUT_FOR_DELIVERY' && (
+                                <button
+                                  className="order-action-btn approve"
+                                  onClick={() => handleAdvanceOrderStatus(order.id, 'DELIVERED', '✅ Order delivered successfully.')}
+                                  disabled={orderLoading[order.id]}
+                                >
+                                  {orderLoading[order.id] ? 'Processing...' : '✅ Delivered'}
+                                </button>
+                              )}
+
                               {['LABEL_GENERATED', 'READY_FOR_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'].includes(order.status) && order.raw?.trackingId && (
                                 <button
                                   className="btn-secondary"
@@ -4146,13 +4459,13 @@ export default function EmahuProDashboard() {
                         <td colSpan="7" style={{ textAlign: 'center', padding: '60px 24px' }}>
                           <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>
                             {orderStatusFilter === 'PENDING_APPROVAL' ? '⏳' :
-                             orderStatusFilter === 'APPROVED' ? '✅' :
-                             orderStatusFilter === 'REJECTED' ? '❌' :
-                             orderStatusFilter === 'DELIVERED' ? '🎉' : '📦'}
+                              orderStatusFilter === 'APPROVED' ? '✅' :
+                                orderStatusFilter === 'REJECTED' ? '❌' :
+                                  orderStatusFilter === 'DELIVERED' ? '🎉' : '📦'}
                           </div>
                           <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
                             {orderStatusFilter === 'all' ? 'No Orders Yet' :
-                             `No ${orderStatusFilter.replace(/_/g, ' ').toLowerCase()} orders`}
+                              `No ${orderStatusFilter.replace(/_/g, ' ').toLowerCase()} orders`}
                           </h3>
                           <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', maxWidth: '380px', margin: '0 auto' }}>
                             {orderStatusFilter === 'PENDING_APPROVAL'
@@ -4190,7 +4503,7 @@ export default function EmahuProDashboard() {
                         <span>1. Product Views ({funnelViews.toLocaleString()} visitors)</span>
                         <span style={{ fontWeight: 'bold' }}>100%</span>
                       </div>
-                      <div style={{ height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ height: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden' }}>
                         <div style={{ width: '100%', height: '100%', background: 'linear-gradient(to right, var(--color-primary), #a855f7)' }}></div>
                       </div>
                     </div>
@@ -4200,7 +4513,7 @@ export default function EmahuProDashboard() {
                         <span>2. Add to Cart ({funnelCart.toLocaleString()} sessions)</span>
                         <span style={{ fontWeight: 'bold' }}>{cartPct}%</span>
                       </div>
-                      <div style={{ height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ height: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden' }}>
                         <div style={{ width: `${cartPct}%`, height: '100%', background: 'linear-gradient(to right, var(--color-primary), #a855f7)' }}></div>
                       </div>
                     </div>
@@ -4210,7 +4523,7 @@ export default function EmahuProDashboard() {
                         <span>3. Initiated Checkout ({funnelCheckout.toLocaleString()} sessions)</span>
                         <span style={{ fontWeight: 'bold' }}>{checkoutPct}%</span>
                       </div>
-                      <div style={{ height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ height: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden' }}>
                         <div style={{ width: `${checkoutPct}%`, height: '100%', background: 'linear-gradient(to right, var(--color-primary), #a855f7)' }}></div>
                       </div>
                     </div>
@@ -4220,7 +4533,7 @@ export default function EmahuProDashboard() {
                         <span>4. Completed Sales ({funnelSales.toLocaleString()} orders)</span>
                         <span style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>{salesPct}% Net Conv.</span>
                       </div>
-                      <div style={{ height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ height: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden' }}>
                         <div style={{ width: `${parseFloat(salesPct) > 100 ? 100 : salesPct}%`, height: '100%', background: 'var(--color-success)' }}></div>
                       </div>
                     </div>
@@ -4260,14 +4573,14 @@ export default function EmahuProDashboard() {
                         <div style={{ color: '#10b981', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
                           🏆 Highest Selling Product
                         </div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', color: '#fff', fontWeight: 700 }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 700 }}>
                           {highestSellingProduct.name}
                         </h4>
                         <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
                           Category: {highestSellingProduct.category} · Brand: {highestSellingProduct.brand}
                         </div>
                       </div>
-                      
+
                       <div style={{ display: 'flex', gap: '16px' }}>
                         <div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Units Sold</div>
@@ -4284,31 +4597,31 @@ export default function EmahuProDashboard() {
 
                     {/* Selling Range List */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff' }}>Products Sales Distribution (Selling Range):</span>
-                      <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>Products Sales Distribution (Selling Range):</span>
+                      <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-secondary)' }}>
                         <table className="portal-table" style={{ width: '100%', fontSize: '0.8rem' }}>
                           <thead>
-                            <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                              <th style={{ textAlign: 'left', padding: '8px 12px' }}>Rank</th>
-                              <th style={{ textAlign: 'left', padding: '8px 12px' }}>Product</th>
-                              <th style={{ textAlign: 'center', padding: '8px 12px' }}>Price</th>
-                              <th style={{ textAlign: 'center', padding: '8px 12px' }}>Stock</th>
-                              <th style={{ textAlign: 'center', padding: '8px 12px' }}>Units Sold</th>
+                            <tr style={{ background: 'rgba(0,0,0,0.03)', borderBottom: '1px solid var(--border-color)' }}>
+                              <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Rank</th>
+                              <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Product</th>
+                              <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Price</th>
+                              <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Stock</th>
+                              <th style={{ textAlign: 'center', padding: '8px 12px', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Units Sold</th>
                             </tr>
                           </thead>
                           <tbody>
                             {sortedProductsRange.map((p, idx) => (
-                              <tr key={p.id || p._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                <td style={{ padding: '8px 12px', fontWeight: 'bold', color: idx === 0 ? '#10b981' : '#fff' }}>
+                              <tr key={p.id || p._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '8px 12px', fontWeight: 'bold', color: idx === 0 ? '#10b981' : 'var(--text-primary)' }}>
                                   #{idx + 1}
                                 </td>
-                                <td style={{ padding: '8px 12px', color: '#fff' }}>
+                                <td style={{ padding: '8px 12px', color: 'var(--text-primary)' }}>
                                   {p.name}
                                 </td>
-                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                   ₹{p.price.toLocaleString('en-IN')}
                                 </td>
-                                <td style={{ padding: '8px 12px', textAlign: 'center', color: p.stock === 0 ? '#ef4444' : p.stock <= 10 ? '#f59e0b' : '#fff' }}>
+                                <td style={{ padding: '8px 12px', textAlign: 'center', color: p.stock === 0 ? '#ef4444' : p.stock <= 10 ? '#f59e0b' : 'var(--text-secondary)' }}>
                                   {p.stock}
                                 </td>
                                 <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>
@@ -4342,209 +4655,409 @@ export default function EmahuProDashboard() {
 
               <div className="settings-grid">
                 <div className="settings-nav-sidebar">
-                  <button className="settings-nav-btn active">General Information</button>
-                  <button className="settings-nav-btn" onClick={() => triggerToast('Config Locked', 'Settings subpages are managed by corporate dashboard controls.', 'danger')}>Payout Methods</button>
-                  <button className="settings-nav-btn" onClick={() => triggerToast('Config Locked', 'Settings subpages are managed by corporate dashboard controls.', 'danger')}>Shipping Tiers</button>
-                  <button className="settings-nav-btn" onClick={() => triggerToast('Config Locked', 'Settings subpages are managed by corporate dashboard controls.', 'danger')}>API Access keys</button>
+                  <button className={`settings-nav-btn ${settingsSubTab === 'general' ? 'active' : ''}`} onClick={() => setSettingsSubTab('general')}>General Information</button>
+                  <button className={`settings-nav-btn ${settingsSubTab === 'payout' ? 'active' : ''}`} onClick={() => setSettingsSubTab('payout')}>Payout & Bank Details</button>
+                  <button className={`settings-nav-btn ${settingsSubTab === 'billing' ? 'active' : ''}`} onClick={() => setSettingsSubTab('billing')}>Payment History & Billing</button>
                 </div>
 
                 <div className="glass-card settings-card">
-                  <div>
-                    <h4 className="settings-section-title">Public profile details</h4>
-                    <div className="avatar-upload-area" style={{ marginTop: '20px' }}>
-                      <div className="settings-avatar-preview">PS</div>
-                      <div className="avatar-upload-actions">
-                        <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>Brand Logo / Identity</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>PNG or JPEG formats. Size up to 2MB.</span>
-                        <button className="btn-secondary" style={{ width: 'max-content' }} onClick={() => triggerToast('Select Image', 'Native browser file browser selected.', 'success')}>Upload Image</button>
+
+                  {/* SUBTAB 1: GENERAL PROFILE INFORMATION */}
+                  {settingsSubTab === 'general' && (
+                    <div>
+                      <div>
+                        <h4 className="settings-section-title">Public profile details</h4>
+                        <div className="avatar-upload-area" style={{ marginTop: '20px' }}>
+                          <div className="settings-avatar-preview">PS</div>
+                          <div className="avatar-upload-actions">
+                            <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>Brand Logo / Identity</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>PNG or JPEG formats. Size up to 2MB.</span>
+                            <button className="btn-secondary" style={{ width: 'max-content' }} onClick={() => triggerToast('Select Image', 'Native browser file browser selected.', 'success')}>Upload Image</button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="form-grid-2">
+                        <div className="form-group">
+                          <label className="form-label">Vendor Store Name</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={settingsForm.storeName}
+                            onChange={(e) => setSettingsForm(prev => ({ ...prev, storeName: e.target.value }))}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Support Help Email</label>
+                          <input
+                            type="email"
+                            className="form-input"
+                            value={sellerUser?.email || ''}
+                            readOnly
+                            disabled
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-grid-2">
+                        <div className="form-group">
+                          <label className="form-label">Active Contact Phone</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={settingsForm.phone}
+                            onChange={(e) => setSettingsForm(prev => ({ ...prev, phone: e.target.value }))}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Registered GSTIN Number</label>
+                          <input
+                            ref={gstinRef}
+                            type="text"
+                            className="form-input gstin-input"
+                            value={sellerUser?.gstNumber || '27AAAAA1111A1Z1'}
+                            readOnly
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group" style={{ marginTop: '16px' }}>
+                        <label className="form-label">Registered Shop Address</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={settingsForm.address}
+                          onChange={(e) => setSettingsForm(prev => ({ ...prev, address: e.target.value }))}
+                          placeholder="Enter street, building, and landmark..."
+                        />
+                      </div>
+
+                      <div className="form-grid-2" style={{ marginTop: '16px' }}>
+                        <div className="form-group">
+                          <label className="form-label">City</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={settingsForm.city}
+                            onChange={(e) => setSettingsForm(prev => ({ ...prev, city: e.target.value }))}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">State</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={settingsForm.state}
+                            onChange={(e) => setSettingsForm(prev => ({ ...prev, state: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-grid-2" style={{ marginTop: '16px' }}>
+                        <div className="form-group">
+                          <label className="form-label">Latitude</label>
+                          <input
+                            type="number"
+                            step="any"
+                            className="form-input"
+                            value={settingsForm.latitude}
+                            onChange={(e) => setSettingsForm(prev => ({ ...prev, latitude: e.target.value }))}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Longitude</label>
+                          <input
+                            type="number"
+                            step="any"
+                            className="form-input"
+                            value={settingsForm.longitude}
+                            onChange={(e) => setSettingsForm(prev => ({ ...prev, longitude: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {/* GPS Detect + current location preview */}
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={detectSellerLocation}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                            Detect My GPS Location
+                          </button>
+
+                          {/* Live address badge */}
+                          {(settingsForm.address || settingsForm.city) && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(65,105,225,0.08)', border: '1px solid rgba(65,105,225,0.2)', borderRadius: '8px', padding: '6px 14px', fontSize: '0.8rem', color: '#4169e1', fontWeight: 600, maxWidth: '360px' }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4169e1" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {[settingsForm.address, settingsForm.city, settingsForm.state].filter(Boolean).join(', ')}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Map container has been removed from the seller dashboard settings per user request */}
+                      </div>
+
+                      <div style={{ marginTop: '24px' }}>
+                        <button className="btn-primary" onClick={handleSaveSettings}>Save Profile Details</button>
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="form-grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Vendor Store Name</label>
-                      <input 
-                        type="text" 
-                        className="form-input" 
-                        value={settingsForm.storeName} 
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, storeName: e.target.value }))} 
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Support Help Email</label>
-                      <input 
-                        type="email" 
-                        className="form-input" 
-                        value={sellerUser?.email || ''} 
-                        readOnly 
-                        disabled 
-                      />
-                    </div>
-                  </div>
+                  {/* SUBTAB 2: PAYOUT & BANK DETAILS */}
+                  {settingsSubTab === 'payout' && (
+                    <form onSubmit={handleSaveBankDetails}>
+                      <h4 className="settings-section-title">Bank Payout Configuration</h4>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '24px' }}>Configure your verified settlement account details. All released escrow transaction payments will be routed here directly.</p>
 
-                  <div className="form-grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Active Contact Phone</label>
-                      <input 
-                        type="text" 
-                        className="form-input" 
-                        value={settingsForm.phone} 
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, phone: e.target.value }))} 
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Registered GSTIN Number</label>
-                      <input 
-                        ref={gstinRef} 
-                        type="text" 
-                        className="form-input gstin-input" 
-                        value={sellerUser?.gstNumber || '27AAAAA1111A1Z1'} 
-                        readOnly 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-group" style={{ marginTop: '16px' }}>
-                    <label className="form-label">Registered Shop Address</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      value={settingsForm.address} 
-                      onChange={(e) => setSettingsForm(prev => ({ ...prev, address: e.target.value }))} 
-                      placeholder="Enter street, building, and landmark..."
-                    />
-                  </div>
-
-                  <div className="form-grid-2" style={{ marginTop: '16px' }}>
-                    <div className="form-group">
-                      <label className="form-label">City</label>
-                      <input 
-                        type="text" 
-                        className="form-input" 
-                        value={settingsForm.city} 
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, city: e.target.value }))} 
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">State</label>
-                      <input 
-                        type="text" 
-                        className="form-input" 
-                        value={settingsForm.state} 
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, state: e.target.value }))} 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-grid-2" style={{ marginTop: '16px' }}>
-                    <div className="form-group">
-                      <label className="form-label">Latitude</label>
-                      <input 
-                        type="number" 
-                        step="any"
-                        className="form-input" 
-                        value={settingsForm.latitude} 
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, latitude: e.target.value }))} 
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Longitude</label>
-                      <input 
-                        type="number" 
-                        step="any"
-                        className="form-input" 
-                        value={settingsForm.longitude} 
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, longitude: e.target.value }))} 
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {/* GPS Detect + current location preview */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                      <button 
-                        type="button" 
-                        className="btn-secondary" 
-                        onClick={detectSellerLocation}
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        Detect My GPS Location
-                      </button>
-
-                      {/* Live address badge */}
-                      {(settingsForm.address || settingsForm.city) && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(65,105,225,0.08)', border: '1px solid rgba(65,105,225,0.2)', borderRadius: '8px', padding: '6px 14px', fontSize: '0.8rem', color: '#4169e1', fontWeight: 600, maxWidth: '360px' }}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4169e1" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {[settingsForm.address, settingsForm.city, settingsForm.state].filter(Boolean).join(', ')}
-                          </span>
+                      <div className="form-grid-2">
+                        <div className="form-group">
+                          <label className="form-label">Account Holder Name</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={bankDetailsForm.bankHolder}
+                            onChange={(e) => setBankDetailsForm(prev => ({ ...prev, bankHolder: e.target.value }))}
+                            required
+                            placeholder="e.g. Acme Retail Enterprises"
+                          />
                         </div>
-                      )}
-                    </div>
+                        <div className="form-group">
+                          <label className="form-label">Settlement Bank Name</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={bankDetailsForm.bankName}
+                            onChange={(e) => setBankDetailsForm(prev => ({ ...prev, bankName: e.target.value }))}
+                            required
+                            placeholder="e.g. State Bank of India"
+                          />
+                        </div>
+                      </div>
 
-                    {/* Map container */}
-                    <div style={{ marginTop: '14px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                          📌 Shop Location — Click map or drag marker to repin
-                        </span>
+                      <div className="form-grid-2" style={{ marginTop: '16px' }}>
+                        <div className="form-group">
+                          <label className="form-label">Bank Account Number</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={bankDetailsForm.accountNumber}
+                            onChange={(e) => setBankDetailsForm(prev => ({ ...prev, accountNumber: e.target.value }))}
+                            required
+                            placeholder="e.g. 100293849102"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">IFSC Code</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={bankDetailsForm.ifscCode}
+                            onChange={(e) => setBankDetailsForm(prev => ({ ...prev, ifscCode: e.target.value }))}
+                            required
+                            placeholder="e.g. SBIN0004523"
+                          />
+                        </div>
+                      </div>
 
-                        {/* External Navigate button */}
-                        {settingsForm.latitude && settingsForm.longitude && (
-                          <a
-                            href={`https://www.google.com/maps/dir/?api=1&destination=${settingsForm.latitude},${settingsForm.longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '6px',
-                              background: '#4169e1', color: '#fff',
-                              padding: '7px 14px', borderRadius: '7px',
-                              fontSize: '0.78rem', fontWeight: 700,
-                              textDecoration: 'none', cursor: 'pointer',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-                            Navigate to Shop
-                          </a>
+                      <div style={{ marginTop: '24px' }}>
+                        <button type="submit" className="btn-primary" style={{ width: 'max-content' }}>Save Payout Account Details</button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* SUBTAB 3: PAYMENT HISTORY & BILLING */}
+                  {settingsSubTab === 'billing' && (() => {
+                    // Helper to get payout calculations
+                    const getPayoutDetails = (mappedOrder) => {
+                      const order = mappedOrder.raw || mappedOrder;
+                      const orderTotal = order.total || 0;
+                      const productAmount = order.productAmount || orderTotal;
+                      const feePercent = order.platformFeePercent !== undefined ? order.platformFeePercent : platformFeePercent;
+                      const feeAmount = order.platformFeeAmount !== undefined ? order.platformFeeAmount : parseFloat(((productAmount * feePercent) / 100).toFixed(2));
+                      const penaltyAmount = order.penaltyAmount || 0;
+                      const netPayout = order.sellerNetPayout !== undefined ? order.sellerNetPayout : parseFloat((productAmount - feeAmount - penaltyAmount).toFixed(2));
+                      return { productAmount, feePercent, feeAmount, penaltyAmount, netPayout };
+                    };
+
+                    const settledOrders = orders.filter(o => {
+                      const raw = o.raw || o;
+                      return raw.paymentReleased || (raw.status && raw.status.includes('RELEASED'));
+                    });
+                    const lockedOrders = orders.filter(o => {
+                      const raw = o.raw || o;
+                      return !raw.paymentReleased && !['REJECTED', '❌ Order Rejected by Seller'].includes(raw.status);
+                    });
+
+                    const totalSettled = settledOrders.reduce((sum, o) => sum + getPayoutDetails(o).netPayout, 0);
+                    const totalLocked = lockedOrders.reduce((sum, o) => sum + getPayoutDetails(o).netPayout, 0);
+                    const totalDeductedPenalties = orders.reduce((sum, o) => {
+                      const raw = o.raw || o;
+                      return sum + (raw.penaltyAmount || 0);
+                    }, 0);
+
+                    const getEstimatedPayoutDate = (mappedOrder) => {
+                      const order = mappedOrder.raw || mappedOrder;
+                      const baseDate = order.deliveredAt ? new Date(order.deliveredAt) : (order.createdAt ? new Date(order.createdAt) : new Date());
+                      const estDate = new Date(baseDate.getTime() + 15 * 24 * 60 * 60 * 1000);
+                      return estDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                    };
+
+                    return (
+                      <div>
+                        <h4 className="settings-section-title">Payment History &amp; Escrow Holdings</h4>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '24px' }}>Monitor settled payments, active customer capital holds, and penalty history inside the Emahu Escrow grid.</p>
+
+                        {/* Financial Summary Cards */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+                          <div className="stats-box" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)', padding: '16px', borderRadius: '10px' }}>
+                            <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', color: '#10b981', fontWeight: 700, letterSpacing: '0.5px' }}>Settled Payouts</span>
+                            <h3 style={{ fontSize: '1.5rem', margin: '4px 0', color: '#10b981', fontWeight: 800 }}>₹{totalSettled.toLocaleString('en-IN')}</h3>
+                            <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>Credited directly to bank</p>
+                          </div>
+
+                          <div className="stats-box" style={{ background: 'rgba(65,105,225,0.06)', border: '1px solid rgba(65,105,225,0.15)', padding: '16px', borderRadius: '10px' }}>
+                            <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', color: '#4169e1', fontWeight: 700, letterSpacing: '0.5px' }}>Locked Escrow Holds</span>
+                            <h3 style={{ fontSize: '1.5rem', margin: '4px 0', color: '#4169e1', fontWeight: 800 }}>₹{totalLocked.toLocaleString('en-IN')}</h3>
+                            <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>Held securely in vault</p>
+                          </div>
+
+                          <div className="stats-box" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', padding: '16px', borderRadius: '10px' }}>
+                            <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', color: '#ef4444', fontWeight: 700, letterSpacing: '0.5px' }}>Penalties Deducted</span>
+                            <h3 style={{ fontSize: '1.5rem', margin: '4px 0', color: '#ef4444', fontWeight: 800 }}>₹{totalDeductedPenalties.toLocaleString('en-IN')}</h3>
+                            <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>Penalty cuts applied by admin</p>
+                          </div>
+                        </div>
+
+                        {/* Billing Cycle Details Card */}
+                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px 20px', marginBottom: '32px' }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#fff', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            ⚡ Emahu 15-Day Settlement Billing Cycle
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                            Escrow funds are held for a standard <strong>15-day payment cycle</strong>. Once 15 days have elapsed, the payout is eligible to be released. Payout transfers made by the administrator will have their transfer receipt screenshot attached in the ledger table below.
+                          </p>
+                        </div>
+
+                        {/* Transactions Table */}
+                        <h5 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '12px', color: '#fff' }}>Transaction Payout Ledger</h5>
+                        {orders.length === 0 ? (
+                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No transactions recorded.</p>
+                        ) : (
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+                              <thead>
+                                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                                  <th style={{ padding: '8px 12px' }}>Order ID</th>
+                                  <th style={{ padding: '8px 12px' }}>Order Date</th>
+                                  <th style={{ padding: '8px 12px' }}>Est. Payout (15d)</th>
+                                  <th style={{ padding: '8px 12px' }}>Gross Amt</th>
+                                  <th style={{ padding: '8px 12px' }}>Platform Fee</th>
+                                  <th style={{ padding: '8px 12px' }}>Penalty Cut</th>
+                                  <th style={{ padding: '8px 12px' }}>Net Payout</th>
+                                  <th style={{ padding: '8px 12px' }}>Settlement State</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {orders.map((o, idx) => {
+                                  const raw = o.raw || o;
+                                  const { productAmount, feePercent, feeAmount, penaltyAmount, netPayout } = getPayoutDetails(o);
+                                  const isReleased = raw.paymentReleased || (raw.status && raw.status.includes('RELEASED'));
+                                  const isRejected = raw.status && (raw.status.includes('REJECTED') || raw.status.includes('Rejected'));
+
+                                  return (
+                                    <tr key={raw.orderId ? `payout-${raw.orderId}-${idx}` : `payout-idx-${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                      <td style={{ padding: '10px 12px', fontWeight: 'bold' }}>#{raw.orderId}</td>
+                                      <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>
+                                        {raw.date || (raw.createdAt ? new Date(raw.createdAt).toLocaleDateString('en-IN') : 'N/A')}
+                                      </td>
+                                      <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>
+                                        {getEstimatedPayoutDate(o)}
+                                      </td>
+                                      <td style={{ padding: '10px 12px' }}>₹{productAmount.toLocaleString('en-IN')}</td>
+                                      <td style={{ padding: '10px 12px', color: '#ef4444' }}>
+                                        -₹{feeAmount.toLocaleString('en-IN')} ({feePercent}%)
+                                      </td>
+                                      <td style={{ padding: '10px 12px', color: penaltyAmount > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                                        {penaltyAmount > 0 ? `-₹${penaltyAmount.toLocaleString('en-IN')}` : '—'}
+                                        {raw.penaltyReason && <span style={{ display: 'block', fontSize: '0.68rem', color: '#a1a1aa' }}>({raw.penaltyReason})</span>}
+                                      </td>
+                                      <td style={{ padding: '10px 12px', fontWeight: 'bold', color: isReleased ? '#10b981' : '#fff' }}>
+                                        ₹{netPayout.toLocaleString('en-IN')}
+                                      </td>
+                                      <td style={{ padding: '10px 12px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                          <span style={{
+                                            display: 'inline-block',
+                                            padding: '2px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '0.7rem',
+                                            fontWeight: 700,
+                                            width: 'max-content',
+                                            backgroundColor: raw.paymentStatus === 'paid' ? 'rgba(16,185,129,0.1)' : isReleased ? 'rgba(59,130,246,0.1)' : isRejected ? 'rgba(239,68,68,0.1)' : 'rgba(156,163,175,0.1)',
+                                            color: raw.paymentStatus === 'paid' ? '#10b981' : isReleased ? '#3b82f6' : isRejected ? '#ef4444' : '#9ca3af'
+                                          }}>
+                                            {raw.paymentStatus === 'paid' ? '🔓 Paid & Settled' : isReleased ? '⌛ Payout Processing' : isRejected ? '❌ Cancelled' : '🔒 Escrow Locked'}
+                                          </span>
+                                          {raw.paymentStatus === 'paid' && raw.transactionFile && (
+                                            <a
+                                              href={raw.transactionFile}
+                                              download={`payout_receipt_${raw.orderId}.png`}
+                                              style={{ fontSize: '0.72rem', color: '#3b82f6', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px', fontWeight: '600' }}
+                                            >
+                                              📄 View Transfer Receipt
+                                            </a>
+                                          )}
+                                          {!isReleased && !isRejected && (raw.status === 'DELIVERED' || raw.status === 'COMPLETED') && (
+                                            <button
+                                              onClick={() => {
+                                                setSelectedDetailedOrderId(raw.orderId);
+                                                setIsReleaseModalOpen(true);
+                                              }}
+                                              style={{
+                                                padding: '4px 8px',
+                                                background: '#10b981',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                fontSize: '0.72rem',
+                                                fontWeight: '700',
+                                                cursor: 'pointer',
+                                                marginTop: '4px',
+                                                boxShadow: '0 2px 6px rgba(16,185,129,0.15)',
+                                                width: 'max-content'
+                                              }}
+                                            >
+                                              💰 Release Payout
+                                            </button>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
                         )}
                       </div>
+                    );
+                  })()}
 
-                      <div 
-                        id="seller-shop-map" 
-                        style={{ 
-                          height: '320px', 
-                          width: '100%', 
-                          borderRadius: '10px', 
-                          border: '1px solid var(--border-color)',
-                          position: 'relative',
-                          zIndex: 10
-                        }} 
-                      />
-
-                      {/* Coordinate readout */}
-                      {settingsForm.latitude && settingsForm.longitude && (
-                        <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          <span>🌐 Lat: <strong>{parseFloat(settingsForm.latitude).toFixed(5)}</strong></span>
-                          <span>Lon: <strong>{parseFloat(settingsForm.longitude).toFixed(5)}</strong></span>
-                        </div>
-                      )}
-                    </div>
-
-
-                 </div>
-
+                </div>
               </div>
             </div>
-          </div>
           )}
 
 
 
-          {/* TAB: DELIVERY SETTINGS (ADMIN ONLY) */}
-          {activeTab === 'delivery_settings' && sellerUser?.role === 'admin' && (
+          {/* TAB: DELIVERY SETTINGS */}
+          {activeTab === 'delivery_settings' && (
             <div>
               <div className="view-header">
                 <div className="view-title-group">
@@ -4566,9 +5079,9 @@ export default function EmahuProDashboard() {
                       <div className="form-grid-2">
                         <div className="form-group">
                           <label className="form-label" style={{ color: 'var(--text-secondary)' }}>Maximum Allowed Delivery Distance (KM)</label>
-                          <input 
-                            type="number" 
-                            className="form-input" 
+                          <input
+                            type="number"
+                            className="form-input"
                             value={adminDeliverySettings.maxDeliveryDistance}
                             onChange={(e) => setAdminDeliverySettings(prev => ({ ...prev, maxDeliveryDistance: parseFloat(e.target.value) || 0 }))}
                             required
@@ -4579,9 +5092,9 @@ export default function EmahuProDashboard() {
                       <div className="form-grid-2" style={{ marginTop: '16px' }}>
                         <div className="form-group">
                           <label className="form-label" style={{ color: 'var(--text-secondary)' }}>Express Shipping Extra Surcharge (₹)</label>
-                          <input 
-                            type="number" 
-                            className="form-input" 
+                          <input
+                            type="number"
+                            className="form-input"
                             value={adminDeliverySettings.expressDeliverySurcharge}
                             onChange={(e) => setAdminDeliverySettings(prev => ({ ...prev, expressDeliverySurcharge: parseFloat(e.target.value) || 0 }))}
                             required
@@ -4592,9 +5105,9 @@ export default function EmahuProDashboard() {
                       <div style={{ marginTop: '24px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                           <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>Cost Distance Slabs Configuration</span>
-                          <button 
-                            type="button" 
-                            className="company-portal-btn" 
+                          <button
+                            type="button"
+                            className="company-portal-btn"
                             onClick={handleAddSlab}
                             style={{ height: '32px', fontSize: '0.8rem', padding: '0 12px' }}
                           >
@@ -4607,8 +5120,8 @@ export default function EmahuProDashboard() {
                             <div key={index} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                               <div className="form-group" style={{ flex: 1 }}>
                                 <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>From Distance (KM)</label>
-                                <input 
-                                  type="number" 
+                                <input
+                                  type="number"
                                   className="form-input"
                                   style={{ height: '36px', fontSize: '0.85rem' }}
                                   value={slab.fromKm}
@@ -4618,8 +5131,8 @@ export default function EmahuProDashboard() {
                               </div>
                               <div className="form-group" style={{ flex: 1 }}>
                                 <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>To Distance (KM)</label>
-                                <input 
-                                  type="number" 
+                                <input
+                                  type="number"
                                   className="form-input"
                                   style={{ height: '36px', fontSize: '0.85rem' }}
                                   value={slab.toKm}
@@ -4629,8 +5142,8 @@ export default function EmahuProDashboard() {
                               </div>
                               <div className="form-group" style={{ flex: 1 }}>
                                 <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Cost (₹)</label>
-                                <input 
-                                  type="number" 
+                                <input
+                                  type="number"
                                   className="form-input"
                                   style={{ height: '36px', fontSize: '0.85rem' }}
                                   value={slab.charge}
@@ -4638,17 +5151,17 @@ export default function EmahuProDashboard() {
                                   required
                                 />
                               </div>
-                              <button 
-                                type="button" 
+                              <button
+                                type="button"
                                 className="company-portal-btn"
                                 onClick={() => handleRemoveSlab(index)}
-                                style={{ 
-                                  height: '36px', 
-                                  marginTop: '18px', 
-                                  background: 'var(--color-danger)', 
+                                style={{
+                                  height: '36px',
+                                  marginTop: '18px',
+                                  background: 'var(--color-danger)',
                                   borderColor: 'var(--color-danger)',
-                                  color: '#fff', 
-                                  padding: '0 12px', 
+                                  color: '#fff',
+                                  padding: '0 12px',
                                   fontSize: '0.8rem'
                                 }}
                               >
@@ -4706,7 +5219,7 @@ export default function EmahuProDashboard() {
                         const isApproved = seller.status === 'approved';
                         const isRejected = seller.status === 'rejected';
                         const isPending = seller.status === 'pending';
-                        
+
                         return (
                           <tr key={seller._id}>
                             <td>
@@ -4737,13 +5250,12 @@ export default function EmahuProDashboard() {
                             </td>
                             <td>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <span className={`status-badge ${
-                                  isApproved ? 'in-stock' :
-                                  isPending ? 'draft' : 'out-of-stock'
-                                }`} style={{ display: 'inline-block', width: 'fit-content' }}>
+                                <span className={`status-badge ${isApproved ? 'in-stock' :
+                                    isPending ? 'draft' : 'out-of-stock'
+                                  }`} style={{ display: 'inline-block', width: 'fit-content' }}>
                                   {seller.status === 'approved' ? 'Approved & Active' :
-                                   seller.status === 'rejected' ? 'Rejected' :
-                                   seller.status === 'more_info_requested' ? 'More Info' : 'Pending Audit'}
+                                    seller.status === 'rejected' ? 'Rejected' :
+                                      seller.status === 'more_info_requested' ? 'More Info' : 'Pending Audit'}
                                 </span>
                                 {seller.verificationFeedback && (
                                   <span style={{ fontSize: '0.75rem', color: '#f87171', maxWidth: '200px' }}>
@@ -4762,7 +5274,7 @@ export default function EmahuProDashboard() {
                             <td>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px 0' }}>
                                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                  <button 
+                                  <button
                                     className="company-portal-btn"
                                     style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', background: isApproved ? 'rgba(255,255,255,0.08)' : 'var(--color-success)', borderColor: isApproved ? 'rgba(255,255,255,0.1)' : 'var(--color-success)' }}
                                     onClick={() => handleSellerDecision(seller._id, 'approve')}
@@ -4771,7 +5283,7 @@ export default function EmahuProDashboard() {
                                     {isApproved ? 'Approved ✓' : 'Approve'}
                                   </button>
 
-                                  <button 
+                                  <button
                                     className="company-portal-btn"
                                     style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
                                     onClick={() => {
@@ -4786,7 +5298,7 @@ export default function EmahuProDashboard() {
                                     Reject
                                   </button>
 
-                                  <button 
+                                  <button
                                     className="company-portal-btn"
                                     style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', background: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: '#fff' }}
                                     onClick={() => setSelectedDetailedSeller(seller)}
@@ -4794,8 +5306,8 @@ export default function EmahuProDashboard() {
                                     Details
                                   </button>
                                 </div>
-                                
-                                <input 
+
+                                <input
                                   type="text"
                                   placeholder="Feedback/rejection reason..."
                                   className="form-input"
@@ -4884,14 +5396,13 @@ export default function EmahuProDashboard() {
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '4px' }}>
                 <strong style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Request Status:</strong>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                  <span className={`status-badge ${
-                    selectedDetailedProduct.approvalStatus === 'approved' ? 'in-stock' :
-                    (selectedDetailedProduct.approvalStatus === 'pending' && selectedDetailedProduct.adminCode) ? 'low-stock' :
-                    selectedDetailedProduct.approvalStatus === 'pending' ? 'draft' : 'out-of-stock'
-                  }`}>
+                  <span className={`status-badge ${selectedDetailedProduct.approvalStatus === 'approved' ? 'in-stock' :
+                      (selectedDetailedProduct.approvalStatus === 'pending' && selectedDetailedProduct.adminCode) ? 'low-stock' :
+                        selectedDetailedProduct.approvalStatus === 'pending' ? 'draft' : 'out-of-stock'
+                    }`}>
                     {selectedDetailedProduct.approvalStatus === 'approved' ? 'Approved & Live' :
-                     (selectedDetailedProduct.approvalStatus === 'pending' && selectedDetailedProduct.adminCode) ? 'Pending Activation' :
-                     selectedDetailedProduct.approvalStatus === 'pending' ? 'Under Admin Review' : 'Rejected'}
+                      (selectedDetailedProduct.approvalStatus === 'pending' && selectedDetailedProduct.adminCode) ? 'Pending Activation' :
+                        selectedDetailedProduct.approvalStatus === 'pending' ? 'Under Admin Review' : 'Rejected'}
                   </span>
                   {selectedDetailedProduct.approvalAttempts > 0 && (
                     <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 'bold' }}>
@@ -4936,7 +5447,7 @@ export default function EmahuProDashboard() {
             </div>
 
             <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', color: 'var(--text-primary)', overflowY: 'auto', maxHeight: '75vh' }}>
-              
+
               {/* Profile Summary Card */}
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                 <div>
@@ -4951,15 +5462,14 @@ export default function EmahuProDashboard() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                  <span className={`status-badge ${
-                    selectedDetailedSeller.status === 'approved' ? 'in-stock' :
-                    selectedDetailedSeller.status === 'pending' ? 'draft' : 'out-of-stock'
-                  }`}>
+                  <span className={`status-badge ${selectedDetailedSeller.status === 'approved' ? 'in-stock' :
+                      selectedDetailedSeller.status === 'pending' ? 'draft' : 'out-of-stock'
+                    }`}>
                     {selectedDetailedSeller.status === 'approved' ? 'Approved' :
-                     selectedDetailedSeller.status === 'rejected' ? 'Rejected' :
-                     selectedDetailedSeller.status === 'more_info_requested' ? 'More Info Requested' : 'Pending Audit'}
+                      selectedDetailedSeller.status === 'rejected' ? 'Rejected' :
+                        selectedDetailedSeller.status === 'more_info_requested' ? 'More Info Requested' : 'Pending Audit'}
                   </span>
-                  
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
                     {selectedDetailedSeller.isEmailVerified ? (
                       <span style={{ fontSize: '0.72rem', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
@@ -5010,7 +5520,7 @@ export default function EmahuProDashboard() {
                           <span style={{ fontWeight: 'bold', textTransform: 'capitalize' }}>{doc.documentType?.replace(/_/g, ' ')}</span>
                           <span className={`status-badge ${doc.status === 'approved' ? 'in-stock' : 'out-of-stock'}`} style={{ fontSize: '0.65rem', padding: '1px 4px' }}>{doc.status}</span>
                         </div>
-                        
+
                         <div style={{ width: '100%', height: '140px', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {doc.fileUrl && doc.fileUrl.startsWith('http') ? (
                             <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -5085,8 +5595,8 @@ export default function EmahuProDashboard() {
             <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 {selectedDetailedSeller.status !== 'approved' && (
-                  <button 
-                    className="company-portal-btn" 
+                  <button
+                    className="company-portal-btn"
                     style={{ background: 'var(--color-success)', borderColor: 'var(--color-success)', marginRight: '10px' }}
                     onClick={() => {
                       handleSellerDecision(selectedDetailedSeller._id, 'approve');
@@ -5096,8 +5606,8 @@ export default function EmahuProDashboard() {
                     Approve Seller Store
                   </button>
                 )}
-                <button 
-                  className="company-portal-btn" 
+                <button
+                  className="company-portal-btn"
                   style={{ background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
                   onClick={() => {
                     const reason = sellerRejectionFeedback[selectedDetailedSeller._id] || '';
@@ -5167,10 +5677,10 @@ export default function EmahuProDashboard() {
                 <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Product Title *</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      placeholder="e.g. Minimalist Walnut Coffee Table" 
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. Minimalist Walnut Coffee Table"
                       value={newProductName}
                       onChange={(e) => setNewProductName(e.target.value)}
                       required
@@ -5182,10 +5692,10 @@ export default function EmahuProDashboard() {
 
                   <div className="form-group">
                     <label className="form-label">Brand Name *</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      placeholder="e.g. Apple, Sony, Nike" 
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. Apple, Sony, Nike"
                       value={newProductBrand}
                       onChange={(e) => setNewProductBrand(e.target.value)}
                       required
@@ -5198,9 +5708,9 @@ export default function EmahuProDashboard() {
 
                 <div className="form-group" style={{ marginTop: '16px' }}>
                   <label className="form-label">Merchandise Category *</label>
-                  <CategorySelector 
-                    value={newProductCategory} 
-                    onChange={setNewProductCategory} 
+                  <CategorySelector
+                    value={newProductCategory}
+                    onChange={setNewProductCategory}
                   />
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                     Helps buyers filter and discover your items.
@@ -5226,10 +5736,10 @@ export default function EmahuProDashboard() {
                 <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Listing Price (INR) *</label>
-                    <input 
-                      type="number" 
-                      className="form-input" 
-                      placeholder="₹12,499" 
+                    <input
+                      type="number"
+                      className="form-input"
+                      placeholder="₹12,499"
                       value={newProductPrice}
                       onChange={(e) => setNewProductPrice(e.target.value)}
                       required
@@ -5241,10 +5751,10 @@ export default function EmahuProDashboard() {
 
                   <div className="form-group">
                     <label className="form-label">Compare-At Price (INR) *</label>
-                    <input 
-                      type="number" 
-                      className="form-input" 
-                      placeholder="₹15,000" 
+                    <input
+                      type="number"
+                      className="form-input"
+                      placeholder="₹15,000"
                       value={newProductComparePrice}
                       onChange={(e) => setNewProductComparePrice(e.target.value)}
                       required
@@ -5263,10 +5773,10 @@ export default function EmahuProDashboard() {
                 <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Available Inventory *</label>
-                    <input 
-                      type="number" 
-                      className="form-input" 
-                      placeholder="e.g. 50" 
+                    <input
+                      type="number"
+                      className="form-input"
+                      placeholder="e.g. 50"
                       value={newProductStock}
                       onChange={(e) => setNewProductStock(e.target.value)}
                       required
@@ -5300,8 +5810,8 @@ export default function EmahuProDashboard() {
 
                 <div className="form-group">
                   <label className="form-label">Description *</label>
-                  <textarea 
-                    className="form-textarea" 
+                  <textarea
+                    className="form-textarea"
                     style={{ minHeight: '100px' }}
                     placeholder="Summarize product parameters, size details, materials, warranty terms, and special care instructions..."
                     value={newProductDescription}
@@ -5315,16 +5825,16 @@ export default function EmahuProDashboard() {
               </div>
 
               <div className="modal-footer" style={{ flexShrink: 0 }}>
-                <button 
-                  type="button" 
-                  className="modal-btn cancel" 
+                <button
+                  type="button"
+                  className="modal-btn cancel"
                   onClick={() => setIsAddModalOpen(false)}
                   disabled={isSubmittingProduct}
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="modal-btn confirm"
                   style={{
                     display: 'flex',
@@ -5354,191 +5864,340 @@ export default function EmahuProDashboard() {
         </div>
       )}
 
-      {/* --- DELIVERY PARTNER SELECTION MODAL --- */}
+      {/* --- DELIVERY PARTNER MODAL (LIGHT MODE) --- */}
       {isDeliveryModalOpen && (
         <div className="modal-overlay" style={{ zIndex: 9999 }}>
-          <div className="modal-card" style={{ maxWidth: '520px' }}>
-            <div className="modal-header">
-              <div className="modal-title-group">
-                <h3>Assign Delivery Partner</h3>
-                <p>Select a verified carrier grid partner for Order #{selectedOrderId}</p>
+          <div style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '580px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+
+            {/* Header */}
+            <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>🚚 Assign Delivery Partner</h3>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>All registered partners · Order #{selectedOrderId}</p>
               </div>
-              <button className="modal-close-btn" onClick={() => setIsDeliveryModalOpen(false)}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
+              <button onClick={() => setIsDeliveryModalOpen(false)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#64748b', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
               </button>
             </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px', maxHeight: '400px', overflowY: 'auto' }}>
-              {availablePartnersLoading ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: '#fff' }}>
-                  <div style={{ width: '24px', height: '24px', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
-                  <span>Scanning local city hubs for active carriers...</span>
-                </div>
-              ) : availablePartnersError ? (
-                <div style={{ padding: '12px', color: '#f87171', background: 'rgba(220,38,38,0.1)', border: '1px solid #ef4444', borderRadius: '8px', fontSize: '0.9rem', textAlign: 'center' }}>
-                  ⚠️ {availablePartnersError}
-                </div>
-              ) : availablePartners.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
-                  <span style={{ fontSize: '2.5rem' }}>🛵</span>
-                  <p style={{ marginTop: '10px', fontSize: '0.9rem' }}>No active delivery partners found in the buyer's city hub whose service radius covers the shipping address.</p>
-                </div>
-              ) : (
-                availablePartners.map((partner) => {
-                  const order = orders.find(o => o.id === selectedOrderId);
-                  const buyerAddr = order ? (order.raw?.deliveryAddress?.address || order.raw?.buyerLocation?.address || '') : '';
-                  const sellerAddr = order ? (order.raw?.sellerLocation?.address || '') : '';
-                  const messageText = `Hello! I have assigned you to deliver Emahu Order #${selectedOrderId}.\n\nPickup address: ${sellerAddr}\nDrop address: ${buyerAddr}\nDistance: ${order?.raw?.distanceKm || 0} KM\nEstimated charge: ₹${partner.totalCost}.\n\nYou can view and update the job delivery progress on your dashboard: ${typeof window !== 'undefined' ? `${window.location.origin}/delivery` : 'http://localhost:3000/delivery'}`;
-                  const whatsappUrl = `https://wa.me/${partner.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(messageText)}`;
-                  const isSelected = selectedPartnerId === partner._id;
 
+            {/* Partner List */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '0', minHeight: 0 }}>
+              {/* Special Self-Delivery option at the top */}
+              {!availablePartnersLoading && (
+                (() => {
+                  const isSelected = selectedPartnerId === 'sd';
                   return (
-                    <div 
-                      key={partner._id} 
-                      style={{ 
-                        display: 'flex', 
-                        flexDirection: 'column',
-                        gap: '8px',
-                        padding: '16px', 
-                        borderRadius: '10px', 
-                        backgroundColor: isSelected ? 'rgba(49, 151, 149, 0.08)' : '#f7fafc', 
-                        border: isSelected ? '1px solid #319795' : '1px solid #e2e8f0',
-                        cursor: orderLoading[selectedOrderId] ? 'not-allowed' : 'pointer',
-                        opacity: orderLoading[selectedOrderId] ? 0.6 : 1,
-                        transition: 'all 0.2s ease'
-                      }}
-                      onClick={() => {
-                        if (orderLoading[selectedOrderId]) return;
-                        setSelectedPartnerId(partner._id);
-                        setIsConfirmChecked(false);
-                        setHasContactedPartner(false);
+                    <div
+                      onClick={() => { setSelectedPartnerId(isSelected ? '' : 'sd'); setIsConfirmChecked(false); }}
+                      style={{
+                        borderRadius: '12px',
+                        border: isSelected ? '2px solid #10b981' : '1.5px solid #e2e8f0',
+                        background: isSelected ? '#f0fdf4' : '#fafafa',
+                        cursor: 'pointer',
+                        transition: 'all 0.18s ease',
+                        overflow: 'hidden',
+                        marginBottom: '10px',
+                        boxShadow: isSelected ? '0 2px 12px rgba(16,185,129,0.15)' : '0 1px 4px rgba(0,0,0,0.04)'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <h4 style={{ margin: '0 0 4px 0', color: '#1a202c', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {partner.name}
-                            {isSelected && <span style={{ color: '#319795', fontSize: '0.8rem' }}>● Selected</span>}
-                          </h4>
-                          <div style={{ fontSize: '0.8rem', color: '#4a5568' }}>
-                            📍 Location: {partner.currentArea}, {partner.currentCity} ({partner.pincode})
+                      <div style={{ padding: '13px 15px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                        <div style={{ width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0, background: isSelected ? '#dcfce7' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', border: `1px solid ${isSelected ? '#bbf7d0' : '#e2e8f0'}` }}>
+                          🛵
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: '700', fontSize: '0.93rem', color: '#0f172a' }}>Self-Delivery (sd)</span>
+                            <span style={{ padding: '2px 7px', borderRadius: '20px', fontSize: '0.6rem', fontWeight: '800', background: '#3b82f6', color: '#fff' }}>Merchant Managed</span>
+                            {isSelected && (
+                              <span style={{ padding: '2px 7px', borderRadius: '20px', fontSize: '0.6rem', fontWeight: '800', background: '#6366f1', color: '#fff' }}>✓ Selected</span>
+                            )}
                           </div>
-                          {partner.latitude && partner.longitude && (
-                            <div style={{ fontSize: '0.75rem', color: '#4a5568', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <a
-                                href={`https://www.google.com/maps/search/?api=1&query=${partner.latitude},${partner.longitude}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ color: '#319795', textDecoration: 'underline', fontSize: '0.75rem' }}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                🧭 View operating map location
-                              </a>
-                            </div>
-                          )}
-                          <div style={{ fontSize: '0.78rem', color: '#4a5568', marginTop: '4px' }}>
-                            Vehicle: {partner.vehicleType?.toUpperCase()} | Radius: {partner.serviceRadius} KM | Rate: ₹{partner.ratePerKm}/KM
+                          <div style={{ fontSize: '0.77rem', color: '#475569', marginBottom: '3px' }}>
+                            📍 Deliver items yourself or using your own in-house delivery rider.
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>
+                            No platform delivery partner coordinates will be shared.
                           </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <strong style={{ color: '#15803d', fontSize: '1.25rem', display: 'block' }}>₹{partner.totalCost}</strong>
-                          <span style={{ fontSize: '0.75rem', color: '#4a5568' }}>Total Cost</span>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#3b82f6' }}>₹0</div>
+                          <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '1px' }}>Fulfillment</div>
                         </div>
                       </div>
-
-                      {/* Direct Contact Buttons */}
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }} onClick={(e) => e.stopPropagation()}>
-                        <a 
-                          href={`tel:${partner.phone}`}
-                          onClick={() => setHasContactedPartner(true)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            backgroundColor: '#f7fafc',
-                            border: '1px solid #cbd5e0',
-                            color: '#2d3748',
-                            fontSize: '0.78rem',
-                            textDecoration: 'none',
-                            transition: 'background-color 0.2s'
-                          }}
-                        >
-                          📞 Call Partner ({partner.phone})
-                        </a>
-                        <a 
-                          href={whatsappUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={() => setHasContactedPartner(true)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            backgroundColor: '#25D366',
-                            color: '#fff',
-                            fontSize: '0.78rem',
-                            fontWeight: '600',
-                            textDecoration: 'none',
-                            transition: 'opacity 0.2s'
-                          }}
-                        >
-                          💬 Send WhatsApp Request
-                        </a>
+                      <div style={{ padding: '7px 15px', borderTop: '1px solid #f1f5f9', background: isSelected ? '#f0fdf4' : '#f8fafc', fontSize: '0.69rem', color: '#94a3b8' }}>
+                        Merchant controls all shipping states (Picked Up, In Transit, Delivered) manually.
                       </div>
                     </div>
                   );
-                })
+                })()
+              )}
+
+              {availablePartnersLoading ? (
+                <div style={{ padding: '50px 20px', textAlign: 'center' }}>
+                  <div style={{ width: '34px', height: '34px', border: '3px solid #e2e8f0', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 14px' }} />
+                  <p style={{ color: '#64748b', margin: 0, fontSize: '0.88rem' }}>Loading logistics partners…</p>
+                </div>
+              ) : availablePartnersError ? (
+                <div style={{ padding: '20px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', textAlign: 'center', margin: '8px 0' }}>
+                  <div style={{ fontSize: '1.8rem', marginBottom: '6px' }}>⚠️</div>
+                  <div style={{ fontWeight: '600', color: '#dc2626', marginBottom: '4px', fontSize: '0.9rem' }}>Could not load partners</div>
+                  <div style={{ fontSize: '0.78rem', color: '#b91c1c' }}>{availablePartnersError}</div>
+                </div>
+              ) : (
+                <>
+                  {availablePartners.map((partner, idx) => {
+                    const selectedOrder = orders.find(o => o.id === selectedOrderId);
+                    const buyerCity = selectedOrder?.raw?.deliveryAddress?.city || '';
+                    const buyerAddr = selectedOrder?.raw?.deliveryAddress?.address || selectedOrder?.raw?.buyerLocation?.address || '';
+                    const sellerAddr = selectedOrder?.raw?.sellerLocation?.address || '';
+                    const distKm = selectedOrder?.raw?.distanceKm || 5;
+                    const msgText = `Hello ${partner.name}! Assigned to deliver Emahu Order #${selectedOrderId}.\n\nPickup: ${sellerAddr}\nDrop: ${buyerAddr}${buyerCity ? ', ' + buyerCity : ''}\nDistance: ${distKm} KM\nEstimated earnings: Rs.${partner.totalCost}\n\nPlease confirm. Thank you!`;
+                    const whatsappUrl = `https://wa.me/${(partner.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msgText)}`;
+                    const isSelected = selectedPartnerId === partner._id;
+                    const isBestMatch = partner.isCityMatch && partner.isRadiusMatch;
+                    const vehicleEmoji = { bike: '🏍️', scooter: '🛵', car: '🚗', truck: '🚛' }[partner.vehicleType] || '🚐';
+
+                    return (
+                      <div
+                        key={partner._id}
+                        onClick={() => { setSelectedPartnerId(isSelected ? '' : partner._id); setIsConfirmChecked(false); }}
+                        style={{
+                          borderRadius: '12px',
+                          border: isSelected ? '2px solid #10b981' : '1.5px solid #e2e8f0',
+                          background: isSelected ? '#f0fdf4' : isBestMatch ? '#fafffe' : '#ffffff',
+                          cursor: 'pointer',
+                          transition: 'all 0.18s ease',
+                          overflow: 'hidden',
+                          marginBottom: '10px',
+                          boxShadow: isSelected ? '0 2px 12px rgba(16,185,129,0.15)' : '0 1px 4px rgba(0,0,0,0.04)'
+                        }}
+                      >
+                        {/* Card top row */}
+                        <div style={{ padding: '13px 15px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                          {/* Vehicle icon badge */}
+                          <div style={{ width: '42px', height: '42px', borderRadius: '10px', flexShrink: 0, background: isSelected ? '#dcfce7' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', border: `1px solid ${isSelected ? '#bbf7d0' : '#e2e8f0'}` }}>
+                            {vehicleEmoji}
+                          </div>
+
+                          {/* Partner info */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                              <span style={{ fontWeight: '700', fontSize: '0.93rem', color: '#0f172a' }}>{partner.name}</span>
+                              {idx === 0 && isBestMatch && (
+                                <span style={{ padding: '2px 7px', borderRadius: '20px', fontSize: '0.6rem', fontWeight: '800', background: '#10b981', color: '#fff', letterSpacing: '0.3px' }}>⭐ Best Match</span>
+                              )}
+                              {isSelected && (
+                                <span style={{ padding: '2px 7px', borderRadius: '20px', fontSize: '0.6rem', fontWeight: '800', background: '#6366f1', color: '#fff' }}>✓ Selected</span>
+                              )}
+                              {isBestMatch && idx > 0 && (
+                                <span style={{ padding: '2px 6px', borderRadius: '20px', fontSize: '0.6rem', fontWeight: '700', background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>City Match ✓</span>
+                              )}
+                              {partner.isCityMatch && !partner.isRadiusMatch && (
+                                <span style={{ padding: '2px 6px', borderRadius: '20px', fontSize: '0.6rem', fontWeight: '700', background: '#fef9c3', color: '#854d0e', border: '1px solid #fde047' }}>City Only</span>
+                              )}
+                              {!partner.isCityMatch && (
+                                <span style={{ padding: '2px 6px', borderRadius: '20px', fontSize: '0.6rem', fontWeight: '700', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #e2e8f0' }}>Other City</span>
+                              )}
+                            </div>
+
+                            {/* Location */}
+                            <div style={{ fontSize: '0.77rem', color: '#475569', marginBottom: '3px' }}>
+                              📍 {[partner.currentArea, partner.currentCity, partner.pincode].filter(Boolean).join(', ') || 'Location not set'}
+                            </div>
+
+                            {/* Vehicle + Radius + Distance */}
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>
+                              <span>{vehicleEmoji} {partner.vehicleType ? partner.vehicleType.charAt(0).toUpperCase() + partner.vehicleType.slice(1) : 'Vehicle'}{partner.vehicleNumber ? ` · ${partner.vehicleNumber}` : ''}</span>
+                              <span>· 📐 {partner.serviceRadius} km radius</span>
+                              {partner.distanceToBuyer > 0 && (
+                                <span style={{ color: partner.isRadiusMatch ? '#16a34a' : '#dc2626', fontWeight: '600' }}>
+                                  {partner.isRadiusMatch ? '✓' : '✗'} {partner.distanceToBuyer} km from buyer
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Cost */}
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#16a34a' }}>₹{partner.totalCost}</div>
+                            <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '1px' }}>Est. total</div>
+                          </div>
+                        </div>
+
+                        {/* Bottom row: rates + action buttons */}
+                        <div style={{ padding: '7px 15px', borderTop: '1px solid #f1f5f9', background: isSelected ? '#f0fdf4' : '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ fontSize: '0.69rem', color: '#94a3b8', display: 'flex', gap: '6px' }}>
+                            <span>₹{partner.rateUpTo2Km}/km (≤2km)</span>
+                            <span>·</span>
+                            <span>₹{partner.rateAbove2Km}/km (&gt;2km)</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '5px' }} onClick={e => e.stopPropagation()}>
+                            {partner.latitude && partner.longitude && (
+                              <a href={`https://www.google.com/maps/search/?api=1&query=${partner.latitude},${partner.longitude}`} target="_blank" rel="noreferrer"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.69rem', color: '#6366f1', textDecoration: 'none', padding: '3px 7px', borderRadius: '5px', background: '#eef2ff', fontWeight: '600', border: '1px solid #c7d2fe' }}>
+                                🗺️ Map
+                              </a>
+                            )}
+                            <a href={`tel:${partner.phone}`} onClick={() => setHasContactedPartner(true)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.69rem', color: '#374151', textDecoration: 'none', padding: '3px 7px', borderRadius: '5px', background: '#f9fafb', fontWeight: '600', border: '1px solid #e5e7eb' }}>
+                              📞 Call
+                            </a>
+                            <a href={whatsappUrl} target="_blank" rel="noreferrer" onClick={() => setHasContactedPartner(true)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.69rem', color: '#fff', textDecoration: 'none', padding: '3px 7px', borderRadius: '5px', background: '#25D366', fontWeight: '600' }}>
+                              💬 WhatsApp
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {availablePartners.length === 0 && (
+                    <div style={{ padding: '20px', textAlign: 'center', border: '1px dashed #e2e8f0', borderRadius: '12px', marginTop: '10px', background: '#fafafa' }}>
+                      <p style={{ color: '#64748b', margin: 0, fontSize: '0.8rem', fontWeight: 600 }}>No third-party logistics partners found near buyer.</p>
+                      <p style={{ color: '#94a3b8', margin: '2px 0 0 0', fontSize: '0.72rem' }}>You can use Self-Delivery above to fulfill this order.</p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
-            {/* Checkbox Confirmation & Action Button */}
-            {selectedPartnerId && hasContactedPartner && (
-              <div style={{ padding: '16px 20px', borderTop: '1px solid #e2e8f0', background: '#f7fafc' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2d3748', fontSize: '0.85rem', cursor: 'pointer', marginBottom: '12px' }}>
-                  <input
-                    type="checkbox"
-                    checked={isConfirmChecked}
-                    onChange={(e) => setIsConfirmChecked(e.target.checked)}
-                    style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#319795' }}
-                  />
-                  <span>Confirm to assign <strong>{availablePartners.find(p => p._id === selectedPartnerId)?.name}</strong> for delivery</span>
-                </label>
-                <button
-                  className="form-btn"
-                  style={{ 
-                    width: '100%', 
-                    margin: 0, 
-                    padding: '10px', 
-                    borderRadius: '8px',
-                    backgroundColor: isConfirmChecked ? '#319795' : 'rgba(0,0,0,0.08)', 
-                    cursor: isConfirmChecked ? 'pointer' : 'not-allowed', 
-                    color: isConfirmChecked ? '#fff' : '#4a5568',
-                    border: 'none',
-                    fontWeight: '600'
-                  }}
-                  disabled={!isConfirmChecked || orderLoading[selectedOrderId]}
-                  onClick={() => {
-                    const partner = availablePartners.find(p => p._id === selectedPartnerId);
-                    if (partner) {
-                      handleSelectDeliveryPartner(selectedOrderId, partner._id, partner.name, partner.totalCost);
-                      setIsDeliveryModalOpen(false);
-                    }
-                  }}
-                >
-                  Approve & Assign Partner
-                </button>
-              </div>
-            )}
+            {/* Confirm Footer */}
+            {selectedPartnerId && (() => {
+              const isSelfDelivery = selectedPartnerId === 'sd';
+              const partner = isSelfDelivery 
+                ? { _id: 'sd', name: 'Self-Delivery (sd)', totalCost: 0, currentCity: 'Merchant Location' } 
+                : availablePartners.find(p => p._id === selectedPartnerId);
+
+              return (
+                <div style={{ padding: '14px 18px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                  {/* Selected banner */}
+                  <div style={{ padding: '9px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.8rem', color: '#15803d', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1rem' }}>✓</span>
+                    <span><strong>{isSelfDelivery ? 'Self-Delivery (sd)' : partner?.name}</strong>{partner?.currentCity ? ` · ${partner.currentCity}` : ''} · {isSelfDelivery ? 'Merchant-managed' : `₹${partner?.totalCost} estimated`}</span>
+                  </div>
+                  {/* Confirmation checkbox */}
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#374151', fontSize: '0.8rem', cursor: 'pointer', marginBottom: '10px' }}>
+                    <input type="checkbox" checked={isConfirmChecked} onChange={(e) => setIsConfirmChecked(e.target.checked)}
+                      style={{ cursor: 'pointer', width: '15px', height: '15px', marginTop: '2px', accentColor: '#10b981', flexShrink: 0 }} />
+                    <span>I confirm assigning <strong style={{ color: '#0f172a' }}>{isSelfDelivery ? 'Self-Delivery (sd)' : partner?.name}</strong> as the delivery partner. This will update the order status.</span>
+                  </label>
+                  {/* Assign Button */}
+                  <button
+                    disabled={!isConfirmChecked || !!orderLoading[selectedOrderId]}
+                    onClick={() => { if (partner) { handleSelectDeliveryPartner(selectedOrderId, partner._id, partner.name, partner.totalCost); setIsDeliveryModalOpen(false); } }}
+                    style={{
+                      width: '100%', padding: '11px', borderRadius: '10px', border: 'none',
+                      background: isConfirmChecked ? 'linear-gradient(135deg, #10b981, #059669)' : '#e2e8f0',
+                      color: isConfirmChecked ? '#fff' : '#94a3b8',
+                      fontWeight: '700', fontSize: '0.9rem',
+                      cursor: isConfirmChecked && !orderLoading[selectedOrderId] ? 'pointer' : 'not-allowed',
+                      transition: 'all 0.2s',
+                      boxShadow: isConfirmChecked ? '0 4px 14px rgba(16,185,129,0.25)' : 'none'
+                    }}
+                  >
+                    {orderLoading[selectedOrderId] ? '⌛ Assigning...' : `🚚 Confirm & Assign ${isSelfDelivery ? 'Self-Delivery (sd)' : partner?.name}`}
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
 
+      {/* --- PAYMENT RELEASE MODAL (LIGHT MODE) --- */}
+      {isReleaseModalOpen && selectedDetailedOrder && (() => {
+        const orderTotal = selectedDetailedOrder.total || 0;
+        const productAmount = selectedDetailedOrder.productAmount || orderTotal;
+        const feeAmount = parseFloat(((productAmount * platformFeePercent) / 100).toFixed(2));
+        const netPayout = parseFloat((productAmount - feeAmount).toFixed(2));
+
+        return (
+          <div className="modal-overlay" style={{ zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+            <div style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '480px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+              
+              {/* Header */}
+              <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>💰 Release Escrow Payment</h3>
+                  <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>Order #{selectedDetailedOrder.orderId}</p>
+                </div>
+                <button onClick={() => setIsReleaseModalOpen(false)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#64748b', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div style={{ padding: '22px' }}>
+                <p style={{ margin: '0 0 20px 0', fontSize: '0.84rem', color: '#475569', lineHeight: '1.5' }}>
+                  The customer has received the shipment. Please authorize the release of the escrow funds. The platform commission fee will be automatically deducted.
+                </p>
+
+                {/* Calculation breakdown card */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '0.88rem', fontWeight: '700', color: '#0f172a' }}>Settlement Summary</h4>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#475569', marginBottom: '8px' }}>
+                    <span>Order Bill (Products Total)</span>
+                    <span style={{ fontWeight: '600', color: '#0f172a' }}>₹{productAmount.toLocaleString('en-IN')}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#dc2626', marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #e2e8f0' }}>
+                    <span>{platformFeeName} ({platformFeePercent}%)</span>
+                    <span style={{ fontWeight: '600' }}>- ₹{feeAmount.toLocaleString('en-IN')}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#0f172a' }}>Net Payout to You</span>
+                    <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#16a34a' }}>₹{netPayout.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button
+                    onClick={() => setIsReleaseModalOpen(false)}
+                    style={{
+                      flex: 1,
+                      padding: '11px 0',
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  
+                  <button
+                    onClick={() => handleReleasePayment(selectedDetailedOrder.orderId)}
+                    disabled={isReleasingPayment}
+                    style={{
+                      flex: 1,
+                      padding: '11px 0',
+                      background: '#10b981',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontWeight: '700',
+                      fontSize: '0.85rem',
+                      cursor: isReleasingPayment ? 'not-allowed' : 'pointer',
+                      opacity: isReleasingPayment ? 0.7 : 1,
+                      boxShadow: '0 4px 12px rgba(16,185,129,0.2)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {isReleasingPayment ? 'Processing...' : 'Confirm & Release'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+      
       {/* --- REJECTION REASON MODAL --- */}
       {isRejectModalOpen && (
         <div className="modal-overlay" style={{ zIndex: 9999 }}>
@@ -5554,11 +6213,11 @@ export default function EmahuProDashboard() {
                 </svg>
               </button>
             </div>
-            
+
             <div style={{ padding: '20px' }}>
               <div className="form-group" style={{ marginBottom: '16px' }}>
                 <label className="form-label" style={{ color: '#fff' }}>Select Reason *</label>
-                <select 
+                <select
                   className="select-filter"
                   style={{ width: '100%', padding: '10px', borderRadius: '6px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
                   value={rejectionReasonType}
@@ -5576,8 +6235,8 @@ export default function EmahuProDashboard() {
               {rejectionReasonType === 'Other' && (
                 <div className="form-group">
                   <label className="form-label" style={{ color: '#fff' }}>Custom Reason *</label>
-                  <textarea 
-                    className="form-textarea" 
+                  <textarea
+                    className="form-textarea"
                     style={{ height: '80px', width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px', borderRadius: '6px' }}
                     placeholder="Describe custom reason..."
                     value={customRejectReason}
@@ -5590,8 +6249,8 @@ export default function EmahuProDashboard() {
 
             <div className="modal-footer">
               <button className="modal-btn cancel" onClick={() => setIsRejectModalOpen(false)}>Cancel</button>
-              <button 
-                className="modal-btn delete" 
+              <button
+                className="modal-btn delete"
                 style={{ background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
                 disabled={orderLoading[selectedOrderId]}
                 onClick={() => {
@@ -5688,8 +6347,8 @@ export default function EmahuProDashboard() {
 
             <div className="modal-footer" style={{ borderTop: '1px solid #e2e8f0', marginTop: '20px', paddingTop: '12px' }}>
               <button className="modal-btn cancel" style={{ border: '1px solid #e2e8f0', color: '#000' }} onClick={() => setIsLabelModalOpen(false)}>Close</button>
-              <button 
-                className="modal-btn confirm" 
+              <button
+                className="modal-btn confirm"
                 style={{ background: '#4f46e5', borderColor: '#4f46e5', color: '#fff' }}
                 onClick={() => {
                   const printContent = document.getElementById('printable-shipping-label').innerHTML;
@@ -5719,8 +6378,8 @@ export default function EmahuProDashboard() {
               >
                 🖨️ Print Label
               </button>
-              <button 
-                className="modal-btn confirm" 
+              <button
+                className="modal-btn confirm"
                 style={{ background: '#10b981', borderColor: '#10b981', color: '#fff' }}
                 onClick={() => {
                   // Mock download by saving string representation
@@ -5752,39 +6411,39 @@ export default function EmahuProDashboard() {
           }
           const itemSellerId = item.seller?._id || item.seller?.id;
           return (itemSellerId && sellerUserId && itemSellerId.toString() === sellerUserId.toString()) ||
-                 (item.seller?.email && sellerUser?.email && item.seller.email === sellerUser.email);
+            (item.seller?.email && sellerUser?.email && item.seller.email === sellerUser.email);
         });
 
         const ORDER_STAGES = [
-          { key: 'PENDING_APPROVAL', label: 'Pending',     icon: '⏳' },
-          { key: 'APPROVED',         label: 'Approved',    icon: '✅' },
-          { key: 'DELIVERY_ASSIGNED',label: 'Assigned',    icon: '🚚' },
-          { key: 'LABEL_GENERATED',  label: 'Label Ready', icon: '🏷️' },
-          { key: 'READY_FOR_PICKUP', label: 'Ready',       icon: '📦' },
-          { key: 'PICKED_UP',        label: 'Picked Up',   icon: '🚀' },
-          { key: 'IN_TRANSIT',       label: 'In Transit',  icon: '🚛' },
-          { key: 'OUT_FOR_DELIVERY', label: 'Out Delivery',icon: '🛵' },
-          { key: 'DELIVERED',        label: 'Delivered',   icon: '🎉' },
-          { key: 'COMPLETED',        label: 'Completed',   icon: '✔️' },
+          { key: 'PENDING_APPROVAL', label: 'Pending', icon: '⏳' },
+          { key: 'APPROVED', label: 'Approved', icon: '✅' },
+          { key: 'DELIVERY_ASSIGNED', label: 'Assigned', icon: '🚚' },
+          { key: 'LABEL_GENERATED', label: 'Label Ready', icon: '🏷️' },
+          { key: 'READY_FOR_PICKUP', label: 'Ready', icon: '📦' },
+          { key: 'PICKED_UP', label: 'Picked Up', icon: '🚀' },
+          { key: 'IN_TRANSIT', label: 'In Transit', icon: '🚛' },
+          { key: 'OUT_FOR_DELIVERY', label: 'Out Delivery', icon: '🛵' },
+          { key: 'DELIVERED', label: 'Delivered', icon: '🎉' },
+          { key: 'COMPLETED', label: 'Completed', icon: '✔️' },
         ];
         const currentStageIdx = ORDER_STAGES.findIndex(s => s.key === selectedDetailedOrder.status);
-        const isRejected  = selectedDetailedOrder.status === 'REJECTED' || !!selectedDetailedOrder.sellerRejected;
+        const isRejected = selectedDetailedOrder.status === 'REJECTED' || !!selectedDetailedOrder.sellerRejected;
         const isCompleted = selectedDetailedOrder.status === 'COMPLETED' || selectedDetailedOrder.status === 'DELIVERED';
 
         const stColorMap = {
-          PENDING_APPROVAL: { bg:'#fffbeb', text:'#d97706', border:'#fcd34d' },
-          APPROVED:         { bg:'#f0fdf4', text:'#16a34a', border:'#86efac' },
-          DELIVERY_ASSIGNED:{ bg:'#eff6ff', text:'#2563eb', border:'#93c5fd' },
-          LABEL_GENERATED:  { bg:'#f0f9ff', text:'#0369a1', border:'#7dd3fc' },
-          READY_FOR_PICKUP: { bg:'#fff7ed', text:'#ea580c', border:'#fdba74' },
-          PICKED_UP:        { bg:'#f5f3ff', text:'#7c3aed', border:'#c4b5fd' },
-          IN_TRANSIT:       { bg:'#faf5ff', text:'#7c3aed', border:'#d8b4fe' },
-          OUT_FOR_DELIVERY: { bg:'#fff1f2', text:'#e11d48', border:'#fda4af' },
-          DELIVERED:        { bg:'#f0fdf4', text:'#15803d', border:'#4ade80' },
-          COMPLETED:        { bg:'#f0fdf4', text:'#15803d', border:'#4ade80' },
-          REJECTED:         { bg:'#fef2f2', text:'#dc2626', border:'#fca5a5' },
+          PENDING_APPROVAL: { bg: '#fffbeb', text: '#d97706', border: '#fcd34d' },
+          APPROVED: { bg: '#f0fdf4', text: '#16a34a', border: '#86efac' },
+          DELIVERY_ASSIGNED: { bg: '#eff6ff', text: '#2563eb', border: '#93c5fd' },
+          LABEL_GENERATED: { bg: '#f0f9ff', text: '#0369a1', border: '#7dd3fc' },
+          READY_FOR_PICKUP: { bg: '#fff7ed', text: '#ea580c', border: '#fdba74' },
+          PICKED_UP: { bg: '#f5f3ff', text: '#7c3aed', border: '#c4b5fd' },
+          IN_TRANSIT: { bg: '#faf5ff', text: '#7c3aed', border: '#d8b4fe' },
+          OUT_FOR_DELIVERY: { bg: '#fff1f2', text: '#e11d48', border: '#fda4af' },
+          DELIVERED: { bg: '#f0fdf4', text: '#15803d', border: '#4ade80' },
+          COMPLETED: { bg: '#f0fdf4', text: '#15803d', border: '#4ade80' },
+          REJECTED: { bg: '#fef2f2', text: '#dc2626', border: '#fca5a5' },
         };
-        const sc = isRejected ? stColorMap.REJECTED : (stColorMap[selectedDetailedOrder.status] || { bg:'#f8fafc', text:'#475569', border:'#cbd5e1' });
+        const sc = isRejected ? stColorMap.REJECTED : (stColorMap[selectedDetailedOrder.status] || { bg: '#f8fafc', text: '#475569', border: '#cbd5e1' });
 
         return (
           <div className="modal-overlay" style={{ zIndex: 9998, backgroundColor: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)' }}>
@@ -5809,7 +6468,7 @@ export default function EmahuProDashboard() {
                   </span>
                   <button onClick={() => { setSelectedDetailedOrderId(null); setSelectedCarrier(''); }}
                     style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: '8px', cursor: 'pointer', color: '#fff', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
                   </button>
                 </div>
               </div>
@@ -5850,8 +6509,8 @@ export default function EmahuProDashboard() {
                     <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '12px' }}>📦 Order Information</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
                       {[['Order ID', <span key="id" style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#0f172a' }}>{selectedDetailedOrder.orderId}</span>],
-                        ['Date', selectedDetailedOrder.date],
-                        ['Payment Status', <span key="status" style={{ color: '#16a34a', fontWeight: '600' }}>🔒 Secured in Escrow</span>],
+                      ['Date', selectedDetailedOrder.date],
+                      ['Payment Status', <span key="status" style={{ color: '#16a34a', fontWeight: '600' }}>🔒 Secured in Escrow</span>],
                       ].map(([label, val], i) => (
                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: i < 2 ? '1px solid #f0f0f0' : 'none', paddingBottom: i < 2 ? '8px' : '0' }}>
                           <span style={{ color: '#64748b' }}>{label}</span>
@@ -5870,7 +6529,7 @@ export default function EmahuProDashboard() {
                     <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span>🔐</span> Buyer Escrow Vault Lock
                     </div>
-                    
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ color: '#64748b' }}>Vault Status</span>
@@ -5884,14 +6543,14 @@ export default function EmahuProDashboard() {
                           </span>
                         )}
                       </div>
-                      
+
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
                         <span style={{ color: '#64748b' }}>Escrow Account</span>
                         <strong style={{ textTransform: 'capitalize' }}>
                           {selectedDetailedOrder.escrowMethod ? `${selectedDetailedOrder.escrowMethod} Escrow` : 'Wallet Vault'}
                         </strong>
                       </div>
-                      
+
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
                         <span style={{ color: '#64748b' }}>Lock Hash</span>
                         <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#475569' }}>
@@ -5917,8 +6576,8 @@ export default function EmahuProDashboard() {
                             Paid on: {selectedDetailedOrder.transactionDate ? new Date(selectedDetailedOrder.transactionDate).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}
                           </div>
                           {selectedDetailedOrder.transactionFile && (
-                            <a 
-                              href={selectedDetailedOrder.transactionFile} 
+                            <a
+                              href={selectedDetailedOrder.transactionFile}
                               download={`payout_receipt_${selectedDetailedOrder.orderId}.png`}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', color: '#3b82f6', textDecoration: 'underline', fontWeight: '600' }}
                             >
@@ -5939,12 +6598,12 @@ export default function EmahuProDashboard() {
                             </div>
                           </div>
                         ) : (
-                          <button 
+                          <button
                             onClick={() => handleVerifyEscrow(selectedDetailedOrder.orderId, selectedDetailedOrder.total || 0)}
                             disabled={verifyingEscrow[selectedDetailedOrder.orderId]}
-                            style={{ 
-                              width: '100%', padding: '9px 12px', background: verifyingEscrow[selectedDetailedOrder.orderId] ? '#cbd5e1' : '#4f46e5', 
-                              color: verifyingEscrow[selectedDetailedOrder.orderId] ? '#475569' : '#fff', border: 'none', borderRadius: '8px', 
+                            style={{
+                              width: '100%', padding: '9px 12px', background: verifyingEscrow[selectedDetailedOrder.orderId] ? '#cbd5e1' : '#4f46e5',
+                              color: verifyingEscrow[selectedDetailedOrder.orderId] ? '#475569' : '#fff', border: 'none', borderRadius: '8px',
                               fontSize: '0.8rem', fontWeight: '700', cursor: verifyingEscrow[selectedDetailedOrder.orderId] ? 'not-allowed' : 'pointer',
                               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s'
                             }}
@@ -5980,7 +6639,7 @@ export default function EmahuProDashboard() {
                   <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
                     <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '10px' }}>📍 Delivery Address</div>
                     <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: '1.65', margin: 0 }}>
-                      {selectedDetailedOrder.deliveryAddress?.address}<br/>
+                      {selectedDetailedOrder.deliveryAddress?.address}<br />
                       {selectedDetailedOrder.deliveryAddress?.city}, {selectedDetailedOrder.deliveryAddress?.stateName} — {selectedDetailedOrder.deliveryAddress?.pincode}
                     </p>
                   </div>
@@ -6183,33 +6842,13 @@ export default function EmahuProDashboard() {
                             <span style={{ width: '22px', height: '22px', background: '#16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>✓</span>
                             <span style={{ fontSize: '0.82rem', color: '#15803d', fontWeight: '700' }}>Order Approved — Assign Delivery Partner</span>
                           </div>
-                          <label style={{ fontSize: '0.78rem', color: '#475569', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Select Courier Partner</label>
-                          <select value={selectedCarrier} onChange={e => setSelectedCarrier(e.target.value)} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
-                            style={{ width: '100%', height: '40px', border: '1.5px solid #d1d5db', borderRadius: '8px', padding: '0 10px', fontSize: '0.85rem', color: '#0f172a', background: '#fff', marginBottom: '12px', outline: 'none', cursor: 'pointer' }}>
-                            <option value="">— Select Courier Partner —</option>
-                            <option value="Delhivery">🚚 Delhivery</option>
-                            <option value="Blue Dart">🔵 Blue Dart</option>
-                            <option value="XpressBees">🐝 XpressBees</option>
-                            <option value="DTDC">📦 DTDC</option>
-                            <option value="Ecom Express">⚡ Ecom Express</option>
-                            <option value="India Post">🇮🇳 India Post</option>
-                          </select>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <button onClick={() => {
-                              if (orderLoading[selectedDetailedOrder.orderId]) return;
-                              handleSelectDeliveryPartner(selectedDetailedOrder.orderId, selectedCarrier, selectedCarrier === 'Blue Dart' ? '1-3 Days' : '2-4 Days', selectedCarrier === 'Blue Dart' ? 120 : 80);
-                            }} disabled={!selectedCarrier || !!orderLoading[selectedDetailedOrder.orderId]}
-                              style={{ width: '100%', padding: '12px 0', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', border: 'none', cursor: selectedCarrier ? 'pointer' : 'not-allowed', background: selectedCarrier ? '#4f46e5' : '#cbd5e1', color: selectedCarrier ? '#fff' : '#94a3b8', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
-                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Assigning...' : '🚚 Assign Courier Partner'}
-                            </button>
-                            <span style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', marginTop: '6px' }}>
-                              Or bypass directly to label ready:
-                            </span>
-                            <button onClick={() => handleAssignAndGenerateLabel(selectedDetailedOrder.orderId, selectedCarrier)} disabled={!selectedCarrier || !!orderLoading[selectedDetailedOrder.orderId]}
-                              style={{ width: '100%', padding: '10px 0', borderRadius: '8px', fontWeight: '600', fontSize: '0.8rem', border: '1px solid #cbd5e1', cursor: selectedCarrier ? 'pointer' : 'not-allowed', background: '#fff', color: selectedCarrier ? '#4f46e5' : '#cbd5e1', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
-                              🏷️ Assign &amp; Auto-Generate Label
-                            </button>
-                          </div>
+                          <p style={{ fontSize: '0.8rem', color: '#15803d', margin: '0 0 14px 0', lineHeight: '1.4' }}>
+                            Order approved. Scan city hubs for active Emahu Logistics Partners to handle last-mile delivery transit.
+                          </p>
+                          <button onClick={() => { setSelectedOrderId(selectedDetailedOrder.orderId); setIsDeliveryModalOpen(true); }}
+                            style={{ width: '100%', padding: '12px 0', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}>
+                            🚚 Scan &amp; Assign Delivery Partner
+                          </button>
                         </div>
                       )}
 
@@ -6221,7 +6860,7 @@ export default function EmahuProDashboard() {
                             <span style={{ fontSize: '0.82rem', color: '#1e3a8a', fontWeight: '700' }}>Courier Assigned</span>
                           </div>
                           <p style={{ fontSize: '0.8rem', color: '#1e3a8a', margin: '0 0 14px 0', lineHeight: '1.4' }}>
-                            Order assigned to <strong>{selectedDetailedOrder.carrier}</strong>. Tracking ID <strong>{selectedDetailedOrder.trackingId}</strong> has been registered. 
+                            Order assigned to <strong>{selectedDetailedOrder.carrier}</strong>. Tracking ID <strong>{selectedDetailedOrder.trackingId}</strong> has been registered.
                             Generate the shipping label to prepare packaging.
                           </p>
                           <button onClick={() => handleGenerateLabel(selectedDetailedOrder.orderId)} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
@@ -6254,8 +6893,8 @@ export default function EmahuProDashboard() {
                         </div>
                       )}
 
-                      {/* READY_FOR_PICKUP (with carrier assigned) */}
-                      {selectedDetailedOrder.status === 'READY_FOR_PICKUP' && selectedDetailedOrder.carrier && (
+                      {/* READY_FOR_PICKUP */}
+                      {selectedDetailedOrder.status === 'READY_FOR_PICKUP' && (
                         <div style={{ background: '#fff7ed', border: '1.5px solid #fdba74', borderRadius: '12px', padding: '18px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
                             <span style={{ width: '22px', height: '22px', background: '#ea580c', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>📦</span>
@@ -6264,14 +6903,34 @@ export default function EmahuProDashboard() {
                           <p style={{ fontSize: '0.8rem', color: '#9a3412', margin: '0 0 4px 0', lineHeight: '1.4' }}>
                             The package is sealed and waiting at your dispatch desk.
                           </p>
-                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#ea580c', fontWeight: '600', fontStyle: 'italic', marginTop: '6px' }}>
+                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#ea580c', fontWeight: '600', fontStyle: 'italic', marginTop: '6px', marginBottom: '10px' }}>
                             ⌛ Awaiting pickup confirmation from the assigned logistics partner.
                           </span>
+                          
+                          <button
+                            onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'PICKED_UP', `🚀 Package picked up by ${selectedDetailedOrder.carrier ? 'courier partner ' + selectedDetailedOrder.carrier : 'Seller (Self-Delivery)'}.`)}
+                            disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                            style={{
+                              width: '100%',
+                              padding: '11px 0',
+                              background: '#ea580c',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontWeight: '700',
+                              fontSize: '0.85rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 10px rgba(234,88,12,0.2)',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🚀 Dispatch Order (Mark Picked Up)'}
+                          </button>
                         </div>
                       )}
 
                       {/* PICKED_UP / IN_TRANSIT / OUT_FOR_DELIVERY */}
-                      {['PICKED_UP','IN_TRANSIT','OUT_FOR_DELIVERY'].includes(selectedDetailedOrder.status) && (
+                      {['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(selectedDetailedOrder.status) && (
                         <div style={{ background: '#faf5ff', border: '1.5px solid #d8b4fe', borderRadius: '12px', padding: '18px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
                             <span style={{ width: '22px', height: '22px', background: '#7c3aed', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>
@@ -6286,20 +6945,145 @@ export default function EmahuProDashboard() {
                             {selectedDetailedOrder.status === 'IN_TRANSIT' && 'The shipment is in transit on the EV logistics corridor.'}
                             {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && 'The delivery agent is en route.'}
                           </p>
-                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#7c3aed', fontWeight: '600', fontStyle: 'italic', marginTop: '6px' }}>
+                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#7c3aed', fontWeight: '600', fontStyle: 'italic', marginTop: '6px', marginBottom: '10px' }}>
                             🚚 Delivery status and tracking updates are managed dynamically by the courier.
                           </span>
+
+                          {selectedDetailedOrder.status === 'PICKED_UP' && (
+                            <button
+                              onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'IN_TRANSIT', '🚚 Order package is in transit via EV corridor.')}
+                              disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                              style={{
+                                width: '100%',
+                                padding: '11px 0',
+                                background: '#7c3aed',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontWeight: '700',
+                                fontSize: '0.85rem',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 10px rgba(124,58,237,0.2)',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🚛 Advance to In Transit'}
+                            </button>
+                          )}
+
+                          {selectedDetailedOrder.status === 'IN_TRANSIT' && (
+                            <button
+                              onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'OUT_FOR_DELIVERY', '🛵 Package is out for delivery with local dispatch rider.')}
+                              disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                              style={{
+                                width: '100%',
+                                padding: '11px 0',
+                                background: '#7c3aed',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontWeight: '700',
+                                fontSize: '0.85rem',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 10px rgba(124,58,237,0.2)',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🛵 Mark Out for Delivery'}
+                            </button>
+                          )}
+
+                          {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && (
+                            <button
+                              onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'DELIVERED', '✅ Order delivered successfully.')}
+                              disabled={!!orderLoading[selectedDetailedOrder.orderId]}
+                              style={{
+                                width: '100%',
+                                padding: '11px 0',
+                                background: '#16a34a',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontWeight: '700',
+                                fontSize: '0.85rem',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 10px rgba(22,163,74,0.2)',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '✅ Confirm Delivery'}
+                            </button>
+                          )}
                         </div>
                       )}
 
                       {/* COMPLETED / DELIVERED */}
-                      {isCompleted && (
+                      {/* COMPLETED / DELIVERED / RELEASED */}
+                      {selectedDetailedOrder.status === '🔓 FUNDS RELEASED' || selectedDetailedOrder.paymentReleased ? (() => {
+                        const orderTotal = selectedDetailedOrder.total || 0;
+                        const productAmount = selectedDetailedOrder.productAmount || orderTotal;
+                        const feePercent = selectedDetailedOrder.platformFeePercent || platformFeePercent;
+                        const feeAmount = selectedDetailedOrder.platformFeeAmount !== undefined ? selectedDetailedOrder.platformFeeAmount : parseFloat(((productAmount * feePercent) / 100).toFixed(2));
+                        const netPayout = selectedDetailedOrder.sellerNetPayout !== undefined ? selectedDetailedOrder.sellerNetPayout : parseFloat((productAmount - feeAmount).toFixed(2));
+                        const releaseDate = selectedDetailedOrder.paymentReleasedAt ? new Date(selectedDetailedOrder.paymentReleasedAt).toLocaleString('en-IN') : new Date().toLocaleString('en-IN');
+
+                        return (
+                          <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '24px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '2.8rem', marginBottom: '10px' }}>💰</div>
+                            <p style={{ color: '#15803d', fontWeight: '700', fontSize: '1.05rem', margin: '0 0 4px 0' }}>Payout Released</p>
+                            
+                            <div style={{ background: '#ffffff', border: '1px solid #dcfce7', borderRadius: '10px', padding: '12px', margin: '14px 0', textAlign: 'left', fontSize: '0.82rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#475569' }}>
+                                <span>Order Total (Products)</span>
+                                <span style={{ fontWeight: '600', color: '#0f172a' }}>₹{productAmount.toLocaleString('en-IN')}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #f0fdf4', color: '#dc2626' }}>
+                                <span>Platform Fee ({feePercent}%)</span>
+                                <span style={{ fontWeight: '600' }}>- ₹{feeAmount.toLocaleString('en-IN')}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', color: '#15803d', fontSize: '0.88rem' }}>
+                                <span>Net Payout Settled</span>
+                                <span>₹{netPayout.toLocaleString('en-IN')}</span>
+                              </div>
+                            </div>
+                            
+                            <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b' }}>
+                              Released on: {releaseDate}
+                            </span>
+                          </div>
+                        );
+                      })() : isCompleted && !selectedDetailedOrder.paymentReleased ? (
                         <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '24px', textAlign: 'center' }}>
                           <div style={{ fontSize: '2.8rem', marginBottom: '10px' }}>🎉</div>
                           <p style={{ color: '#15803d', fontWeight: '700', fontSize: '1.05rem', margin: '0 0 4px 0' }}>Transaction Completed</p>
-                          <p style={{ color: '#16a34a', fontSize: '0.8rem', margin: 0 }}>Funds will be released after buyer confirmation or auto-release window.</p>
+                          <p style={{ color: '#16a34a', fontSize: '0.8rem', margin: '0 0 16px 0', lineHeight: '1.4' }}>
+                            The order has been successfully delivered. You can now release the escrow funds to your settlement account.
+                          </p>
+                          
+                          <button
+                            onClick={() => setIsReleaseModalOpen(true)}
+                            style={{
+                              width: '100%',
+                              padding: '12px 0',
+                              background: '#10b981',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontWeight: '700',
+                              fontSize: '0.88rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              boxShadow: '0 4px 12px rgba(16,185,129,0.2)',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            💰 Release Payment
+                          </button>
                         </div>
-                      )}
+                      ) : null}
 
                       {/* REJECTED */}
                       {isRejected && (
@@ -6315,7 +7099,7 @@ export default function EmahuProDashboard() {
                       )}
 
                       {/* Carrier details if assigned */}
-                      {selectedDetailedOrder.carrier && !['PENDING_APPROVAL','APPROVED','REJECTED'].includes(selectedDetailedOrder.status) && (
+                      {selectedDetailedOrder.carrier && !['PENDING_APPROVAL', 'APPROVED', 'REJECTED'].includes(selectedDetailedOrder.status) && (
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px' }}>
                           <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '10px' }}>🚚 Carrier Details</div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem' }}>
@@ -6406,7 +7190,7 @@ export default function EmahuProDashboard() {
               <h4>Delete listed merchandise?</h4>
               <p>Are you sure you want to remove <strong>&ldquo;{productToDelete?.name}&rdquo;</strong> from your live index? This cannot be undone.</p>
             </div>
-            
+
             <div className="modal-footer">
               <button className="modal-btn cancel" onClick={() => setIsDeleteModalOpen(false)}>Abort</button>
               <button className="modal-btn delete" onClick={handleDeleteProduct}>Delete Listing</button>
@@ -6426,7 +7210,7 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
   const handleDecision = async (productId, decision) => {
     setLoadingMap(prev => ({ ...prev, [productId]: true }));
     const reason = rejectionReasonMap[productId] || '';
-    
+
     if (decision === 'reject' && !reason.trim()) {
       triggerToast('Error', 'Please enter a rejection reason first.', 'danger');
       setLoadingMap(prev => ({ ...prev, [productId]: false }));
@@ -6445,8 +7229,8 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
       if (data.success) {
         triggerToast(
           decision === 'approve' ? 'Approval Code Generated' : 'Product Rejected',
-          decision === 'approve' 
-            ? `Admin code generated: ${data.product.adminCode}. Give this code to the seller.` 
+          decision === 'approve'
+            ? `Admin code generated: ${data.product.adminCode}. Give this code to the seller.`
             : `Listing rejected. Feedback sent to vendor.`,
           decision === 'approve' ? 'success' : 'danger'
         );
@@ -6540,7 +7324,7 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
                           >
                             Approve & Get Code
                           </button>
-                          
+
                           <button
                             className="company-portal-btn"
                             style={{ background: 'var(--color-danger)', borderColor: 'var(--color-danger)', height: '32px', fontSize: '0.8rem' }}
@@ -6550,7 +7334,7 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
                             Reject Listing
                           </button>
                         </div>
-                        
+
                         {!isRejected && p.approvalAttempts < 3 && (
                           <input
                             type="text"
@@ -6605,7 +7389,7 @@ function DocumentUploader({ label, value, onChange }) {
       setProgress(current);
       if (current >= 100) {
         clearInterval(interval);
-        
+
         const reader = new FileReader();
         reader.onload = (e) => {
           onChange(e.target.result); // yields base64 Data URL
@@ -6667,7 +7451,7 @@ function DocumentUploader({ label, value, onChange }) {
           style={{ display: 'none' }}
           onChange={onFileSelect}
         />
-        
+
         {uploading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '40px', height: '40px', border: '3px solid var(--border-color)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
@@ -6714,7 +7498,7 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
 
     try {
       const token = localStorage.getItem('emahu_seller_token');
-      
+
       if (businessDocUrl.trim()) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents`, {
           method: 'POST',
@@ -6790,9 +7574,9 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
           value={idDocUrl}
           onChange={setIdDocUrl}
         />
-        <button 
-          type="submit" 
-          className="company-portal-btn" 
+        <button
+          type="submit"
+          className="company-portal-btn"
           style={{ width: '100%', height: '40px', background: '#6366f1', color: '#fff', fontWeight: '700', borderRadius: '8px', cursor: submitting ? 'not-allowed' : 'pointer', border: 'none', marginTop: '8px' }}
           disabled={submitting}
         >

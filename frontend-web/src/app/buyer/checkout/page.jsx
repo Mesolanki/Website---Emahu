@@ -86,6 +86,39 @@ export default function CheckoutPage() {
     fetchSettings();
   }, []);
 
+  // ── Block checkout if buyer has an unconfirmed arrived order ──
+  useEffect(() => {
+    const checkDeliveredOrders = async () => {
+      let buyerUserId = '';
+      const buyerUserStr = localStorage.getItem('emahu_buyer_user');
+      if (buyerUserStr) {
+        try {
+          buyerUserId = JSON.parse(buyerUserStr).id || JSON.parse(buyerUserStr)._id || '';
+        } catch (e) {}
+      }
+      if (!buyerUserId) {
+        buyerUserId = localStorage.getItem('emahu_guest_id') || '';
+      }
+      if (!buyerUserId) return;
+
+      try {
+        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${buyerUserId}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.success && data.orders) {
+          const unconfirmed = data.orders.find(o => o.status === 'DELIVERED');
+          if (unconfirmed) {
+            alert(`Checkout Blocked: You must inspect and confirm delivery of your arrived order #${unconfirmed.orderId} before placing a new order.`);
+            window.location.href = '/buyer/orders';
+          }
+        }
+      } catch (err) {
+        console.warn('Error checking delivered orders in checkout page:', err);
+      }
+    };
+    checkDeliveredOrders();
+  }, []);
+
   // Leaflet CDNs lazy loader
   useEffect(() => {
     if (typeof window === 'undefined') return;

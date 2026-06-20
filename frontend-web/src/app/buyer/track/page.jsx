@@ -47,6 +47,7 @@ function TrackOrderContent() {
             createdAt: new Date('2026-05-24T00:00:00.000Z').toISOString(),
             items: [
               {
+                productId: 'prod_mock_sony',
                 name: 'Sony WH-1000XM5 Headphones',
                 price: 26999,
                 quantity: 1,
@@ -657,7 +658,7 @@ function TrackOrderContent() {
             {/* Action CTAs */}
             <div className="sidebar-action-ctas">
               <Link href="/buyer/orders" className="track-link-btn track-link-btn--solid">
-                📂 Manage Escrow Locks
+                📂 View My Orders
               </Link>
               <Link href="/buyer/products" className="track-link-btn track-link-btn--outline">
                 Start Buying More

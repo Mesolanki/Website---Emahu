@@ -13,6 +13,8 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 
+const paymentRoutes = require('./routes/paymentRoutes');
+
 // Initialize app
 const app = express();
 
@@ -67,6 +69,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/payment', paymentRoutes);
 
 
 // 404 Route handler

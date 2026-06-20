@@ -90,6 +90,8 @@ exports.register = async (req, res) => {
       city,
       state,
       perItemCharge,
+      rateUpTo2Km,
+      rateAbove2Km,
       deliveryScope,
       operatingLocation,
       dispatchNotes,
@@ -100,7 +102,13 @@ exports.register = async (req, res) => {
       vehicleType,
       vehicleNumber,
       latitude,
-      longitude
+      longitude,
+      salaryRequirement,
+      serviceAreaCountry,
+      serviceAreaRegion,
+      serviceAreaDistrict,
+      serviceAreaState,
+      serviceAreaCity
     } = req.body;
 
     // Simple validation
@@ -142,6 +150,8 @@ exports.register = async (req, res) => {
       city,
       state,
       perItemCharge,
+      rateUpTo2Km: rateUpTo2Km ? Number(rateUpTo2Km) : (perItemCharge ? Number(perItemCharge) : 10),
+      rateAbove2Km: rateAbove2Km ? Number(rateAbove2Km) : (perItemCharge ? Number(perItemCharge) : 10),
       deliveryScope,
       operatingLocation,
       dispatchNotes,
@@ -153,6 +163,12 @@ exports.register = async (req, res) => {
       vehicleNumber,
       latitude,
       longitude,
+      salaryRequirement,
+      serviceAreaCountry,
+      serviceAreaRegion,
+      serviceAreaDistrict,
+      serviceAreaState,
+      serviceAreaCity,
       status: (role === 'seller' || role === 'delivery') ? 'pending' : 'approved'
     });
 
@@ -346,6 +362,12 @@ exports.googleLogin = async (req, res) => {
     // Check if the existing user's role matches the requested role
     if (role && user.role !== role) {
       console.warn(`Role mismatch: existing user has role '${user.role}' but requested role is '${role}'`);
+      if (role === 'buyer') {
+        return res.status(400).json({
+          success: false,
+          error: 'This email ID already exists.'
+        });
+      }
       return res.status(403).json({
         success: false,
         error: `Access denied. This email is already registered as a ${user.role}. Please log in using the correct portal.`
@@ -511,7 +533,11 @@ exports.updateDetails = async (req, res) => {
       state: req.body.state !== undefined ? req.body.state : req.user.state,
       storeName: req.body.storeName !== undefined ? req.body.storeName : req.user.storeName,
       latitude: req.body.latitude !== undefined ? req.body.latitude : req.user.latitude,
-      longitude: req.body.longitude !== undefined ? req.body.longitude : req.user.longitude
+      longitude: req.body.longitude !== undefined ? req.body.longitude : req.user.longitude,
+      bankHolder: req.body.bankHolder !== undefined ? req.body.bankHolder : req.user.bankHolder,
+      accountNumber: req.body.accountNumber !== undefined ? req.body.accountNumber : req.user.accountNumber,
+      ifscCode: req.body.ifscCode !== undefined ? req.body.ifscCode : req.user.ifscCode,
+      bankName: req.body.bankName !== undefined ? req.body.bankName : req.user.bankName
     };
 
     const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
@@ -533,7 +559,11 @@ exports.updateDetails = async (req, res) => {
         state: user.state,
         storeName: user.storeName,
         latitude: user.latitude,
-        longitude: user.longitude
+        longitude: user.longitude,
+        bankHolder: user.bankHolder,
+        accountNumber: user.accountNumber,
+        ifscCode: user.ifscCode,
+        bankName: user.bankName
       }
     });
   } catch (error) {

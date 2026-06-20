@@ -137,6 +137,7 @@ export default function OrdersPage() {
               createdAt: new Date().toISOString(),
               items: [
                 {
+                  productId: 'prod_mock_sony',
                   name: 'Sony WH-1000XM5 Headphones',
                   price: 26999,
                   quantity: 1,
@@ -246,7 +247,12 @@ export default function OrdersPage() {
           } else if (someRejected) {
             overallStatus = '⚠️ Partial Rejection — Items Pending';
           } else if (hasConfirmed) {
-            overallStatus = '✓ Delivery Confirmed by Seller';
+            const anyDelivered = group.ordersList.some(o => o.status === 'DELIVERED');
+            if (anyDelivered) {
+              overallStatus = '🎁 ARRIVED - Awaiting Confirmation';
+            } else {
+              overallStatus = '✓ Delivery Confirmed by Seller';
+            }
           } else if (isPending) {
             overallStatus = 'PENDING_APPROVAL';
           }
@@ -254,6 +260,7 @@ export default function OrdersPage() {
           return {
             ...group,
             status: overallStatus,
+            hasDelivered: group.ordersList.some(o => o.status === 'DELIVERED'),
             canDisputeOrRelease: !allReleased && !hasDisputed && !allRejected && hasConfirmed,
             sellerConfirmed: hasConfirmed,
             sellerRejected: allRejected,
@@ -263,7 +270,17 @@ export default function OrdersPage() {
           };
         });
 
-        setOrders(groupedOrders);
+        const sortedGroupedOrders = groupedOrders.sort((a, b) => {
+          const aArrived = a.hasDelivered && a.status !== '🔓 FUNDS RELEASED' && a.status !== '⚠️ VAULT DISPUTED / FROZEN';
+          const bArrived = b.hasDelivered && b.status !== '🔓 FUNDS RELEASED' && b.status !== '⚠️ VAULT DISPUTED / FROZEN';
+          if (aArrived && !bArrived) return -1;
+          if (!aArrived && bArrived) return 1;
+          const dateA = parseOrderDate(a.ordersList?.[0]);
+          const dateB = parseOrderDate(b.ordersList?.[0]);
+          return dateB - dateA;
+        });
+
+        setOrders(sortedGroupedOrders);
       } catch (e) {
         console.error('Error loading real orders:', e);
       }
@@ -426,9 +443,37 @@ export default function OrdersPage() {
               const isDisputed = disputedOrdersList.includes(ord.billId) || ord.status.includes('DISPUTED') || ord.ordersList.some(o => o.sellerRejected);
               const isReleased = releasedOrdersList.includes(ord.billId) || ord.status.includes('RELEASED');
               const isLocked = !isDisputed && !isReleased;
+              const isArrived = ord.hasDelivered && !isReleased && !isDisputed;
               
               return (
-                <div key={ord.billId} className={`order-card ${isDisputed ? 'order-card--disputed' : ''} ${isReleased ? 'order-card--released' : ''} ${isLocked ? 'order-card--locked' : ''}`}>
+                <div 
+                  key={ord.billId} 
+                  className={`order-card ${isDisputed ? 'order-card--disputed' : ''} ${isReleased ? 'order-card--released' : ''} ${isLocked ? 'order-card--locked' : ''}`}
+                  style={isArrived ? {
+                    border: '2.5px solid #d97706',
+                    boxShadow: '0 0 16px rgba(217, 119, 6, 0.18)',
+                    background: 'rgba(254, 252, 232, 0.02)',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  } : {}}
+                >
+                  {isArrived && (
+                    <div style={{
+                      background: '#d97706',
+                      color: '#fff',
+                      padding: '10px 16px',
+                      fontSize: '0.82rem',
+                      fontWeight: '800',
+                      textAlign: 'center',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}>
+                      <span className="pulse-dot-yellow" />
+                      ⚠️ ACTION REQUIRED: This package has arrived! Please inspect the items and click "Release Vault to Merchant" below to confirm delivery.
+                    </div>
+                  )}
                   
                   {/* Card Header summary */}
                   <div className="order-card-header">
@@ -564,7 +609,7 @@ export default function OrdersPage() {
                             <path d="M7 11V7a5 5 0 0 1 9.9-1" />
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                           </svg>
-                          <span>Vault released successfully. Merchant has received the checkout funds. Transaction closed in full.</span>
+                          <span style={{ color: 'var(--color-success)', fontWeight: '600' }}>Transaction Completed</span>
                         </>
                       ) : (disputedOrdersList.includes(ord.billId) || ord.status.includes('DISPUTED')) ? (
                         <>

@@ -105,6 +105,14 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    rateUpTo2Km: {
+      type: Number,
+      default: 0
+    },
+    rateAbove2Km: {
+      type: Number,
+      default: 0
+    },
     deliveryScope: {
       type: String,
       enum: ['local', 'interstate'],
@@ -156,6 +164,30 @@ const userSchema = new mongoose.Schema(
     serviceRadius: {
       type: Number,
       default: 15
+    },
+    salaryRequirement: {
+      type: String,
+      trim: true
+    },
+    serviceAreaCountry: {
+      type: String,
+      trim: true
+    },
+    serviceAreaRegion: {
+      type: String,
+      trim: true
+    },
+    serviceAreaDistrict: {
+      type: String,
+      trim: true
+    },
+    serviceAreaState: {
+      type: String,
+      trim: true
+    },
+    serviceAreaCity: {
+      type: String,
+      trim: true
     },
     verificationFeedback: {
       type: String,

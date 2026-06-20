@@ -728,55 +728,65 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
     const order = await Order.findOne({ orderId });
-    if (!order) {
-      return res.status(404).json({ success: false, error: 'Order not found' });
-    }
 
-    const orderCity = (order.deliveryAddress?.city || '').trim().toLowerCase();
-    const buyerLat = order.buyerLocation?.latitude;
-    const buyerLon = order.buyerLocation?.longitude;
+    // --- Resolve location context (gracefully handles demo/seed orders not in DB) ---
+    let orderCity = '';
+    let buyerLat;
+    let buyerLon;
+    let distance = 5; // Default 5 KM fallback for demo orders
+
+    if (order) {
+      orderCity = (order.deliveryAddress?.city || '').trim().toLowerCase();
+      buyerLat = order.buyerLocation?.latitude;
+      buyerLon = order.buyerLocation?.longitude;
+
+      if (order.distanceKm) {
+        distance = order.distanceKm;
+      } else {
+        const sLat = order.sellerLocation?.latitude || 23.0225;
+        const sLon = order.sellerLocation?.longitude || 72.5714;
+        const bLat = buyerLat || 23.0225;
+        const bLon = buyerLon || 72.5714;
+        const googleDist = await getGoogleMapsDistance(sLat, sLon, bLat, bLon);
+        distance = googleDist ? googleDist.distanceKm : getHaversineDistance(sLat, sLon, bLat, bLon);
+        order.distanceKm = parseFloat(distance.toFixed(2));
+        await order.save();
+      }
+    }
+    // If order not in DB (demo/seed order), we continue and return all partners with default distance
 
     // Fetch all approved delivery partners
-    const partners = await User.find({
-      role: 'delivery',
-      status: 'approved'
-    });
+    const partners = await User.find({ role: 'delivery', status: 'approved' });
 
     const availablePartners = [];
 
-    // Calculate distance between seller and buyer (if not already calculated)
-    let distance = order.distanceKm;
-    if (!distance) {
-      const sLat = order.sellerLocation?.latitude || 23.0225;
-      const sLon = order.sellerLocation?.longitude || 72.5714;
-      const bLat = buyerLat || 23.0225;
-      const bLon = buyerLon || 72.5714;
-      const googleDist = await getGoogleMapsDistance(sLat, sLon, bLat, bLon);
-      distance = googleDist ? googleDist.distanceKm : getHaversineDistance(sLat, sLon, bLat, bLon);
-      order.distanceKm = parseFloat(distance.toFixed(2));
-      await order.save();
-    }
-
     for (const partner of partners) {
       const partnerCity = (partner.currentCity || partner.city || '').trim().toLowerCase();
-      
-      // 1. City match check (non-blocking)
+
+      // 1. City match check
       const isCityMatch = !orderCity || !partnerCity || partnerCity === orderCity;
 
-      // 2. Service radius check (non-blocking)
+      // 2. Service radius check
       let isRadiusMatch = true;
       let distToBuyer = 0;
-      if (buyerLat !== undefined && buyerLon !== undefined && partner.latitude !== undefined && partner.longitude !== undefined) {
+      if (
+        buyerLat !== undefined && buyerLon !== undefined &&
+        partner.latitude !== undefined && partner.longitude !== undefined
+      ) {
         distToBuyer = getHaversineDistance(partner.latitude, partner.longitude, buyerLat, buyerLon);
         isRadiusMatch = distToBuyer <= (partner.serviceRadius || 15);
       }
 
-      // 3. Calculate delivery cost for this partner
-      // Formula: distance_units = ceil(distance_km / 2), delivery_fee = base_fee + (distance_units * rate_per_2km)
-      const baseFee = 0;
-      const ratePer2Km = partner.perItemCharge || 10; // rate per 2KM, default ₹10
-      const distanceUnits = Math.ceil(distance / 2);
-      const totalCost = parseFloat((baseFee + (distanceUnits * ratePer2Km)).toFixed(2));
+      // 3. Calculate delivery cost based on two-tiered rates
+      const rateUpTo2 = partner.rateUpTo2Km || partner.perItemCharge || 10;
+      const rateAbove2 = partner.rateAbove2Km || partner.perItemCharge || 10;
+      let totalCost = 0;
+      if (distance <= 2) {
+        totalCost = distance * rateUpTo2;
+      } else {
+        totalCost = (2 * rateUpTo2) + ((distance - 2) * rateAbove2);
+      }
+      totalCost = parseFloat(totalCost.toFixed(2));
 
       availablePartners.push({
         _id: partner._id,
@@ -789,26 +799,38 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
         currentArea: partner.currentArea || partner.address,
         pincode: partner.pincode,
         serviceRadius: partner.serviceRadius || 15,
-        ratePerKm: ratePer2Km,
+        ratePerKm: rateUpTo2,
+        rateUpTo2Km: rateUpTo2,
+        rateAbove2Km: rateAbove2,
+        latitude: partner.latitude,
+        longitude: partner.longitude,
         totalCost,
         isCityMatch,
         isRadiusMatch,
-        distanceToBuyer: distToBuyer
+        distanceToBuyer: parseFloat(distToBuyer.toFixed(2)),
+        deliveryScope: partner.deliveryScope || 'local',
+        profilePhoto: partner.profilePhoto,
+        operatingLocation: partner.operatingLocation,
+        serviceAreaState: partner.serviceAreaState,
+        serviceAreaDistrict: partner.serviceAreaDistrict,
+        serviceAreaCity: partner.serviceAreaCity,
+        isActivePartner: partner.isActivePartner !== false
       });
     }
 
-    // Sort: Preferred city match + radius match first, then sorted by distance to buyer
+    // Sort: Best city match + radius match first, then by distance to buyer
     availablePartners.sort((a, b) => {
-      if (a.isCityMatch && !b.isCityMatch) return -1;
-      if (!a.isCityMatch && b.isCityMatch) return 1;
-      if (a.isRadiusMatch && !b.isRadiusMatch) return -1;
-      if (!a.isRadiusMatch && b.isRadiusMatch) return 1;
+      const scoreA = (a.isCityMatch ? 2 : 0) + (a.isRadiusMatch ? 1 : 0);
+      const scoreB = (b.isCityMatch ? 2 : 0) + (b.isRadiusMatch ? 1 : 0);
+      if (scoreB !== scoreA) return scoreB - scoreA;
       return a.distanceToBuyer - b.distanceToBuyer;
     });
 
     res.status(200).json({
       success: true,
       distanceKm: parseFloat(distance.toFixed(2)),
+      orderCity,
+      totalPartners: availablePartners.length,
       availablePartners
     });
   } catch (error) {
@@ -835,8 +857,16 @@ exports.createDeliveryPartner = async (req, res) => {
       pincode,
       serviceRadius,
       perItemCharge,
+      rateUpTo2Km,
+      rateAbove2Km,
       latitude,
-      longitude
+      longitude,
+      salaryRequirement,
+      serviceAreaCountry,
+      serviceAreaRegion,
+      serviceAreaDistrict,
+      serviceAreaState,
+      serviceAreaCity
     } = req.body;
     
     const userExists = await User.findOne({ email });
@@ -860,8 +890,16 @@ exports.createDeliveryPartner = async (req, res) => {
       pincode,
       serviceRadius: serviceRadius ? Number(serviceRadius) : 15,
       perItemCharge: perItemCharge ? Number(perItemCharge) : 10,
+      rateUpTo2Km: rateUpTo2Km ? Number(rateUpTo2Km) : (perItemCharge ? Number(perItemCharge) : 10),
+      rateAbove2Km: rateAbove2Km ? Number(rateAbove2Km) : (perItemCharge ? Number(perItemCharge) : 10),
       latitude: latitude ? Number(latitude) : undefined,
-      longitude: longitude ? Number(longitude) : undefined
+      longitude: longitude ? Number(longitude) : undefined,
+      salaryRequirement,
+      serviceAreaCountry,
+      serviceAreaRegion,
+      serviceAreaDistrict,
+      serviceAreaState,
+      serviceAreaCity
     });
 
     res.status(201).json({
@@ -894,8 +932,16 @@ exports.updateDeliveryPartner = async (req, res) => {
       pincode,
       serviceRadius,
       perItemCharge,
+      rateUpTo2Km,
+      rateAbove2Km,
       latitude,
-      longitude
+      longitude,
+      salaryRequirement,
+      serviceAreaCountry,
+      serviceAreaRegion,
+      serviceAreaDistrict,
+      serviceAreaState,
+      serviceAreaCity
     } = req.body;
     
     const partner = await User.findById(req.params.id);
@@ -916,9 +962,22 @@ exports.updateDeliveryPartner = async (req, res) => {
     if (currentArea !== undefined) partner.currentArea = currentArea;
     if (pincode !== undefined) partner.pincode = pincode;
     if (serviceRadius !== undefined) partner.serviceRadius = Number(serviceRadius);
-    if (perItemCharge !== undefined) partner.perItemCharge = Number(perItemCharge);
+    if (perItemCharge !== undefined) {
+      partner.perItemCharge = Number(perItemCharge);
+      partner.rateUpTo2Km = Number(perItemCharge);
+      partner.rateAbove2Km = Number(perItemCharge);
+    }
+    if (rateUpTo2Km !== undefined) partner.rateUpTo2Km = Number(rateUpTo2Km);
+    if (rateAbove2Km !== undefined) partner.rateAbove2Km = Number(rateAbove2Km);
     if (latitude !== undefined) partner.latitude = Number(latitude);
     if (longitude !== undefined) partner.longitude = Number(longitude);
+    
+    if (salaryRequirement !== undefined) partner.salaryRequirement = salaryRequirement;
+    if (serviceAreaCountry !== undefined) partner.serviceAreaCountry = serviceAreaCountry;
+    if (serviceAreaRegion !== undefined) partner.serviceAreaRegion = serviceAreaRegion;
+    if (serviceAreaDistrict !== undefined) partner.serviceAreaDistrict = serviceAreaDistrict;
+    if (serviceAreaState !== undefined) partner.serviceAreaState = serviceAreaState;
+    if (serviceAreaCity !== undefined) partner.serviceAreaCity = serviceAreaCity;
 
     await partner.save();
 
@@ -960,7 +1019,27 @@ exports.deleteDeliveryPartner = async (req, res) => {
 // @access  Private (Delivery Partner only)
 exports.updatePartnerProfile = async (req, res) => {
   try {
-    const { currentCity, currentArea, pincode, serviceRadius, perItemCharge, isActivePartner, vehicleType, vehicleNumber, latitude, longitude } = req.body;
+    const { 
+      currentCity, 
+      currentArea, 
+      pincode, 
+      serviceRadius, 
+      perItemCharge, 
+      rateUpTo2Km,
+      rateAbove2Km,
+      isActivePartner, 
+      vehicleType, 
+      vehicleNumber, 
+      latitude, 
+      longitude,
+      operatingLocation,
+      salaryRequirement,
+      serviceAreaCountry,
+      serviceAreaRegion,
+      serviceAreaDistrict,
+      serviceAreaState,
+      serviceAreaCity
+    } = req.body;
     const partner = await User.findById(req.user._id);
     if (!partner || partner.role !== 'delivery') {
       return res.status(404).json({ success: false, error: 'Delivery partner not found' });
@@ -970,12 +1049,26 @@ exports.updatePartnerProfile = async (req, res) => {
     if (currentArea !== undefined) partner.currentArea = currentArea;
     if (pincode !== undefined) partner.pincode = pincode;
     if (serviceRadius !== undefined) partner.serviceRadius = Number(serviceRadius);
-    if (perItemCharge !== undefined) partner.perItemCharge = Number(perItemCharge);
+    if (perItemCharge !== undefined) {
+      partner.perItemCharge = Number(perItemCharge);
+      partner.rateUpTo2Km = Number(perItemCharge);
+      partner.rateAbove2Km = Number(perItemCharge);
+    }
+    if (rateUpTo2Km !== undefined) partner.rateUpTo2Km = Number(rateUpTo2Km);
+    if (rateAbove2Km !== undefined) partner.rateAbove2Km = Number(rateAbove2Km);
     if (isActivePartner !== undefined) partner.isActivePartner = isActivePartner;
     if (vehicleType !== undefined) partner.vehicleType = vehicleType;
     if (vehicleNumber !== undefined) partner.vehicleNumber = vehicleNumber;
     if (latitude !== undefined) partner.latitude = Number(latitude);
     if (longitude !== undefined) partner.longitude = Number(longitude);
+    
+    if (operatingLocation !== undefined) partner.operatingLocation = operatingLocation;
+    if (salaryRequirement !== undefined) partner.salaryRequirement = salaryRequirement;
+    if (serviceAreaCountry !== undefined) partner.serviceAreaCountry = serviceAreaCountry;
+    if (serviceAreaRegion !== undefined) partner.serviceAreaRegion = serviceAreaRegion;
+    if (serviceAreaDistrict !== undefined) partner.serviceAreaDistrict = serviceAreaDistrict;
+    if (serviceAreaState !== undefined) partner.serviceAreaState = serviceAreaState;
+    if (serviceAreaCity !== undefined) partner.serviceAreaCity = serviceAreaCity;
 
     await partner.save();
 

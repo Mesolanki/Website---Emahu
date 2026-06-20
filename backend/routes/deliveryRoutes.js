@@ -17,9 +17,9 @@ const {
 } = require('../controllers/deliveryController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-// Settings (Public & Admin only)
+// Settings (Public & Admin/Seller)
 router.get('/settings', getDeliverySettings);
-router.put('/settings', protect, authorize('admin'), updateDeliverySettings);
+router.put('/settings', protect, authorize('admin', 'seller'), updateDeliverySettings);
 
 // Calculate Delivery charge (Public)
 router.post('/calculate', calculateDeliveryCharge);

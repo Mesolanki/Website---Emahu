@@ -819,9 +819,10 @@
 }
 
 .sel-portals-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  justify-content: center;
   gap: 32px;
+  flex-wrap: wrap;
 }
 
 .sel-portal-box {

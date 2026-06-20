@@ -10,6 +10,20 @@ exports.createOrder = async (req, res) => {
   try {
     const orderData = req.body;
     
+    // Check if the buyer has any unconfirmed delivered orders
+    if (orderData.userId) {
+      const hasUnconfirmedDelivered = await Order.findOne({
+        userId: orderData.userId,
+        status: 'DELIVERED'
+      });
+      if (hasUnconfirmedDelivered) {
+        return res.status(400).json({
+          success: false,
+          error: `Checkout Blocked: You must confirm receipt/release of your delivered order #${hasUnconfirmedDelivered.orderId} before placing a new order.`
+        });
+      }
+    }
+
     // Calculate and verify delivery charges
     let distanceKm = 0;
     let deliveryCharge = 0;
@@ -229,8 +243,19 @@ exports.getOrders = async (req, res) => {
 exports.updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
     
+    // Normalize empty strings that fail Mongoose schema casting/validation to null
+    if (updateData.deliveryPartnerId === '') {
+      updateData.deliveryPartnerId = null;
+    }
+    if (updateData.deliveredAt === '') {
+      updateData.deliveredAt = null;
+    }
+    if (updateData.transactionDate === '') {
+      updateData.transactionDate = null;
+    }
+
     const order = await Order.findOneAndUpdate(
       { orderId: id },
       { $set: updateData },
@@ -250,6 +275,12 @@ exports.updateOrder = async (req, res) => {
     });
   } catch (error) {
     console.error('Update Order Error:', error);
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
     res.status(500).json({
       success: false,
       error: 'Server error while updating order'

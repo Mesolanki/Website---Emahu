@@ -290,6 +290,9 @@ export default function BuyerHeader() {
                     <Link href="/buyer/wishlist" className="bh-profile__dropdown-item" onClick={() => setProfileDropdownOpen(false)}>
                       ❤️ My Wishlist
                     </Link>
+                    <Link href="/buyer/settings" className="bh-profile__dropdown-item" onClick={() => setProfileDropdownOpen(false)}>
+                      ⚙️ Profile Settings
+                    </Link>
                     <div className="bh-profile__dropdown-divider" />
                     <button onClick={handleSignOut} className="bh-profile__dropdown-item bh-profile__dropdown-item--logout">
                       🚪 Sign Out

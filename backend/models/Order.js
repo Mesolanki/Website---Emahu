@@ -156,7 +156,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['unpaid', 'paid'],
+      enum: ['unpaid', 'paid', 'released'],
       default: 'unpaid'
     },
     transactionFile: {
@@ -165,6 +165,31 @@ const orderSchema = new mongoose.Schema(
     },
     transactionDate: {
       type: Date
+    },
+    // --- Payment Release Fields ---
+    paymentReleased: {
+      type: Boolean,
+      default: false
+    },
+    paymentReleasedAt: {
+      type: Date
+    },
+    platformFeePercent: {
+      type: Number  // snapshot of the % applied at time of release
+    },
+    platformFeeAmount: {
+      type: Number  // ₹ amount deducted as Emahu commission
+    },
+    sellerNetPayout: {
+      type: Number  // amount seller actually receives
+    },
+    penaltyAmount: {
+      type: Number,
+      default: 0
+    },
+    penaltyReason: {
+      type: String,
+      default: ''
     }
   },
   {
