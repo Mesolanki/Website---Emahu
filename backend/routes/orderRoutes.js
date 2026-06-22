@@ -4,7 +4,8 @@ const {
   createOrder,
   getOrders,
   updateOrder,
-  getAdminOrders
+  getAdminOrders,
+  buyerConfirmDelivery
 } = require('../controllers/orderController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -17,5 +18,7 @@ router.route('/admin/all')
 
 router.route('/:id')
   .put(updateOrder);
+
+router.put('/:id/confirm-receipt', protect, buyerConfirmDelivery);
 
 module.exports = router;

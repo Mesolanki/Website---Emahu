@@ -248,7 +248,8 @@ export default function OrdersPage() {
             overallStatus = '⚠️ Partial Rejection — Items Pending';
           } else if (hasConfirmed) {
             const anyDelivered = group.ordersList.some(o => o.status === 'DELIVERED');
-            if (anyDelivered) {
+            const anyArrived = group.ordersList.some(o => o.status === 'ARRIVED' || o.deliveryStatus === 'arrived');
+            if (anyArrived || anyDelivered) {
               overallStatus = '🎁 ARRIVED - Awaiting Confirmation';
             } else {
               overallStatus = '✓ Delivery Confirmed by Seller';
@@ -261,6 +262,7 @@ export default function OrdersPage() {
             ...group,
             status: overallStatus,
             hasDelivered: group.ordersList.some(o => o.status === 'DELIVERED'),
+            hasArrived: group.ordersList.some(o => o.status === 'ARRIVED' || o.deliveryStatus === 'arrived'),
             canDisputeOrRelease: !allReleased && !hasDisputed && !allRejected && hasConfirmed,
             sellerConfirmed: hasConfirmed,
             sellerRejected: allRejected,
@@ -271,8 +273,8 @@ export default function OrdersPage() {
         });
 
         const sortedGroupedOrders = groupedOrders.sort((a, b) => {
-          const aArrived = a.hasDelivered && a.status !== '🔓 FUNDS RELEASED' && a.status !== '⚠️ VAULT DISPUTED / FROZEN';
-          const bArrived = b.hasDelivered && b.status !== '🔓 FUNDS RELEASED' && b.status !== '⚠️ VAULT DISPUTED / FROZEN';
+          const aArrived = (a.hasDelivered || a.hasArrived) && a.status !== '🔓 FUNDS RELEASED' && a.status !== '⚠️ VAULT DISPUTED / FROZEN';
+          const bArrived = (b.hasDelivered || b.hasArrived) && b.status !== '🔓 FUNDS RELEASED' && b.status !== '⚠️ VAULT DISPUTED / FROZEN';
           if (aArrived && !bArrived) return -1;
           if (!aArrived && bArrived) return 1;
           const dateA = parseOrderDate(a.ordersList?.[0]);
@@ -327,6 +329,32 @@ export default function OrdersPage() {
       }
     } catch (localErr) {
       console.error('Failed to sync order status to localStorage:', localErr);
+    }
+  };
+
+  // Action: Buyer confirms delivery receipt when package is arrived (Method B: No-OTP Flow)
+  const handleConfirmReceipt = async (orderId) => {
+    const token = localStorage.getItem('emahu_buyer_token');
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/confirm-receipt`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Receipt confirmed! The order status has been updated to DELIVERED. Please inspect your package and release funds when ready.');
+        // Trigger reload
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('storage'));
+        }
+      } else {
+        alert(data.error || 'Failed to confirm receipt');
+      }
+    } catch (err) {
+      console.error('Error confirming receipt:', err);
+      alert('Error confirming receipt');
     }
   };
 
@@ -443,7 +471,7 @@ export default function OrdersPage() {
               const isDisputed = disputedOrdersList.includes(ord.billId) || ord.status.includes('DISPUTED') || ord.ordersList.some(o => o.sellerRejected);
               const isReleased = releasedOrdersList.includes(ord.billId) || ord.status.includes('RELEASED');
               const isLocked = !isDisputed && !isReleased;
-              const isArrived = ord.hasDelivered && !isReleased && !isDisputed;
+              const isArrived = (ord.hasDelivered || ord.hasArrived) && !isReleased && !isDisputed;
               
               return (
                 <div 
@@ -768,6 +796,50 @@ export default function OrdersPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Arrived Sub-Orders Receipt Confirmation */}
+                    {!isReleased && !isDisputed && ord.ordersList.map((subOrd) => {
+                      if (subOrd.status === 'ARRIVED' || subOrd.deliveryStatus === 'arrived') {
+                        return (
+                          <div key={subOrd.orderId} style={{
+                            margin: '12px 0',
+                            padding: '12px 16px',
+                            background: 'rgba(16, 185, 129, 0.08)',
+                            border: '1.5px solid #10b981',
+                            borderRadius: '10px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '12px'
+                          }}>
+                            <div style={{ textAlign: 'left' }}>
+                              <strong style={{ color: '#065f46', fontSize: '0.88rem' }}>📦 Courier Has Arrived (Order #{subOrd.orderId})</strong>
+                              <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#047857' }}>
+                                The package has been delivered to your location. Please verify the contents of your package.
+                              </p>
+                            </div>
+                            <button 
+                              onClick={() => handleConfirmReceipt(subOrd.orderId)}
+                              style={{
+                                background: '#10b981',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '8px 16px',
+                                fontSize: '0.8rem',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 4px rgba(16,185,129,0.2)'
+                              }}
+                            >
+                              ✓ Received Order
+                            </button>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
 
                     <div className="order-actions">
                       <Link href={`/buyer/track?id=${ord.billId}`} className="orders-btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.8rem', fontWeight: '750', textDecoration: 'none', border: '1.5px solid #cbd5e1', color: '#475569', borderRadius: '6px' }}>

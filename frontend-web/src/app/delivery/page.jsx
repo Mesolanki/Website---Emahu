@@ -7,6 +7,19 @@ import { registerUser, loginUser, saveAuthSession, clearAuthSession, checkIsLogg
 import { indiaStatesCities } from '@/utils/indiaStatesCities';
 import './delivery.css';
 
+function getHaversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of the Earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const d = R * c; // Distance in km
+  return d;
+}
+
 export default function DeliveryPortal() {
   const formSectionRef = useRef(null);
 
@@ -62,11 +75,42 @@ export default function DeliveryPortal() {
 
   // --- Dashboard States ---
   const [orders, setOrders] = useState([]);
+  const [availableOrders, setAvailableOrders] = useState([]);
   const [stats, setStats] = useState({ total: 0, pending: 0, earnings: 0 });
   const [dashLoading, setDashLoading] = useState(false);
   const [editProfileMode, setEditProfileMode] = useState(false);
   const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
   const [faqActive, setFaqActive] = useState(null);
+
+  // New features states
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState('new'); // 'new', 'active', 'completed', 'earnings', 'profile'
+  
+  // Simulation states
+  const [simStep, setSimStep] = useState(0);
+  const [simCoordinates, setSimCoordinates] = useState(null);
+  
+  // Handover confirmation states (OTP)
+  const [otpSentCode, setOtpSentCode] = useState(false);
+  const [otpResendCooldown, setOtpResendCooldown] = useState(0);
+  const [enteredOtp, setEnteredOtp] = useState('');
+  const [uploadedPhoto, setUploadedPhoto] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpSuccess, setOtpSuccess] = useState('');
+  const [submittingOtp, setSubmittingOtp] = useState(false);
+  
+  // Handover confirmation states (Photo upload)
+  const [arrivedPhoto, setArrivedPhoto] = useState('');
+  const [submittingPhoto, setSubmittingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const [photoSuccess, setPhotoSuccess] = useState('');
+
+  // Map refs
+  const activeOrderMapRef = useRef(null);
+  const activeOrderMarkerRef = useRef(null);
+  const activeSellerMarkerRef = useRef(null);
+  const activeBuyerMarkerRef = useRef(null);
+  const activePolylineRef = useRef(null);
 
   // Auto-set Lat/Lon when city changes for Ahmedabad & Surat defaults
   useEffect(() => {
@@ -122,6 +166,27 @@ export default function DeliveryPortal() {
     }
   }, []);
 
+  // Leaflet CDNs lazy loader
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    if (!document.getElementById('leaflet-js')) {
+      const script = document.createElement('script');
+      script.id = 'leaflet-js';
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => setLeafletLoaded(true);
+      document.head.appendChild(script);
+    } else {
+      setLeafletLoaded(true);
+    }
+  }, []);
+
   // Fetch Dashboard Orders
   const fetchDashboardData = async (userToken) => {
     if (!userToken) return;
@@ -136,14 +201,14 @@ export default function DeliveryPortal() {
       if (data.success) {
         const jobs = data.orders || [];
         setOrders(jobs);
+        setAvailableOrders(data.availableOrders || []);
 
         // Calculate Stats
         const deliveredJobs = jobs.filter(j => j.deliveryStatus === 'delivered');
         const pendingJobs = jobs.filter(j => j.deliveryStatus !== 'delivered' && j.deliveryStatus !== 'rejected');
 
         const totalEarnings = deliveredJobs.reduce((acc, curr) => {
-          const rate = user?.perKmRate || user?.perItemCharge || 5;
-          const cost = curr.deliveryCost !== undefined ? curr.deliveryCost : (curr.distanceKm || 0) * rate;
+          const cost = curr.deliveryCost !== undefined ? curr.deliveryCost : (curr.distanceKm || 0) * 2;
           return acc + cost;
         }, 0);
 
@@ -643,6 +708,350 @@ export default function DeliveryPortal() {
       </div>
     );
   };
+
+  // Send live GPS tracking location updates to server
+  const sendLiveLocationUpdate = async (lat, lon, orderId) => {
+    if (!token) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/location`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId,
+          latitude: parseFloat(lat),
+          longitude: parseFloat(lon)
+        })
+      });
+      // Synchronize state locally
+      setUser(prev => prev ? { ...prev, latitude: parseFloat(lat), longitude: parseFloat(lon) } : null);
+    } catch (err) {
+      console.error('Failed to update live coordinates:', err);
+    }
+  };
+
+  const updateDriverPosition = async (lat, lon, orderId) => {
+    setSimCoordinates({ latitude: lat, longitude: lon });
+    await sendLiveLocationUpdate(lat, lon, orderId);
+  };
+
+  // Cooldown countdown for resending verification OTP
+  useEffect(() => {
+    if (otpResendCooldown > 0) {
+      const timer = setTimeout(() => setOtpResendCooldown(otpResendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpResendCooldown]);
+
+  // Handover OTP method handlers
+  const handleSendHandoverOtp = async (orderId) => {
+    if (!token) return;
+    setOtpError('');
+    setOtpSuccess('');
+    
+    const pLat = simCoordinates?.latitude || user?.latitude;
+    const pLon = simCoordinates?.longitude || user?.longitude;
+    if (!pLat || !pLon) {
+      setOtpError('Location error: Could not resolve your current GPS coordinates. Please click Detect Location first.');
+      return;
+    }
+
+    const bLat = activeOrder?.buyerLocation?.latitude;
+    const bLon = activeOrder?.buyerLocation?.longitude;
+    if (bLat !== undefined && bLon !== undefined) {
+      const dist = getHaversineDistance(Number(pLat), Number(pLon), Number(bLat), Number(bLon));
+      if (dist > 0.1) {
+        setOtpError(`GPS Proximity Verification Failed. You are ${Math.round(dist * 1000)} meters away. You must be within 100m to send OTP.`);
+        return;
+      }
+    }
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/otp/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId,
+          latitude: parseFloat(pLat),
+          longitude: parseFloat(pLon)
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOtpSentCode(true);
+        setOtpResendCooldown(60);
+        setOtpSuccess('Security OTP code has been sent to the buyer email.');
+      } else {
+        setOtpError(data.error || 'Failed to send OTP code.');
+      }
+    } catch (err) {
+      console.error(err);
+      setOtpError('Network error requesting OTP.');
+    }
+  };
+
+  const handleVerifyHandoverOtp = async (orderId) => {
+    if (!token) return;
+    if (!enteredOtp.trim()) {
+      setOtpError('Please enter the 6-digit OTP code.');
+      return;
+    }
+    const finalPhoto = uploadedPhoto || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&q=80';
+    
+    setOtpError('');
+    setOtpSuccess('');
+    setSubmittingOtp(true);
+    
+    const pLat = simCoordinates?.latitude || user?.latitude;
+    const pLon = simCoordinates?.longitude || user?.longitude;
+
+    const bLat = activeOrder?.buyerLocation?.latitude;
+    const bLon = activeOrder?.buyerLocation?.longitude;
+    if (bLat !== undefined && bLon !== undefined) {
+      const dist = getHaversineDistance(Number(pLat), Number(pLon), Number(bLat), Number(bLon));
+      if (dist > 0.1) {
+        setOtpError(`GPS Proximity Verification Failed. You are ${Math.round(dist * 1000)} meters away. You must be within 100m to verify OTP.`);
+        setSubmittingOtp(false);
+        return;
+      }
+    }
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/otp/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId,
+          otp: enteredOtp.trim(),
+          deliveryPhoto: finalPhoto,
+          latitude: parseFloat(pLat),
+          longitude: parseFloat(pLon)
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOtpSuccess('Delivery confirmed and verified successfully!');
+        setEnteredOtp('');
+        setOtpSentCode(false);
+        fetchDashboardData(token);
+      } else {
+        setOtpError(data.error || 'Invalid OTP code.');
+      }
+    } catch (err) {
+      console.error(err);
+      setOtpError('Network error verifying OTP.');
+    } finally {
+      setSubmittingOtp(false);
+    }
+  };
+
+  // Handover arrival photo method handlers
+  const handleUploadArrivalPhoto = async (orderId) => {
+    if (!token) return;
+    const finalPhoto = arrivedPhoto || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&q=80';
+    
+    setPhotoError('');
+    setPhotoSuccess('');
+    setSubmittingPhoto(true);
+
+    const pLat = simCoordinates?.latitude || user?.latitude;
+    const pLon = simCoordinates?.longitude || user?.longitude;
+    if (!pLat || !pLon) {
+      setPhotoError('Location error: Could not resolve your current GPS coordinates. Please click Detect Location first.');
+      setSubmittingPhoto(false);
+      return;
+    }
+
+    const bLat = activeOrder?.buyerLocation?.latitude;
+    const bLon = activeOrder?.buyerLocation?.longitude;
+    if (bLat !== undefined && bLon !== undefined) {
+      const dist = getHaversineDistance(Number(pLat), Number(pLon), Number(bLat), Number(bLon));
+      if (dist > 0.1) {
+        setPhotoError(`GPS Proximity Verification Failed. You are ${Math.round(dist * 1000)} meters away. You must be within 100m to upload arrival photo.`);
+        setSubmittingPhoto(false);
+        return;
+      }
+    }
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/photo/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId,
+          deliveryPhoto: finalPhoto,
+          latitude: parseFloat(pLat),
+          longitude: parseFloat(pLon)
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPhotoSuccess('Arrival photo uploaded successfully! Waiting for buyer confirmation.');
+        fetchDashboardData(token);
+      } else {
+        setPhotoError(data.error || 'Failed to upload photo.');
+      }
+    } catch (err) {
+      console.error(err);
+      setPhotoError('Network error uploading arrival photo.');
+    } finally {
+      setSubmittingPhoto(false);
+    }
+  };
+
+  // Courier path routing simulation handlers
+  const handleAdvanceSimulation = (order) => {
+    if (!order) return;
+    const nextStep = simStep + 1;
+    if (nextStep > 5) return;
+    
+    setSimStep(nextStep);
+    
+    const sLat = order.sellerLocation?.latitude || 23.0225;
+    const sLon = order.sellerLocation?.longitude || 72.5714;
+    const bLat = order.buyerLocation?.latitude || 23.0225;
+    const bLon = order.buyerLocation?.longitude || 72.5714;
+    
+    const t = nextStep / 5;
+    const lat = sLat + (bLat - sLat) * t;
+    const lon = sLon + (bLon - sLon) * t;
+    
+    updateDriverPosition(lat.toFixed(6), lon.toFixed(6), order.orderId);
+  };
+
+  const handleResetSimulation = (order) => {
+    if (!order) return;
+    setSimStep(0);
+    const sLat = order.sellerLocation?.latitude || 23.0225;
+    const sLon = order.sellerLocation?.longitude || 72.5714;
+    updateDriverPosition(sLat.toFixed(6), sLon.toFixed(6), order.orderId);
+  };
+
+  // Auto-GPS position polling (every 8s) for active orders
+  useEffect(() => {
+    if (!isLoggedIn || !token || activeTab !== 'active') return;
+    const activeOrder = orders.find(o => ['accepted', 'picked_up', 'in_transit', 'out_for_delivery', 'arrived'].includes(o.deliveryStatus));
+    if (!activeOrder) return;
+
+    const interval = setInterval(() => {
+      if (navigator.geolocation && !simCoordinates) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude.toFixed(6);
+            const lon = pos.coords.longitude.toFixed(6);
+            sendLiveLocationUpdate(lat, lon, activeOrder.orderId);
+          },
+          (err) => console.warn('Auto-GPS watch failed:', err),
+          { enableHighAccuracy: true }
+        );
+      }
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [isLoggedIn, token, activeTab, orders, simCoordinates]);
+
+  // Clean active Leaflet map instances on tab changes
+  useEffect(() => {
+    return () => {
+      if (activeOrderMapRef.current) {
+        activeOrderMapRef.current.remove();
+        activeOrderMapRef.current = null;
+      }
+    };
+  }, [activeTab]);
+
+  // Active delivery Leaflet map drawing effect
+  const activeOrder = orders.find(o => ['accepted', 'picked_up', 'in_transit', 'out_for_delivery', 'arrived'].includes(o.deliveryStatus));
+
+  const pLat = simCoordinates?.latitude || user?.latitude;
+  const pLon = simCoordinates?.longitude || user?.longitude;
+  const bLat = activeOrder?.buyerLocation?.latitude;
+  const bLon = activeOrder?.buyerLocation?.longitude;
+
+  let isTooFar = false;
+  let distanceToBuyerMeters = 0;
+  if (activeOrder && activeOrder.deliveryStatus === 'arrived') {
+    if (pLat && pLon && bLat && bLon) {
+      const distKm = getHaversineDistance(Number(pLat), Number(pLon), Number(bLat), Number(bLon));
+      distanceToBuyerMeters = Math.round(distKm * 1000);
+      isTooFar = distKm > 0.1; // 100m
+    } else {
+      isTooFar = true; // Block if we don't have location
+    }
+  }
+
+  useEffect(() => {
+    if (!leafletLoaded || typeof window === 'undefined' || !window.L || !activeOrder || activeTab !== 'active') return;
+
+    const mapId = 'active-delivery-map';
+    const container = document.getElementById(mapId);
+    if (!container) return;
+
+    const sLat = activeOrder.sellerLocation?.latitude || 23.0225;
+    const sLon = activeOrder.sellerLocation?.longitude || 72.5714;
+    const bLat = activeOrder.buyerLocation?.latitude || 23.0225;
+    const bLon = activeOrder.buyerLocation?.longitude || 72.5714;
+    
+    const pLat = parseFloat(simCoordinates?.latitude || user?.latitude || sLat);
+    const pLon = parseFloat(simCoordinates?.longitude || user?.longitude || sLon);
+
+    if (!activeOrderMapRef.current) {
+      activeOrderMapRef.current = window.L.map(mapId).setView([pLat, pLon], 13);
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(activeOrderMapRef.current);
+
+      const sellerIcon = window.L.divIcon({
+        html: '<div style="background-color:#dd6b20; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.3)"></div>',
+        className: 'custom-div-icon',
+        iconSize: [14, 14]
+      });
+
+      const buyerIcon = window.L.divIcon({
+        html: '<div style="background-color:#e53e3e; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.3)"></div>',
+        className: 'custom-div-icon',
+        iconSize: [14, 14]
+      });
+
+      const partnerIcon = window.L.divIcon({
+        html: '<div style="background-color:#319795; width:18px; height:18px; border-radius:50%; border:3px solid white; box-shadow:0 0 7px rgba(0,0,0,0.4)"></div>',
+        className: 'custom-div-icon',
+        iconSize: [18, 18]
+      });
+
+      activeSellerMarkerRef.current = window.L.marker([sLat, sLon], { icon: sellerIcon })
+        .addTo(activeOrderMapRef.current)
+        .bindPopup(`<strong>Merchant Pickup</strong><br/>${activeOrder.sellerLocation?.address || 'Pickup Point'}`);
+
+      activeBuyerMarkerRef.current = window.L.marker([bLat, bLon], { icon: buyerIcon })
+        .addTo(activeOrderMapRef.current)
+        .bindPopup(`<strong>Customer Dropoff</strong><br/>${activeOrder.deliveryAddress?.address || 'Drop-off Point'}`);
+
+      activeOrderMarkerRef.current = window.L.marker([pLat, pLon], { icon: partnerIcon })
+        .addTo(activeOrderMapRef.current)
+        .bindPopup(`<strong>Your GPS Location</strong>`);
+
+      activePolylineRef.current = window.L.polyline([[sLat, sLon], [bLat, bLon]], { color: '#319795', weight: 4, dashArray: '5, 8' })
+        .addTo(activeOrderMapRef.current);
+
+      activeOrderMapRef.current.fitBounds([[sLat, sLon], [bLat, bLon]], { padding: [40, 40] });
+    } else {
+      if (activeOrderMarkerRef.current) {
+        activeOrderMarkerRef.current.setLatLng([pLat, pLon]);
+      }
+    }
+  }, [leafletLoaded, activeOrder?._id, simCoordinates, user?.latitude, user?.longitude, activeTab]);
 
   // --- Rendering ---
   return (
@@ -1228,8 +1637,24 @@ export default function DeliveryPortal() {
             <div className="benefit-card" style={{ padding: '24px' }}>
               <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Earnings</span>
               <h3 style={{ fontSize: '2rem', margin: '8px 0 0 0', color: '#319795' }}>₹{stats.earnings}</h3>
-              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>At rate ₹{user?.perKmRate || user?.perItemCharge || 5}/KM</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>At rate ₹2/KM</span>
             </div>
+          </div>
+
+          {/* Dashboard Tab Buttons */}
+          <div className="dash-tabs" style={{ display: 'flex', gap: '8px', marginBottom: '24px', backgroundColor: '#e2e8f0', padding: '6px', borderRadius: '12px' }}>
+            <button type="button" onClick={() => { setActiveTab('new'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'new' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'new' ? '#ffffff' : 'transparent', color: activeTab === 'new' ? '#319795' : '#475569', boxShadow: activeTab === 'new' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
+              🆕 New Jobs ({availableOrders.length})
+            </button>
+            <button type="button" onClick={() => { setActiveTab('active'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'active' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'active' ? '#ffffff' : 'transparent', color: activeTab === 'active' ? '#319795' : '#475569', boxShadow: activeTab === 'active' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
+              ⚡ Active Job {activeOrder ? '⏳' : ''}
+            </button>
+            <button type="button" onClick={() => { setActiveTab('completed'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'completed' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'completed' ? '#ffffff' : 'transparent', color: activeTab === 'completed' ? '#319795' : '#475569', boxShadow: activeTab === 'completed' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
+              ✅ Completed
+            </button>
+            <button type="button" onClick={() => { setActiveTab('earnings'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'earnings' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'earnings' ? '#ffffff' : 'transparent', color: activeTab === 'earnings' ? '#319795' : '#475569', boxShadow: activeTab === 'earnings' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
+              📊 Earnings
+            </button>
           </div>
 
           {/* Edit Profile Panel */}
@@ -1426,213 +1851,428 @@ export default function DeliveryPortal() {
             </div>
           )}
 
-          {/* Active Job Queues */}
-          <div className="form-card-wrapper" style={{ padding: '32px' }}>
-            <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 600 }}>Your Delivery Queue</h3>
-              <button onClick={() => fetchDashboardData(token)} className="lp-btn lp-btn--secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
-                🔄 Refresh Queue
-              </button>
+          {/* TAB: NEW JOBS */}
+          {activeTab === 'new' && !editProfileMode && (
+            <div className="form-card-wrapper" style={{ padding: '32px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 600 }}>Available Jobs in {user?.currentCity}</h3>
+                <button onClick={() => fetchDashboardData(token)} className="lp-btn lp-btn--secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
+                  🔄 Refresh Jobs
+                </button>
+              </div>
+              {dashLoading ? (
+                <p style={{ textAlign: 'center', color: '#64748b' }}>Refreshing available jobs...</p>
+              ) : availableOrders.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                  <span style={{ fontSize: '3rem' }}>📭</span>
+                  <h4 style={{ fontSize: '1.1rem', margin: '16px 0 8px 0', color: '#0f172a' }}>No new jobs available</h4>
+                  <p>There are no unassigned orders in {user?.currentCity || 'your city'} right now. New jobs will appear here when buyers place orders.</p>
+                </div>
+              ) : (
+                <div className="orders-table-wrapper" style={{ overflowX: 'auto' }}>
+                  <table className="orders-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '0.85rem' }}>
+                        <th style={{ padding: '12px' }}>Order ID</th>
+                        <th style={{ padding: '12px' }}>Addresses</th>
+                        <th style={{ padding: '12px' }}>Distance</th>
+                        <th style={{ padding: '12px' }}>Payout Charge</th>
+                        <th style={{ padding: '12px', textAlign: 'right' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {availableOrders.map((order) => {
+                        const payout = parseFloat(((order.distanceKm || 0) * 2).toFixed(2));
+                        return (
+                          <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
+                            <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
+                            <td style={{ padding: '12px' }}>
+                              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                <strong>Pickup:</strong> {order.sellerLocation?.address || 'Seller Hub'}
+                              </div>
+                              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                                <strong>Dropoff:</strong> {order.deliveryAddress?.address || order.buyerLocation?.address}
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
+                            <td style={{ padding: '12px', fontWeight: 700, color: '#319795' }}>₹{payout}</td>
+                            <td style={{ padding: '12px', textAlign: 'right' }}>
+                              <button onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')} className="lp-btn lp-btn--primary" style={{ padding: '6px 14px', fontSize: '0.8rem', backgroundColor: '#319795' }}>
+                                Accept Job
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
+          )}
 
-            {dashLoading ? (
-              <p style={{ textAlign: 'center', color: '#64748b' }}>Refreshing logistics queue...</p>
-            ) : orders.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                <span style={{ fontSize: '3rem' }}>📦</span>
-                <h4 style={{ fontSize: '1.1rem', margin: '16px 0 8px 0', color: '#0f172a' }}>No assignments found</h4>
-                <p>Ensure your status toggle is set to Active and that merchants in {user?.currentCity} have placed orders.</p>
-              </div>
-            ) : (
-              <div className="orders-table-wrapper" style={{ overflowX: 'auto' }}>
-                <table className="orders-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '0.85rem' }}>
-                      <th style={{ padding: '12px' }}>Order ID</th>
-                      <th style={{ padding: '12px' }}>Addresses</th>
-                      <th style={{ padding: '12px' }}>Distance</th>
-                      <th style={{ padding: '12px' }}>Cost Details</th>
-                      <th style={{ padding: '12px' }}>Current Status</th>
-                      <th style={{ padding: '12px', textAlign: 'right' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map((order) => {
-                      const cost = order.deliveryCost !== undefined ? order.deliveryCost : parseFloat(((order.distanceKm || 0) * (user?.perKmRate || user?.perItemCharge || 5)).toFixed(2));
-                      return (
-                        <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
-                          <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
-                          <td style={{ padding: '12px' }}>
-                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                              <strong>Pickup:</strong> {order.sellerLocation?.address || 'Seller Hub'}
-                              {order.sellerLocation?.latitude && order.sellerLocation?.longitude && (
-                                <a
-                                  href={`https://www.google.com/maps/search/?api=1&query=${order.sellerLocation.latitude},${order.sellerLocation.longitude}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{ color: '#319795', textDecoration: 'underline', marginLeft: '6px', fontSize: '0.75rem' }}
-                                >
-                                  📍 Map
-                                </a>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
-                              <strong>Delivery:</strong> {order.deliveryAddress?.address || order.buyerLocation?.address}
-                              {order.buyerLocation?.latitude && order.buyerLocation?.longitude && (
-                                <a
-                                  href={`https://www.google.com/maps/search/?api=1&query=${order.buyerLocation.latitude},${order.buyerLocation.longitude}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{ color: '#319795', textDecoration: 'underline', marginLeft: '6px', fontSize: '0.75rem' }}
-                                >
-                                  📍 Map
-                                </a>
-                              )}
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
-                          <td style={{ padding: '12px' }}>
-                            <div style={{ fontWeight: 600, color: '#319795' }}>₹{cost}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>₹{user?.perKmRate || user?.perItemCharge || 5}/KM</div>
-                          </td>
-                          <td style={{ padding: '12px' }}>
-                            <span className={`status-pill status-pill--${order.deliveryStatus}`}>
-                              {order.deliveryStatus || order.status}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                              {order.deliveryStatus !== 'delivered' && (
-                                <div style={{ display: 'flex', gap: '6px', marginRight: '10px' }}>
-                                  {order.sellerPhone && (
-                                    <>
-                                      <a
-                                        href={`tel:${order.sellerPhone}`}
-                                        title={`Call Seller: ${order.sellerName || ''}`}
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          gap: '4px',
-                                          padding: '6px 10px',
-                                          borderRadius: '6px',
-                                          backgroundColor: '#2563eb',
-                                          color: '#fff',
-                                          fontSize: '0.75rem',
-                                          fontWeight: '700',
-                                          textDecoration: 'none'
-                                        }}
-                                      >
-                                        📞 Call Seller
-                                      </a>
-                                      <a
-                                        href={`https://wa.me/${order.sellerPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${order.sellerName || 'Merchant'}, I am your delivery partner for Emahu order #${order.orderId}. I am on my way to pick up the package.`)}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        title="WhatsApp Seller"
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          gap: '4px',
-                                          padding: '6px 10px',
-                                          borderRadius: '6px',
-                                          backgroundColor: '#25d366',
-                                          color: '#fff',
-                                          fontSize: '0.75rem',
-                                          fontWeight: '700',
-                                          textDecoration: 'none'
-                                        }}
-                                      >
-                                        💬 Msg Seller
-                                      </a>
-                                    </>
-                                  )}
-                                  {order.deliveryAddress?.phone && (
-                                    <>
-                                      <a
-                                        href={`tel:${order.deliveryAddress.phone}`}
-                                        title={`Call Buyer: ${order.deliveryAddress.fullName || ''}`}
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          gap: '4px',
-                                          padding: '6px 10px',
-                                          borderRadius: '6px',
-                                          backgroundColor: '#7c3aed',
-                                          color: '#fff',
-                                          fontSize: '0.75rem',
-                                          fontWeight: '700',
-                                          textDecoration: 'none'
-                                        }}
-                                      >
-                                        📱 Call Buyer
-                                      </a>
-                                      <a
-                                        href={`https://wa.me/${order.deliveryAddress.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${order.deliveryAddress.fullName || 'Customer'}, I am your delivery partner for Emahu order #${order.orderId}. I am on my way to deliver your package.`)}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        title="WhatsApp Buyer"
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          gap: '4px',
-                                          padding: '6px 10px',
-                                          borderRadius: '6px',
-                                          backgroundColor: '#10b981',
-                                          color: '#fff',
-                                          fontSize: '0.75rem',
-                                          fontWeight: '700',
-                                          textDecoration: 'none'
-                                        }}
-                                      >
-                                        💬 Msg Buyer
-                                      </a>
-                                    </>
-                                  )}
-                                </div>
-                              )}
+          {/* TAB: ACTIVE DELIVERY */}
+          {activeTab === 'active' && !editProfileMode && (
+            <div className="form-card-wrapper" style={{ padding: '32px' }}>
+              {!activeOrder ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                  <span style={{ fontSize: '3rem' }}>🏍️</span>
+                  <h4 style={{ fontSize: '1.1rem', margin: '16px 0 8px 0', color: '#0f172a' }}>No active delivery job</h4>
+                  <p>Go to the <strong>New Jobs</strong> tab to accept a delivery assignment.</p>
+                </div>
+              ) : (
+                <div>
+                  {/* Active job header */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px', marginBottom: '20px' }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ACTIVE ASSIGNMENT</span>
+                      <h3 style={{ fontSize: '1.5rem', color: '#0f172a', fontWeight: '800', margin: '4px 0 0 0' }}>Order #{activeOrder.orderId}</h3>
+                    </div>
+                    <span className={`status-pill status-pill--${activeOrder.deliveryStatus}`}>
+                      {activeOrder.deliveryStatus === 'accepted' ? 'Accepted' :
+                       activeOrder.deliveryStatus === 'picked_up' ? 'Picked Up' :
+                       activeOrder.deliveryStatus === 'in_transit' ? 'In Transit' :
+                       activeOrder.deliveryStatus === 'out_for_delivery' ? 'Out For Delivery' :
+                       activeOrder.deliveryStatus === 'arrived' ? 'Arrived' : activeOrder.deliveryStatus}
+                    </span>
+                  </div>
 
-                              {order.deliveryStatus === 'assigned' && (
-                                <div style={{ display: 'flex', gap: '6px' }}>
-                                  <button onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')} className="lp-btn lp-btn--primary" style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: '#38a169' }}>
-                                    Accept
-                                  </button>
-                                  <button onClick={() => handleUpdateJobStatus(order.orderId, 'rejected')} className="lp-btn lp-btn--primary" style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: '#e53e3e' }}>
-                                    Reject
-                                  </button>
-                                </div>
-                              )}
-                              {order.deliveryStatus === 'accepted' && (
-                                <button onClick={() => handleUpdateJobStatus(order.orderId, 'picked_up')} className="lp-btn lp-btn--primary" style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: '#dd6b20' }}>
-                                  Mark Picked Up
-                                </button>
-                              )}
-                              {order.deliveryStatus === 'picked_up' && (
-                                <button onClick={() => handleUpdateJobStatus(order.orderId, 'out_for_delivery')} className="lp-btn lp-btn--primary" style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: '#319795' }}>
-                                  Mark Out For Delivery
-                                </button>
-                              )}
-                              {order.deliveryStatus === 'out_for_delivery' && (
-                                <button onClick={() => handleUpdateJobStatus(order.orderId, 'delivered')} className="lp-btn lp-btn--primary" style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: '#38a169' }}>
-                                  Mark Delivered
-                                </button>
-                              )}
-                              {order.deliveryStatus === 'delivered' && (
-                                <span style={{ color: '#38a169', fontWeight: 600 }}>🎉 Done</span>
-                              )}
+                  {/* Simulation Panel */}
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '12px', marginBottom: '20px', textAlign: 'left' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: '800', color: '#475569', marginBottom: '8px' }}>
+                      🤖 SIMULATION PANEL (LOGISTICS DEMO CONTROLLER)
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 12px 0' }}>
+                      Advance the simulated courier position step-by-step from Seller Hub to Buyer Address. Check proximity requirements live.
+                    </p>
+                    
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155' }}>
+                        Courier Position: <span style={{ color: '#319795' }}>{simStep === 0 ? 'At Seller Hub' : simStep === 5 ? 'Arrived at Buyer Address' : `In Transit (Step ${simStep}/5)`}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleAdvanceSimulation(activeOrder)}
+                          disabled={simStep >= 5}
+                          style={{ padding: '6px 12px', fontSize: '0.75rem', background: '#319795', color: '#fff', border: 'none', borderRadius: '6px', cursor: simStep >= 5 ? 'not-allowed' : 'pointer', opacity: simStep >= 5 ? 0.5 : 1, fontWeight: '700' }}
+                        >
+                          Advance Step ➔
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleResetSimulation(activeOrder)}
+                          style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'transparent', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: '700' }}
+                        >
+                          Reset Location
+                        </button>
+                      </div>
+                    </div>
+
+                    {simCoordinates && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px', padding: '8px 12px', background: '#ffffff', borderRadius: '6px', border: '1px solid #edf2f7', fontSize: '0.75rem', color: '#475569' }}>
+                        <div><strong>Sim Lat:</strong> {simCoordinates.latitude}</div>
+                        <div><strong>Sim Lon:</strong> {simCoordinates.longitude}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Active Order Leaflet Map */}
+                  <div id="active-delivery-map" style={{ height: '350px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #cbd5e1', marginBottom: '20px' }}></div>
+
+                  {/* Delivery Locations details & Contact buttons */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', marginBottom: '20px', textAlign: 'left' }}>
+                    <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #edf2f7' }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', marginBottom: '8px' }}>PICKUP ADDRESS (MERCHANT)</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#0f172a' }}>{activeOrder.sellerLocation?.shopName || 'Merchant'}</div>
+                      <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: '2px' }}>{activeOrder.sellerLocation?.address || 'N/A'}</div>
+                      {activeOrder.sellerPhone && (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                          <a href={`tel:${activeOrder.sellerPhone}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', background: '#2563eb', color: '#fff', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', textDecoration: 'none' }}>
+                            📞 Call Merchant
+                          </a>
+                          <a href={`https://wa.me/${activeOrder.sellerPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello, I am your delivery agent for Emahu order #${activeOrder.orderId}.`)}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', background: '#25d366', color: '#fff', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', textDecoration: 'none' }}>
+                            💬 WhatsApp
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #edf2f7' }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', marginBottom: '8px' }}>DELIVERY ADDRESS (CUSTOMER)</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#0f172a' }}>{activeOrder.deliveryAddress?.fullName || 'Customer'}</div>
+                      <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: '2px' }}>{activeOrder.deliveryAddress?.address || 'N/A'}</div>
+                      {activeOrder.deliveryAddress?.phone && (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                          <a href={`tel:${activeOrder.deliveryAddress.phone}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', background: '#7c3aed', color: '#fff', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', textDecoration: 'none' }}>
+                            📞 Call Customer
+                          </a>
+                          <a href={`https://wa.me/${activeOrder.deliveryAddress.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello, I am your delivery partner for Emahu order #${activeOrder.orderId}. I am on my way to deliver your package.`)}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', background: '#10b981', color: '#fff', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', textDecoration: 'none' }}>
+                            💬 WhatsApp
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Step Transitions / Control Buttons */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '24px' }}>
+                    {activeOrder.deliveryStatus === 'accepted' && (
+                      <button onClick={() => handleUpdateJobStatus(activeOrder.orderId, 'picked_up')} className="lp-btn" style={{ flex: 1, padding: '12px', fontSize: '0.85rem', fontWeight: '700', backgroundColor: '#dd6b20', color: '#fff' }}>
+                        📦 Confirm Pickup from Merchant
+                      </button>
+                    )}
+                    {activeOrder.deliveryStatus === 'picked_up' && (
+                      <button onClick={() => handleUpdateJobStatus(activeOrder.orderId, 'in_transit')} className="lp-btn" style={{ flex: 1, padding: '12px', fontSize: '0.85rem', fontWeight: '700', backgroundColor: '#3182ce', color: '#fff' }}>
+                        🚚 Mark In Transit
+                      </button>
+                    )}
+                    {activeOrder.deliveryStatus === 'in_transit' && (
+                      <button onClick={() => handleUpdateJobStatus(activeOrder.orderId, 'out_for_delivery')} className="lp-btn" style={{ flex: 1, padding: '12px', fontSize: '0.85rem', fontWeight: '700', backgroundColor: '#319795', color: '#fff' }}>
+                        🏍️ Mark Out for Delivery
+                      </button>
+                    )}
+                    {activeOrder.deliveryStatus === 'out_for_delivery' && (
+                      <button onClick={() => handleUpdateJobStatus(activeOrder.orderId, 'arrived')} className="lp-btn" style={{ flex: 1, padding: '12px', fontSize: '0.85rem', fontWeight: '700', backgroundColor: '#2b6cb0', color: '#fff' }}>
+                        📍 Mark Arrived at Destination
+                      </button>
+                    )}
+                  </div>
+
+                  {/* HANDOVER CONFIRMATION PANEL (Only visible when status is arrived) */}
+                  {activeOrder.deliveryStatus === 'arrived' && (
+                    <div style={{ border: '2px solid #319795', borderRadius: '16px', overflow: 'hidden', marginTop: '24px' }}>
+                      <div style={{ background: '#319795', padding: '12px 20px', color: '#fff', fontWeight: '800', fontSize: '0.9rem', textAlign: 'left' }}>
+                        🔐 SECURE HANDOVER VERIFICATION REQUIRED
+                      </div>
+                      
+                      <div style={{ padding: '24px', background: '#ffffff', textAlign: 'left' }}>
+                        <p style={{ fontSize: '0.82rem', color: '#475569', margin: '0 0 20px 0' }}>
+                          To complete the delivery, you must prove GPS proximity (within 100 meters) and complete either <strong>Method A (OTP verification)</strong> or <strong>Method B (Photo upload + Buyer dashboard confirmation)</strong>.
+                        </p>
+
+                        {isTooFar && (
+                          <div style={{ backgroundColor: '#fff5f5', border: '1px solid #feb2b2', color: '#c53030', padding: '14px 18px', borderRadius: '12px', marginBottom: '20px', fontSize: '0.82rem', lineHeight: '1.5', textAlign: 'left' }}>
+                            <strong style={{ display: 'block', fontSize: '0.88rem', marginBottom: '4px' }}>⚠️ GPS Proximity Lock Active (Distance: {distanceToBuyerMeters}m)</strong>
+                            <span>You are currently {distanceToBuyerMeters} meters away from the customer's drop-off coordinates. Handover verification actions (OTP requests and photo uploads) are disabled until you are within the 100-meter threshold. Please use the simulation panel to advance closer or update your physical location.</span>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+                          
+                          {/* METHOD A: OTP Code */}
+                          <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '12px', backgroundColor: '#fcfcfd' }}>
+                            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: '700', color: '#0f172a' }}>🔒 Method A: Security OTP</h4>
+                            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 12px 0' }}>
+                              Request a 6-digit OTP to be sent to the buyer's email, then type it below to instantly complete.
+                            </p>
+
+                            {otpError && <div className="form-alert-error" style={{ fontSize: '0.8rem', padding: '8px 12px' }}>⚠️ {otpError}</div>}
+                            {otpSuccess && <div className="form-alert-success" style={{ fontSize: '0.8rem', padding: '8px 12px' }}>✓ {otpSuccess}</div>}
+
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleSendHandoverOtp(activeOrder.orderId)}
+                                disabled={otpResendCooldown > 0 || isTooFar}
+                                className="lp-btn"
+                                style={{ padding: '8px 14px', fontSize: '0.78rem', background: isTooFar ? '#cbd5e1' : '#319795', color: isTooFar ? '#64748b' : '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', opacity: (otpResendCooldown > 0 || isTooFar) ? 0.6 : 1, cursor: isTooFar ? 'not-allowed' : 'pointer' }}
+                              >
+                                {otpResendCooldown > 0 ? `Resend in ${otpResendCooldown}s` : otpSentCode ? 'Resend OTP Code' : 'Send Code to Buyer'}
+                              </button>
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+
+                            {otpSentCode && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <div className="form-group">
+                                  <label className="form-label" style={{ fontSize: '0.7rem' }}>ENTER 6-DIGIT OTP</label>
+                                  <input
+                                    type="text"
+                                    maxLength={6}
+                                    className="form-input"
+                                    placeholder="e.g. 123456"
+                                    value={enteredOtp}
+                                    onChange={(e) => setEnteredOtp(e.target.value)}
+                                    style={{ padding: '8px 12px', fontSize: '0.9rem', height: '38px', maxWidth: '200px' }}
+                                  />
+                                </div>
+
+                                <div className="form-group">
+                                  <label className="form-label" style={{ fontSize: '0.7rem' }}>MOCK DELIVERED PHOTO (OPTIONAL URL)</label>
+                                  <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="https://unsplash..."
+                                    value={uploadedPhoto}
+                                    onChange={(e) => setUploadedPhoto(e.target.value)}
+                                    style={{ padding: '8px 12px', fontSize: '0.8rem', height: '38px' }}
+                                  />
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleVerifyHandoverOtp(activeOrder.orderId)}
+                                  disabled={submittingOtp || isTooFar}
+                                  className="lp-btn"
+                                  style={{ padding: '10px 16px', fontSize: '0.8rem', background: isTooFar ? '#cbd5e1' : '#38a169', color: isTooFar ? '#64748b' : '#fff', border: 'none', borderRadius: '8px', fontWeight: '800', opacity: isTooFar ? 0.6 : 1, cursor: isTooFar ? 'not-allowed' : 'pointer' }}
+                                >
+                                  {submittingOtp ? 'Verifying OTP...' : 'Verify OTP & Complete Delivery'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* METHOD B: Photo Confirm */}
+                          <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '12px', backgroundColor: '#fcfcfd' }}>
+                            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: '700', color: '#0f172a' }}>📸 Method B: Package Photo & Buyer Confirm</h4>
+                            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 12px 0' }}>
+                              Upload a package proof of delivery photo to mark arrival. The buyer must then click "Received Order" on their own dashboard to release payout.
+                            </p>
+
+                            {photoError && <div className="form-alert-error" style={{ fontSize: '0.8rem', padding: '8px 12px' }}>⚠️ {photoError}</div>}
+                            {photoSuccess && <div className="form-alert-success" style={{ fontSize: '0.8rem', padding: '8px 12px' }}>✓ {photoSuccess}</div>}
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              <div className="form-group">
+                                <label className="form-label" style={{ fontSize: '0.7rem' }}>DELIVERY PHOTO URL</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  placeholder="e.g. https://images.unsplash.com/photo-..."
+                                  value={arrivedPhoto}
+                                  onChange={(e) => setArrivedPhoto(e.target.value)}
+                                  style={{ padding: '8px 12px', fontSize: '0.8rem', height: '38px' }}
+                                />
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleUploadArrivalPhoto(activeOrder.orderId)}
+                                disabled={submittingPhoto || isTooFar}
+                                className="lp-btn"
+                                style={{ padding: '10px 16px', fontSize: '0.8rem', background: isTooFar ? '#cbd5e1' : '#319795', color: isTooFar ? '#64748b' : '#fff', border: 'none', borderRadius: '8px', fontWeight: '800', opacity: isTooFar ? 0.6 : 1, cursor: isTooFar ? 'not-allowed' : 'pointer' }}
+                              >
+                                {submittingPhoto ? 'Uploading photo...' : 'Submit Arrival Photo & Notify Buyer'}
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+          )}
+
+          {/* TAB: COMPLETED DELIVERIES */}
+          {activeTab === 'completed' && !editProfileMode && (
+            <div className="form-card-wrapper" style={{ padding: '32px' }}>
+              <h3 style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 600, marginBottom: '20px', textAlign: 'left' }}>Completed Deliveries</h3>
+              {orders.filter(o => o.deliveryStatus === 'delivered').length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                  <span style={{ fontSize: '3rem' }}>🏁</span>
+                  <h4 style={{ fontSize: '1.1rem', margin: '16px 0 8px 0', color: '#0f172a' }}>No completed jobs yet</h4>
+                  <p>Delivered assignments will appear here as part of your shipment history.</p>
+                </div>
+              ) : (
+                <div className="orders-table-wrapper" style={{ overflowX: 'auto' }}>
+                  <table className="orders-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '0.85rem' }}>
+                        <th style={{ padding: '12px' }}>Order ID</th>
+                        <th style={{ padding: '12px' }}>Addresses</th>
+                        <th style={{ padding: '12px' }}>Distance</th>
+                        <th style={{ padding: '12px' }}>Earnings</th>
+                        <th style={{ padding: '12px' }}>Completed Date</th>
+                        <th style={{ padding: '12px', textAlign: 'right' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orders.filter(o => o.deliveryStatus === 'delivered').map((order) => {
+                        const cost = order.deliveryCost !== undefined ? order.deliveryCost : parseFloat(((order.distanceKm || 0) * 2).toFixed(2));
+                        const dateObj = order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : order.date;
+                        return (
+                          <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
+                            <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
+                            <td style={{ padding: '12px' }}>
+                              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                <strong>Pickup:</strong> {order.sellerLocation?.address || 'Seller Hub'}
+                              </div>
+                              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                                <strong>Dropoff:</strong> {order.deliveryAddress?.address || order.buyerLocation?.address}
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
+                            <td style={{ padding: '12px', fontWeight: 700, color: '#2f855a' }}>₹{cost}</td>
+                            <td style={{ padding: '12px', color: '#475569' }}>{dateObj}</td>
+                            <td style={{ padding: '12px', textAlign: 'right' }}>
+                              <span className="status-pill status-pill--delivered">Delivered</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: EARNINGS REPORTS */}
+          {activeTab === 'earnings' && !editProfileMode && (
+            <div className="form-card-wrapper" style={{ padding: '32px' }}>
+              <h3 style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 600, marginBottom: '20px', textAlign: 'left' }}>Earnings Dashboard & Reports</h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px', textAlign: 'left' }}>
+                <div style={{ padding: '20px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '16px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: '700' }}>TOTAL INCOME</div>
+                  <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#16a34a', marginTop: '6px' }}>₹{stats.earnings}</div>
+                  <p style={{ fontSize: '0.75rem', color: '#16a34a', margin: '4px 0 0 0' }}>Flat ₹2 per KM rate applied on deliveries.</p>
+                </div>
+                <div style={{ padding: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: '700' }}>JOBS DELIVERED</div>
+                  <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#0f172a', marginTop: '6px' }}>
+                    {orders.filter(o => o.deliveryStatus === 'delivered').length}
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0 0' }}>Out of {stats.total} total assigned jobs.</p>
+                </div>
+              </div>
+
+              <h4 style={{ fontSize: '1rem', color: '#0f172a', fontWeight: '700', marginBottom: '12px', textAlign: 'left' }}>Income Report Table</h4>
+              {orders.filter(o => o.deliveryStatus === 'delivered').length === 0 ? (
+                <p style={{ color: '#64748b', textAlign: 'center', padding: '20px' }}>No income report history available yet.</p>
+              ) : (
+                <div className="orders-table-wrapper" style={{ overflowX: 'auto' }}>
+                  <table className="orders-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '0.85rem' }}>
+                        <th style={{ padding: '12px' }}>Order</th>
+                        <th style={{ padding: '12px' }}>Distance</th>
+                        <th style={{ padding: '12px' }}>Delivery Rate</th>
+                        <th style={{ padding: '12px' }}>Earnings Payout</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orders.filter(o => o.deliveryStatus === 'delivered').map((order) => {
+                        const cost = order.deliveryCost !== undefined ? order.deliveryCost : parseFloat(((order.distanceKm || 0) * 2).toFixed(2));
+                        return (
+                          <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.88rem' }}>
+                            <td style={{ padding: '12px', fontWeight: 600 }}>#{order.orderId}</td>
+                            <td style={{ padding: '12px' }}>{order.distanceKm || 0} KM</td>
+                            <td style={{ padding: '12px' }}>₹2/KM</td>
+                            <td style={{ padding: '12px', fontWeight: 700, color: '#16a34a' }}>₹{cost}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
         </section>
       )}
 

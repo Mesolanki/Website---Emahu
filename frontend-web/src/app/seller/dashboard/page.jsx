@@ -203,6 +203,95 @@ const getCategoryOptions = (storeCategory) => {
   ];
 };
 
+// Sub-component for interactive Leaflet Map for live order tracking on seller dashboard
+function LiveTrackingMap({ orderId, trackingData, leafletLoaded }) {
+  const mapRef = useRef(null);
+  const mapContainerId = `map-container-${orderId}`;
+  
+  const markerCourierRef = useRef(null);
+  const markerSellerRef = useRef(null);
+  const markerBuyerRef = useRef(null);
+  const polylineRef = useRef(null);
+
+  useEffect(() => {
+    if (!leafletLoaded || typeof window === 'undefined' || !window.L || !trackingData) return;
+
+    const container = document.getElementById(mapContainerId);
+    if (!container) return;
+
+    const sLat = trackingData.sellerLocation?.latitude || 23.0225;
+    const sLon = trackingData.sellerLocation?.longitude || 72.5714;
+    const bLat = trackingData.buyerLocation?.latitude || 23.0225;
+    const bLon = trackingData.buyerLocation?.longitude || 72.5714;
+    
+    const cLat = trackingData.partnerLocation?.latitude || sLat;
+    const cLon = trackingData.partnerLocation?.longitude || sLon;
+
+    if (!mapRef.current) {
+      mapRef.current = window.L.map(mapContainerId).setView([cLat, cLon], 13);
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(mapRef.current);
+
+      const sellerIcon = window.L.divIcon({
+        html: '<div style="background-color:#dd6b20; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.3)"></div>',
+        className: 'custom-div-icon',
+        iconSize: [14, 14]
+      });
+
+      const buyerIcon = window.L.divIcon({
+        html: '<div style="background-color:#e53e3e; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.3)"></div>',
+        className: 'custom-div-icon',
+        iconSize: [14, 14]
+      });
+
+      const courierIcon = window.L.divIcon({
+        html: '<div style="background-color:#319795; width:18px; height:18px; border-radius:50%; border:3px solid white; box-shadow:0 0 7px rgba(0,0,0,0.4)"></div>',
+        className: 'custom-div-icon',
+        iconSize: [18, 18]
+      });
+
+      markerSellerRef.current = window.L.marker([sLat, sLon], { icon: sellerIcon })
+        .addTo(mapRef.current)
+        .bindPopup(`<strong>Your Store Pickup</strong>`);
+
+      markerBuyerRef.current = window.L.marker([bLat, bLon], { icon: buyerIcon })
+        .addTo(mapRef.current)
+        .bindPopup(`<strong>Customer Dropoff</strong>`);
+
+      if (trackingData.partnerLocation) {
+        markerCourierRef.current = window.L.marker([cLat, cLon], { icon: courierIcon })
+          .addTo(mapRef.current)
+          .bindPopup(`<strong>Courier Partner</strong>`);
+      }
+
+      polylineRef.current = window.L.polyline([[sLat, sLon], [bLat, bLon]], { color: '#319795', weight: 4, dashArray: '5, 8' })
+        .addTo(mapRef.current);
+
+      mapRef.current.fitBounds([[sLat, sLon], [bLat, bLon]], { padding: [40, 40] });
+    } else {
+      if (markerCourierRef.current && trackingData.partnerLocation) {
+        markerCourierRef.current.setLatLng([cLat, cLon]);
+      } else if (!markerCourierRef.current && trackingData.partnerLocation) {
+        const courierIcon = window.L.divIcon({
+          html: '<div style="background-color:#319795; width:18px; height:18px; border-radius:50%; border:3px solid white; box-shadow:0 0 7px rgba(0,0,0,0.4)"></div>',
+          className: 'custom-div-icon',
+          iconSize: [18, 18]
+        });
+        markerCourierRef.current = window.L.marker([cLat, cLon], { icon: courierIcon })
+          .addTo(mapRef.current)
+          .bindPopup(`<strong>Courier Partner</strong>`);
+      }
+    }
+  }, [leafletLoaded, trackingData, mapContainerId]);
+
+  return (
+    <div style={{ margin: '12px 0' }}>
+      <div id={mapContainerId} style={{ height: '240px', width: '100%', borderRadius: '10px', border: '1px solid #cbd5e1', zIndex: 1 }} />
+    </div>
+  );
+}
+
 export default function EmahuProDashboard() {
   const router = useRouter();
 
@@ -1411,6 +1500,39 @@ export default function EmahuProDashboard() {
     const found = orders.find(o => o.id === selectedDetailedOrderId);
     return found ? found.raw : null;
   }, [selectedDetailedOrderId, orders]);
+
+  const [liveTrackingDetails, setLiveTrackingDetails] = useState(null);
+
+  useEffect(() => {
+    if (!selectedDetailedOrderId || !selectedDetailedOrder) {
+      setLiveTrackingDetails(null);
+      return;
+    }
+
+    const hasPartner = selectedDetailedOrder.deliveryPartnerId && 
+      ['assigned', 'accepted', 'picked_up', 'in_transit', 'out_for_delivery', 'arrived'].includes(selectedDetailedOrder.deliveryStatus);
+
+    if (!hasPartner) {
+      setLiveTrackingDetails(null);
+      return;
+    }
+
+    const fetchLiveTracking = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/track/live/${selectedDetailedOrder.orderId}`);
+        const data = await res.json();
+        if (data.success) {
+          setLiveTrackingDetails(data);
+        }
+      } catch (err) {
+        console.warn('Error fetching live tracking for seller dashboard:', err);
+      }
+    };
+
+    fetchLiveTracking();
+    const interval = setInterval(fetchLiveTracking, 5000);
+    return () => clearInterval(interval);
+  }, [selectedDetailedOrderId, selectedDetailedOrder?.orderId]);
 
   const fetchAvailablePartners = async (orderId) => {
     setAvailablePartnersLoading(true);
@@ -6030,7 +6152,7 @@ export default function EmahuProDashboard() {
                             {partner.coveredCities && partner.coveredCities.length > 0 && (
                               <div><strong>Covered Cities:</strong> {partner.coveredCities.join(', ')}</div>
                             )}
-                            <div><strong>Rate:</strong> ₹{partner.perKmRate || partner.perItemCharge || 5}/KM</div>
+                            <div><strong>Rate:</strong> ₹2/KM</div>
                           </div>
                           <div style={{ display: 'flex', gap: '5px' }} onClick={e => e.stopPropagation()}>
                             {partner.latitude && partner.longitude && (
@@ -6687,6 +6809,21 @@ export default function EmahuProDashboard() {
                           </a>
                         </div>
                       )}
+
+                      {leafletLoaded && selectedDetailedOrder.buyerLocation?.latitude !== undefined && selectedDetailedOrder.sellerLocation?.latitude !== undefined && (
+                        <div style={{ marginTop: '12px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '6px' }}>🗺️ Live Transit Route Map</span>
+                          <LiveTrackingMap 
+                            orderId={selectedDetailedOrder.orderId} 
+                            trackingData={liveTrackingDetails || {
+                              sellerLocation: selectedDetailedOrder.sellerLocation,
+                              buyerLocation: selectedDetailedOrder.buyerLocation,
+                              partnerLocation: null
+                            }} 
+                            leafletLoaded={leafletLoaded} 
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -7105,6 +7242,15 @@ export default function EmahuProDashboard() {
                           <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '10px' }}>🚚 Carrier Details</div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#64748b' }}>Partner</span><strong>{selectedDetailedOrder.carrier}</strong></div>
+                            {liveTrackingDetails?.partnerDetails?.vehicleType && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Vehicle</span>
+                                <strong>
+                                  {liveTrackingDetails.partnerDetails.vehicleType.toUpperCase()}
+                                  {liveTrackingDetails.partnerDetails.vehicleNumber ? ` - ${liveTrackingDetails.partnerDetails.vehicleNumber}` : ''}
+                                </strong>
+                              </div>
+                            )}
                             {selectedDetailedOrder.trackingId && (
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#64748b' }}>Tracking #</span><strong style={{ color: '#4f46e5', fontFamily: 'monospace', fontSize: '0.78rem' }}>{selectedDetailedOrder.trackingId}</strong></div>
                             )}

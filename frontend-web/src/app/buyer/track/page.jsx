@@ -1,10 +1,91 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import './track.css';
+
+// Sub-component for interactive Leaflet Map for a specific orderId
+function LiveTrackingMap({ orderId, trackingData, leafletLoaded }) {
+  const mapRef = useRef(null);
+  const mapContainerId = `map-container-${orderId}`;
+  
+  const markerCourierRef = useRef(null);
+  const markerSellerRef = useRef(null);
+  const markerBuyerRef = useRef(null);
+  const polylineRef = useRef(null);
+
+  useEffect(() => {
+    if (!leafletLoaded || typeof window === 'undefined' || !window.L || !trackingData) return;
+
+    const container = document.getElementById(mapContainerId);
+    if (!container) return;
+
+    const sLat = trackingData.sellerLocation?.latitude || 23.0225;
+    const sLon = trackingData.sellerLocation?.longitude || 72.5714;
+    const bLat = trackingData.buyerLocation?.latitude || 23.0225;
+    const bLon = trackingData.buyerLocation?.longitude || 72.5714;
+    
+    // Fallback: If courier coordinates are not yet set/known, default to seller
+    const cLat = trackingData.partnerLocation?.latitude || sLat;
+    const cLon = trackingData.partnerLocation?.longitude || sLon;
+
+    // Initialize Leaflet map if not already done
+    if (!mapRef.current) {
+      mapRef.current = window.L.map(mapContainerId).setView([cLat, cLon], 13);
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(mapRef.current);
+
+      const sellerIcon = window.L.divIcon({
+        html: '<div style="background-color:#dd6b20; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.3)"></div>',
+        className: 'custom-div-icon',
+        iconSize: [14, 14]
+      });
+
+      const buyerIcon = window.L.divIcon({
+        html: '<div style="background-color:#e53e3e; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.3)"></div>',
+        className: 'custom-div-icon',
+        iconSize: [14, 14]
+      });
+
+      const courierIcon = window.L.divIcon({
+        html: '<div style="background-color:#319795; width:18px; height:18px; border-radius:50%; border:3px solid white; box-shadow:0 0 7px rgba(0,0,0,0.4)"></div>',
+        className: 'custom-div-icon',
+        iconSize: [18, 18]
+      });
+
+      markerSellerRef.current = window.L.marker([sLat, sLon], { icon: sellerIcon })
+        .addTo(mapRef.current)
+        .bindPopup(`<strong>Merchant Pickup</strong>`);
+
+      markerBuyerRef.current = window.L.marker([bLat, bLon], { icon: buyerIcon })
+        .addTo(mapRef.current)
+        .bindPopup(`<strong>Your Dropoff</strong>`);
+
+      markerCourierRef.current = window.L.marker([cLat, cLon], { icon: courierIcon })
+        .addTo(mapRef.current)
+        .bindPopup(`<strong>Courier Location</strong>`);
+
+      polylineRef.current = window.L.polyline([[sLat, sLon], [bLat, bLon]], { color: '#319795', weight: 4, dashArray: '5, 8' })
+        .addTo(mapRef.current);
+
+      mapRef.current.fitBounds([[sLat, sLon], [bLat, bLon]], { padding: [40, 40] });
+    } else {
+      // Update courier marker position dynamically when tracking coordinates shift
+      if (markerCourierRef.current && trackingData.partnerLocation) {
+        markerCourierRef.current.setLatLng([cLat, cLon]);
+      }
+    }
+  }, [leafletLoaded, trackingData, mapContainerId]);
+
+  return (
+    <div style={{ marginBottom: '24px' }}>
+      <div id={mapContainerId} style={{ height: '350px', width: '100%', borderRadius: '12px', border: '1px solid #e2e8f0', zIndex: 1 }} />
+    </div>
+  );
+}
 
 const STATUS_ORDER = [
   'PENDING_APPROVAL',
@@ -31,6 +112,71 @@ function TrackOrderContent() {
 
   // Loaded orders list from localStorage
   const [allOrders, setAllOrders] = useState([]);
+  
+  const [liveTracking, setLiveTracking] = useState({});
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+
+  // Lazy-load Leaflet CDNs
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    if (!document.getElementById('leaflet-js')) {
+      const script = document.createElement('script');
+      script.id = 'leaflet-js';
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => setLeafletLoaded(true);
+      document.head.appendChild(script);
+    } else {
+      setLeafletLoaded(true);
+    }
+  }, []);
+
+  // Poll live tracking details for all active sub-orders in the current activeOrder
+  useEffect(() => {
+    if (!activeOrder || !activeOrder.ordersList) return;
+
+    const activeSubOrders = activeOrder.ordersList.filter(o => 
+      o.deliveryPartnerId && 
+      ['assigned', 'accepted', 'picked_up', 'in_transit', 'out_for_delivery', 'arrived'].includes(o.deliveryStatus)
+    );
+
+    if (activeSubOrders.length === 0) {
+      setLiveTracking({});
+      return;
+    }
+
+    const fetchLiveTracking = async () => {
+      const updatedTracking = { ...liveTracking };
+      let changed = false;
+
+      for (const subOrd of activeSubOrders) {
+        try {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/track/live/${subOrd.orderId}`);
+          const data = await res.json();
+          if (data.success) {
+            updatedTracking[subOrd.orderId] = data;
+            changed = true;
+          }
+        } catch (err) {
+          console.warn(`Error fetching live tracking for sub-order ${subOrd.orderId}:`, err);
+        }
+      }
+
+      if (changed) {
+        setLiveTracking(updatedTracking);
+      }
+    };
+
+    fetchLiveTracking();
+    const interval = setInterval(fetchLiveTracking, 5000);
+    return () => clearInterval(interval);
+  }, [activeOrder?.orderId]);
 
   useEffect(() => {
     // 1. Load from localStorage first for instant initial paint
@@ -467,6 +613,38 @@ function TrackOrderContent() {
               </div>
             )}
 
+            {/* Live Tracking Map Component */}
+            {leafletLoaded && Object.keys(liveTracking).map(subOrdId => {
+              const trackingData = liveTracking[subOrdId];
+              return (
+                <div key={subOrdId} className="live-map-card" style={{ marginBottom: '24px', background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: '850', color: '#1e293b' }}>
+                      🚚 LIVE ROUTE MAP (Order #{subOrdId})
+                    </h4>
+                    <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                      {trackingData.deliveryStatus?.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <LiveTrackingMap orderId={subOrdId} trackingData={trackingData} leafletLoaded={leafletLoaded} />
+                  
+                  {/* Distance and ETA */}
+                  {trackingData.remainingDistanceKm !== null && (
+                    <div style={{ display: 'flex', gap: '20px', background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+                      <div>
+                        <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 'bold' }}>Remaining Distance</span>
+                        <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{trackingData.remainingDistanceKm} KM</strong>
+                      </div>
+                      <div>
+                        <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 'bold' }}>Estimated Time (ETA)</span>
+                        <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{trackingData.etaMinutes} mins</strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
             {/* Vertical Steps Timeline */}
             <div className="track-steps-list">
               {getTrackingSteps(activeOrder.rawStatus || activeOrder.status, activeOrder.allRejected).map((step, idx) => (
@@ -521,8 +699,75 @@ function TrackOrderContent() {
               </div>
             </div>
 
-            {/* Courier Details */}
-            {activeOrder.carrier && (
+            {/* Live Courier Details */}
+            {Object.keys(liveTracking).length > 0 ? (
+              Object.keys(liveTracking).map(subOrdId => {
+                const trackingData = liveTracking[subOrdId];
+                const partner = trackingData.partnerDetails;
+                if (!partner) return null;
+                return (
+                  <div key={subOrdId} className="sidebar-info-block" style={{ borderLeft: '4px solid #319795', paddingTop: '16px' }}>
+                    <h3>🚚 Driver Logistics (Order #{subOrdId})</h3>
+                    <div className="sidebar-metrics-grid">
+                      <div>
+                        <span>Driver Name</span>
+                        <strong style={{ fontSize: '0.95rem' }}>{partner.name}</strong>
+                      </div>
+                      <div>
+                        <span>Vehicle Info</span>
+                        <strong>{partner.vehicleType?.toUpperCase()} ({partner.vehicleNumber || 'N/A'})</strong>
+                      </div>
+                      {partner.phone && (
+                        <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
+                          <a 
+                            href={`tel:${partner.phone}`} 
+                            style={{ 
+                              flex: 1, 
+                              textAlign: 'center', 
+                              padding: '8px 12px', 
+                              background: '#319795', 
+                              color: '#fff', 
+                              borderRadius: '6px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: 'bold', 
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            📞 Call Partner
+                          </a>
+                          <a 
+                            href={`https://wa.me/91${partner.phone.replace(/\D/g, '')}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            style={{ 
+                              flex: 1, 
+                              textAlign: 'center', 
+                              padding: '8px 12px', 
+                              background: '#10b981', 
+                              color: '#fff', 
+                              borderRadius: '6px', 
+                              fontSize: '0.75rem', 
+                              fontWeight: 'bold', 
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            💬 WhatsApp
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            ) : activeOrder.carrier ? (
               <div className="sidebar-info-block" style={{ borderLeft: '3px solid #10b981', paddingTop: '16px' }}>
                 <h3>🚚 Dispatch Logistics</h3>
                 <div className="sidebar-metrics-grid">
@@ -544,7 +789,7 @@ function TrackOrderContent() {
                   </div>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {(activeOrder.status === 'REJECTED' || activeOrder.status === '❌ Order Rejected by Seller' || activeOrder.rawStatus === 'REJECTED') && activeOrder.rejectionReason && (
               <div className="sidebar-info-block" style={{ borderLeft: '3px solid #ef4444', backgroundColor: 'rgba(239, 68, 68, 0.05)', paddingTop: '16px' }}>

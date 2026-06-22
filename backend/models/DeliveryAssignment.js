@@ -27,8 +27,12 @@ const deliveryAssignmentSchema = new mongoose.Schema(
     },
     currentStatus: {
       type: String,
-      enum: ['assigned', 'accepted', 'rejected', 'picked_up', 'out_for_delivery', 'delivered'],
+      enum: ['assigned', 'accepted', 'rejected', 'picked_up', 'in_transit', 'out_for_delivery', 'arrived', 'delivered'],
       default: 'assigned'
+    },
+    deliveryPhoto: {
+      type: String,
+      default: ''
     },
     createdDate: {
       type: Date,

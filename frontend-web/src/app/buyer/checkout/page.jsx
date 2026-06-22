@@ -152,6 +152,39 @@ export default function CheckoutPage() {
     return R * c;
   }
 
+  function detectCityAndState(address) {
+    if (!address || typeof address !== 'string') return { city: '', state: '' };
+    const lower = address.toLowerCase();
+    
+    const list = [
+      { city: 'Ahmedabad', state: 'Gujarat', aliases: ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad nagar', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav', 'gandhinagar', 'sanand'] },
+      { city: 'Surat', state: 'Gujarat', aliases: ['surat', 'adajan', 'vesu', 'katargam', 'varachha', 'althan', 'citylight', 'pal', 'piplod', 'dindoli', 'udhna', 'rander', 'bhestan'] },
+      { city: 'Rajkot', state: 'Gujarat', aliases: ['rajkot', 'kalavad road', 'gondal road'] },
+      { city: 'Vadodara', state: 'Gujarat', aliases: ['vadodara', 'baroda', 'alkapuri', 'manjalpur', 'waghodia'] },
+      { city: 'Mumbai', state: 'Maharashtra', aliases: ['mumbai', 'bombay', 'bandra', 'andheri', 'dadar', 'thane', 'navi mumbai', 'kurla', 'mulund', 'worli', 'lower parel'] },
+      { city: 'Pune', state: 'Maharashtra', aliases: ['pune', 'pimpri', 'chinchwad', 'kothrud', 'hadapsar', 'wakad', 'aundh', 'baner'] },
+      { city: 'Nagpur', state: 'Maharashtra', aliases: ['nagpur'] },
+      { city: 'Delhi', state: 'Delhi', aliases: ['delhi', 'new delhi', 'old delhi', 'dwarka', 'rohini', 'noida', 'gurugram', 'gurgaon', 'faridabad'] },
+      { city: 'Bangalore', state: 'Karnataka', aliases: ['bangalore', 'bengaluru', 'koramangala', 'indiranagar', 'whitefield', 'marathahalli', 'jayanagar', 'electronic city'] },
+      { city: 'Chennai', state: 'Tamil Nadu', aliases: ['chennai', 'madras', 'anna nagar', 'adyar', 'velachery', 't. nagar', 'porur'] },
+      { city: 'Kolkata', state: 'West Bengal', aliases: ['kolkata', 'calcutta', 'salt lake', 'howrah', 'jadavpur', 'new town'] },
+      { city: 'Hyderabad', state: 'Telangana', aliases: ['hyderabad', 'secunderabad', 'banjara hills', 'jubilee hills', 'gachibowli', 'hitech city', 'kondapur', 'madhapur'] },
+      { city: 'Jaipur', state: 'Rajasthan', aliases: ['jaipur'] },
+      { city: 'Lucknow', state: 'Uttar Pradesh', aliases: ['lucknow', 'gomti nagar'] },
+      { city: 'Chandigarh', state: 'Punjab', aliases: ['chandigarh', 'mohali', 'panchkula'] }
+    ];
+    
+    for (const item of list) {
+      const terms = item.aliases || [item.city];
+      for (const term of terms) {
+        if (lower.includes(term.toLowerCase())) {
+          return { city: item.city, state: item.state };
+        }
+      }
+    }
+    return { city: '', state: '' };
+  }
+
   // Update/draw Leaflet map showing buyer/seller connection routes
   useEffect(() => {
     if (!leafletLoaded || typeof window === 'undefined' || !window.L) return;
@@ -246,11 +279,23 @@ export default function CheckoutPage() {
             if (data && data.address) {
               const road = data.address.road || '';
               const suburb = data.address.suburb || data.address.neighbourhood || '';
-              const addrText = [road, suburb, data.address.county].filter(Boolean).join(', ') || data.display_name;
-              setAddress(addrText);
-              setCity(data.address.city || data.address.town || data.address.village || '');
-              setStateName(data.address.state || '');
-              setPincode(data.address.postcode || '');
+              const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || '';
+              const stateVal = data.address.state || '';
+              const postcodeVal = data.address.postcode || data.address.postal || '';
+              
+              const parts = [road, suburb, cityVal, stateVal].filter(Boolean);
+              let fullAddr = parts.join(', ');
+              if (postcodeVal) {
+                fullAddr += ` - ${postcodeVal}`;
+              }
+              if (!fullAddr) {
+                fullAddr = data.display_name;
+              }
+              
+              setAddress(fullAddr);
+              setCity(cityVal);
+              setStateName(stateVal);
+              setPincode(postcodeVal);
               setAddressType('manual');
             }
           } catch (geocodingErr) {
@@ -600,9 +645,9 @@ export default function CheckoutPage() {
               phone,
               email,
               address,
-              city: addressType === 'saved' ? 'Profile City' : city,
-              stateName: addressType === 'saved' ? 'Profile State' : stateName,
-              pincode: addressType === 'saved' ? 'Profile Zip' : pincode
+              city: addressType === 'saved' ? (detectCityAndState(address).city || 'Ahmedabad') : city,
+              stateName: addressType === 'saved' ? (detectCityAndState(address).state || 'Gujarat') : stateName,
+              pincode: addressType === 'saved' ? (address.match(/\b\d{6}\b/)?.[0] || '380001') : pincode
             },
             shippingSpeed,
             escrowMethod,

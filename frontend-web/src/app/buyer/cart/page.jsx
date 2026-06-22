@@ -289,14 +289,31 @@ export default function CartPage() {
         setBuyerCoordinates(coords);
         localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
         setGpsLoading(false);
-        // Reverse geocode to get city name
+        // Reverse geocode to get city, state, pincode name
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
           const data = await res.json();
           if (data && data.address) {
-            const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || '';
+            const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || '';
+            const stateVal = data.address.state || '';
+            const postcodeVal = data.address.postcode || data.address.postal || '';
+            
+            const road = data.address.road || '';
+            const suburb = data.address.suburb || data.address.neighbourhood || '';
+            const parts = [road, suburb, cityVal, stateVal].filter(Boolean);
+            let fullAddr = parts.join(', ');
+            if (postcodeVal) {
+              fullAddr += ` - ${postcodeVal}`;
+            }
+            if (!fullAddr) {
+              fullAddr = data.display_name;
+            }
+
             setBuyerCity(cityVal);
             localStorage.setItem('emahu_buyer_city', cityVal);
+            localStorage.setItem('emahu_buyer_state', stateVal);
+            localStorage.setItem('emahu_buyer_pincode', postcodeVal);
+            localStorage.setItem('emahu_buyer_full_address', fullAddr);
           }
         } catch (_) {}
       },
@@ -445,10 +462,10 @@ export default function CartPage() {
               fullName: 'Guest Customer',
               phone: '+91 99999 99999',
               email: 'guest@emahu.com',
-              address: buyerCity || 'Emahu Hub Office',
-              city: buyerCity || 'Delhi',
-              stateName: 'Delhi',
-              pincode: '110001'
+              address: localStorage.getItem('emahu_buyer_full_address') || buyerCity || 'Emahu Hub Office',
+              city: buyerCity || 'Ahmedabad',
+              stateName: localStorage.getItem('emahu_buyer_state') || 'Gujarat',
+              pincode: localStorage.getItem('emahu_buyer_pincode') || '380001'
             },
             shippingSpeed: 'standard',
             escrowMethod: 'wallet'

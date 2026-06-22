@@ -66,6 +66,33 @@ const sendTokenResponse = async (user, statusCode, req, res) => {
     });
 };
 
+function detectCityAndState(address) {
+  if (!address || typeof address !== 'string') return { city: '', state: '' };
+  const lower = address.toLowerCase();
+  
+  const list = [
+    { city: 'Ahmedabad', state: 'Gujarat' },
+    { city: 'Surat', state: 'Gujarat' },
+    { city: 'Rajkot', state: 'Gujarat' },
+    { city: 'Vadodara', state: 'Gujarat' },
+    { city: 'Mumbai', state: 'Maharashtra' },
+    { city: 'Pune', state: 'Maharashtra' },
+    { city: 'Delhi', state: 'Delhi' },
+    { city: 'Bangalore', state: 'Karnataka' },
+    { city: 'Bengaluru', state: 'Karnataka' },
+    { city: 'Chennai', state: 'Tamil Nadu' },
+    { city: 'Kolkata', state: 'West Bengal' },
+    { city: 'Hyderabad', state: 'Telangana' }
+  ];
+  
+  for (const item of list) {
+    if (lower.includes(item.city.toLowerCase())) {
+      return { city: item.city, state: item.state };
+    }
+  }
+  return { city: '', state: '' };
+}
+
 // @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public
@@ -157,6 +184,29 @@ exports.register = async (req, res) => {
       });
     }
 
+    // Auto-detect City and State for Sellers & Partners on registration
+    let resolvedCity = city;
+    let resolvedState = state;
+    if (role === 'seller') {
+      if (!resolvedCity || !resolvedState) {
+        const detected = detectCityAndState(address || '');
+        if (detected.city) {
+          if (!resolvedCity) resolvedCity = detected.city;
+          if (!resolvedState) resolvedState = detected.state;
+        }
+      }
+    }
+
+    let resolvedCurrentCity = currentCity;
+    if (role === 'delivery') {
+      if (!resolvedCurrentCity) {
+        const detected = detectCityAndState(address || operatingLocation || '');
+        if (detected.city) {
+          resolvedCurrentCity = detected.city;
+        }
+      }
+    }
+
     // Create user
     const user = await User.create({
       name,
@@ -176,15 +226,15 @@ exports.register = async (req, res) => {
       ifscCode,
       bankName,
       gstNumber,
-      city,
-      state,
+      city: resolvedCity,
+      state: resolvedState,
       perItemCharge,
       rateUpTo2Km: rateUpTo2Km ? Number(rateUpTo2Km) : (perItemCharge ? Number(perItemCharge) : 10),
       rateAbove2Km: rateAbove2Km ? Number(rateAbove2Km) : (perItemCharge ? Number(perItemCharge) : 10),
       deliveryScope,
       operatingLocation,
       dispatchNotes,
-      currentCity,
+      currentCity: resolvedCurrentCity,
       currentArea,
       pincode,
       serviceRadius,
@@ -201,7 +251,7 @@ exports.register = async (req, res) => {
       perKmRate,
       coveredCities,
       deliveryScope,
-      status: (role === 'seller' || role === 'delivery') ? 'pending' : 'approved'
+      status: (role === 'seller') ? 'pending' : 'approved'
     });
 
     // Notify all admins of new seller registration
@@ -557,12 +607,25 @@ exports.getMe = async (req, res) => {
 // @access  Private
 exports.updateDetails = async (req, res) => {
   try {
+    // Auto-detect City and State for Sellers & Partners on update
+    let resolvedCity = req.body.city !== undefined ? req.body.city : req.user.city;
+    let resolvedState = req.body.state !== undefined ? req.body.state : req.user.state;
+    if (req.user.role === 'seller' && (req.body.address !== undefined || req.body.city !== undefined || req.body.state !== undefined)) {
+      if (!resolvedCity || !resolvedState) {
+        const detected = detectCityAndState(req.body.address || req.user.address || '');
+        if (detected.city) {
+          if (!resolvedCity) resolvedCity = detected.city;
+          if (!resolvedState) resolvedState = detected.state;
+        }
+      }
+    }
+
     const fieldsToUpdate = {
       name: req.body.name || req.user.name,
       phone: req.body.phone !== undefined ? req.body.phone : req.user.phone,
       address: req.body.address !== undefined ? req.body.address : req.user.address,
-      city: req.body.city !== undefined ? req.body.city : req.user.city,
-      state: req.body.state !== undefined ? req.body.state : req.user.state,
+      city: resolvedCity,
+      state: resolvedState,
       storeName: req.body.storeName !== undefined ? req.body.storeName : req.user.storeName,
       latitude: req.body.latitude !== undefined ? req.body.latitude : req.user.latitude,
       longitude: req.body.longitude !== undefined ? req.body.longitude : req.user.longitude,

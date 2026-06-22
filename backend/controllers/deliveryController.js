@@ -22,6 +22,48 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
   return d;
 }
 
+function detectCityAndState(address) {
+  if (!address || typeof address !== 'string') return { city: '', state: '' };
+  const lower = address.toLowerCase();
+  
+  const list = [
+    // Gujarat cities and common neighborhoods
+    { city: 'Ahmedabad', state: 'Gujarat', aliases: ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad nagar', 'sg highway', 'sindhu bhavan', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav'] },
+    { city: 'Surat', state: 'Gujarat', aliases: ['surat', 'adajan', 'vesu', 'katargam', 'varachha', 'althan', 'citylight', 'pal', 'piplod', 'dindoli', 'udhna', 'rander', 'bhestan'] },
+    { city: 'Rajkot', state: 'Gujarat', aliases: ['rajkot', 'kalavad road', 'gondal road', 'university road rajkot'] },
+    { city: 'Vadodara', state: 'Gujarat', aliases: ['vadodara', 'baroda', 'alkapuri', 'manjalpur', 'waghodia', 'akota'] },
+    // Maharashtra
+    { city: 'Mumbai', state: 'Maharashtra', aliases: ['mumbai', 'bombay', 'bandra', 'andheri', 'dadar', 'thane', 'navi mumbai', 'kurla', 'mulund', 'worli', 'lower parel'] },
+    { city: 'Pune', state: 'Maharashtra', aliases: ['pune', 'pimpri', 'chinchwad', 'kothrud', 'hadapsar', 'wakad', 'aundh', 'baner', 'kondhwa'] },
+    { city: 'Nagpur', state: 'Maharashtra', aliases: ['nagpur', 'dharampeth', 'sitabuldi', 'sadar'] },
+    // Delhi NCR
+    { city: 'Delhi', state: 'Delhi', aliases: ['delhi', 'new delhi', 'old delhi', 'dwarka', 'rohini', 'noida', 'gurugram', 'gurgaon', 'faridabad'] },
+    // Karnataka
+    { city: 'Bangalore', state: 'Karnataka', aliases: ['bangalore', 'bengaluru', 'koramangala', 'indiranagar', 'whitefield', 'marathahalli', 'jayanagar', 'electronic city'] },
+    // Tamil Nadu
+    { city: 'Chennai', state: 'Tamil Nadu', aliases: ['chennai', 'madras', 'anna nagar', 'adyar', 'velachery', 't. nagar', 'porur'] },
+    // West Bengal
+    { city: 'Kolkata', state: 'West Bengal', aliases: ['kolkata', 'calcutta', 'salt lake', 'howrah', 'jadavpur', 'new town'] },
+    // Telangana
+    { city: 'Hyderabad', state: 'Telangana', aliases: ['hyderabad', 'secunderabad', 'banjara hills', 'jubilee hills', 'gachibowli', 'hitech city', 'kondapur', 'madhapur'] },
+    // Other major cities
+    { city: 'Jaipur', state: 'Rajasthan', aliases: ['jaipur', 'malviya nagar jaipur', 'vaishali nagar'] },
+    { city: 'Lucknow', state: 'Uttar Pradesh', aliases: ['lucknow', 'gomti nagar', 'hazratganj'] },
+    { city: 'Chandigarh', state: 'Punjab', aliases: ['chandigarh', 'mohali', 'panchkula'] },
+    { city: 'Ahmedabad', state: 'Gujarat', aliases: ['gandhinagar', 'sanand'] }  // satellite cities
+  ];
+  
+  for (const item of list) {
+    const searchTerms = item.aliases || [item.city];
+    for (const term of searchTerms) {
+      if (lower.includes(term.toLowerCase())) {
+        return { city: item.city, state: item.state };
+      }
+    }
+  }
+  return { city: '', state: '' };
+}
+
 // Google Maps Distance Matrix API call with Haversine fallback
 async function getGoogleMapsDistance(originLat, originLon, destLat, destLon) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -123,20 +165,12 @@ exports.updateDeliverySettings = async (req, res) => {
 
 // Helper function to resolve delivery charge based on settings and distance/amount
 function resolveCharge(distance, productTotal, settings) {
-  if (distance > settings.maxDeliveryDistance) {
-    return { error: `Distance (${distance.toFixed(1)} KM) exceeds maximum allowed delivery distance (${settings.maxDeliveryDistance} KM)` };
+  const maxDist = settings?.maxDeliveryDistance || 100;
+  if (distance > maxDist) {
+    return { error: `Distance (${distance.toFixed(1)} KM) exceeds maximum allowed delivery distance (${maxDist} KM)` };
   }
-  
-  // Free shipping threshold check removed to always charge by slabs
-  
-  // Find matching slab
-  const matchedSlab = settings.slabs.find(slab => distance >= slab.fromKm && distance < slab.toKm);
-  if (matchedSlab) {
-    return { charge: matchedSlab.charge, free: false };
-  }
-  
-  // Fallback if no matching slab
-  return { charge: 99, free: false };
+  const charge = parseFloat((distance * 2).toFixed(2));
+  return { charge, free: false };
 }
 
 exports.resolveCharge = resolveCharge;
@@ -367,8 +401,8 @@ exports.assignOrderToPartner = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Delivery partner not found' });
     }
 
-    // Calculate cost based on per KM rate
-    const perKmRate = partner.perKmRate || partner.perItemCharge || 10;
+    // Calculate cost based on per KM rate of ₹2/KM
+    const perKmRate = 2;
     const totalCost = parseFloat(((order.distanceKm || 5) * perKmRate).toFixed(2));
 
     // Update Order
@@ -547,10 +581,18 @@ exports.updateAssignmentStatus = async (req, res) => {
       order.status = 'PICKED_UP';
       timelineLabel = 'Picked Up';
       timelineDesc = 'Package has been picked up from the merchant warehouse.';
+    } else if (status === 'in_transit') {
+      order.status = 'IN_TRANSIT';
+      timelineLabel = 'In Transit';
+      timelineDesc = 'Package is in transit with the courier partner.';
     } else if (status === 'out_for_delivery') {
       order.status = 'OUT_FOR_DELIVERY';
       timelineLabel = 'Out For Delivery';
       timelineDesc = 'Courier partner is out for delivery with your package.';
+    } else if (status === 'arrived') {
+      order.status = 'ARRIVED';
+      timelineLabel = 'Arrived';
+      timelineDesc = 'Courier partner has arrived at the delivery destination.';
     } else if (status === 'delivered') {
       order.status = 'DELIVERED';
       order.deliveredAt = new Date();
@@ -848,9 +890,37 @@ exports.getPartnerOrders = async (req, res) => {
     // Sort descending by order ID
     orders.sort((a, b) => String(b.orderId).localeCompare(String(a.orderId)));
 
+    // Load available orders (unassigned in partner's city)
+    const partnerCity = (partner.currentCity || partner.city || '').trim().toLowerCase();
+    const pCities = (partner.coveredCities && partner.coveredCities.length > 0)
+      ? partner.coveredCities.map(c => c.trim().toLowerCase())
+      : [partnerCity];
+
+    const unassignedOrders = await Order.find({
+      deliveryStatus: 'unassigned',
+      status: { $in: ['APPROVED', 'READY_FOR_PICKUP'] }
+    }).lean();
+
+    const availableOrders = [];
+    for (const o of unassignedOrders) {
+      const oCity = (o.deliveryAddress?.city || '').trim().toLowerCase();
+      if (pCities.includes(oCity)) {
+        const sellerUser = await User.findById(o.sellerId);
+        availableOrders.push({
+          ...o,
+          assignmentStatus: 'unassigned',
+          assignedDate: o.createdAt,
+          sellerPhone: sellerUser ? sellerUser.phone : '',
+          sellerName: sellerUser ? (sellerUser.storeName || sellerUser.name) : ''
+        });
+      }
+    }
+    availableOrders.sort((a, b) => String(b.orderId).localeCompare(String(a.orderId)));
+
     res.status(200).json({
       success: true,
-      orders
+      orders,
+      availableOrders
     });
   } catch (error) {
     console.error('Get Partner Orders Error:', error);
@@ -923,14 +993,22 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
     const { orderId } = req.params;
     const order = await Order.findOne({ orderId });
 
-    // --- Resolve location context (gracefully handles demo/seed orders not in DB) ---
     let orderCity = '';
-    let buyerLat;
-    let buyerLon;
-    let distance = 5; // Default 5 KM fallback for demo orders
+    let buyerLat, buyerLon, distance = 5;
 
     if (order) {
-      orderCity = (order.deliveryAddress?.city || '').trim().toLowerCase();
+      // Try deliveryAddress.city first, but validate it's a real city (not a single letter or garbled value)
+      const rawCity = (order.deliveryAddress?.city || '').trim();
+      const knownCity = rawCity.length >= 3 ? detectCityAndState(rawCity).city : '';
+      orderCity = (knownCity || rawCity.length >= 3 ? rawCity : '').toLowerCase();
+
+      // If orderCity is still empty or invalid, detect from full address strings
+      if (!orderCity || orderCity.length < 3) {
+        const buyerAddr = order.buyerLocation?.address || order.deliveryAddress?.address || '';
+        const detected = detectCityAndState(buyerAddr);
+        if (detected.city) orderCity = detected.city.trim().toLowerCase();
+      }
+
       buyerLat = order.buyerLocation?.latitude;
       buyerLon = order.buyerLocation?.longitude;
 
@@ -947,56 +1025,48 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
         await order.save();
       }
     }
-    // If order not in DB (demo/seed order), we continue and return all partners with default distance
 
-    // Fetch all approved and active delivery partners
-    const partners = await User.find({ role: 'delivery', status: 'approved', isActivePartner: true });
+    // Fetch all active delivery partners (isActivePartner true or unset — not explicitly false)
+    const partners = await User.find({ role: 'delivery', isActivePartner: { $ne: false } });
 
     let sellerCity = '';
     if (order && order.sellerId) {
       const sellerUser = await User.findById(order.sellerId);
       if (sellerUser) {
-        sellerCity = (sellerUser.city || '').trim().toLowerCase();
+        sellerCity = (sellerUser.currentCity || sellerUser.city || '').trim().toLowerCase();
       }
     }
     if (!sellerCity && order && order.sellerLocation?.address) {
-      sellerCity = (order.sellerLocation.address || '').split(',').pop().trim().toLowerCase();
+      const detected = detectCityAndState(order.sellerLocation.address);
+      sellerCity = (detected.city || '').trim().toLowerCase();
     }
 
+    const isSameCityOrder = sellerCity && orderCity && sellerCity === orderCity;
+
     const availablePartners = [];
-
     for (const partner of partners) {
-      // 1. Smart Matching System check
-      // Show only delivery partners who cover BOTH seller city and buyer city. Hide all other delivery partners.
-      if (sellerCity && orderCity) {
-        const pCities = (partner.coveredCities && partner.coveredCities.length > 0)
-          ? partner.coveredCities.map(c => c.trim().toLowerCase())
-          : [(partner.currentCity || partner.city || '').trim().toLowerCase()];
-        
-        const coversSeller = pCities.includes(sellerCity);
-        const coversBuyer = pCities.includes(orderCity.trim().toLowerCase());
-        
-        if (!coversSeller || !coversBuyer) {
-          continue; // Hide this partner!
-        }
-      }
+      const pCities = (partner.coveredCities && partner.coveredCities.length > 0)
+        ? partner.coveredCities.map(c => c.trim().toLowerCase())
+        : [(partner.currentCity || partner.city || '').trim().toLowerCase()].filter(Boolean);
 
-      const partnerCity = (partner.currentCity || partner.city || '').trim().toLowerCase();
-      const isCityMatch = true;
+      const coversBuyer = orderCity ? pCities.includes(orderCity) : false;
+      const coversSeller = sellerCity ? pCities.includes(sellerCity) : false;
 
-      // 2. Service radius check
+      // City-based exclusion: skip partners who don't cover buyer's city
+      if (orderCity && !coversBuyer) continue;
+      // For cross-city orders also require seller-city coverage
+      if (!isSameCityOrder && sellerCity && orderCity && !coversSeller) continue;
+
+      const isCityMatch = coversBuyer || coversSeller;
+
       let isRadiusMatch = true;
       let distToBuyer = 0;
-      if (
-        buyerLat !== undefined && buyerLon !== undefined &&
-        partner.latitude !== undefined && partner.longitude !== undefined
-      ) {
+      if (buyerLat !== undefined && buyerLon !== undefined && partner.latitude !== undefined && partner.longitude !== undefined) {
         distToBuyer = getHaversineDistance(partner.latitude, partner.longitude, buyerLat, buyerLon);
         isRadiusMatch = distToBuyer <= (partner.serviceRadius || 15);
       }
 
-      // 3. Calculate delivery cost based on per KM rate
-      const perKmRate = partner.perKmRate || partner.perItemCharge || 10;
+      const perKmRate = 2;
       const totalCost = parseFloat((distance * perKmRate).toFixed(2));
 
       availablePartners.push({
@@ -1027,22 +1097,22 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
         serviceAreaState: partner.serviceAreaState,
         serviceAreaDistrict: partner.serviceAreaDistrict,
         serviceAreaCity: partner.serviceAreaCity,
-        isActivePartner: partner.isActivePartner !== false
+        isActivePartner: partner.isActivePartner !== false,
+        status: partner.status
       });
     }
 
-    // Sort: Best city match + radius match first, then by distance to buyer
     availablePartners.sort((a, b) => {
       const scoreA = (a.isCityMatch ? 2 : 0) + (a.isRadiusMatch ? 1 : 0);
       const scoreB = (b.isCityMatch ? 2 : 0) + (b.isRadiusMatch ? 1 : 0);
-      if (scoreB !== scoreA) return scoreB - scoreA;
-      return a.distanceToBuyer - b.distanceToBuyer;
+      return scoreB - scoreA || a.distanceToBuyer - b.distanceToBuyer;
     });
 
     res.status(200).json({
       success: true,
       distanceKm: parseFloat(distance.toFixed(2)),
       orderCity,
+      sellerCity,
       totalPartners: availablePartners.length,
       availablePartners
     });
@@ -1093,6 +1163,15 @@ exports.createDeliveryPartner = async (req, res) => {
 
     const resolvedRate = perKmRate !== undefined ? Number(perKmRate) : (perItemCharge ? Number(perItemCharge) : 0);
 
+    // Auto-detect currentCity on partner creation if blank
+    let resolvedCurrentCity = currentCity;
+    if (!resolvedCurrentCity) {
+      const detected = detectCityAndState(address || operatingLocation || '');
+      if (detected.city) {
+        resolvedCurrentCity = detected.city;
+      }
+    }
+
     const partner = await User.create({
       name,
       email,
@@ -1104,7 +1183,7 @@ exports.createDeliveryPartner = async (req, res) => {
       vehicleNumber,
       status: 'approved',
       isActivePartner: true,
-      currentCity,
+      currentCity: resolvedCurrentCity,
       currentArea,
       pincode,
       serviceRadius: serviceRadius ? Number(serviceRadius) : 15,
@@ -1186,7 +1265,18 @@ exports.updateDeliveryPartner = async (req, res) => {
     if (status !== undefined) partner.status = status;
     if (address !== undefined) partner.address = address;
     
-    if (currentCity !== undefined) partner.currentCity = currentCity;
+    // Auto-detect currentCity on update if it is empty/undefined
+    let resolvedCurrentCity = currentCity;
+    if (resolvedCurrentCity === undefined || resolvedCurrentCity === '') {
+      const addressToUse = address !== undefined ? address : partner.address;
+      const opLocToUse = operatingLocation !== undefined ? operatingLocation : partner.operatingLocation;
+      const detected = detectCityAndState(addressToUse || opLocToUse || '');
+      if (detected.city) {
+        resolvedCurrentCity = detected.city;
+      }
+    }
+    if (resolvedCurrentCity !== undefined) partner.currentCity = resolvedCurrentCity;
+    
     if (currentArea !== undefined) partner.currentArea = currentArea;
     if (pincode !== undefined) partner.pincode = pincode;
     if (serviceRadius !== undefined) partner.serviceRadius = Number(serviceRadius);
@@ -1286,7 +1376,17 @@ exports.updatePartnerProfile = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Delivery partner not found' });
     }
 
-    if (currentCity !== undefined) partner.currentCity = currentCity;
+    // Auto-detect currentCity on self profile update if it is empty/undefined
+    let resolvedCurrentCity = currentCity;
+    if (resolvedCurrentCity === undefined || resolvedCurrentCity === '') {
+      const addressToUse = address !== undefined ? address : partner.address;
+      const opLocToUse = operatingLocation !== undefined ? operatingLocation : partner.operatingLocation;
+      const detected = detectCityAndState(addressToUse || opLocToUse || '');
+      if (detected.city) {
+        resolvedCurrentCity = detected.city;
+      }
+    }
+    if (resolvedCurrentCity !== undefined) partner.currentCity = resolvedCurrentCity;
     if (currentArea !== undefined) partner.currentArea = currentArea;
     if (pincode !== undefined) partner.pincode = pincode;
     if (address !== undefined) partner.address = address;
@@ -1331,5 +1431,610 @@ exports.updatePartnerProfile = async (req, res) => {
   } catch (error) {
     console.error('Update Profile Error:', error);
     res.status(500).json({ success: false, error: 'Server error updating profile: ' + error.message });
+  }
+};
+
+// Helper: Send delivery confirmation emails to buyer and seller
+async function notifyDeliveryCompleted(order, partner) {
+  try {
+    const buyerEmail = order.deliveryAddress?.email;
+    const buyerName = order.deliveryAddress?.fullName || 'Valued Customer';
+    const sellerEmail = order.sellerEmail;
+    
+    // Build items HTML list for the buyer's email
+    let itemsHtml = '';
+    if (order.items && order.items.length) {
+      order.items.forEach(item => {
+        itemsHtml += `
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 12px 16px; color: #0f172a; font-weight: 600;">
+              ${item.name}
+              ${item.brand ? `<span style="display: block; font-size: 0.75rem; color: #64748b; font-weight: 400;">Brand: ${item.brand}</span>` : ''}
+            </td>
+            <td style="padding: 12px 16px; text-align: center; color: #334155;">${item.quantity}</td>
+            <td style="padding: 12px 16px; text-align: right; color: #0f172a; font-weight: 600;">₹${item.price.toFixed(2)}</td>
+          </tr>
+        `;
+      });
+    }
+
+    const formattedDate = new Date().toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+
+    const fullAddress = order.deliveryAddress?.address 
+      ? `${order.deliveryAddress.address}, ${order.deliveryAddress.city || ''} - ${order.deliveryAddress.pincode || ''}`
+      : 'N/A';
+
+    // 1. Send Email to Buyer
+    if (buyerEmail) {
+      const buyerHtml = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 40px 32px; text-align: center; color: #ffffff;">
+            <div style="font-size: 24px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px;">EMAHU</div>
+            <h1 style="color: #ffffff; margin: 0; font-size: 1.8rem; font-weight: 700;">📦 Order Delivered!</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 0.95rem;">Order #${order.orderId}</p>
+          </div>
+          <div style="padding: 36px 32px; background: #ffffff;">
+            <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 24px 0;">Dear ${buyerName},</p>
+            <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">Great news! Your order has been successfully delivered by our courier partner.</p>
+
+            <!-- Shipping Address & Details -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+              <h3 style="color: #0f172a; margin: 0 0 12px 0; font-size: 1rem; font-weight: 700;">Delivery Details</h3>
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b; width: 35%;">Delivery Address:</td>
+                  <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${fullAddress}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;">Courier Partner:</td>
+                  <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${order.carrier || partner?.name || 'Courier'}</td>
+                </tr>
+                ${order.trackingId ? `
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;">Tracking ID:</td>
+                  <td style="padding: 4px 0; color: #0f172a; font-weight: 600; font-family: monospace;">${order.trackingId}</td>
+                </tr>` : ''}
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;">Delivered On:</td>
+                  <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${formattedDate}</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Items delivered table -->
+            <div style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 24px;">
+              <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                <thead>
+                  <tr style="background: #f1f5f9; border-bottom: 1px solid #e2e8f0;">
+                    <th style="padding: 12px 16px; color: #475569; font-weight: 700;">Item</th>
+                    <th style="padding: 12px 16px; text-align: center; color: #475569; font-weight: 700;">Qty</th>
+                    <th style="padding: 12px 16px; text-align: right; color: #475569; font-weight: 700;">Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsHtml}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Price breakdown -->
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 28px;">
+              <table style="width: 50%; font-size: 0.9rem; text-align: right;">
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b;">Subtotal:</td>
+                  <td style="padding: 6px 0 6px 16px; color: #0f172a; font-weight: 600;">₹${(order.productAmount || (order.total - (order.deliveryCharge || 0))).toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b;">Delivery Fee:</td>
+                  <td style="padding: 6px 0 6px 16px; color: #0f172a; font-weight: 600;">₹${(order.deliveryCharge || 0).toFixed(2)}</td>
+                </tr>
+                ${order.discountAmount > 0 ? `
+                <tr>
+                  <td style="padding: 6px 0; color: #ef4444;">Discount:</td>
+                  <td style="padding: 6px 0 6px 16px; color: #ef4444; font-weight: 600;">− ₹${order.discountAmount.toFixed(2)}</td>
+                </tr>` : ''}
+                <tr style="border-top: 2px solid #e2e8f0;">
+                  <td style="padding: 10px 0 0 0; color: #0f172a; font-weight: 700; font-size: 1rem;">Total Paid:</td>
+                  <td style="padding: 10px 0 0 16px; color: #10b981; font-weight: 800; font-size: 1.1rem;">₹${order.total.toFixed(2)}</td>
+                </tr>
+              </table>
+            </div>
+
+            <p style="color: #64748b; font-size: 0.88rem; line-height: 1.6; margin: 0;">If you have any issues with this delivery or the items received, please raise a dispute in your dashboard or contact our support team immediately.</p>
+          </div>
+          <div style="background: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 0.8rem;">
+            <p style="margin: 0 0 4px 0;">Thank you for shopping on <strong style="color: #10b981;">Emahu Marketplace</strong></p>
+          </div>
+        </div>
+      `;
+
+      await sendEmail({
+        to: buyerEmail,
+        subject: `📦 Delivered: Your Order #${order.orderId} | Emahu Marketplace`,
+        text: `Dear ${buyerName},\n\nYour order #${order.orderId} has been successfully delivered!\n\nDelivery Address: ${fullAddress}\nCourier: ${order.carrier || partner?.name || 'Courier'}\nDelivered On: ${formattedDate}\n\nThank you for shopping with Emahu!\n\nRegards,\nThe Emahu Team`,
+        html: buyerHtml
+      });
+    }
+
+    // 2. Send Email to Seller
+    if (sellerEmail) {
+      const sellerHtml = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); padding: 40px 32px; text-align: center; color: #ffffff;">
+            <div style="font-size: 24px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px;">EMAHU</div>
+            <h1 style="color: #ffffff; margin: 0; font-size: 1.8rem; font-weight: 700;">📦 Order Delivered</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 0.95rem;">Order #${order.orderId}</p>
+          </div>
+          <div style="padding: 36px 32px; background: #ffffff;">
+            <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 24px 0;">Dear Seller,</p>
+            <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">We are pleased to inform you that Order #${order.orderId} has been successfully delivered to the customer.</p>
+
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+              <h3 style="color: #0f172a; margin: 0 0 12px 0; font-size: 1rem; font-weight: 700;">Details</h3>
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b; width: 35%;">Order ID:</td>
+                  <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">#${order.orderId}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;">Recipient:</td>
+                  <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${buyerName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b;">Delivered On:</td>
+                  <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${formattedDate}</td>
+                </tr>
+              </table>
+            </div>
+
+            <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">The customer has received their package. Your payout is now eligible for release. Please log in to your merchant dashboard to request payment release.</p>
+          </div>
+          <div style="background: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 0.8rem;">
+            <p style="margin: 0;">Emahu Marketplace Seller Center</p>
+          </div>
+        </div>
+      `;
+
+      await sendEmail({
+        to: sellerEmail,
+        subject: `📦 Order #${order.orderId} Delivered – Payment Ready for Release | Emahu Marketplace`,
+        text: `Dear Seller,\n\nOrder #${order.orderId} has been successfully delivered to ${buyerName} on ${formattedDate}.\n\nYour payout is now ready for release. Please log in to your merchant dashboard to request payment release.\n\nRegards,\nThe Emahu Team`,
+        html: sellerHtml
+      });
+    }
+  } catch (emailErr) {
+    console.error('Error sending delivery confirmation emails in helper:', emailErr);
+  }
+}
+
+exports.notifyDeliveryCompleted = notifyDeliveryCompleted;
+
+// @desc    Update delivery partner live location
+// @route   POST /api/delivery/location
+// @access  Private (Delivery Partner only)
+exports.updateLiveLocation = async (req, res) => {
+  try {
+    const { orderId, latitude, longitude } = req.body;
+    const partnerId = req.user._id;
+
+    const partner = await User.findById(partnerId);
+    if (!partner) {
+      return res.status(404).json({ success: false, error: 'Delivery partner not found' });
+    }
+
+    partner.latitude = Number(latitude);
+    partner.longitude = Number(longitude);
+    await partner.save();
+
+    // Broadcast live location event to socket grid
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('location-updated', {
+        partnerId: partnerId.toString(),
+        orderId,
+        latitude: Number(latitude),
+        longitude: Number(longitude)
+      });
+    }
+
+    res.status(200).json({ success: true, message: 'Live GPS coordinates updated' });
+  } catch (error) {
+    console.error('Update Live Location Error:', error);
+    res.status(500).json({ success: false, error: 'Server error updating location' });
+  }
+};
+
+// @desc    Get live delivery tracking metadata
+// @route   GET /api/delivery/track/live/:orderId
+// @access  Public
+exports.getLiveTrackingDetails = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findOne({ orderId });
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    let partner = null;
+    if (order.deliveryPartnerId) {
+      partner = await User.findById(order.deliveryPartnerId).select('name phone vehicleType vehicleNumber latitude longitude');
+    }
+
+    const sellerLoc = order.sellerLocation || { latitude: 23.0225, longitude: 72.5714 };
+    const buyerLoc = order.buyerLocation || { latitude: 23.0225, longitude: 72.5714 };
+    const partnerLoc = partner ? { latitude: partner.latitude, longitude: partner.longitude } : null;
+
+    let remainingDistance = null;
+    let etaMinutes = null;
+
+    if (partnerLoc && partnerLoc.latitude && partnerLoc.longitude) {
+      const destLat = ['picked_up', 'in_transit', 'out_for_delivery', 'arrived'].includes(order.deliveryStatus)
+        ? buyerLoc.latitude
+        : sellerLoc.latitude;
+      const destLon = ['picked_up', 'in_transit', 'out_for_delivery', 'arrived'].includes(order.deliveryStatus)
+        ? buyerLoc.longitude
+        : sellerLoc.longitude;
+
+      const googleDist = await getGoogleMapsDistance(partnerLoc.latitude, partnerLoc.longitude, destLat, destLon);
+      remainingDistance = googleDist ? googleDist.distanceKm : getHaversineDistance(partnerLoc.latitude, partnerLoc.longitude, destLat, destLon);
+      
+      const durationSec = googleDist ? googleDist.durationSec : Math.round(remainingDistance * 2.4 * 60);
+      etaMinutes = Math.max(1, Math.round(durationSec / 60));
+    }
+
+    res.status(200).json({
+      success: true,
+      orderId,
+      deliveryStatus: order.deliveryStatus,
+      status: order.status,
+      sellerLocation: sellerLoc,
+      buyerLocation: buyerLoc,
+      partnerLocation: partnerLoc,
+      partnerDetails: partner,
+      remainingDistanceKm: remainingDistance ? parseFloat(remainingDistance.toFixed(2)) : null,
+      etaMinutes
+    });
+  } catch (error) {
+    console.error('Get Live Tracking Details Error:', error);
+    res.status(500).json({ success: false, error: 'Server error retrieving tracking details' });
+  }
+};
+
+// @desc    Generate and send delivery OTP
+// @route   POST /api/delivery/otp/send
+// @access  Private (Delivery Partner only)
+exports.sendDeliveryOtp = async (req, res) => {
+  try {
+    const { orderId, latitude, longitude } = req.body;
+    const partnerId = req.user._id;
+
+    if (latitude === undefined || longitude === undefined) {
+      return res.status(400).json({ success: false, error: 'GPS coordinates are required for proximity verification.' });
+    }
+
+    const order = await Order.findOne({ orderId });
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    if (order.deliveryPartnerId?.toString() !== partnerId.toString()) {
+      return res.status(403).json({ success: false, error: 'Unauthorized: You are not assigned to this order' });
+    }
+
+    const buyerLat = order.buyerLocation?.latitude;
+    const buyerLon = order.buyerLocation?.longitude;
+    if (!buyerLat || !buyerLon) {
+      return res.status(400).json({ success: false, error: 'Buyer GPS coordinates are not set' });
+    }
+
+    // Proximity check: Must be within 100 meters
+    const dist = getHaversineDistance(Number(latitude), Number(longitude), buyerLat, buyerLon);
+    if (dist > 0.1) {
+      return res.status(400).json({ success: false, error: `GPS Proximity Verification Failed. You are ${Math.round(dist * 1000)} meters away. You must be within 100m to send OTP.` });
+    }
+
+    const Otp = require('../models/Otp');
+    const email = order.deliveryAddress?.email;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Buyer contact email not found' });
+    }
+
+    // Rate Limiting: 60s cooldown
+    const existingOtp = await Otp.findOne({ email, isVerified: false }).sort({ createdAt: -1 });
+    if (existingOtp) {
+      const diff = (Date.now() - new Date(existingOtp.lastSentAt).getTime()) / 1000;
+      if (diff < 60) {
+        return res.status(429).json({ success: false, error: `Please wait ${Math.round(60 - diff)} seconds before requesting another code.` });
+      }
+    }
+
+    // Generate secure 6-digit OTP code
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+    if (existingOtp) {
+      existingOtp.otp = otpCode;
+      existingOtp.expiresAt = expiresAt;
+      existingOtp.attempts = 0;
+      existingOtp.lastSentAt = new Date();
+      await existingOtp.save();
+    } else {
+      await Otp.create({
+        email,
+        otp: otpCode,
+        expiresAt,
+        attempts: 0,
+        lastSentAt: new Date()
+      });
+    }
+
+    const otpHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+        <div style="background-color: #319795; padding: 30px; text-align: center; color: white;">
+          <h2 style="margin:0;">Order Receipt Verification</h2>
+          <p style="margin: 5px 0 0 0;">Order #${orderId}</p>
+        </div>
+        <div style="padding: 30px; background-color: white; text-align: center;">
+          <p>Your delivery partner has arrived at your address.</p>
+          <p>Please share the following OTP with the driver to confirm you have received the package:</p>
+          <div style="background-color: #f7fafc; border: 1px dashed #cbd5e0; padding: 15px; font-size: 2.2rem; font-weight: bold; letter-spacing: 6px; color: #2d3748; margin: 20px 0; border-radius: 8px;">
+            ${otpCode}
+          </div>
+          <p style="color: #e53e3e; font-size: 0.8rem; font-weight: 600;">Do NOT share this code unless the courier partner has handed over your package.</p>
+          <p style="color: #718096; font-size: 0.75rem; margin-top: 10px;">This security code is valid for 10 minutes and expires after 5 failed entry attempts.</p>
+        </div>
+      </div>
+    `;
+
+    // 1. Send Email
+    await sendEmail({
+      to: email,
+      subject: `🔑 Delivery Confirmation Code: ${otpCode} | Emahu Marketplace`,
+      text: `Your delivery OTP is ${otpCode}. Share this with your driver to confirm delivery.`,
+      html: otpHtml
+    });
+
+    // 2. Send SMS
+    const sendSms = require('../utils/sendSms');
+    const buyerPhone = order.deliveryAddress?.phone || order.buyerPhone || '';
+    if (buyerPhone) {
+      await sendSms({
+        to: buyerPhone,
+        body: `Your Emahu delivery confirmation OTP is ${otpCode}. Share this with the delivery partner only when you receive your package.`
+      });
+    }
+
+    // 3. Create In-App Notification
+    await Notification.create({
+      recipient: order.userId,
+      title: 'Delivery OTP Verification Code',
+      message: `Your Emahu delivery confirmation OTP code is ${otpCode}. Share this code with the driver to confirm receipt of order #${orderId}.`,
+      isRead: false
+    });
+
+    res.status(200).json({ success: true, message: 'Confirmation code sent to buyer' });
+  } catch (error) {
+    console.error('Send OTP Error:', error);
+    res.status(500).json({ success: false, error: 'Server error sending delivery OTP' });
+  }
+};
+
+// @desc    Verify OTP and complete delivery
+// @route   POST /api/delivery/otp/verify
+// @access  Private (Delivery Partner only)
+exports.verifyDeliveryOtp = async (req, res) => {
+  try {
+    const { orderId, otp, deliveryPhoto, latitude, longitude } = req.body;
+    const partnerId = req.user._id;
+
+    const order = await Order.findOne({ orderId });
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    if (order.deliveryPartnerId?.toString() !== partnerId.toString()) {
+      return res.status(403).json({ success: false, error: 'Unauthorized: You are not assigned to this order' });
+    }
+
+    const buyerLat = order.buyerLocation?.latitude;
+    const buyerLon = order.buyerLocation?.longitude;
+    if (buyerLat && buyerLon) {
+      const dist = getHaversineDistance(Number(latitude), Number(longitude), buyerLat, buyerLon);
+      if (dist > 0.1) {
+        return res.status(400).json({ success: false, error: `GPS Proximity Verification Failed. You are ${Math.round(dist * 1000)} meters away. You must be within 100m of buyer location to verify.` });
+      }
+    }
+
+    if (!deliveryPhoto) {
+      return res.status(400).json({ success: false, error: 'Please upload a package verification photo to confirm delivery' });
+    }
+
+    const Otp = require('../models/Otp');
+    const email = order.deliveryAddress?.email;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Buyer contact email not found' });
+    }
+
+    const otpRecord = await Otp.findOne({ email, isVerified: false }).sort({ createdAt: -1 });
+    if (!otpRecord) {
+      return res.status(400).json({ success: false, error: 'No active OTP verification code found. Please request a new code.' });
+    }
+
+    if (new Date() > new Date(otpRecord.expiresAt)) {
+      return res.status(400).json({ success: false, error: 'Verification code has expired. Request a new OTP.' });
+    }
+
+    if (otpRecord.attempts >= 5) {
+      return res.status(400).json({ success: false, error: 'Too many incorrect attempts. Please generate a new OTP code.' });
+    }
+
+    if (otpRecord.otp !== otp) {
+      otpRecord.attempts += 1;
+      await otpRecord.save();
+      return res.status(400).json({ success: false, error: `Incorrect verification code. ${5 - otpRecord.attempts} attempts remaining.` });
+    }
+
+    // Code is correct
+    otpRecord.isVerified = true;
+    await otpRecord.save();
+    await Otp.deleteMany({ email });
+
+    // Transition statuses to delivered
+    order.deliveryStatus = 'delivered';
+    order.status = 'DELIVERED';
+    order.deliveryPhoto = deliveryPhoto;
+    order.deliveredAt = new Date();
+
+    const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    order.timeline.push({
+      status: 'DELIVERED',
+      label: 'Delivered',
+      desc: `Package delivered successfully. Verified via secure OTP.`,
+      date: dateStr
+    });
+    await order.save();
+
+    let assignment = await DeliveryAssignment.findOne({ orderId });
+    if (assignment) {
+      assignment.currentStatus = 'delivered';
+      assignment.deliveryPhoto = deliveryPhoto;
+      assignment.deliveredDate = new Date();
+      await assignment.save();
+    }
+
+    await DeliveryTracking.create({
+      assignmentId: assignment?._id,
+      orderId,
+      status: 'delivered',
+      location: { latitude: Number(latitude), longitude: Number(longitude) },
+      remarks: 'Delivery completed. Verified via secure OTP.'
+    });
+
+    // Notify Buyer
+    const Notification = require('../models/Notification');
+    await Notification.create({
+      recipient: order.userId,
+      recipientModel: 'User',
+      title: 'Order Delivered Successfully',
+      message: `Your order #${orderId} has been delivered. Thank you!`,
+      isRead: false
+    });
+
+    // Notify Seller
+    await Notification.create({
+      recipient: order.sellerId,
+      recipientModel: 'User',
+      title: 'Order Delivered',
+      message: `Order #${orderId} was delivered by courier partner. Payout eligible.`,
+      isRead: false
+    });
+
+    // Trigger Socket Broadcast
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('delivery-status-changed', {
+        orderId,
+        status: 'DELIVERED',
+        deliveryStatus: 'delivered'
+      });
+    }
+
+    // Send emails in background
+    notifyDeliveryCompleted(order, req.user);
+
+    res.status(200).json({ success: true, message: 'Delivery completed and verified successfully', order });
+  } catch (error) {
+    console.error('Verify Delivery OTP Error:', error);
+    res.status(500).json({ success: false, error: 'Server error confirming OTP' });
+  }
+};
+
+// @desc    Partner uploaded arrival photo (Buyer must confirm receipt)
+// @route   POST /api/delivery/photo/upload
+// @access  Private (Delivery Partner only)
+exports.uploadArrivedPhoto = async (req, res) => {
+  try {
+    const { orderId, deliveryPhoto, latitude, longitude } = req.body;
+    const partnerId = req.user._id;
+
+    const order = await Order.findOne({ orderId });
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    if (order.deliveryPartnerId?.toString() !== partnerId.toString()) {
+      return res.status(403).json({ success: false, error: 'Unauthorized: You are not assigned to this order' });
+    }
+
+    const buyerLat = order.buyerLocation?.latitude;
+    const buyerLon = order.buyerLocation?.longitude;
+    if (buyerLat && buyerLon) {
+      const dist = getHaversineDistance(Number(latitude), Number(longitude), buyerLat, buyerLon);
+      if (dist > 0.1) {
+        return res.status(400).json({ success: false, error: `GPS Proximity Verification Failed. You are ${Math.round(dist * 1000)} meters away. You must be within 100m to verify arrival.` });
+      }
+    }
+
+    if (!deliveryPhoto) {
+      return res.status(400).json({ success: false, error: 'Please upload a package photo to confirm arrival' });
+    }
+
+    // Transition status to arrived
+    order.deliveryStatus = 'arrived';
+    order.status = 'ARRIVED';
+    order.deliveryPhoto = deliveryPhoto;
+
+    const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    order.timeline.push({
+      status: 'ARRIVED',
+      label: 'Arrived',
+      desc: `Courier partner has arrived at the destination. Package photo uploaded. Waiting for buyer confirmation.`,
+      date: dateStr
+    });
+    await order.save();
+
+    let assignment = await DeliveryAssignment.findOne({ orderId });
+    if (assignment) {
+      assignment.currentStatus = 'arrived';
+      assignment.deliveryPhoto = deliveryPhoto;
+      await assignment.save();
+    }
+
+    await DeliveryTracking.create({
+      assignmentId: assignment?._id,
+      orderId,
+      status: 'arrived',
+      location: { latitude: Number(latitude), longitude: Number(longitude) },
+      remarks: 'Courier partner arrived at destination. Verification photo uploaded.'
+    });
+
+    // Notify Buyer
+    const Notification = require('../models/Notification');
+    await Notification.create({
+      recipient: order.userId,
+      recipientModel: 'User',
+      title: 'Courier Arrived at Location',
+      message: `Your package for order #${orderId} has arrived! Please confirm receipt on your dashboard.`,
+      isRead: false
+    });
+
+    // Socket broadcast
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('delivery-status-changed', {
+        orderId,
+        status: 'ARRIVED',
+        deliveryStatus: 'arrived'
+      });
+    }
+
+    res.status(200).json({ success: true, message: 'Arrival verified and photo uploaded successfully', order });
+  } catch (error) {
+    console.error('Upload Arrived Photo Error:', error);
+    res.status(500).json({ success: false, error: 'Server error uploading arrival photo' });
   }
 };

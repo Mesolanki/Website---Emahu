@@ -13,7 +13,12 @@ const {
   deleteDeliveryPartner,
   getDeliveryPartners,
   getAvailablePartnersForOrder,
-  updatePartnerProfile
+  updatePartnerProfile,
+  updateLiveLocation,
+  getLiveTrackingDetails,
+  sendDeliveryOtp,
+  verifyDeliveryOtp,
+  uploadArrivedPhoto
 } = require('../controllers/deliveryController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -30,6 +35,13 @@ router.put('/status', protect, authorize('delivery'), updateAssignmentStatus);
 router.put('/profile', protect, authorize('delivery'), updatePartnerProfile);
 router.get('/my-orders', protect, authorize('delivery'), getPartnerOrders);
 router.get('/available-partners/:orderId', protect, authorize('admin', 'seller'), getAvailablePartnersForOrder);
+
+// Live GPS Tracking & Handover OTP/Photo confirmation endpoints
+router.post('/location', protect, authorize('delivery'), updateLiveLocation);
+router.get('/track/live/:orderId', protect, getLiveTrackingDetails);
+router.post('/otp/send', protect, authorize('delivery'), sendDeliveryOtp);
+router.post('/otp/verify', protect, authorize('delivery'), verifyDeliveryOtp);
+router.post('/photo/upload', protect, authorize('delivery'), uploadArrivedPhoto);
 
 // Delivery Analytics (Admin only)
 router.get('/analytics', protect, authorize('admin'), getDeliveryAnalytics);

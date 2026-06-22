@@ -70,6 +70,7 @@ const orderSchema = new mongoose.Schema(
         'PICKED_UP',
         'IN_TRANSIT',
         'OUT_FOR_DELIVERY',
+        'ARRIVED',
         'DELIVERED',
         'COMPLETED',
         '⚠️ VAULT DISPUTED / FROZEN',
@@ -140,8 +141,12 @@ const orderSchema = new mongoose.Schema(
     },
     deliveryStatus: {
       type: String,
-      enum: ['unassigned', 'assigned', 'accepted', 'rejected', 'picked_up', 'out_for_delivery', 'delivered'],
+      enum: ['unassigned', 'assigned', 'accepted', 'rejected', 'picked_up', 'in_transit', 'out_for_delivery', 'arrived', 'delivered'],
       default: 'unassigned'
+    },
+    deliveryPhoto: {
+      type: String,
+      default: ''
     },
     deliveredAt: {
       type: Date

@@ -3,12 +3,73 @@ const User = require('../models/User');
 const DeliverySetting = require('../models/DeliverySetting');
 const { getHaversineDistance, resolveCharge } = require('./deliveryController');
 
+function detectCityAndState(address) {
+  if (!address || typeof address !== 'string') return { city: '', state: '' };
+  const lower = address.toLowerCase();
+  
+  const list = [
+    { city: 'Ahmedabad', state: 'Gujarat', aliases: ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad nagar', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav', 'gandhinagar', 'sanand'] },
+    { city: 'Surat', state: 'Gujarat', aliases: ['surat', 'adajan', 'vesu', 'katargam', 'varachha', 'althan', 'citylight', 'pal', 'piplod', 'dindoli', 'udhna', 'rander', 'bhestan'] },
+    { city: 'Rajkot', state: 'Gujarat', aliases: ['rajkot', 'kalavad road', 'gondal road'] },
+    { city: 'Vadodara', state: 'Gujarat', aliases: ['vadodara', 'baroda', 'alkapuri', 'manjalpur', 'waghodia'] },
+    { city: 'Mumbai', state: 'Maharashtra', aliases: ['mumbai', 'bombay', 'bandra', 'andheri', 'dadar', 'thane', 'navi mumbai', 'kurla', 'mulund', 'worli', 'lower parel'] },
+    { city: 'Pune', state: 'Maharashtra', aliases: ['pune', 'pimpri', 'chinchwad', 'kothrud', 'hadapsar', 'wakad', 'aundh', 'baner'] },
+    { city: 'Nagpur', state: 'Maharashtra', aliases: ['nagpur'] },
+    { city: 'Delhi', state: 'Delhi', aliases: ['delhi', 'new delhi', 'old delhi', 'dwarka', 'rohini', 'noida', 'gurugram', 'gurgaon', 'faridabad'] },
+    { city: 'Bangalore', state: 'Karnataka', aliases: ['bangalore', 'bengaluru', 'koramangala', 'indiranagar', 'whitefield', 'marathahalli', 'jayanagar', 'electronic city'] },
+    { city: 'Chennai', state: 'Tamil Nadu', aliases: ['chennai', 'madras', 'anna nagar', 'adyar', 'velachery', 't. nagar', 'porur'] },
+    { city: 'Kolkata', state: 'West Bengal', aliases: ['kolkata', 'calcutta', 'salt lake', 'howrah', 'jadavpur', 'new town'] },
+    { city: 'Hyderabad', state: 'Telangana', aliases: ['hyderabad', 'secunderabad', 'banjara hills', 'jubilee hills', 'gachibowli', 'hitech city', 'kondapur', 'madhapur'] },
+    { city: 'Jaipur', state: 'Rajasthan', aliases: ['jaipur'] },
+    { city: 'Lucknow', state: 'Uttar Pradesh', aliases: ['lucknow', 'gomti nagar'] },
+    { city: 'Chandigarh', state: 'Punjab', aliases: ['chandigarh', 'mohali', 'panchkula'] }
+  ];
+  
+  for (const item of list) {
+    const terms = item.aliases || [item.city];
+    for (const term of terms) {
+      if (lower.includes(term.toLowerCase())) {
+        return { city: item.city, state: item.state };
+      }
+    }
+  }
+  return { city: '', state: '' };
+}
+
 // @desc    Create a new order
 // @route   POST /api/orders
 // @access  Public (supports guest checkout)
 exports.createOrder = async (req, res) => {
   try {
     const orderData = req.body;
+    
+    // Auto-detect city/state from buyer address
+    const bAddr = orderData.buyerLocation?.address || orderData.deliveryAddress?.address || '';
+    if (!orderData.deliveryAddress) {
+      orderData.deliveryAddress = {};
+    }
+    if (
+      !orderData.deliveryAddress.city || 
+      !orderData.deliveryAddress.stateName || 
+      orderData.deliveryAddress.city.toLowerCase().includes('profile')
+    ) {
+      const detected = detectCityAndState(bAddr);
+      if (detected.city) {
+        orderData.deliveryAddress.city = detected.city;
+        orderData.deliveryAddress.stateName = detected.state;
+      }
+    }
+    if (
+      !orderData.deliveryAddress.pincode || 
+      orderData.deliveryAddress.pincode.toLowerCase().includes('profile')
+    ) {
+      const match = bAddr.match(/\b\d{6}\b/);
+      if (match) {
+        orderData.deliveryAddress.pincode = match[0];
+      } else {
+        orderData.deliveryAddress.pincode = '380001';
+      }
+    }
     
     // Check if the buyer has any unconfirmed delivered orders
     if (orderData.userId) {
@@ -75,7 +136,6 @@ exports.createOrder = async (req, res) => {
     // Resolve Buyer Location
     let bLat = orderData.buyerLocation?.latitude;
     let bLon = orderData.buyerLocation?.longitude;
-    let bAddr = orderData.buyerLocation?.address || orderData.deliveryAddress?.address || '';
 
     // If coordinates are missing, fallback to seller location to avoid crashes and give 0 distance
     if (bLat === undefined || bLat === null || bLon === undefined || bLon === null) {
@@ -304,5 +364,88 @@ exports.getAdminOrders = async (req, res) => {
       success: false,
       error: 'Server error while retrieving orders for admin'
     });
+  }
+};
+
+// @desc    Buyer confirms delivery receipt when package is arrived
+// @route   PUT /api/orders/:id/confirm-receipt
+// @access  Private (Buyer only)
+exports.buyerConfirmDelivery = async (req, res) => {
+  try {
+    const { id } = req.params; // orderId
+    const order = await Order.findOne({ orderId: id });
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    if (order.userId !== req.user.id && order.userId !== req.user._id?.toString()) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to confirm receipt for this order' });
+    }
+
+    if (order.deliveryStatus !== 'arrived') {
+      return res.status(400).json({ success: false, error: 'Courier has not marked this order as arrived yet' });
+    }
+
+    order.deliveryStatus = 'delivered';
+    order.status = 'DELIVERED';
+    order.deliveredAt = new Date();
+
+    const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    order.timeline.push({
+      status: 'DELIVERED',
+      label: 'Delivered',
+      desc: 'Buyer confirmed package receipt on dashboard.',
+      date: dateStr
+    });
+    await order.save();
+
+    const DeliveryAssignment = require('../models/DeliveryAssignment');
+    let assignment = await DeliveryAssignment.findOne({ orderId: id });
+    if (assignment) {
+      assignment.currentStatus = 'delivered';
+      assignment.deliveredDate = new Date();
+      await assignment.save();
+    }
+
+    const DeliveryTracking = require('../models/DeliveryTracking');
+    await DeliveryTracking.create({
+      assignmentId: assignment?._id,
+      orderId: id,
+      status: 'delivered',
+      remarks: 'Delivery confirmed by buyer.'
+    });
+
+    // Notify Courier Partner
+    if (order.deliveryPartnerId) {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        recipient: order.deliveryPartnerId,
+        recipientModel: 'User',
+        title: 'Delivery Receipt Confirmed',
+        message: `Buyer has confirmed receipt of order #${id}. Earnings updated.`,
+        isRead: false
+      });
+    }
+
+    // Trigger Socket Broadcast
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('delivery-status-changed', {
+        orderId: id,
+        status: 'DELIVERED',
+        deliveryStatus: 'delivered'
+      });
+    }
+
+    // Send emails in background
+    const { notifyDeliveryCompleted } = require('./deliveryController');
+    const partner = order.deliveryPartnerId ? await User.findById(order.deliveryPartnerId) : null;
+    notifyDeliveryCompleted(order, partner);
+
+    res.status(200).json({ success: true, message: 'Delivery receipt confirmed successfully', order });
+  } catch (error) {
+    console.error('Buyer Confirm Delivery Error:', error);
+    res.status(500).json({ success: false, error: 'Server error confirming receipt: ' + error.message });
   }
 };

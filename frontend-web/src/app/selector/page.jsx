@@ -167,6 +167,7 @@ export default function RoleSelector() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dbProducts, setDbProducts] = useState([]);
   const [dbCategories, setDbCategories] = useState([]);
+  const [showAllCategories, setShowAllCategories] = useState(false);
   
   // Portal & Dropdown States
   const [deliveryDropdownOpen, setDeliveryDropdownOpen] = useState(false);
@@ -507,7 +508,7 @@ export default function RoleSelector() {
             <div className="sel-categories-view">
               <h2 className="sel-section-title">Explore Main Categories</h2>
               <div className="sel-cat-grid">
-                {mergedCategories.map((cat) => (
+                {(showAllCategories ? mergedCategories : mergedCategories.slice(0, 6)).map((cat) => (
                   <button
                     key={cat.id}
                     className="sel-cat-card"
@@ -531,6 +532,48 @@ export default function RoleSelector() {
                   </button>
                 ))}
               </div>
+
+              {/* Explore More / Show Less Button */}
+              {mergedCategories.length > 6 && (
+                <div style={{ textAlign: 'center', marginTop: '24px' }}>
+                  <button
+                    onClick={() => setShowAllCategories(!showAllCategories)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '12px 28px',
+                      borderRadius: '50px',
+                      border: '2px solid rgba(99,102,241,0.3)',
+                      background: showAllCategories
+                        ? 'rgba(99,102,241,0.08)'
+                        : 'linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(168,85,247,0.12) 100%)',
+                      color: '#6366f1',
+                      fontWeight: '700',
+                      fontSize: '0.92rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.25s ease',
+                      letterSpacing: '0.01em'
+                    }}
+                  >
+                    {showAllCategories ? (
+                      <>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="18 15 12 9 6 15" />
+                        </svg>
+                        Show Less
+                      </>
+                    ) : (
+                      <>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                        Explore More Categories ({mergedCategories.length - 6} more)
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             /* Subcategory & Search Section */
