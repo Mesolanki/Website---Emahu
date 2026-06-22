@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './dashboard.css';
 import { logoutUser, clearAuthSession } from '@/utils/auth';
+import { indiaStatesCities } from '@/utils/indiaStatesCities';
 let toastIdCounter = 0;
 
 const cleanImageUrl = (img) => {
@@ -106,6 +107,7 @@ export default function AdminDashboard() {
   const [newPartnerServiceAreaDistrict, setNewPartnerServiceAreaDistrict] = useState('');
   const [newPartnerServiceAreaState, setNewPartnerServiceAreaState] = useState('');
   const [newPartnerServiceAreaCity, setNewPartnerServiceAreaCity] = useState('');
+  const [newPartnerAddress, setNewPartnerAddress] = useState('');
   const [newPartnerRate, setNewPartnerRate] = useState('10');
   const [newPartnerVehicleType, setNewPartnerVehicleType] = useState('bike');
   const [newPartnerLat, setNewPartnerLat] = useState('23.0225');
@@ -124,6 +126,19 @@ export default function AdminDashboard() {
   const [editPartnerServiceAreaDistrict, setEditPartnerServiceAreaDistrict] = useState('');
   const [editPartnerServiceAreaState, setEditPartnerServiceAreaState] = useState('');
   const [editPartnerServiceAreaCity, setEditPartnerServiceAreaCity] = useState('');
+  const [editPartnerAddress, setEditPartnerAddress] = useState('');
+
+  const [newPartnerCategory, setNewPartnerCategory] = useState('single_two_boy');
+  const [newPartnerDeliveryScope, setNewPartnerDeliveryScope] = useState('local');
+  const [newPartnerSelectedStates, setNewPartnerSelectedStates] = useState([]);
+  const [newPartnerCoveredCities, setNewPartnerCoveredCities] = useState([]);
+  const [newPartnerPerKmRate, setNewPartnerPerKmRate] = useState('5');
+
+  const [editPartnerCategory, setEditPartnerCategory] = useState('single_two_boy');
+  const [editPartnerDeliveryScope, setEditPartnerDeliveryScope] = useState('local');
+  const [editPartnerSelectedStates, setEditPartnerSelectedStates] = useState([]);
+  const [editPartnerCoveredCities, setEditPartnerCoveredCities] = useState([]);
+  const [editPartnerPerKmRate, setEditPartnerPerKmRate] = useState('5');
 
   // Notifications states
   const [notifications, setNotifications] = useState([]);
@@ -1141,6 +1156,26 @@ export default function AdminDashboard() {
         setEditPartnerServiceAreaDistrict(selectedDetailPartner.serviceAreaDistrict || '');
         setEditPartnerServiceAreaState(selectedDetailPartner.serviceAreaState || '');
         setEditPartnerServiceAreaCity(selectedDetailPartner.serviceAreaCity || '');
+        setEditPartnerAddress(selectedDetailPartner.address || '');
+
+        const cat = selectedDetailPartner.category || 'single_two_boy';
+        setEditPartnerCategory(cat);
+        setEditPartnerDeliveryScope(selectedDetailPartner.deliveryScope || 'local');
+        setEditPartnerPerKmRate(String(selectedDetailPartner.perKmRate || selectedDetailPartner.perItemCharge || '5'));
+        setEditPartnerCoveredCities(selectedDetailPartner.coveredCities || []);
+        
+        if (selectedDetailPartner.serviceAreaState) {
+          if (Array.isArray(selectedDetailPartner.serviceAreaState)) {
+            setEditPartnerServiceAreaState(selectedDetailPartner.serviceAreaState[0] || '');
+            setEditPartnerSelectedStates(selectedDetailPartner.serviceAreaState);
+          } else {
+            setEditPartnerServiceAreaState(selectedDetailPartner.serviceAreaState);
+            setEditPartnerSelectedStates([selectedDetailPartner.serviceAreaState]);
+          }
+        } else {
+          setEditPartnerServiceAreaState('');
+          setEditPartnerSelectedStates([]);
+        }
       }, 0);
     }
   }, [selectedDetailPartner]);
@@ -1175,6 +1210,38 @@ export default function AdminDashboard() {
       alert('Please fill Name and Mobile Number');
       return;
     }
+    if (newPartnerCategory === 'single_two_boy') {
+      if (!newPartnerServiceAreaState) {
+        alert('Service State is required');
+        return;
+      }
+      if (!newPartnerCoveredCities || newPartnerCoveredCities.length === 0) {
+        alert('Covered City is required');
+        return;
+      }
+      if (newPartnerCoveredCities.length > 1) {
+        alert('Single/Two Boy category can only select 1 city');
+        return;
+      }
+    } else {
+      if (!newPartnerSelectedStates || newPartnerSelectedStates.length === 0) {
+        alert('At least one Service State is required');
+        return;
+      }
+      if (!newPartnerCoveredCities || newPartnerCoveredCities.length === 0) {
+        alert('At least one Covered City is required');
+        return;
+      }
+      if (newPartnerDeliveryScope === 'local' && newPartnerCoveredCities.length > 2) {
+        alert('Local Delivery Partners can select a maximum of 2 cities');
+        return;
+      }
+    }
+    if (!newPartnerPerKmRate || isNaN(newPartnerPerKmRate)) {
+      alert('Please enter a valid rate per KM');
+      return;
+    }
+
     setNewPartnerLoading(true);
     const generatedEmail = `delivery_${newPartnerPhone.trim().replace(/[^0-9]/g, '') || Date.now()}_${Math.floor(1000 + Math.random() * 9000)}@emahu.com`;
     const generatedPassword = 'default_delivery_pass_123';
@@ -1192,11 +1259,12 @@ export default function AdminDashboard() {
           password: generatedPassword,
           phone: newPartnerPhone,
           operatingLocation: newPartnerOperatingLocation,
-          currentCity: newPartnerServiceAreaCity,
+          currentCity: newPartnerCoveredCities[0] || newPartnerServiceAreaCity,
           currentArea: newPartnerServiceAreaRegion,
           pincode: '382481',
           serviceRadius: 999,
-          perItemCharge: parseFloat(newPartnerRate),
+          perItemCharge: parseFloat(newPartnerPerKmRate),
+          perKmRate: parseFloat(newPartnerPerKmRate),
           vehicleType: newPartnerVehicleType,
           vehicleNumber: 'N/A',
           latitude: parseFloat(newPartnerLat),
@@ -1205,8 +1273,12 @@ export default function AdminDashboard() {
           serviceAreaCountry: newPartnerServiceAreaCountry,
           serviceAreaRegion: newPartnerServiceAreaRegion,
           serviceAreaDistrict: newPartnerServiceAreaDistrict,
-          serviceAreaState: newPartnerServiceAreaState,
-          serviceAreaCity: newPartnerServiceAreaCity
+          serviceAreaState: newPartnerCategory === 'single_two_boy' ? newPartnerServiceAreaState : newPartnerSelectedStates,
+          serviceAreaCity: newPartnerCoveredCities[0] || newPartnerServiceAreaCity,
+          address: newPartnerAddress,
+          coveredCities: newPartnerCoveredCities,
+          deliveryScope: newPartnerDeliveryScope,
+          category: newPartnerCategory
         })
       });
       const data = await res.json();
@@ -1221,6 +1293,9 @@ export default function AdminDashboard() {
         setNewPartnerServiceAreaDistrict('');
         setNewPartnerServiceAreaState('');
         setNewPartnerServiceAreaCity('');
+        setNewPartnerAddress('');
+        setNewPartnerSelectedStates([]);
+        setNewPartnerCoveredCities([]);
         fetchDeliveryPartners();
       } else {
         triggerToast('Error', data.error || 'Failed to create partner', 'danger');
@@ -1234,6 +1309,38 @@ export default function AdminDashboard() {
   };
 
   const handleSavePartnerChanges = async (partnerId) => {
+    if (editPartnerCategory === 'single_two_boy') {
+      if (!editPartnerServiceAreaState) {
+        alert('Service State is required');
+        return;
+      }
+      if (!editPartnerCoveredCities || editPartnerCoveredCities.length === 0) {
+        alert('Covered City is required');
+        return;
+      }
+      if (editPartnerCoveredCities.length > 1) {
+        alert('Single/Two Boy category can only select 1 city');
+        return;
+      }
+    } else {
+      if (!editPartnerSelectedStates || editPartnerSelectedStates.length === 0) {
+        alert('At least one Service State is required');
+        return;
+      }
+      if (!editPartnerCoveredCities || editPartnerCoveredCities.length === 0) {
+        alert('At least one Covered City is required');
+        return;
+      }
+      if (editPartnerDeliveryScope === 'local' && editPartnerCoveredCities.length > 2) {
+        alert('Local Delivery Partners can select a maximum of 2 cities');
+        return;
+      }
+    }
+    if (!editPartnerPerKmRate || isNaN(editPartnerPerKmRate)) {
+      alert('Please enter a valid rate per KM');
+      return;
+    }
+
     try {
       const token = localStorage.getItem('emahu_admin_token');
       const res = await fetch(`/api/delivery/partners/${partnerId}`, {
@@ -1243,9 +1350,10 @@ export default function AdminDashboard() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          perItemCharge: parseFloat(editPartnerRate),
+          perItemCharge: parseFloat(editPartnerPerKmRate),
+          perKmRate: parseFloat(editPartnerPerKmRate),
           serviceRadius: parseFloat(editPartnerRadius),
-          currentCity: editPartnerServiceAreaCity,
+          currentCity: editPartnerCoveredCities[0] || editPartnerServiceAreaCity,
           currentArea: editPartnerServiceAreaRegion,
           pincode: '382481',
           vehicleType: editPartnerVehicleType,
@@ -1256,8 +1364,12 @@ export default function AdminDashboard() {
           serviceAreaCountry: editPartnerServiceAreaCountry,
           serviceAreaRegion: editPartnerServiceAreaRegion,
           serviceAreaDistrict: editPartnerServiceAreaDistrict,
-          serviceAreaState: editPartnerServiceAreaState,
-          serviceAreaCity: editPartnerServiceAreaCity
+          serviceAreaState: editPartnerCategory === 'single_two_boy' ? editPartnerServiceAreaState : editPartnerSelectedStates,
+          serviceAreaCity: editPartnerCoveredCities[0] || editPartnerServiceAreaCity,
+          address: editPartnerAddress,
+          coveredCities: editPartnerCoveredCities,
+          deliveryScope: editPartnerDeliveryScope,
+          category: editPartnerCategory
         })
       });
       const data = await res.json();
@@ -1505,31 +1617,209 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Rate Per 2KM (₹)</label>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Street Address</label>
+                    <input 
+                      type="text" 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={newPartnerAddress} 
+                      onChange={(e) => setNewPartnerAddress(e.target.value)} 
+                    />
+                  </div>
+
+                  {/* Category Selector */}
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Category</label>
+                    <select 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                      value={newPartnerCategory} 
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewPartnerCategory(val);
+                        if (val === 'single_two_boy') {
+                          setNewPartnerDeliveryScope('local');
+                        }
+                        setNewPartnerCoveredCities([]);
+                        setNewPartnerSelectedStates([]);
+                      }}
+                    >
+                      <option value="single_two_boy">Single/Two Boy Delivery</option>
+                      <option value="agency">Delivery Agency</option>
+                      <option value="partner">Delivery Partner</option>
+                    </select>
+                  </div>
+
+                  {/* Delivery Scope Selector */}
+                  {newPartnerCategory !== 'single_two_boy' && (
+                    <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Delivery Scope</label>
+                      <select 
+                        className="ad-modal-input" 
+                        style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                        value={newPartnerDeliveryScope} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewPartnerDeliveryScope(val);
+                          if (val === 'local' && newPartnerCoveredCities.length > 2) {
+                            setNewPartnerCoveredCities(newPartnerCoveredCities.slice(0, 2));
+                          }
+                        }}
+                      >
+                        <option value="local">Local Delivery Partner</option>
+                        <option value="intercity">Intercity Delivery Partner</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* State Selector */}
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>
+                      {newPartnerCategory === 'single_two_boy' ? 'Service State' : 'Service States (Select Multiple)'}
+                    </label>
+                    {newPartnerCategory === 'single_two_boy' ? (
+                      <select 
+                        className="ad-modal-input"
+                        style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                        value={newPartnerServiceAreaState}
+                        onChange={(e) => {
+                          setNewPartnerServiceAreaState(e.target.value);
+                          setNewPartnerCoveredCities([]);
+                        }}
+                      >
+                        <option value="">Select State</option>
+                        {Object.keys(indiaStatesCities).map((stateName) => (
+                          <option key={stateName} value={stateName}>{stateName}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select 
+                        className="ad-modal-input"
+                        style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                        value=""
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!val) return;
+                          if (!newPartnerSelectedStates.includes(val)) {
+                            setNewPartnerSelectedStates([...newPartnerSelectedStates, val]);
+                          }
+                        }}
+                      >
+                        <option value="">Select State to Add</option>
+                        {Object.keys(indiaStatesCities).map((stateName) => (
+                          <option key={stateName} value={stateName}>{stateName}</option>
+                        ))}
+                      </select>
+                    )}
+                    
+                    {newPartnerCategory !== 'single_two_boy' && newPartnerSelectedStates.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                        {newPartnerSelectedStates.map((st) => (
+                          <span key={st} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#3f3f46', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
+                            {st}
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                const updated = newPartnerSelectedStates.filter(s => s !== st);
+                                setNewPartnerSelectedStates(updated);
+                                const citiesOfState = indiaStatesCities[st] || [];
+                                setNewPartnerCoveredCities(newPartnerCoveredCities.filter(c => !citiesOfState.includes(c)));
+                              }}
+                              style={{ border: 'none', background: 'transparent', color: '#f87171', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* City Selector */}
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>
+                      {newPartnerCategory === 'single_two_boy' ? 'Service City' : 'Covered Cities'}
+                    </label>
+                    {newPartnerCategory === 'single_two_boy' ? (
+                      <select 
+                        className="ad-modal-input"
+                        style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                        value={newPartnerCoveredCities[0] || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            setNewPartnerCoveredCities([val]);
+                          } else {
+                            setNewPartnerCoveredCities([]);
+                          }
+                        }}
+                        disabled={!newPartnerServiceAreaState}
+                      >
+                        <option value="">{newPartnerServiceAreaState ? "Select City" : "First Select a State"}</option>
+                        {newPartnerServiceAreaState && (indiaStatesCities[newPartnerServiceAreaState] || []).map((cityName) => (
+                          <option key={cityName} value={cityName}>{cityName}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select 
+                        className="ad-modal-input"
+                        style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                        value=""
+                        onChange={(e) => {
+                          const selectedCity = e.target.value;
+                          if (!selectedCity) return;
+                          
+                          if (newPartnerDeliveryScope === 'local' && newPartnerCoveredCities.length >= 2) {
+                            alert('Local Delivery Partners can select a maximum of 2 cities.');
+                            return;
+                          }
+                          
+                          if (newPartnerCoveredCities.includes(selectedCity)) {
+                            return;
+                          }
+                          
+                          setNewPartnerCoveredCities([...newPartnerCoveredCities, selectedCity]);
+                        }}
+                        disabled={newPartnerSelectedStates.length === 0}
+                      >
+                        <option value="">{newPartnerSelectedStates.length > 0 ? "Select City to Add" : "First Select at Least One State"}</option>
+                        {newPartnerSelectedStates.flatMap(st => (indiaStatesCities[st] || []).map(cityName => ({ state: st, city: cityName })))
+                          .map(({ state, city }) => (
+                            <option key={`${state}-${city}`} value={city}>{city} ({state})</option>
+                          ))
+                        }
+                      </select>
+                    )}
+                    
+                    {newPartnerCategory !== 'single_two_boy' && newPartnerCoveredCities.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                        {newPartnerCoveredCities.map((city) => (
+                          <span key={city} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#0d9488', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
+                            {city}
+                            <button 
+                              type="button" 
+                              onClick={() => setNewPartnerCoveredCities(newPartnerCoveredCities.filter(c => c !== city))}
+                              style={{ border: 'none', background: 'transparent', color: '#f87171', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Rate per Kilometer */}
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Rate Per KM (₹)</label>
                     <input 
                       type="number" 
                       required
                       className="ad-modal-input" 
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={newPartnerRate} 
-                      onChange={(e) => setNewPartnerRate(e.target.value)} 
+                      value={newPartnerPerKmRate} 
+                      onChange={(e) => setNewPartnerPerKmRate(e.target.value)} 
                     />
-                  </div>
-
-                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Vehicle Type</label>
-                    <select 
-                      className="ad-modal-input" 
-                      style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
-                      value={newPartnerVehicleType} 
-                      onChange={(e) => setNewPartnerVehicleType(e.target.value)}
-                    >
-                      <option value="bike">Bike</option>
-                      <option value="scooter">Scooter</option>
-                      <option value="car">Car</option>
-                      <option value="truck">Truck</option>
-                      <option value="other">Other</option>
-                    </select>
                   </div>
                 </div>
 
@@ -1586,14 +1876,21 @@ export default function AdminDashboard() {
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>City</label>
-                    <input 
-                      type="text" 
-                      required
+                    <select 
                       className="ad-modal-input" 
-                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
                       value={newPartnerServiceAreaCity} 
-                      onChange={(e) => setNewPartnerServiceAreaCity(e.target.value)} 
-                    />
+                      onChange={(e) => setNewPartnerServiceAreaCity(e.target.value)}
+                    >
+                      <option value="">Select City</option>
+                      <option value="Ahmedabad">Ahmedabad</option>
+                      <option value="Surat">Surat</option>
+                      <option value="Rajkot">Rajkot</option>
+                      <option value="Vadodara">Vadodara</option>
+                      <option value="Mumbai">Mumbai</option>
+                      <option value="Delhi">Delhi</option>
+                      <option value="All">All Cities</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -1661,6 +1958,16 @@ export default function AdminDashboard() {
                   <span>•</span>
                   <span>📞 Phone: {selectedDetailPartner.phone || 'N/A'}</span>
                 </div>
+                {selectedDetailPartner.address && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-admin-muted)', marginTop: '4px' }}>
+                    🏢 HQ Address: {selectedDetailPartner.address}
+                  </div>
+                )}
+                {selectedDetailPartner.vehicleNumber && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-admin-muted)', marginTop: '2px' }}>
+                    ⚙️ Fleet Details: {selectedDetailPartner.vehicleNumber}
+                  </div>
+                )}
               </div>
               <span className={`ad-status-badge ${selectedDetailPartner.status}`} style={{ fontSize: '0.85rem', padding: '6px 14px' }}>
                 {selectedDetailPartner.status?.toUpperCase()}
@@ -1672,31 +1979,198 @@ export default function AdminDashboard() {
                 <div className="ad-detail-info-section">
                   <h4>Edit Fleet Parameters</h4>
                   
+                  {/* Category Selector */}
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Rate Per 2KM (₹)</label>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Category</label>
+                    <select 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                      value={editPartnerCategory} 
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditPartnerCategory(val);
+                        if (val === 'single_two_boy') {
+                          setEditPartnerDeliveryScope('local');
+                        }
+                        setEditPartnerCoveredCities([]);
+                        setEditPartnerSelectedStates([]);
+                      }}
+                    >
+                      <option value="single_two_boy">Single/Two Boy Delivery</option>
+                      <option value="agency">Delivery Agency</option>
+                      <option value="partner">Delivery Partner</option>
+                    </select>
+                  </div>
+
+                  {/* Delivery Scope Selector */}
+                  {editPartnerCategory !== 'single_two_boy' && (
+                    <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Delivery Scope</label>
+                      <select 
+                        className="ad-modal-input" 
+                        style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                        value={editPartnerDeliveryScope} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditPartnerDeliveryScope(val);
+                          if (val === 'local' && editPartnerCoveredCities.length > 2) {
+                            setEditPartnerCoveredCities(editPartnerCoveredCities.slice(0, 2));
+                          }
+                        }}
+                      >
+                        <option value="local">Local Delivery Partner</option>
+                        <option value="intercity">Intercity Delivery Partner</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* State Selector */}
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>
+                      {editPartnerCategory === 'single_two_boy' ? 'Service State' : 'Service States (Select Multiple)'}
+                    </label>
+                    {editPartnerCategory === 'single_two_boy' ? (
+                      <select 
+                        className="ad-modal-input"
+                        style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                        value={editPartnerServiceAreaState}
+                        onChange={(e) => {
+                          setEditPartnerServiceAreaState(e.target.value);
+                          setEditPartnerCoveredCities([]);
+                        }}
+                      >
+                        <option value="">Select State</option>
+                        {Object.keys(indiaStatesCities).map((stateName) => (
+                          <option key={stateName} value={stateName}>{stateName}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select 
+                        className="ad-modal-input"
+                        style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                        value=""
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!val) return;
+                          if (!editPartnerSelectedStates.includes(val)) {
+                            setEditPartnerSelectedStates([...editPartnerSelectedStates, val]);
+                          }
+                        }}
+                      >
+                        <option value="">Select State to Add</option>
+                        {Object.keys(indiaStatesCities).map((stateName) => (
+                          <option key={stateName} value={stateName}>{stateName}</option>
+                        ))}
+                      </select>
+                    )}
+                    
+                    {editPartnerCategory !== 'single_two_boy' && editPartnerSelectedStates.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                        {editPartnerSelectedStates.map((st) => (
+                          <span key={st} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#3f3f46', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
+                            {st}
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                const updated = editPartnerSelectedStates.filter(s => s !== st);
+                                setEditPartnerSelectedStates(updated);
+                                const citiesOfState = indiaStatesCities[st] || [];
+                                setEditPartnerCoveredCities(editPartnerCoveredCities.filter(c => !citiesOfState.includes(c)));
+                              }}
+                              style={{ border: 'none', background: 'transparent', color: '#f87171', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* City Selector */}
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>
+                      {editPartnerCategory === 'single_two_boy' ? 'Service City' : 'Covered Cities'}
+                    </label>
+                    {editPartnerCategory === 'single_two_boy' ? (
+                      <select 
+                        className="ad-modal-input"
+                        style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                        value={editPartnerCoveredCities[0] || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            setEditPartnerCoveredCities([val]);
+                          } else {
+                            setEditPartnerCoveredCities([]);
+                          }
+                        }}
+                        disabled={!editPartnerServiceAreaState}
+                      >
+                        <option value="">{editPartnerServiceAreaState ? "Select City" : "First Select a State"}</option>
+                        {editPartnerServiceAreaState && (indiaStatesCities[editPartnerServiceAreaState] || []).map((cityName) => (
+                          <option key={cityName} value={cityName}>{cityName}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select 
+                        className="ad-modal-input"
+                        style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
+                        value=""
+                        onChange={(e) => {
+                          const selectedCity = e.target.value;
+                          if (!selectedCity) return;
+                          
+                          if (editPartnerDeliveryScope === 'local' && editPartnerCoveredCities.length >= 2) {
+                            alert('Local Delivery Partners can select a maximum of 2 cities.');
+                            return;
+                          }
+                          
+                          if (editPartnerCoveredCities.includes(selectedCity)) {
+                            return;
+                          }
+                          
+                          setEditPartnerCoveredCities([...editPartnerCoveredCities, selectedCity]);
+                        }}
+                        disabled={editPartnerSelectedStates.length === 0}
+                      >
+                        <option value="">{editPartnerSelectedStates.length > 0 ? "Select City to Add" : "First Select at Least One State"}</option>
+                        {editPartnerSelectedStates.flatMap(st => (indiaStatesCities[st] || []).map(cityName => ({ state: st, city: cityName })))
+                          .map(({ state, city }) => (
+                            <option key={`${state}-${city}`} value={city}>{city} ({state})</option>
+                          ))
+                        }
+                      </select>
+                    )}
+                    
+                    {editPartnerCategory !== 'single_two_boy' && editPartnerCoveredCities.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                        {editPartnerCoveredCities.map((city) => (
+                          <span key={city} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#0d9488', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
+                            {city}
+                            <button 
+                              type="button" 
+                              onClick={() => setEditPartnerCoveredCities(editPartnerCoveredCities.filter(c => c !== city))}
+                              style={{ border: 'none', background: 'transparent', color: '#f87171', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Rate per Kilometer */}
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Rate Per KM (₹)</label>
                     <input 
                       type="number" 
                       className="ad-modal-input" 
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerRate} 
-                      onChange={(e) => setEditPartnerRate(e.target.value)} 
+                      value={editPartnerPerKmRate} 
+                      onChange={(e) => setEditPartnerPerKmRate(e.target.value)} 
                     />
-                  </div>
-
-                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Vehicle Type</label>
-                    <select 
-                      className="ad-modal-input" 
-                      style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
-                      value={editPartnerVehicleType} 
-                      onChange={(e) => setEditPartnerVehicleType(e.target.value)}
-                    >
-                      <option value="bike">Bike</option>
-                      <option value="scooter">Scooter</option>
-                      <option value="car">Car</option>
-                      <option value="truck">Truck</option>
-                      <option value="other">Other</option>
-                    </select>
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
@@ -1718,6 +2192,17 @@ export default function AdminDashboard() {
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
                       value={editPartnerSalaryRequirement} 
                       onChange={(e) => setEditPartnerSalaryRequirement(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Street Address</label>
+                    <input 
+                      type="text" 
+                      className="ad-modal-input" 
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      value={editPartnerAddress} 
+                      onChange={(e) => setEditPartnerAddress(e.target.value)} 
                     />
                   </div>
                 </div>
@@ -1771,13 +2256,20 @@ export default function AdminDashboard() {
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>City</label>
-                    <input 
-                      type="text" 
+                    <select 
                       className="ad-modal-input" 
-                      style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
+                      style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
                       value={editPartnerServiceAreaCity} 
-                      onChange={(e) => setEditPartnerServiceAreaCity(e.target.value)} 
-                    />
+                      onChange={(e) => setEditPartnerServiceAreaCity(e.target.value)}
+                    >
+                      <option value="Ahmedabad">Ahmedabad</option>
+                      <option value="Surat">Surat</option>
+                      <option value="Rajkot">Rajkot</option>
+                      <option value="Vadodara">Vadodara</option>
+                      <option value="Mumbai">Mumbai</option>
+                      <option value="Delhi">Delhi</option>
+                      <option value="All">All Cities</option>
+                    </select>
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px' }}>
@@ -3546,7 +4038,7 @@ export default function AdminDashboard() {
                                   Scope: {partner.deliveryScope === 'local' ? 'Local Same-City' : 'State-to-State'}
                                 </div>
                                 <div className="ad-muted" style={{ color: '#10b981', fontWeight: 'bold' }}>
-                                  ₹{partner.perItemCharge || '0.00'}/2km
+                                  ₹{partner.perKmRate || partner.perItemCharge || '0.00'}/KM
                                 </div>
                               </td>
                               <td>
@@ -3607,7 +4099,7 @@ export default function AdminDashboard() {
                                   Scope: {partner.deliveryScope === 'local' ? 'Local Same-City' : 'State-to-State'}
                                 </div>
                                 <div className="ad-muted" style={{ color: '#10b981', fontWeight: 'bold' }}>
-                                  ₹{partner.perItemCharge || '0.00'}/2km
+                                  ₹{partner.perKmRate || partner.perItemCharge || '0.00'}/KM
                                 </div>
                               </td>
                               <td>

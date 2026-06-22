@@ -6026,10 +6026,11 @@ export default function EmahuProDashboard() {
 
                         {/* Bottom row: rates + action buttons */}
                         <div style={{ padding: '7px 15px', borderTop: '1px solid #f1f5f9', background: isSelected ? '#f0fdf4' : '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ fontSize: '0.69rem', color: '#94a3b8', display: 'flex', gap: '6px' }}>
-                            <span>₹{partner.rateUpTo2Km}/km (≤2km)</span>
-                            <span>·</span>
-                            <span>₹{partner.rateAbove2Km}/km (&gt;2km)</span>
+                          <div style={{ fontSize: '0.69rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            {partner.coveredCities && partner.coveredCities.length > 0 && (
+                              <div><strong>Covered Cities:</strong> {partner.coveredCities.join(', ')}</div>
+                            )}
+                            <div><strong>Rate:</strong> ₹{partner.perKmRate || partner.perItemCharge || 5}/KM</div>
                           </div>
                           <div style={{ display: 'flex', gap: '5px' }} onClick={e => e.stopPropagation()}>
                             {partner.latitude && partner.longitude && (

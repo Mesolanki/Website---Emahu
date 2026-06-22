@@ -14,6 +14,12 @@ export default function AdminRegister() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [isEmailOtpSent, setIsEmailOtpSent] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [devOtp, setDevOtp] = useState('');
+  const [adminSecret, setAdminSecret] = useState('');
 
   useEffect(() => {
     if (localStorage.getItem('emahu_admin_logged_in') === 'true') {
@@ -21,10 +27,80 @@ export default function AdminRegister() {
     }
   }, [router]);
 
+  const handleSendEmailOtp = async () => {
+    if (!email.trim()) {
+      setError('Email address is required to send OTP');
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setError('Enter a valid email address');
+      return;
+    }
+    setOtpLoading(true);
+    setError('');
+    setDevOtp('');
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: email })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsEmailOtpSent(true);
+        if (data.devOtp) {
+          setDevOtp(data.devOtp);
+        }
+      } else {
+        setError(data.error || 'Failed to send OTP');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Network error sending OTP code.');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    if (!emailOtp.trim()) {
+      setError('Please enter the verification code');
+      return;
+    }
+    setOtpLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: email, otp: emailOtp })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsEmailVerified(true);
+      } else {
+        setError(data.error || 'Invalid OTP code');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Network error verifying OTP code.');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !email || !password || !phone) {
+    if (!name || !email || !password || !phone || !adminSecret) {
       setError('Please fill in all fields.');
+      return;
+    }
+    if (!isEmailVerified) {
+      setError('Please verify your email address via OTP first.');
       return;
     }
     setError('');
@@ -37,7 +113,8 @@ export default function AdminRegister() {
         password,
         phone,
         role: 'admin',
-        address: 'EMAHU Corporate HQ'
+        address: 'EMAHU Corporate HQ',
+        adminSecret
       });
 
       saveAuthSession(data, 'admin');
@@ -119,15 +196,67 @@ export default function AdminRegister() {
 
             <div className="ar-input-group">
               <label className="ar-label" htmlFor="ar-email">Email Address</label>
-              <input
-                id="ar-email"
-                type="email"
-                className="ar-input"
-                placeholder="e.g. admin@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  id="ar-email"
+                  type="email"
+                  className="ar-input"
+                  placeholder="e.g. admin@company.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (isEmailVerified) setIsEmailVerified(false);
+                    if (isEmailOtpSent) setIsEmailOtpSent(false);
+                  }}
+                  readOnly={isEmailVerified}
+                  style={{ flex: 1 }}
+                  required
+                />
+                {!isEmailVerified && (
+                  <button
+                    type="button"
+                    className="ar-btn"
+                    style={{ padding: '0 12px', height: '42px', width: 'auto', fontSize: '0.78rem', background: 'var(--color-admin-primary, #6366f1)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    onClick={handleSendEmailOtp}
+                    disabled={otpLoading}
+                  >
+                    {otpLoading ? '...' : isEmailOtpSent ? 'Resend' : 'Send Code'}
+                  </button>
+                )}
+              </div>
+
+              {/* OTP Code Input */}
+              {isEmailOtpSent && !isEmailVerified && (
+                <div style={{ marginTop: '8px', background: 'rgba(99,102,241,0.03)', border: '1px solid rgba(99,102,241,0.15)', padding: '10px', borderRadius: '6px' }}>
+                  <label className="ar-label" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>Verification Code</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      className="ar-input"
+                      placeholder="Enter 6-digit OTP"
+                      value={emailOtp}
+                      onChange={(e) => setEmailOtp(e.target.value)}
+                      style={{ flex: 1, height: '36px', fontSize: '0.85rem' }}
+                    />
+                    <button
+                      type="button"
+                      className="ar-btn"
+                      style={{ padding: '0 12px', height: '36px', width: 'auto', fontSize: '0.78rem', background: '#10b981', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                      onClick={handleVerifyEmailOtp}
+                      disabled={otpLoading}
+                    >
+                      Verify
+                    </button>
+                  </div>
+                  {/* Simulated Dev OTP display removed to ensure authentication security */}
+                </div>
+              )}
+
+              {isEmailVerified && (
+                <div style={{ color: '#10b981', fontSize: '0.75rem', marginTop: '6px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  ✓ Email Address Verified Successfully
+                </div>
+              )}
             </div>
 
             <div className="ar-input-group">
@@ -156,10 +285,23 @@ export default function AdminRegister() {
               />
             </div>
 
+            <div className="ar-input-group">
+              <label className="ar-label" htmlFor="ar-admin-secret">Admin Authorization Key</label>
+              <input
+                id="ar-admin-secret"
+                type="password"
+                className="ar-input"
+                placeholder="Enter admin authorization secret key"
+                value={adminSecret}
+                onChange={(e) => setAdminSecret(e.target.value)}
+                required
+              />
+            </div>
+
             <button
               type="submit"
               className={`ar-btn ar-btn--primary ${loading ? 'ar-btn--loading' : ''}`}
-              disabled={loading}
+              disabled={loading || !isEmailVerified || !adminSecret}
             >
               {loading ? (
                 <>

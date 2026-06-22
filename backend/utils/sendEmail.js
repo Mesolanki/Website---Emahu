@@ -12,7 +12,7 @@ const sendEmail = async (options) => {
   const port = parseInt(process.env.EMAIL_PORT || '587', 10);
   const user = process.env.EMAIL_USER || '';
   const pass = process.env.EMAIL_PASS || '';
-  const from = process.env.EMAIL_FROM || '"Emahu Marketplace" <noreply@emahu.com>';
+  const from = process.env.EMAIL_FROM || `"Emahu Marketplace" <${user}>`;
 
   console.log('\n=================================================');
   console.log(`✉️  PREPARING OUTBOUND EMAIL TO: ${options.to}`);
@@ -39,9 +39,16 @@ const sendEmail = async (options) => {
     const mailOptions = {
       from,
       to: options.to,
+      replyTo: user,
       subject: options.subject,
       text: options.text,
       html: options.html || undefined,
+      headers: {
+        'X-Priority': '1', // High priority
+        'X-MSMail-Priority': 'High',
+        'Importance': 'high',
+        'X-Auto-Response-Suppress': 'OOF, AutoReply'
+      }
     };
 
     const info = await transporter.sendMail(mailOptions);

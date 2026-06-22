@@ -10,6 +10,29 @@
 
 const BASE_URL = 'http://localhost:5000';
 
+async function requestAndVerifyOtp(email) {
+  // 1. Send OTP
+  const sendRes = await fetch(`${BASE_URL}/api/auth/send-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  const sendData = await sendRes.json();
+  if (!sendData.success) throw new Error(`Send OTP failed for ${email}: ${sendData.error}`);
+  
+  const otp = sendData.devOtp;
+  if (!otp) throw new Error(`devOtp not returned in response. Make sure NODE_ENV=development`);
+  
+  // 2. Verify OTP
+  const verifyRes = await fetch(`${BASE_URL}/api/auth/verify-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp })
+  });
+  const verifyData = await verifyRes.json();
+  if (!verifyData.success) throw new Error(`Verify OTP failed for ${email}: ${verifyData.error}`);
+}
+
 async function runTests() {
   console.log('🚀 Starting Integration Tests for Emahu E-Commerce System...');
   
@@ -28,6 +51,10 @@ async function runTests() {
     // -------------------------------------------------------------------------
     console.log('\n--- 1. Register Admin and Seller ---');
     
+    // Send and verify OTP for Admin
+    await requestAndVerifyOtp(adminEmail);
+    console.log('✅ Admin OTP verified successfully.');
+
     // Register Admin
     const adminRegRes = await fetch(`${BASE_URL}/api/auth/register`, {
       method: 'POST',
@@ -36,7 +63,8 @@ async function runTests() {
         name: 'Test Administrator',
         email: adminEmail,
         password: 'password123',
-        role: 'admin'
+        role: 'admin',
+        adminSecret: 'emahu_admin_secret_key_2026'
       })
     });
     const adminRegData = await adminRegRes.json();
@@ -56,6 +84,10 @@ async function runTests() {
     if (!adminLoginData.success) throw new Error('Admin login failed: ' + JSON.stringify(adminLoginData));
     adminToken = adminLoginData.accessToken;
     console.log('✅ Admin logged in. Token acquired.');
+
+    // Send and verify OTP for Seller
+    await requestAndVerifyOtp(sellerEmail);
+    console.log('✅ Seller OTP verified successfully.');
 
     // Register Seller (Should default to 'pending' status)
     const sellerRegRes = await fetch(`${BASE_URL}/api/auth/register`, {

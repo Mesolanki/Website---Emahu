@@ -383,15 +383,6 @@ export default function ForgotPassword() {
               </div>
             </div>
 
-            {devOtp && (
-              <div style={{ fontSize: '0.8rem', color: '#34d399', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>[DEV ONLY] Resetted OTP: {devOtp}</span>
-                <span onClick={() => {
-                  setOtpValues(devOtp.split(''));
-                  setError('');
-                }} style={{ textDecoration: 'underline', cursor: 'pointer', color: '#60a5fa' }}>Auto-Fill</span>
-              </div>
-            )}
 
             <div className="fp-timer-row">
               {timer > 0 ? (

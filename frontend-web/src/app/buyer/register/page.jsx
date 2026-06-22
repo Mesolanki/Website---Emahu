@@ -437,17 +437,6 @@ export default function BuyerRegister() {
                             </button>
                           </div>
                           {errors.otp && <span className="br-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
-                          {devOtp && (
-                            <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '6px', fontWeight: 'bold' }}>
-                              [DEV ONLY] Code: {devOtp} (Click to auto-fill)
-                              <span 
-                                onClick={() => setEmailOtp(devOtp)} 
-                                style={{ textDecoration: 'underline', cursor: 'pointer', marginLeft: '6px', color: '#3b82f6' }}
-                              >
-                                [Fill]
-                              </span>
-                            </div>
-                          )}
                         </div>
                       )}
 

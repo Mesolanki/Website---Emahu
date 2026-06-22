@@ -822,21 +822,6 @@ export default function SellerRegister() {
               }
             </p>
 
-            {devEmailOtp && (
-              <div style={{
-                backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                border: '1px solid rgba(56, 189, 248, 0.2)',
-                color: '#38bdf8',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                marginBottom: '16px',
-                textAlign: 'left',
-                fontWeight: 'bold'
-              }}>
-                🔧 Dev Mode Simulated Email OTP: {devEmailOtp}
-              </div>
-            )}
 
             {otpError && (
               <div style={{

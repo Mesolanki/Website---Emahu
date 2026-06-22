@@ -113,9 +113,17 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    perKmRate: {
+      type: Number,
+      default: 0
+    },
+    coveredCities: {
+      type: [String],
+      default: []
+    },
     deliveryScope: {
       type: String,
-      enum: ['local', 'interstate'],
+      enum: ['local', 'intercity', 'interstate'],
       default: 'local'
     },
     operatingLocation: {
@@ -182,8 +190,7 @@ const userSchema = new mongoose.Schema(
       trim: true
     },
     serviceAreaState: {
-      type: String,
-      trim: true
+      type: mongoose.Schema.Types.Mixed
     },
     serviceAreaCity: {
       type: String,

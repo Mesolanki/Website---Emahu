@@ -6,6 +6,7 @@ const DeliveryAssignment = require('../models/DeliveryAssignment');
 const DeliveryTracking = require('../models/DeliveryTracking');
 const Order = require('../models/Order');
 const Notification = require('../models/Notification');
+const sendEmail = require('../utils/sendEmail');
 
 // Haversine formula to compute distance in KM
 function getHaversineDistance(lat1, lon1, lat2, lon2) {
@@ -366,18 +367,24 @@ exports.assignOrderToPartner = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Delivery partner not found' });
     }
 
+    // Calculate cost based on per KM rate
+    const perKmRate = partner.perKmRate || partner.perItemCharge || 10;
+    const totalCost = parseFloat(((order.distanceKm || 5) * perKmRate).toFixed(2));
+
     // Update Order
     order.deliveryPartnerId = deliveryPartnerId;
     order.carrier = partner.name;
     order.carrierPhone = partner.phone;
-    order.deliveryStatus = 'accepted';
-    order.status = 'LABEL_GENERATED';
+    order.deliveryStatus = 'assigned';
+    order.status = 'DELIVERY_ASSIGNED';
+    order.deliveryCost = totalCost;
+    order.deliveryCharge = totalCost;
     
     const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     order.timeline.push({
-      status: 'LABEL_GENERATED',
-      label: 'Delivery Accepted',
-      desc: `Order assigned to courier partner: ${partner.name}. Courier accepted the job.`,
+      status: 'DELIVERY_ASSIGNED',
+      label: 'Delivery Assigned',
+      desc: `Order assigned to courier partner: ${partner.name}. Waiting for partner acceptance.`,
       date: dateStr
     });
     
@@ -391,13 +398,14 @@ exports.assignOrderToPartner = async (req, res) => {
         sellerId: order.sellerId,
         buyerId: order.userId,
         deliveryPartnerId,
-        distance: order.distanceKm,
-        deliveryCharge: order.deliveryCharge || 0,
-        currentStatus: 'accepted'
+        distance: order.distanceKm || 5,
+        deliveryCharge: totalCost,
+        currentStatus: 'assigned'
       });
     } else {
       assignment.deliveryPartnerId = deliveryPartnerId;
-      assignment.currentStatus = 'accepted';
+      assignment.deliveryCharge = totalCost;
+      assignment.currentStatus = 'assigned';
     }
     await assignment.save();
 
@@ -405,8 +413,8 @@ exports.assignOrderToPartner = async (req, res) => {
     await DeliveryTracking.create({
       assignmentId: assignment._id,
       orderId,
-      status: 'accepted',
-      remarks: `Assigned to partner ${partner.name} (Auto-Accepted)`
+      status: 'assigned',
+      remarks: `Assigned to partner ${partner.name}. Waiting for acceptance.`
     });
 
     // Create Notification for Delivery Partner
@@ -527,6 +535,10 @@ exports.updateAssignmentStatus = async (req, res) => {
         order.status = 'READY_FOR_PICKUP';
         order.deliveryStatus = 'unassigned';
         order.deliveryPartnerId = undefined;
+        order.carrier = undefined;
+        order.carrierPhone = undefined;
+        order.deliveryCost = undefined;
+        order.deliveryCharge = undefined;
       }
       assignment.currentStatus = 'rejected';
       timelineLabel = 'Courier Rejected';
@@ -556,6 +568,188 @@ exports.updateAssignmentStatus = async (req, res) => {
       });
       await order.save();
       await assignment.save();
+
+      // Trigger Delivery Confirmation Email if status is delivered
+      if (status === 'delivered') {
+        // Send email to buyer and seller in the background
+        const sendDeliveryEmails = async () => {
+          try {
+            const buyerEmail = order.deliveryAddress?.email;
+            const buyerName = order.deliveryAddress?.fullName || 'Valued Customer';
+            const sellerEmail = order.sellerEmail;
+            
+            // Build items HTML list for the buyer's email
+            let itemsHtml = '';
+            if (order.items && order.items.length) {
+              order.items.forEach(item => {
+                itemsHtml += `
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 12px 16px; color: #0f172a; font-weight: 600;">
+                      ${item.name}
+                      ${item.brand ? `<span style="display: block; font-size: 0.75rem; color: #64748b; font-weight: 400;">Brand: ${item.brand}</span>` : ''}
+                    </td>
+                    <td style="padding: 12px 16px; text-align: center; color: #334155;">${item.quantity}</td>
+                    <td style="padding: 12px 16px; text-align: right; color: #0f172a; font-weight: 600;">₹${item.price.toFixed(2)}</td>
+                  </tr>
+                `;
+              });
+            }
+
+            const formattedDate = new Date().toLocaleString('en-IN', {
+              timeZone: 'Asia/Kolkata',
+              dateStyle: 'medium',
+              timeStyle: 'short'
+            });
+
+            const fullAddress = order.deliveryAddress?.address 
+              ? `${order.deliveryAddress.address}, ${order.deliveryAddress.city || ''} - ${order.deliveryAddress.pincode || ''}`
+              : 'N/A';
+
+            // 1. Send Email to Buyer
+            if (buyerEmail) {
+              const buyerHtml = `
+                <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                  <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 40px 32px; text-align: center; color: #ffffff;">
+                    <div style="font-size: 24px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px;">EMAHU</div>
+                    <h1 style="color: #ffffff; margin: 0; font-size: 1.8rem; font-weight: 700;">📦 Order Delivered!</h1>
+                    <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 0.95rem;">Order #${order.orderId}</p>
+                  </div>
+                  <div style="padding: 36px 32px; background: #ffffff;">
+                    <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 24px 0;">Dear ${buyerName},</p>
+                    <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">Great news! Your order has been successfully delivered by our courier partner.</p>
+
+                    <!-- Shipping Address & Details -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                      <h3 style="color: #0f172a; margin: 0 0 12px 0; font-size: 1rem; font-weight: 700;">Delivery Details</h3>
+                      <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <tr>
+                          <td style="padding: 4px 0; color: #64748b; width: 35%;">Delivery Address:</td>
+                          <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${fullAddress}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 4px 0; color: #64748b;">Courier Partner:</td>
+                          <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${order.carrier || partner.name}</td>
+                        </tr>
+                        ${order.trackingId ? `
+                        <tr>
+                          <td style="padding: 4px 0; color: #64748b;">Tracking ID:</td>
+                          <td style="padding: 4px 0; color: #0f172a; font-weight: 600; font-family: monospace;">${order.trackingId}</td>
+                        </tr>` : ''}
+                        <tr>
+                          <td style="padding: 4px 0; color: #64748b;">Delivered On:</td>
+                          <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${formattedDate}</td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- Items delivered table -->
+                    <div style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 24px;">
+                      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                        <thead>
+                          <tr style="background: #f1f5f9; border-bottom: 1px solid #e2e8f0;">
+                            <th style="padding: 12px 16px; color: #475569; font-weight: 700;">Item</th>
+                            <th style="padding: 12px 16px; text-align: center; color: #475569; font-weight: 700;">Qty</th>
+                            <th style="padding: 12px 16px; text-align: right; color: #475569; font-weight: 700;">Price</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${itemsHtml}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <!-- Price breakdown -->
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 28px;">
+                      <table style="width: 50%; font-size: 0.9rem; text-align: right;">
+                        <tr>
+                          <td style="padding: 6px 0; color: #64748b;">Subtotal:</td>
+                          <td style="padding: 6px 0 6px 16px; color: #0f172a; font-weight: 600;">₹${(order.productAmount || (order.total - (order.deliveryCharge || 0))).toFixed(2)}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 6px 0; color: #64748b;">Delivery Fee:</td>
+                          <td style="padding: 6px 0 6px 16px; color: #0f172a; font-weight: 600;">₹${(order.deliveryCharge || 0).toFixed(2)}</td>
+                        </tr>
+                        ${order.discountAmount > 0 ? `
+                        <tr>
+                          <td style="padding: 6px 0; color: #ef4444;">Discount:</td>
+                          <td style="padding: 6px 0 6px 16px; color: #ef4444; font-weight: 600;">− ₹${order.discountAmount.toFixed(2)}</td>
+                        </tr>` : ''}
+                        <tr style="border-top: 2px solid #e2e8f0;">
+                          <td style="padding: 10px 0 0 0; color: #0f172a; font-weight: 700; font-size: 1rem;">Total Paid:</td>
+                          <td style="padding: 10px 0 0 16px; color: #10b981; font-weight: 800; font-size: 1.1rem;">₹${order.total.toFixed(2)}</td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <p style="color: #64748b; font-size: 0.88rem; line-height: 1.6; margin: 0;">If you have any issues with this delivery or the items received, please raise a dispute in your dashboard or contact our support team immediately.</p>
+                  </div>
+                  <div style="background: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 0.8rem;">
+                    <p style="margin: 0 0 4px 0;">Thank you for shopping on <strong style="color: #10b981;">Emahu Marketplace</strong></p>
+                  </div>
+                </div>
+              `;
+
+              await sendEmail({
+                to: buyerEmail,
+                subject: `📦 Delivered: Your Order #${order.orderId} | Emahu Marketplace`,
+                text: `Dear ${buyerName},\n\nYour order #${order.orderId} has been successfully delivered!\n\nDelivery Address: ${fullAddress}\nCourier: ${order.carrier || partner.name}\nDelivered On: ${formattedDate}\n\nThank you for shopping with Emahu!\n\nRegards,\nThe Emahu Team`,
+                html: buyerHtml
+              });
+            }
+
+            // 2. Send Email to Seller
+            if (sellerEmail) {
+              const sellerHtml = `
+                <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                  <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); padding: 40px 32px; text-align: center; color: #ffffff;">
+                    <div style="font-size: 24px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px;">EMAHU</div>
+                    <h1 style="color: #ffffff; margin: 0; font-size: 1.8rem; font-weight: 700;">📦 Order Delivered</h1>
+                    <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 0.95rem;">Order #${order.orderId}</p>
+                  </div>
+                  <div style="padding: 36px 32px; background: #ffffff;">
+                    <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 24px 0;">Dear Seller,</p>
+                    <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">We are pleased to inform you that Order #${order.orderId} has been successfully delivered to the customer.</p>
+
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                      <h3 style="color: #0f172a; margin: 0 0 12px 0; font-size: 1rem; font-weight: 700;">Details</h3>
+                      <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <tr>
+                          <td style="padding: 4px 0; color: #64748b; width: 35%;">Order ID:</td>
+                          <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">#${order.orderId}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 4px 0; color: #64748b;">Recipient:</td>
+                          <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${buyerName}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 4px 0; color: #64748b;">Delivered On:</td>
+                          <td style="padding: 4px 0; color: #0f172a; font-weight: 600;">${formattedDate}</td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">The customer has received their package. Your payout is now eligible for release. Please log in to your merchant dashboard to request payment release.</p>
+                  </div>
+                  <div style="background: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 0.8rem;">
+                    <p style="margin: 0;">Emahu Marketplace Seller Center</p>
+                  </div>
+                </div>
+              `;
+
+              await sendEmail({
+                to: sellerEmail,
+                subject: `📦 Order #${order.orderId} Delivered – Payment Ready for Release | Emahu Marketplace`,
+                text: `Dear Seller,\n\nOrder #${order.orderId} has been successfully delivered to ${buyerName} on ${formattedDate}.\n\nYour payout is now ready for release. Please log in to your merchant dashboard to request payment release.\n\nRegards,\nThe Emahu Team`,
+                html: sellerHtml
+              });
+            }
+          } catch (emailErr) {
+            console.error('Error sending delivery confirmation emails:', emailErr);
+          }
+        };
+
+        sendDeliveryEmails();
+      }
     } else {
       await order.save();
       // Keep assignment as rejected so it remains in DB and won't show up again
@@ -755,16 +949,40 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
     }
     // If order not in DB (demo/seed order), we continue and return all partners with default distance
 
-    // Fetch all approved delivery partners
-    const partners = await User.find({ role: 'delivery', status: 'approved' });
+    // Fetch all approved and active delivery partners
+    const partners = await User.find({ role: 'delivery', status: 'approved', isActivePartner: true });
+
+    let sellerCity = '';
+    if (order && order.sellerId) {
+      const sellerUser = await User.findById(order.sellerId);
+      if (sellerUser) {
+        sellerCity = (sellerUser.city || '').trim().toLowerCase();
+      }
+    }
+    if (!sellerCity && order && order.sellerLocation?.address) {
+      sellerCity = (order.sellerLocation.address || '').split(',').pop().trim().toLowerCase();
+    }
 
     const availablePartners = [];
 
     for (const partner of partners) {
-      const partnerCity = (partner.currentCity || partner.city || '').trim().toLowerCase();
+      // 1. Smart Matching System check
+      // Show only delivery partners who cover BOTH seller city and buyer city. Hide all other delivery partners.
+      if (sellerCity && orderCity) {
+        const pCities = (partner.coveredCities && partner.coveredCities.length > 0)
+          ? partner.coveredCities.map(c => c.trim().toLowerCase())
+          : [(partner.currentCity || partner.city || '').trim().toLowerCase()];
+        
+        const coversSeller = pCities.includes(sellerCity);
+        const coversBuyer = pCities.includes(orderCity.trim().toLowerCase());
+        
+        if (!coversSeller || !coversBuyer) {
+          continue; // Hide this partner!
+        }
+      }
 
-      // 1. City match check
-      const isCityMatch = !orderCity || !partnerCity || partnerCity === orderCity;
+      const partnerCity = (partner.currentCity || partner.city || '').trim().toLowerCase();
+      const isCityMatch = true;
 
       // 2. Service radius check
       let isRadiusMatch = true;
@@ -777,16 +995,9 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
         isRadiusMatch = distToBuyer <= (partner.serviceRadius || 15);
       }
 
-      // 3. Calculate delivery cost based on two-tiered rates
-      const rateUpTo2 = partner.rateUpTo2Km || partner.perItemCharge || 10;
-      const rateAbove2 = partner.rateAbove2Km || partner.perItemCharge || 10;
-      let totalCost = 0;
-      if (distance <= 2) {
-        totalCost = distance * rateUpTo2;
-      } else {
-        totalCost = (2 * rateUpTo2) + ((distance - 2) * rateAbove2);
-      }
-      totalCost = parseFloat(totalCost.toFixed(2));
+      // 3. Calculate delivery cost based on per KM rate
+      const perKmRate = partner.perKmRate || partner.perItemCharge || 10;
+      const totalCost = parseFloat((distance * perKmRate).toFixed(2));
 
       availablePartners.push({
         _id: partner._id,
@@ -799,9 +1010,11 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
         currentArea: partner.currentArea || partner.address,
         pincode: partner.pincode,
         serviceRadius: partner.serviceRadius || 15,
-        ratePerKm: rateUpTo2,
-        rateUpTo2Km: rateUpTo2,
-        rateAbove2Km: rateAbove2,
+        ratePerKm: perKmRate,
+        perKmRate: perKmRate,
+        rateUpTo2Km: perKmRate,
+        rateAbove2Km: perKmRate,
+        coveredCities: partner.coveredCities || [],
         latitude: partner.latitude,
         longitude: partner.longitude,
         totalCost,
@@ -866,13 +1079,19 @@ exports.createDeliveryPartner = async (req, res) => {
       serviceAreaRegion,
       serviceAreaDistrict,
       serviceAreaState,
-      serviceAreaCity
+      serviceAreaCity,
+      address,
+      perKmRate,
+      coveredCities,
+      deliveryScope
     } = req.body;
     
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ success: false, error: 'User with this email already exists' });
     }
+
+    const resolvedRate = perKmRate !== undefined ? Number(perKmRate) : (perItemCharge ? Number(perItemCharge) : 0);
 
     const partner = await User.create({
       name,
@@ -889,9 +1108,12 @@ exports.createDeliveryPartner = async (req, res) => {
       currentArea,
       pincode,
       serviceRadius: serviceRadius ? Number(serviceRadius) : 15,
-      perItemCharge: perItemCharge ? Number(perItemCharge) : 10,
-      rateUpTo2Km: rateUpTo2Km ? Number(rateUpTo2Km) : (perItemCharge ? Number(perItemCharge) : 10),
-      rateAbove2Km: rateAbove2Km ? Number(rateAbove2Km) : (perItemCharge ? Number(perItemCharge) : 10),
+      perItemCharge: resolvedRate,
+      rateUpTo2Km: resolvedRate,
+      rateAbove2Km: resolvedRate,
+      perKmRate: resolvedRate,
+      coveredCities: coveredCities || [],
+      deliveryScope: deliveryScope || 'local',
       latitude: latitude ? Number(latitude) : undefined,
       longitude: longitude ? Number(longitude) : undefined,
       salaryRequirement,
@@ -899,7 +1121,8 @@ exports.createDeliveryPartner = async (req, res) => {
       serviceAreaRegion,
       serviceAreaDistrict,
       serviceAreaState,
-      serviceAreaCity
+      serviceAreaCity,
+      address
     });
 
     res.status(201).json({
@@ -941,7 +1164,11 @@ exports.updateDeliveryPartner = async (req, res) => {
       serviceAreaRegion,
       serviceAreaDistrict,
       serviceAreaState,
-      serviceAreaCity
+      serviceAreaCity,
+      address,
+      perKmRate,
+      coveredCities,
+      deliveryScope
     } = req.body;
     
     const partner = await User.findById(req.params.id);
@@ -957,6 +1184,7 @@ exports.updateDeliveryPartner = async (req, res) => {
     if (vehicleNumber !== undefined) partner.vehicleNumber = vehicleNumber;
     if (isActivePartner !== undefined) partner.isActivePartner = isActivePartner;
     if (status !== undefined) partner.status = status;
+    if (address !== undefined) partner.address = address;
     
     if (currentCity !== undefined) partner.currentCity = currentCity;
     if (currentArea !== undefined) partner.currentArea = currentArea;
@@ -971,6 +1199,15 @@ exports.updateDeliveryPartner = async (req, res) => {
     if (rateAbove2Km !== undefined) partner.rateAbove2Km = Number(rateAbove2Km);
     if (latitude !== undefined) partner.latitude = Number(latitude);
     if (longitude !== undefined) partner.longitude = Number(longitude);
+    
+    if (perKmRate !== undefined) {
+      partner.perKmRate = Number(perKmRate);
+      partner.perItemCharge = Number(perKmRate);
+      partner.rateUpTo2Km = Number(perKmRate);
+      partner.rateAbove2Km = Number(perKmRate);
+    }
+    if (coveredCities !== undefined) partner.coveredCities = coveredCities;
+    if (deliveryScope !== undefined) partner.deliveryScope = deliveryScope;
     
     if (salaryRequirement !== undefined) partner.salaryRequirement = salaryRequirement;
     if (serviceAreaCountry !== undefined) partner.serviceAreaCountry = serviceAreaCountry;
@@ -1038,7 +1275,11 @@ exports.updatePartnerProfile = async (req, res) => {
       serviceAreaRegion,
       serviceAreaDistrict,
       serviceAreaState,
-      serviceAreaCity
+      serviceAreaCity,
+      address,
+      perKmRate,
+      coveredCities,
+      deliveryScope
     } = req.body;
     const partner = await User.findById(req.user._id);
     if (!partner || partner.role !== 'delivery') {
@@ -1048,6 +1289,7 @@ exports.updatePartnerProfile = async (req, res) => {
     if (currentCity !== undefined) partner.currentCity = currentCity;
     if (currentArea !== undefined) partner.currentArea = currentArea;
     if (pincode !== undefined) partner.pincode = pincode;
+    if (address !== undefined) partner.address = address;
     if (serviceRadius !== undefined) partner.serviceRadius = Number(serviceRadius);
     if (perItemCharge !== undefined) {
       partner.perItemCharge = Number(perItemCharge);
@@ -1062,6 +1304,15 @@ exports.updatePartnerProfile = async (req, res) => {
     if (latitude !== undefined) partner.latitude = Number(latitude);
     if (longitude !== undefined) partner.longitude = Number(longitude);
     
+    if (perKmRate !== undefined) {
+      partner.perKmRate = Number(perKmRate);
+      partner.perItemCharge = Number(perKmRate);
+      partner.rateUpTo2Km = Number(perKmRate);
+      partner.rateAbove2Km = Number(perKmRate);
+    }
+    if (coveredCities !== undefined) partner.coveredCities = coveredCities;
+    if (deliveryScope !== undefined) partner.deliveryScope = deliveryScope;
+
     if (operatingLocation !== undefined) partner.operatingLocation = operatingLocation;
     if (salaryRequirement !== undefined) partner.salaryRequirement = salaryRequirement;
     if (serviceAreaCountry !== undefined) partner.serviceAreaCountry = serviceAreaCountry;

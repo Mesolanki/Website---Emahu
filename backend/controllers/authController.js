@@ -108,7 +108,10 @@ exports.register = async (req, res) => {
       serviceAreaRegion,
       serviceAreaDistrict,
       serviceAreaState,
-      serviceAreaCity
+      serviceAreaCity,
+      adminSecret,
+      perKmRate,
+      coveredCities
     } = req.body;
 
     // Simple validation
@@ -117,6 +120,32 @@ exports.register = async (req, res) => {
         success: false,
         error: 'Please enter name, email, and password'
       });
+    }
+
+    // Admin role authorization verification passcode check
+    if (role === 'admin') {
+      const allowedAdminSecret = process.env.ADMIN_SIGNUP_SECRET || 'emahu_admin_secret_key_2026';
+      if (!adminSecret || adminSecret !== allowedAdminSecret) {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized: Invalid or missing Admin Signup Authorization Key.'
+        });
+      }
+    }
+
+    // Check if email OTP verification was completed (bypass for Google registrations)
+    const isGoogleReg = password && password.startsWith('GoogleAuthPass_');
+    if (!isGoogleReg) {
+      const Otp = require('../models/Otp');
+      const otpRecord = await Otp.findOne({ email: email.trim().toLowerCase(), isVerified: true });
+      if (!otpRecord) {
+        return res.status(400).json({
+          success: false,
+          error: 'Please verify your email address via OTP first before registering'
+        });
+      }
+      // Delete the verified OTP record so it can't be reused
+      await Otp.deleteMany({ email: email.trim().toLowerCase() });
     }
 
     // Check if user already exists
@@ -135,7 +164,7 @@ exports.register = async (req, res) => {
       password,
       role: role || 'buyer',
       phone,
-      isEmailVerified: (role === 'seller'),
+      isEmailVerified: true,
       isPhoneVerified: (role === 'seller'),
       address,
       storeName,
@@ -169,6 +198,9 @@ exports.register = async (req, res) => {
       serviceAreaDistrict,
       serviceAreaState,
       serviceAreaCity,
+      perKmRate,
+      coveredCities,
+      deliveryScope,
       status: (role === 'seller' || role === 'delivery') ? 'pending' : 'approved'
     });
 
@@ -1156,21 +1188,43 @@ exports.sendOtp = async (req, res) => {
 
     // Send email using Nodemailer utility in the background
     const sendEmail = require('../utils/sendEmail');
+    const htmlContent = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div style="background: linear-gradient(135deg, #4f46e5, #3b82f6); padding: 40px 32px; text-align: center; color: #ffffff;">
+          <div style="font-size: 24px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px;">EMAHU</div>
+          <h1 style="color: #ffffff; margin: 0; font-size: 1.8rem; font-weight: 700;">Verify Your Email</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 0.95rem;">Thank you for registering with Emahu Marketplace</p>
+        </div>
+        <div style="padding: 36px 32px; background: #ffffff;">
+          <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 24px 0;">Hello,</p>
+          <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">To complete your registration and activate your account, please use the 6-digit verification code below. This code is valid for <strong>5 minutes</strong>.</p>
+          
+          <div style="text-align: center; margin: 32px 0;">
+            <div style="display: inline-block; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px 36px; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #1e1b4b; font-family: monospace;">
+              ${otpCode}
+            </div>
+          </div>
+
+          <p style="color: #64748b; font-size: 0.88rem; line-height: 1.6; margin: 28px 0 0 0;">If you did not request this verification code, you can safely ignore this email.</p>
+        </div>
+        <div style="background: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 0.8rem;">
+          <p style="margin: 0 0 4px 0;">Emahu Marketplace Inc.</p>
+          <p style="margin: 0;">Securing premium local trade.</p>
+        </div>
+      </div>
+    `;
+
     sendEmail({
       to: cleanEmail,
       subject: 'EMAHU Account Registration Verification Code',
-      text: `Hello,\n\nThank you for choosing EMAHU. Your 6-digit verification code is:\n\n🔑 ${otpCode}\n\nPlease enter this code to confirm your email and complete your registration.\n\nBest regards,\nThe Emahu Team`
+      text: `Hello,\n\nThank you for choosing EMAHU. Your 6-digit verification code is:\n\n🔑 ${otpCode}\n\nPlease enter this code to confirm your email and complete your registration.\n\nBest regards,\nThe Emahu Team`,
+      html: htmlContent
     }).catch(err => console.error('Background sendEmail error:', err));
-
-    const host = process.env.EMAIL_HOST || '';
-    const user = process.env.EMAIL_USER || '';
-    const pass = process.env.EMAIL_PASS || '';
-    const isSimulated = !host || !user || !pass;
 
     res.status(200).json({
       success: true,
       message: `OTP verification email sent successfully to ${cleanEmail}.`,
-      ...(isSimulated && process.env.NODE_ENV === 'development' && { devOtp: otpCode })
+      ...(process.env.NODE_ENV === 'development' && { devOtp: otpCode })
     });
   } catch (error) {
     console.error('Send OTP Error:', error);
@@ -1246,7 +1300,9 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid OTP code. Please try again.' });
     }
 
-    await Otp.deleteOne({ _id: otpRecord._id });
+    otpRecord.isVerified = true;
+    otpRecord.expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins validity for registration completion
+    await otpRecord.save();
 
     res.status(200).json({
       success: true,
@@ -1390,21 +1446,43 @@ exports.forgotPassword = async (req, res) => {
 
     // Send email using Nodemailer utility
     const sendEmail = require('../utils/sendEmail');
+    const htmlContent = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div style="background: linear-gradient(135deg, #ef4444, #f97316); padding: 40px 32px; text-align: center; color: #ffffff;">
+          <div style="font-size: 24px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px;">EMAHU</div>
+          <h1 style="color: #ffffff; margin: 0; font-size: 1.8rem; font-weight: 700;">Password Reset Code</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 0.95rem;">Request for account recovery</p>
+        </div>
+        <div style="padding: 36px 32px; background: #ffffff;">
+          <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 24px 0;">Hello,</p>
+          <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">We received a request to reset your password. Please use the 6-digit verification code below to authorize this password reset. This code is valid for <strong>10 minutes</strong>.</p>
+          
+          <div style="text-align: center; margin: 32px 0;">
+            <div style="display: inline-block; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 12px; padding: 16px 36px; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #991b1b; font-family: monospace;">
+              ${otpCode}
+            </div>
+          </div>
+
+          <p style="color: #64748b; font-size: 0.88rem; line-height: 1.6; margin: 28px 0 0 0;">If you did not request a password reset, please change your password immediately or contact support to secure your account.</p>
+        </div>
+        <div style="background: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 0.8rem;">
+          <p style="margin: 0 0 4px 0;">Emahu Marketplace Inc.</p>
+          <p style="margin: 0;">Securing premium local trade.</p>
+        </div>
+      </div>
+    `;
+
     sendEmail({
       to: cleanEmail,
       subject: 'Password Reset OTP',
-      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`
+      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`,
+      html: htmlContent
     }).catch(err => console.error('Background forgotPassword sendEmail error:', err));
-
-    const host = process.env.EMAIL_HOST || '';
-    const emailUser = process.env.EMAIL_USER || '';
-    const pass = process.env.EMAIL_PASS || '';
-    const isSimulated = !host || !emailUser || !pass;
 
     res.status(200).json({
       success: true,
       message: 'OTP sent successfully.',
-      ...(isSimulated && process.env.NODE_ENV === 'development' && { devOtp: otpCode })
+      ...(process.env.NODE_ENV === 'development' && { devOtp: otpCode })
     });
   } catch (error) {
     console.error('Forgot Password API Error:', error);
@@ -1456,21 +1534,43 @@ exports.resendOtp = async (req, res) => {
 
     // Send email
     const sendEmail = require('../utils/sendEmail');
+    const htmlContent = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div style="background: linear-gradient(135deg, #ef4444, #f97316); padding: 40px 32px; text-align: center; color: #ffffff;">
+          <div style="font-size: 24px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px;">EMAHU</div>
+          <h1 style="color: #ffffff; margin: 0; font-size: 1.8rem; font-weight: 700;">Password Reset Code</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 0.95rem;">Request for account recovery</p>
+        </div>
+        <div style="padding: 36px 32px; background: #ffffff;">
+          <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 24px 0;">Hello,</p>
+          <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">We received a request to reset your password. Please use the 6-digit verification code below to authorize this password reset. This code is valid for <strong>10 minutes</strong>.</p>
+          
+          <div style="text-align: center; margin: 32px 0;">
+            <div style="display: inline-block; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 12px; padding: 16px 36px; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #991b1b; font-family: monospace;">
+              ${otpCode}
+            </div>
+          </div>
+
+          <p style="color: #64748b; font-size: 0.88rem; line-height: 1.6; margin: 28px 0 0 0;">If you did not request a password reset, please change your password immediately or contact support to secure your account.</p>
+        </div>
+        <div style="background: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 0.8rem;">
+          <p style="margin: 0 0 4px 0;">Emahu Marketplace Inc.</p>
+          <p style="margin: 0;">Securing premium local trade.</p>
+        </div>
+      </div>
+    `;
+
     sendEmail({
       to: cleanEmail,
       subject: 'Password Reset OTP',
-      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`
+      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`,
+      html: htmlContent
     }).catch(err => console.error('Background resendOtp sendEmail error:', err));
-
-    const host = process.env.EMAIL_HOST || '';
-    const emailUser = process.env.EMAIL_USER || '';
-    const pass = process.env.EMAIL_PASS || '';
-    const isSimulated = !host || !emailUser || !pass;
 
     res.status(200).json({
       success: true,
       message: 'OTP resent successfully.',
-      ...(isSimulated && process.env.NODE_ENV === 'development' && { devOtp: otpCode })
+      ...(process.env.NODE_ENV === 'development' && { devOtp: otpCode })
     });
   } catch (error) {
     console.error('Resend OTP Error:', error);

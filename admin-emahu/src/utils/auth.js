@@ -14,12 +14,12 @@ const getHeaders = (token = null) => {
   return headers;
 };
 
-export async function registerUser({ name, email, password, role, phone, address }) {
+export async function registerUser({ name, email, password, role, phone, address, adminSecret }) {
   try {
     const response = await fetch(`${API_BASE_URL}/register`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ name, email, password, role, phone, address }),
+      body: JSON.stringify({ name, email, password, role, phone, address, adminSecret }),
     });
 
     const data = await response.json();

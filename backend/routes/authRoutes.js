@@ -78,3 +78,4 @@ router.route('/admin/sellers/:id/documents/:docId')
   .put(protect, authorize('admin'), verifySellerDocument);
 
 module.exports = router;
+  
