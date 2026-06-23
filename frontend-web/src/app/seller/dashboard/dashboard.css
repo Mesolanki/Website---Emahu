@@ -2012,3 +2012,55 @@ body {
   }
 }
 
+/* Very small mobile screen modal layout */
+@media (max-width: 480px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-card,
+  .modal-card.wide {
+    width: 100%;
+    max-width: 100%;
+    max-height: 85vh;
+    border-radius: 16px 16px 0 0;
+    margin: 0;
+    animation: slideUpModalCard 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes slideUpModalCard {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-header {
+    padding: 16px 20px;
+  }
+
+  .modal-form-body {
+    padding: 16px 20px;
+  }
+
+  .modal-footer {
+    padding: 16px 20px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .modal-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Form image grids and columns on mobile */
+  .form-image-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+

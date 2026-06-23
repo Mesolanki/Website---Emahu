@@ -799,7 +799,17 @@
   .pd-info__name { font-size: 1.5rem; }
   .pd-price { font-size: 1.6rem; }
   .pd-gallery { flex-direction: column-reverse; }
-  .pd-thumbs { flex-direction: row; }
+  .pd-thumbs {
+    flex-direction: row;
+    overflow-x: auto;
+    width: 100%;
+    gap: 10px;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+  }
+  .pd-thumbs::-webkit-scrollbar {
+    display: none;
+  }
   .pd-features-grid { grid-template-columns: 1fr; }
   .pd-cta-row { flex-wrap: wrap; }
   .pd-btn-wishlist { width: 100%; border-radius: 10px; }

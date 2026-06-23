@@ -744,6 +744,14 @@
 .bp-page-btn--active { background: #0d0d0d; border-color: #0d0d0d; color: #ffffff; }
 .bp-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
+/* Filter Mobile Drawer Defaults */
+.bp-filter-toggle-btn {
+  display: none;
+}
+.bp-sidebar-header-mobile {
+  display: none;
+}
+
 /* ── Responsive ── */
 @media (max-width: 1100px) {
   .bp-grid { grid-template-columns: repeat(2, 1fr); }
@@ -752,7 +760,95 @@
 
 @media (max-width: 768px) {
   .bp-layout { flex-direction: column; padding: 0 16px 60px; }
-  .bp-sidebar { width: 100%; position: static; padding-right: 0; padding-bottom: 20px; }
+  
+  /* Mobile filters drawer trigger button */
+  .bp-filter-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-right: 12px;
+  }
+  
+  .bp-filter-toggle-btn:hover {
+    border-color: #0d0d0d;
+    background: #f9fafb;
+  }
+
+  .bp-sidebar-header-mobile {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .bp-sidebar-header-mobile h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1a1a1a;
+  }
+
+  .bp-sidebar-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.7rem;
+    font-weight: 300;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .bp-sidebar-close-btn:hover {
+    color: #0d0d0d;
+  }
+
+  .bp-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 1099;
+    animation: fadeIn 0.2s ease forwards;
+  }
+
+  /* Slide-out drawer styles */
+  .bp-sidebar {
+    display: block !important;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 300px;
+    max-width: 80vw;
+    height: 100vh;
+    background: #ffffff;
+    z-index: 1100;
+    padding: 24px;
+    border-right: 1px solid #f0f0f0;
+    overflow-y: auto;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.08);
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+  }
+
+  .bp-sidebar--open {
+    transform: translateX(0) !important;
+  }
+
   .bp-hero { padding: 20px 16px 0; }
   .bp-search-container { padding: 0 16px 20px; }
   .bp-breadcrumb { padding: 12px 16px; }

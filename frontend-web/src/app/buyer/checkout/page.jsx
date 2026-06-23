@@ -882,6 +882,14 @@ export default function CheckoutPage() {
                 </div>
               )}
 
+              {/* Show live route map if coordinates exist */}
+              {buyerCoordinates.latitude && buyerCoordinates.longitude && (
+                <div style={{ marginBottom: '20px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '6px' }}>Live Transit Route Map</span>
+                  <div id="checkout-route-map" style={{ height: '240px', width: '100%', borderRadius: '12px', border: '1px solid #cbd5e1', zIndex: 1 }} />
+                </div>
+              )}
+
               <form onSubmit={handlePlaceOrder} className="co-form">
                                 {addressType === 'saved' ? (
                   /* Option A: Saved Profile Address Summary Card */

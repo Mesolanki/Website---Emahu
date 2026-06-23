@@ -1241,13 +1241,39 @@ input.ad-modal-input {
     font-size: 1.8rem;
   }
 
-  /* Detail modal: full screen on small phones */
+  /* Bottom slide-up drawer for modal overlay */
+  .ad-modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  @keyframes adSlideUpModal {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  /* Modals as bottom sheets */
+  .ad-modal,
   .ad-detail-modal {
     width: 100%;
     max-width: 100%;
-    max-height: 100vh;
-    border-radius: 0;
-    padding: 16px;
+    max-height: 85vh;
+    border-radius: 16px 16px 0 0;
+    margin: 0;
+    padding: 24px 20px;
+    overflow-y: auto;
+    animation: adSlideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .ad-detail-close {
+    top: 16px;
+    right: 16px;
+  }
+
+  .ad-detail-header-block {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
   }
 
   .ad-detail-grid-cards {
@@ -1285,6 +1311,7 @@ input.ad-modal-input {
   .ad-detail-decision-bar {
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
   }
 
   .ad-detail-decision-bar .ad-btn-action,
@@ -1294,9 +1321,14 @@ input.ad-modal-input {
 
   .ad-modal-actions {
     flex-direction: column;
+    gap: 8px;
+    width: 100%;
   }
 
-  .ad-modal-actions button {
+  .ad-modal-actions button,
+  .ad-modal-actions .ad-btn-sec,
+  .ad-modal-actions .ad-btn-danger {
     width: 100%;
+    margin: 0;
   }
 }

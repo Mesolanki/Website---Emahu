@@ -1119,11 +1119,8 @@
   .sel-nav-btn span {
     display: none; /* Hide button texts on mobile to prevent overflow */
   }
-  /* Show cart text or icon correctly */
-  .sel-nav-btn--cart span {
-    display: block;
-  }
   
+
   .sel-title {
     font-size: 1.85rem;
   }

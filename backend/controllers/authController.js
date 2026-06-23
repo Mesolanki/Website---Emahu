@@ -1295,8 +1295,7 @@ exports.sendOtp = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `OTP verification email sent successfully to ${cleanEmail}.`,
-      ...(process.env.NODE_ENV === 'development' && { devOtp: otpCode })
+      message: `OTP verification email sent successfully to ${cleanEmail}.`
     });
   } catch (error) {
     console.error('Send OTP Error:', error);
@@ -1432,8 +1431,7 @@ exports.sendPhoneOtp = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `OTP verification SMS sent successfully to ${cleanPhone}.`,
-      ...(process.env.NODE_ENV === 'development' && { devOtp: otpCode })
+      message: `OTP verification SMS sent successfully to ${cleanPhone}.`
     });
   } catch (error) {
     console.error('Send Phone OTP Error:', error);
@@ -1553,8 +1551,7 @@ exports.forgotPassword = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'OTP sent successfully.',
-      ...(process.env.NODE_ENV === 'development' && { devOtp: otpCode })
+      message: 'OTP sent successfully.'
     });
   } catch (error) {
     console.error('Forgot Password API Error:', error);
@@ -1641,8 +1638,7 @@ exports.resendOtp = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'OTP resent successfully.',
-      ...(process.env.NODE_ENV === 'development' && { devOtp: otpCode })
+      message: 'OTP resent successfully.'
     });
   } catch (error) {
     console.error('Resend OTP Error:', error);

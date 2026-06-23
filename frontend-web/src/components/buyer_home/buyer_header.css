@@ -75,10 +75,12 @@
   flex-shrink: 0;
 }
 
-/* Desktop-only icons: hidden on mobile */
-.bh-action-icon--desktop {
+/* Desktop action icons display styles */
+.bh-action-icon--desktop,
+.bh-action-icon--cart {
   display: flex;
 }
+
 
 .bh-action-icon {
   display: flex;

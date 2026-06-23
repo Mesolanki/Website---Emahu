@@ -92,6 +92,7 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery]   = useState('');
   const [page, setPage]                 = useState(1);
   const [dbProducts, setDbProducts]     = useState([]);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Fetch products from database
   useEffect(() => {
@@ -334,6 +335,12 @@ export default function ProductsPage() {
           {filtered.length} of {allProductsCombined.length} results
         </span>
         <div className="bp-metabar__right">
+          <button className="bp-filter-toggle-btn" onClick={() => setShowMobileFilters(true)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '6px' }}>
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+            </svg>
+            Filters
+          </button>
           <span className="bp-metabar__sort-label">Sort By</span>
           <select className="bp-sort-select" value={sortBy} onChange={e => { setSortBy(e.target.value); setPage(1); }}>
             <option value="popular">Relevance</option>
@@ -370,8 +377,18 @@ export default function ProductsPage() {
       {/* Layout */}
       <div className="bp-layout">
 
+        {/* ── Mobile Filter Drawer Backdrop ── */}
+        {showMobileFilters && (
+          <div className="bp-sidebar-backdrop" onClick={() => setShowMobileFilters(false)} />
+        )}
+
         {/* ── SIDEBAR ── */}
-        <aside className="bp-sidebar">
+        <aside className={`bp-sidebar ${showMobileFilters ? 'bp-sidebar--open' : ''}`}>
+          {/* Mobile Header inside drawer */}
+          <div className="bp-sidebar-header-mobile">
+            <h3>Filters</h3>
+            <button type="button" className="bp-sidebar-close-btn" onClick={() => setShowMobileFilters(false)}>×</button>
+          </div>
 
           {/* Availability */}
           <div className="bp-filter-group">
