@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './register.css';
 import { registerUser, saveAuthSession } from '@/utils/auth';
+import API_BASE from '@/utils/config';
 
 export default function AdminRegister() {
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function AdminRegister() {
     setError('');
     setDevOtp('');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/send-otp`, {
+      const res = await fetch(`${API_BASE}/api/auth/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -72,7 +73,7 @@ export default function AdminRegister() {
     setOtpLoading(true);
     setError('');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/verify-otp`, {
+      const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -248,7 +249,11 @@ export default function AdminRegister() {
                       Verify
                     </button>
                   </div>
-                  {/* Simulated Dev OTP display removed to ensure authentication security */}
+                  {devOtp && (
+                    <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#6366f1', fontWeight: '600' }}>
+                      🔑 Dev Mode OTP Code: <code style={{ background: 'rgba(99,102,241,0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.85rem' }}>{devOtp}</code>
+                    </div>
+                  )}
                 </div>
               )}
 

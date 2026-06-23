@@ -251,7 +251,7 @@ exports.register = async (req, res) => {
       perKmRate,
       coveredCities,
       deliveryScope,
-      status: (role === 'seller') ? 'pending' : 'approved'
+      status: (role === 'seller' || role === 'delivery') ? 'pending' : 'approved'
     });
 
     // Notify all admins of new seller registration
@@ -1166,6 +1166,17 @@ exports.deliveryPartnerDecision = async (req, res) => {
     }
 
     await partner.save();
+
+    /*
+    if (decision === 'approve') {
+      try {
+        const { autoAssignPendingOrdersToPartner } = require('./deliveryController');
+        await autoAssignPendingOrdersToPartner(partner);
+      } catch (assignErr) {
+        console.error('Error auto-assigning pending orders to partner:', assignErr);
+      }
+    }
+    */
 
     // Create Notification for the delivery partner
     const Notification = require('../models/Notification');

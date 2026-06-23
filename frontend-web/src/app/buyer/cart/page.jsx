@@ -60,6 +60,8 @@ export default function CartPage() {
   // ── Check for arrived unconfirmed orders ──
   useEffect(() => {
     const checkDeliveredOrders = async () => {
+      // Removed per request - no longer blocking checkout for arrived orders
+      /*
       let buyerUserId = '';
       const buyerUserStr = localStorage.getItem('emahu_buyer_user');
       if (buyerUserStr) {
@@ -89,6 +91,7 @@ export default function CartPage() {
       } catch (err) {
         console.warn('Error checking delivered orders in cart:', err);
       }
+      */
     };
     checkDeliveredOrders();
   }, []);

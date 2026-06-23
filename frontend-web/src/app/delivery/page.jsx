@@ -436,7 +436,7 @@ export default function DeliveryPortal() {
           : regCategory === 'partner'
             ? `Corporate Contact: ${contactName.trim()}\n${dispatchNotes}`
             : dispatchNotes,
-        status: 'approved', // Auto approve for instant testing flow
+        status: 'pending', // Registration status starts as pending for verification flow
         serviceAreaState: regCategory === 'single_two_boy' ? serviceAreaState : selectedStates,
         address
       };
@@ -592,7 +592,7 @@ export default function DeliveryPortal() {
           : category === 'partner'
             ? `Corporate Contact: ${contactName.trim()}\n${dispatchNotes}`
             : dispatchNotes,
-        status: 'approved', // Auto approve for instant testing flow
+        status: 'pending', // Registration status starts as pending for verification flow
         serviceAreaState,
         address
       };
@@ -1042,14 +1042,26 @@ export default function DeliveryPortal() {
         .addTo(activeOrderMapRef.current)
         .bindPopup(`<strong>Your GPS Location</strong>`);
 
-      activePolylineRef.current = window.L.polyline([[sLat, sLon], [bLat, bLon]], { color: '#319795', weight: 4, dashArray: '5, 8' })
+      const isBeforePickup = activeOrder.deliveryStatus === 'accepted';
+      const destLat = isBeforePickup ? sLat : bLat;
+      const destLon = isBeforePickup ? sLon : bLon;
+
+      activePolylineRef.current = window.L.polyline([[pLat, pLon], [destLat, destLon]], { color: '#319795', weight: 4, dashArray: '5, 8' })
         .addTo(activeOrderMapRef.current);
 
-      activeOrderMapRef.current.fitBounds([[sLat, sLon], [bLat, bLon]], { padding: [40, 40] });
+      activeOrderMapRef.current.fitBounds([[pLat, pLon], [destLat, destLon]], { padding: [40, 40] });
     } else {
       if (activeOrderMarkerRef.current) {
         activeOrderMarkerRef.current.setLatLng([pLat, pLon]);
       }
+      const isBeforePickup = activeOrder.deliveryStatus === 'accepted';
+      const destLat = isBeforePickup ? sLat : bLat;
+      const destLon = isBeforePickup ? sLon : bLon;
+      
+      if (activePolylineRef.current) {
+        activePolylineRef.current.setLatLngs([[pLat, pLon], [destLat, destLon]]);
+      }
+      activeOrderMapRef.current.fitBounds([[pLat, pLon], [destLat, destLon]], { padding: [40, 40] });
     }
   }, [leafletLoaded, activeOrder?._id, simCoordinates, user?.latitude, user?.longitude, activeTab]);
 
@@ -1081,7 +1093,23 @@ export default function DeliveryPortal() {
               </>
             ) : (
               <>
-                <span className="lp-nav-link-btn active">Onboarding Portal</span>
+                <button 
+                  onClick={() => setPortalMode(portalMode === 'register' ? 'login' : 'register')} 
+                  className="lp-nav-link-btn active"
+                  style={{
+                    background: 'linear-gradient(135deg, #319795, #2c7a7b)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: '700',
+                    fontSize: '0.85rem',
+                    boxShadow: '0 4px 6px rgba(49, 151, 149, 0.2)'
+                  }}
+                >
+                  {portalMode === 'register' ? '🔑 Switch to Login' : '📝 Switch to Register'}
+                </button>
               </>
             )}
           </nav>
@@ -1606,56 +1634,192 @@ export default function DeliveryPortal() {
         </section>
       )}
 
+      {/* --- LOGIN MODE --- */}
+      {portalMode === 'login' && (
+        <section className="lp-form-section" style={{ minHeight: '75vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+          <div className="lp-section-container" style={{ maxWidth: '440px', width: '100%', margin: '0 auto' }}>
+            <div className="section-header" style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <h2 className="section-title">Delivery Partner Login</h2>
+              <p className="section-subtitle">Access your dispatch dashboard to accept and fulfill orders.</p>
+            </div>
+            
+            <div className="form-card-wrapper" style={{ padding: '32px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.05)' }}>
+              <form className="lp-form" onSubmit={handleLoginSubmit}>
+                {loginError && (
+                  <div className="form-alert-error" style={{ marginBottom: '16px', padding: '12px', background: 'rgba(229, 62, 62, 0.2)', border: '1px solid #e53e3e', color: '#c53030', borderRadius: '8px', fontSize: '0.85rem' }}>
+                    ⚠️ {loginError}
+                  </div>
+                )}
+                
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label className="form-label" htmlFor="loginEmail" style={{ color: '#334155', fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Email Address</label>
+                  <input
+                    type="email"
+                    id="loginEmail"
+                    className="form-input"
+                    placeholder="partner@emahu.com"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    required
+                    style={{ width: '100%', background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a', padding: '10px 12px', borderRadius: '8px' }}
+                  />
+                </div>
+                
+                <div className="form-group" style={{ marginBottom: '24px' }}>
+                  <label className="form-label" htmlFor="loginPassword" style={{ color: '#334155', fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Password</label>
+                  <input
+                    type="password"
+                    id="loginPassword"
+                    className="form-input"
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    required
+                    style={{ width: '100%', background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a', padding: '10px 12px', borderRadius: '8px' }}
+                  />
+                </div>
+                
+                <button type="submit" className="form-btn" disabled={loginLoading} style={{ width: '100%', background: '#319795', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  {loginLoading ? 'Logging in...' : 'Sign In to Dashboard'}
+                </button>
+                
+                <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.85rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                  <div>
+                    New partner?{' '}
+                    <button 
+                      type="button" 
+                      onClick={() => setPortalMode('register')} 
+                      style={{ background: 'none', border: 'none', color: '#319795', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}
+                    >
+                      Register here
+                    </button>
+                  </div>
+                  <div>
+                    <Link 
+                      href="/forgot-password?role=delivery" 
+                      style={{ color: '#475569', textDecoration: 'none', fontSize: '0.82rem', fontWeight: '600' }}
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* --- DASHBOARD MODE --- */}
       {portalMode === 'dashboard' && (
         <section className="lp-section-container" style={{ padding: '40px 24px' }}>
 
-          {/* Header Stats Grid */}
-          <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-            <div className="benefit-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Active Status</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
-                <span className={`status-pill ${user?.isActivePartner ? 'status-pill--active' : 'status-pill--inactive'}`}>
-                  {user?.isActivePartner ? 'Active (Ready)' : 'Inactive (Offline)'}
-                </span>
-                <button onClick={handleToggleActiveStatus} className="lp-btn lp-btn--secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
-                  Toggle
-                </button>
+          {/* Header Stats Grid - Only visible for approved partners */}
+          {user?.status === 'approved' && (
+            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+              <div className="benefit-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Active Status</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
+                  <span className={`status-pill ${user?.isActivePartner ? 'status-pill--active' : 'status-pill--inactive'}`}>
+                    {user?.isActivePartner ? 'Active (Ready)' : 'Inactive (Offline)'}
+                  </span>
+                  <button onClick={handleToggleActiveStatus} className="lp-btn lp-btn--secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
+                    Toggle
+                  </button>
+                </div>
+              </div>
+
+              <div className="benefit-card" style={{ padding: '24px' }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Assigned Jobs</span>
+                <h3 style={{ fontSize: '2rem', margin: '8px 0 0 0', color: '#0f172a' }}>{stats.total}</h3>
+              </div>
+
+              <div className="benefit-card" style={{ padding: '24px' }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Pending Dispatch</span>
+                <h3 style={{ fontSize: '2rem', margin: '8px 0 0 0', color: '#e53e3e' }}>{stats.pending}</h3>
+              </div>
+
+              <div className="benefit-card" style={{ padding: '24px' }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Earnings</span>
+                <h3 style={{ fontSize: '2rem', margin: '8px 0 0 0', color: '#319795' }}>₹{stats.earnings}</h3>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>At rate ₹2/KM</span>
               </div>
             </div>
+          )}
 
-            <div className="benefit-card" style={{ padding: '24px' }}>
-              <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Assigned Jobs</span>
-              <h3 style={{ fontSize: '2rem', margin: '8px 0 0 0', color: '#0f172a' }}>{stats.total}</h3>
+          {/* Dashboard Tab Buttons - Only visible for approved partners */}
+          {user?.status === 'approved' && (
+            <div className="dash-tabs" style={{ display: 'flex', gap: '8px', marginBottom: '24px', backgroundColor: '#e2e8f0', padding: '6px', borderRadius: '12px' }}>
+              <button type="button" onClick={() => { setActiveTab('new'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'new' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'new' ? '#ffffff' : 'transparent', color: activeTab === 'new' ? '#319795' : '#475569', boxShadow: activeTab === 'new' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
+                🆕 New Jobs ({availableOrders.length})
+              </button>
+              <button type="button" onClick={() => { setActiveTab('active'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'active' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'active' ? '#ffffff' : 'transparent', color: activeTab === 'active' ? '#319795' : '#475569', boxShadow: activeTab === 'active' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
+                ⚡ Active Job {activeOrder ? '⏳' : ''}
+              </button>
+              <button type="button" onClick={() => { setActiveTab('completed'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'completed' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'completed' ? '#ffffff' : 'transparent', color: activeTab === 'completed' ? '#319795' : '#475569', boxShadow: activeTab === 'completed' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
+                ✅ Completed
+              </button>
+              <button type="button" onClick={() => { setActiveTab('earnings'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'earnings' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'earnings' ? '#ffffff' : 'transparent', color: activeTab === 'earnings' ? '#319795' : '#475569', boxShadow: activeTab === 'earnings' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
+                📊 Earnings
+              </button>
             </div>
+          )}
 
-            <div className="benefit-card" style={{ padding: '24px' }}>
-              <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Pending Dispatch</span>
-              <h3 style={{ fontSize: '2rem', margin: '8px 0 0 0', color: '#e53e3e' }}>{stats.pending}</h3>
+          {/* Verification Status Card - Visible if not approved and not editing profile */}
+          {user?.status !== 'approved' && !editProfileMode && (
+            <div style={{ maxWidth: '800px', margin: '0 auto 32px' }}>
+              <div className="form-card-wrapper" style={{ padding: '40px', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.05)', textAlign: 'center' }}>
+                {user?.status === 'rejected' ? (
+                  <>
+                    <span style={{ fontSize: '3.5rem', display: 'block', marginBottom: '16px' }}>❌</span>
+                    <h2 style={{ fontSize: '1.6rem', color: '#ef4444', fontWeight: '800', marginBottom: '12px' }}>Application Rejected</h2>
+                    <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '20px' }}>
+                      Your logistics partner application has been rejected by the EMAHU admin team.
+                    </p>
+                    {user?.verificationFeedback && (
+                      <div style={{ padding: '16px', background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', borderRadius: '8px', fontSize: '0.9rem', textAlign: 'left', marginBottom: '24px' }}>
+                        <strong>Admin Reason / Feedback:</strong> {user.verificationFeedback}
+                      </div>
+                    )}
+                    <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                      Please review the feedback. You can update your details by clicking the <strong>Edit Fleet Profile</strong> button in the navigation bar, or contact support for help.
+                    </p>
+                  </>
+                ) : user?.status === 'more_info_requested' ? (
+                  <>
+                    <span style={{ fontSize: '3.5rem', display: 'block', marginBottom: '16px' }}>⚠️</span>
+                    <h2 style={{ fontSize: '1.6rem', color: '#dd6b20', fontWeight: '800', marginBottom: '12px' }}>More Information Requested</h2>
+                    <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '20px' }}>
+                      Our compliance team has reviewed your documents and requires additional information before approving your profile.
+                    </p>
+                    {user?.verificationFeedback && (
+                      <div style={{ padding: '16px', background: '#fffaf0', border: '1px solid #fbd38d', color: '#c05621', borderRadius: '8px', fontSize: '0.9rem', textAlign: 'left', marginBottom: '24px' }}>
+                        <strong>Compliance Request / Feedback:</strong> {user.verificationFeedback}
+                      </div>
+                    )}
+                    <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                      Please click the <strong>Edit Fleet Profile</strong> button in the navigation bar to update your settings and resubmit your application.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(49, 151, 149, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', border: '1px solid rgba(49, 151, 149, 0.2)' }}>
+                      <span style={{ fontSize: '2rem' }}>⏳</span>
+                    </div>
+                    <h2 style={{ fontSize: '1.6rem', color: '#319795', fontWeight: '800', marginBottom: '12px' }}>Account Pending Verification</h2>
+                    <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.6', margin: '0 auto 16px', maxWidth: '560px' }}>
+                      Thank you for onboarding with Emahu Logistics Network! Your driver credentials, covered cities, and fleet rates are currently undergoing verification by our compliance administrators.
+                    </p>
+                    <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.6', margin: '0 auto 24px', maxWidth: '560px' }}>
+                      Once approved, your availability toggle will be unlocked and you will be automatically assigned pending shipments in your service coverage areas.
+                    </p>
+                    <div style={{ padding: '12px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem', color: '#475569', display: 'inline-block' }}>
+                      Registered Name: <strong>{user?.name}</strong> &nbsp;|&nbsp; City: <strong>{user?.currentCity}</strong> &nbsp;|&nbsp; Category: <strong>{user?.category === 'single_two_boy' ? 'Single/Two Boy' : user?.category === 'agency' ? 'Agency' : 'Enterprise Partner'}</strong>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-
-            <div className="benefit-card" style={{ padding: '24px' }}>
-              <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Earnings</span>
-              <h3 style={{ fontSize: '2rem', margin: '8px 0 0 0', color: '#319795' }}>₹{stats.earnings}</h3>
-              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>At rate ₹2/KM</span>
-            </div>
-          </div>
-
-          {/* Dashboard Tab Buttons */}
-          <div className="dash-tabs" style={{ display: 'flex', gap: '8px', marginBottom: '24px', backgroundColor: '#e2e8f0', padding: '6px', borderRadius: '12px' }}>
-            <button type="button" onClick={() => { setActiveTab('new'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'new' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'new' ? '#ffffff' : 'transparent', color: activeTab === 'new' ? '#319795' : '#475569', boxShadow: activeTab === 'new' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
-              🆕 New Jobs ({availableOrders.length})
-            </button>
-            <button type="button" onClick={() => { setActiveTab('active'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'active' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'active' ? '#ffffff' : 'transparent', color: activeTab === 'active' ? '#319795' : '#475569', boxShadow: activeTab === 'active' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
-              ⚡ Active Job {activeOrder ? '⏳' : ''}
-            </button>
-            <button type="button" onClick={() => { setActiveTab('completed'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'completed' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'completed' ? '#ffffff' : 'transparent', color: activeTab === 'completed' ? '#319795' : '#475569', boxShadow: activeTab === 'completed' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
-              ✅ Completed
-            </button>
-            <button type="button" onClick={() => { setActiveTab('earnings'); setEditProfileMode(false); }} className={`dash-tab-btn ${activeTab === 'earnings' ? 'dash-tab-btn--active' : ''}`} style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: activeTab === 'earnings' ? '#ffffff' : 'transparent', color: activeTab === 'earnings' ? '#319795' : '#475569', boxShadow: activeTab === 'earnings' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s ease' }}>
-              📊 Earnings
-            </button>
-          </div>
+          )}
 
           {/* Edit Profile Panel */}
           {editProfileMode && (
@@ -1852,67 +2016,125 @@ export default function DeliveryPortal() {
           )}
 
           {/* TAB: NEW JOBS */}
-          {activeTab === 'new' && !editProfileMode && (
-            <div className="form-card-wrapper" style={{ padding: '32px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 600 }}>Available Jobs in {user?.currentCity}</h3>
-                <button onClick={() => fetchDashboardData(token)} className="lp-btn lp-btn--secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
-                  🔄 Refresh Jobs
-                </button>
-              </div>
-              {dashLoading ? (
-                <p style={{ textAlign: 'center', color: '#64748b' }}>Refreshing available jobs...</p>
-              ) : availableOrders.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                  <span style={{ fontSize: '3rem' }}>📭</span>
-                  <h4 style={{ fontSize: '1.1rem', margin: '16px 0 8px 0', color: '#0f172a' }}>No new jobs available</h4>
-                  <p>There are no unassigned orders in {user?.currentCity || 'your city'} right now. New jobs will appear here when buyers place orders.</p>
-                </div>
-              ) : (
-                <div className="orders-table-wrapper" style={{ overflowX: 'auto' }}>
-                  <table className="orders-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '0.85rem' }}>
-                        <th style={{ padding: '12px' }}>Order ID</th>
-                        <th style={{ padding: '12px' }}>Addresses</th>
-                        <th style={{ padding: '12px' }}>Distance</th>
-                        <th style={{ padding: '12px' }}>Payout Charge</th>
-                        <th style={{ padding: '12px', textAlign: 'right' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {availableOrders.map((order) => {
-                        const payout = parseFloat(((order.distanceKm || 0) * 2).toFixed(2));
-                        return (
-                          <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
-                            <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
-                            <td style={{ padding: '12px' }}>
-                              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                <strong>Pickup:</strong> {order.sellerLocation?.address || 'Seller Hub'}
-                              </div>
-                              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
-                                <strong>Dropoff:</strong> {order.deliveryAddress?.address || order.buyerLocation?.address}
-                              </div>
-                            </td>
-                            <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
-                            <td style={{ padding: '12px', fontWeight: 700, color: '#319795' }}>₹{payout}</td>
-                            <td style={{ padding: '12px', textAlign: 'right' }}>
-                              <button onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')} className="lp-btn lp-btn--primary" style={{ padding: '6px 14px', fontSize: '0.8rem', backgroundColor: '#319795' }}>
-                                Accept Job
-                              </button>
-                            </td>
+          {activeTab === 'new' && !editProfileMode && user?.status === 'approved' && (() => {
+            const assignedRequests = orders.filter(o => o.deliveryStatus === 'assigned' || o.assignmentStatus === 'assigned');
+            return (
+              <div className="form-card-wrapper" style={{ padding: '32px' }}>
+                {/* Direct requests panel */}
+                {assignedRequests.length > 0 && (
+                  <div style={{ marginBottom: '28px', padding: '20px', background: 'rgba(49, 151, 149, 0.08)', border: '1.5px solid #319795', borderRadius: '12px' }}>
+                    <h4 style={{ fontSize: '1.1rem', color: '#319795', fontWeight: 800, margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      🔔 Direct Job Requests ({assignedRequests.length})
+                    </h4>
+                    <p style={{ fontSize: '0.8rem', color: '#475569', margin: '0 0 16px 0' }}>
+                      These orders have been assigned directly to you by the merchant. Please Accept or Decline them.
+                    </p>
+                    <div className="orders-table-wrapper" style={{ overflowX: 'auto' }}>
+                      <table className="orders-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '0.85rem' }}>
+                            <th style={{ padding: '12px' }}>Order ID</th>
+                            <th style={{ padding: '12px' }}>Addresses</th>
+                            <th style={{ padding: '12px' }}>Distance</th>
+                            <th style={{ padding: '12px' }}>Payout</th>
+                            <th style={{ padding: '12px', textAlign: 'right' }}>Actions</th>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                        </thead>
+                        <tbody>
+                          {assignedRequests.map((order) => {
+                            const payout = order.deliveryCharge || parseFloat(((order.distanceKm || 0) * 2).toFixed(2));
+                            return (
+                              <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
+                                <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
+                                <td style={{ padding: '12px' }}>
+                                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                    <strong>Pickup:</strong> {order.sellerLocation?.address || 'Seller Hub'}
+                                  </div>
+                                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                                    <strong>Dropoff:</strong> {order.deliveryAddress?.address || order.buyerLocation?.address}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
+                                <td style={{ padding: '12px', fontWeight: 700, color: '#319795' }}>₹{payout}</td>
+                                <td style={{ padding: '12px', textAlign: 'right' }}>
+                                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                    <button onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')} className="lp-btn lp-btn--primary" style={{ padding: '6px 14px', fontSize: '0.8rem', backgroundColor: '#319795', border: 'none', color: '#fff', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+                                      Accept
+                                    </button>
+                                    <button onClick={() => handleUpdateJobStatus(order.orderId, 'rejected')} className="lp-btn" style={{ padding: '6px 14px', fontSize: '0.8rem', backgroundColor: '#ef4444', border: 'none', color: '#fff', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+                                      Decline
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 600 }}>Available Jobs in {user?.currentCity}</h3>
+                  <button onClick={() => fetchDashboardData(token)} className="lp-btn lp-btn--secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
+                    🔄 Refresh Jobs
+                  </button>
                 </div>
-              )}
-            </div>
-          )}
+                {dashLoading ? (
+                  <p style={{ textAlign: 'center', color: '#64748b' }}>Refreshing available jobs...</p>
+                ) : availableOrders.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                    <span style={{ fontSize: '3rem' }}>📭</span>
+                    <h4 style={{ fontSize: '1.1rem', margin: '16px 0 8px 0', color: '#0f172a' }}>No new jobs available</h4>
+                    <p>There are no unassigned orders in {user?.currentCity || 'your city'} right now. New jobs will appear here when buyers place orders.</p>
+                  </div>
+                ) : (
+                  <div className="orders-table-wrapper" style={{ overflowX: 'auto' }}>
+                    <table className="orders-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '0.85rem' }}>
+                          <th style={{ padding: '12px' }}>Order ID</th>
+                          <th style={{ padding: '12px' }}>Addresses</th>
+                          <th style={{ padding: '12px' }}>Distance</th>
+                          <th style={{ padding: '12px' }}>Payout Charge</th>
+                          <th style={{ padding: '12px', textAlign: 'right' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {availableOrders.map((order) => {
+                          const payout = parseFloat(((order.distanceKm || 0) * 2).toFixed(2));
+                          return (
+                            <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
+                              <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
+                              <td style={{ padding: '12px' }}>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                  <strong>Pickup:</strong> {order.sellerLocation?.address || 'Seller Hub'}
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                                  <strong>Dropoff:</strong> {order.deliveryAddress?.address || order.buyerLocation?.address}
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
+                              <td style={{ padding: '12px', fontWeight: 700, color: '#319795' }}>₹{payout}</td>
+                              <td style={{ padding: '12px', textAlign: 'right' }}>
+                                <button onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')} className="lp-btn lp-btn--primary" style={{ padding: '6px 14px', fontSize: '0.8rem', backgroundColor: '#319795' }}>
+                                  Accept Job
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* TAB: ACTIVE DELIVERY */}
-          {activeTab === 'active' && !editProfileMode && (
+          {activeTab === 'active' && !editProfileMode && user?.status === 'approved' && (
             <div className="form-card-wrapper" style={{ padding: '32px' }}>
               {!activeOrder ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
@@ -2048,42 +2270,29 @@ export default function DeliveryPortal() {
                       
                       <div style={{ padding: '24px', background: '#ffffff', textAlign: 'left' }}>
                         <p style={{ fontSize: '0.82rem', color: '#475569', margin: '0 0 20px 0' }}>
-                          To complete the delivery, you must prove GPS proximity (within 100 meters) and complete either <strong>Method A (OTP verification)</strong> or <strong>Method B (Photo upload + Buyer dashboard confirmation)</strong>.
+                          To complete the delivery, you must prove GPS proximity (within 100 meters) and verify the secure <strong>6-digit OTP code</strong> provided by the buyer.
                         </p>
 
                         {isTooFar && (
                           <div style={{ backgroundColor: '#fff5f5', border: '1px solid #feb2b2', color: '#c53030', padding: '14px 18px', borderRadius: '12px', marginBottom: '20px', fontSize: '0.82rem', lineHeight: '1.5', textAlign: 'left' }}>
                             <strong style={{ display: 'block', fontSize: '0.88rem', marginBottom: '4px' }}>⚠️ GPS Proximity Lock Active (Distance: {distanceToBuyerMeters}m)</strong>
-                            <span>You are currently {distanceToBuyerMeters} meters away from the customer's drop-off coordinates. Handover verification actions (OTP requests and photo uploads) are disabled until you are within the 100-meter threshold. Please use the simulation panel to advance closer or update your physical location.</span>
+                            <span>You are currently {distanceToBuyerMeters} meters away from the customer&apos;s drop-off coordinates. Handover verification actions (OTP requests and photo uploads) are disabled until you are within the 100-meter threshold. Please use the simulation panel to advance closer or update your physical location.</span>
                           </div>
                         )}
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
                           
-                          {/* METHOD A: OTP Code */}
+                          {/* OTP Code Verification */}
                           <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '12px', backgroundColor: '#fcfcfd' }}>
-                            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: '700', color: '#0f172a' }}>🔒 Method A: Security OTP</h4>
+                            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: '700', color: '#0f172a' }}>🔒 OTP Handover Verification</h4>
                             <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 12px 0' }}>
-                              Request a 6-digit OTP to be sent to the buyer's email, then type it below to instantly complete.
+                              Request a 6-digit OTP to be sent to the buyer&apos;s email, then type it below along with a confirmation photo to complete the delivery.
                             </p>
 
                             {otpError && <div className="form-alert-error" style={{ fontSize: '0.8rem', padding: '8px 12px' }}>⚠️ {otpError}</div>}
                             {otpSuccess && <div className="form-alert-success" style={{ fontSize: '0.8rem', padding: '8px 12px' }}>✓ {otpSuccess}</div>}
 
-                            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleSendHandoverOtp(activeOrder.orderId)}
-                                disabled={otpResendCooldown > 0 || isTooFar}
-                                className="lp-btn"
-                                style={{ padding: '8px 14px', fontSize: '0.78rem', background: isTooFar ? '#cbd5e1' : '#319795', color: isTooFar ? '#64748b' : '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', opacity: (otpResendCooldown > 0 || isTooFar) ? 0.6 : 1, cursor: isTooFar ? 'not-allowed' : 'pointer' }}
-                              >
-                                {otpResendCooldown > 0 ? `Resend in ${otpResendCooldown}s` : otpSentCode ? 'Resend OTP Code' : 'Send Code to Buyer'}
-                              </button>
-                            </div>
-
-                            {otpSentCode && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
                                 <div className="form-group">
                                   <label className="form-label" style={{ fontSize: '0.7rem' }}>ENTER 6-DIGIT OTP</label>
                                   <input
@@ -2098,63 +2307,116 @@ export default function DeliveryPortal() {
                                 </div>
 
                                 <div className="form-group">
-                                  <label className="form-label" style={{ fontSize: '0.7rem' }}>MOCK DELIVERED PHOTO (OPTIONAL URL)</label>
-                                  <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="https://unsplash..."
-                                    value={uploadedPhoto}
-                                    onChange={(e) => setUploadedPhoto(e.target.value)}
-                                    style={{ padding: '8px 12px', fontSize: '0.8rem', height: '38px' }}
-                                  />
+                                  <label className="form-label" style={{ fontSize: '0.7rem' }}>DELIVERED PHOTO (CAMERA CAPTURE REQUIRED)</label>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        capture="environment"
+                                        id="delivery-photo-capture"
+                                        style={{ display: 'none' }}
+                                        onChange={(e) => {
+                                          const file = e.target.files[0];
+                                          if (file) {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                              setUploadedPhoto(reader.result);
+                                            };
+                                            reader.readAsDataURL(file);
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => document.getElementById('delivery-photo-capture').click()}
+                                        className="lp-btn"
+                                        style={{ 
+                                          padding: '8px 16px', 
+                                          fontSize: '0.78rem', 
+                                          background: '#319795', 
+                                          color: '#fff', 
+                                          border: 'none', 
+                                          borderRadius: '8px', 
+                                          cursor: 'pointer', 
+                                          display: 'inline-flex', 
+                                          alignItems: 'center', 
+                                          gap: '6px',
+                                          fontWeight: 'bold',
+                                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                        }}
+                                      >
+                                        📸 Take Photo with Camera
+                                      </button>
+                                      {uploadedPhoto && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setUploadedPhoto('')}
+                                          className="lp-btn"
+                                          style={{ 
+                                            padding: '8px 16px', 
+                                            fontSize: '0.78rem', 
+                                            background: '#e53e3e', 
+                                            color: '#fff', 
+                                            border: 'none', 
+                                            borderRadius: '8px', 
+                                            cursor: 'pointer',
+                                            fontWeight: 'bold'
+                                          }}
+                                        >
+                                          ✕ Clear Photo
+                                        </button>
+                                      )}
+                                    </div>
+                                    
+                                    {uploadedPhoto && (
+                                      <div style={{ 
+                                        border: '1.5px solid #e2e8f0', 
+                                        borderRadius: '10px', 
+                                        overflow: 'hidden', 
+                                        padding: '8px', 
+                                        background: '#f8fafc', 
+                                        maxWidth: '320px',
+                                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+                                      }}>
+                                        {uploadedPhoto.startsWith('data:') ? (
+                                          <img
+                                            src={uploadedPhoto}
+                                            alt="Captured package preview"
+                                            style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '6px' }}
+                                          />
+                                        ) : (
+                                          <div style={{ fontSize: '0.75rem', wordBreak: 'break-all', color: '#475569', padding: '4px' }}>
+                                            Selected: {uploadedPhoto}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleVerifyHandoverOtp(activeOrder.orderId)}
-                                  disabled={submittingOtp || isTooFar}
-                                  className="lp-btn"
-                                  style={{ padding: '10px 16px', fontSize: '0.8rem', background: isTooFar ? '#cbd5e1' : '#38a169', color: isTooFar ? '#64748b' : '#fff', border: 'none', borderRadius: '8px', fontWeight: '800', opacity: isTooFar ? 0.6 : 1, cursor: isTooFar ? 'not-allowed' : 'pointer' }}
-                                >
-                                  {submittingOtp ? 'Verifying OTP...' : 'Verify OTP & Complete Delivery'}
-                                </button>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginTop: '4px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleVerifyHandoverOtp(activeOrder.orderId)}
+                                    disabled={submittingOtp || isTooFar}
+                                    className="lp-btn"
+                                    style={{ padding: '10px 16px', fontSize: '0.8rem', background: isTooFar ? '#cbd5e1' : '#38a169', color: isTooFar ? '#64748b' : '#fff', border: 'none', borderRadius: '8px', fontWeight: '800', opacity: isTooFar ? 0.6 : 1, cursor: isTooFar ? 'not-allowed' : 'pointer' }}
+                                  >
+                                    {submittingOtp ? 'Verifying OTP...' : 'Verify OTP & Complete Delivery'}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSendHandoverOtp(activeOrder.orderId)}
+                                    disabled={otpResendCooldown > 0 || isTooFar}
+                                    className="lp-btn"
+                                    style={{ padding: '10px 16px', fontSize: '0.8rem', background: isTooFar ? '#cbd5e1' : '#319795', color: isTooFar ? '#64748b' : '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', opacity: (otpResendCooldown > 0 || isTooFar) ? 0.6 : 1, cursor: isTooFar ? 'not-allowed' : 'pointer' }}
+                                  >
+                                    {otpResendCooldown > 0 ? `Resend in ${otpResendCooldown}s` : 'Resend OTP to Buyer'}
+                                  </button>
+                                </div>
                               </div>
-                            )}
-                          </div>
-
-                          {/* METHOD B: Photo Confirm */}
-                          <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '12px', backgroundColor: '#fcfcfd' }}>
-                            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: '700', color: '#0f172a' }}>📸 Method B: Package Photo & Buyer Confirm</h4>
-                            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 12px 0' }}>
-                              Upload a package proof of delivery photo to mark arrival. The buyer must then click "Received Order" on their own dashboard to release payout.
-                            </p>
-
-                            {photoError && <div className="form-alert-error" style={{ fontSize: '0.8rem', padding: '8px 12px' }}>⚠️ {photoError}</div>}
-                            {photoSuccess && <div className="form-alert-success" style={{ fontSize: '0.8rem', padding: '8px 12px' }}>✓ {photoSuccess}</div>}
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                              <div className="form-group">
-                                <label className="form-label" style={{ fontSize: '0.7rem' }}>DELIVERY PHOTO URL</label>
-                                <input
-                                  type="text"
-                                  className="form-input"
-                                  placeholder="e.g. https://images.unsplash.com/photo-..."
-                                  value={arrivedPhoto}
-                                  onChange={(e) => setArrivedPhoto(e.target.value)}
-                                  style={{ padding: '8px 12px', fontSize: '0.8rem', height: '38px' }}
-                                />
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => handleUploadArrivalPhoto(activeOrder.orderId)}
-                                disabled={submittingPhoto || isTooFar}
-                                className="lp-btn"
-                                style={{ padding: '10px 16px', fontSize: '0.8rem', background: isTooFar ? '#cbd5e1' : '#319795', color: isTooFar ? '#64748b' : '#fff', border: 'none', borderRadius: '8px', fontWeight: '800', opacity: isTooFar ? 0.6 : 1, cursor: isTooFar ? 'not-allowed' : 'pointer' }}
-                              >
-                                {submittingPhoto ? 'Uploading photo...' : 'Submit Arrival Photo & Notify Buyer'}
-                              </button>
-                            </div>
                           </div>
 
                         </div>
@@ -2167,7 +2429,7 @@ export default function DeliveryPortal() {
           )}
 
           {/* TAB: COMPLETED DELIVERIES */}
-          {activeTab === 'completed' && !editProfileMode && (
+          {activeTab === 'completed' && !editProfileMode && user?.status === 'approved' && (
             <div className="form-card-wrapper" style={{ padding: '32px' }}>
               <h3 style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 600, marginBottom: '20px', textAlign: 'left' }}>Completed Deliveries</h3>
               {orders.filter(o => o.deliveryStatus === 'delivered').length === 0 ? (
@@ -2221,7 +2483,7 @@ export default function DeliveryPortal() {
           )}
 
           {/* TAB: EARNINGS REPORTS */}
-          {activeTab === 'earnings' && !editProfileMode && (
+          {activeTab === 'earnings' && !editProfileMode && user?.status === 'approved' && (
             <div className="form-card-wrapper" style={{ padding: '32px' }}>
               <h3 style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 600, marginBottom: '20px', textAlign: 'left' }}>Earnings Dashboard & Reports</h3>
               

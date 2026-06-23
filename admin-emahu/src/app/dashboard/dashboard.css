@@ -592,6 +592,12 @@
   margin-bottom: 20px;
   resize: none;
 }
+select.ad-modal-input,
+input.ad-modal-input {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  line-height: 22px;
+}
 .ad-modal-input:focus { outline: none; border-color: var(--color-admin-primary); }
 
 .ad-modal-actions { display: flex; justify-content: flex-end; gap: 10px; }

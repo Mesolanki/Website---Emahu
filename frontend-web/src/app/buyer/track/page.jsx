@@ -705,22 +705,30 @@ function TrackOrderContent() {
                 const trackingData = liveTracking[subOrdId];
                 const partner = trackingData.partnerDetails;
                 if (!partner) return null;
+
+                const isDelivered = ['delivered', 'completed'].includes(trackingData.deliveryStatus?.toLowerCase());
+                const isSingleTwoBoy = partner.category === 'single_two_boy' || partner.category === 'delivery_boy';
+                const hideDetails = isSingleTwoBoy && !isDelivered;
+
+                const displayName = hideDetails ? 'Emahu EV Delivery Partner' : partner.name;
+                const displayPhone = hideDetails ? null : partner.phone;
+
                 return (
                   <div key={subOrdId} className="sidebar-info-block" style={{ borderLeft: '4px solid #319795', paddingTop: '16px' }}>
                     <h3>🚚 Driver Logistics (Order #{subOrdId})</h3>
                     <div className="sidebar-metrics-grid">
                       <div>
                         <span>Driver Name</span>
-                        <strong style={{ fontSize: '0.95rem' }}>{partner.name}</strong>
+                        <strong style={{ fontSize: '0.95rem' }}>{displayName}</strong>
                       </div>
                       <div>
                         <span>Vehicle Info</span>
                         <strong>{partner.vehicleType?.toUpperCase()} ({partner.vehicleNumber || 'N/A'})</strong>
                       </div>
-                      {partner.phone && (
+                      {displayPhone && (
                         <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
                           <a 
-                            href={`tel:${partner.phone}`} 
+                            href={`tel:${displayPhone}`} 
                             style={{ 
                               flex: 1, 
                               textAlign: 'center', 
@@ -740,7 +748,7 @@ function TrackOrderContent() {
                             📞 Call Partner
                           </a>
                           <a 
-                            href={`https://wa.me/91${partner.phone.replace(/\D/g, '')}`} 
+                            href={`https://wa.me/91${displayPhone.replace(/\D/g, '')}`} 
                             target="_blank" 
                             rel="noopener noreferrer" 
                             style={{ 

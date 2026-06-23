@@ -22,6 +22,30 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
   return d;
 }
 
+async function generateAndSaveDeliveryOtp(order) {
+  try {
+    const Otp = require('../models/Otp');
+    const email = order.deliveryAddress?.email;
+    if (email) {
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days expiry
+      await Otp.findOneAndUpdate(
+        { email, otp: otpCode },
+        { otp: otpCode, expiresAt, attempts: 0, lastSentAt: new Date(Date.now() - 70 * 1000), isVerified: false },
+        { upsert: true, new: true }
+      );
+      order.deliveryOtp = otpCode;
+      order.deliveryOtpExpiry = expiresAt;
+      order.deliveryOtpAttempts = 0;
+      console.log(`[OTP Generation] Generated OTP ${otpCode} for order ${order.orderId}`);
+    } else {
+      console.warn(`[OTP Generation] Buyer email not found for order ${order.orderId}, cannot generate OTP.`);
+    }
+  } catch (err) {
+    console.error('[OTP Generation] Error in generateAndSaveDeliveryOtp:', err);
+  }
+}
+
 function detectCityAndState(address) {
   if (!address || typeof address !== 'string') return { city: '', state: '' };
   const lower = address.toLowerCase();
@@ -414,6 +438,9 @@ exports.assignOrderToPartner = async (req, res) => {
     order.deliveryCost = totalCost;
     order.deliveryCharge = totalCost;
     
+    // Generate and save secure OTP immediately on assignment
+    await generateAndSaveDeliveryOtp(order);
+    
     const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     order.timeline.push({
       status: 'DELIVERY_ASSIGNED',
@@ -474,8 +501,8 @@ exports.assignOrderToPartner = async (req, res) => {
     if (io) {
       io.emit('delivery-status-changed', {
         orderId,
-        status: 'LABEL_GENERATED',
-        deliveryStatus: 'accepted',
+        status: 'DELIVERY_ASSIGNED',
+        deliveryStatus: 'assigned',
         partner: { name: partner.name, phone: partner.phone }
       });
     }
@@ -533,6 +560,9 @@ exports.updateAssignmentStatus = async (req, res) => {
         order.deliveryPartnerId = partnerId;
         order.deliveryStatus = 'accepted';
         order.status = 'LABEL_GENERATED';
+        
+        // Generate and save secure OTP immediately on self-assignment
+        await generateAndSaveDeliveryOtp(order);
       } else if (status === 'rejected') {
         // Create a rejected assignment record so this partner doesn't see it again
         assignment = new DeliveryAssignment({
@@ -1756,21 +1786,24 @@ exports.sendDeliveryOtp = async (req, res) => {
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
 
-    if (existingOtp) {
-      existingOtp.otp = otpCode;
-      existingOtp.expiresAt = expiresAt;
-      existingOtp.attempts = 0;
-      existingOtp.lastSentAt = new Date();
-      await existingOtp.save();
-    } else {
-      await Otp.create({
-        email,
-        otp: otpCode,
-        expiresAt,
-        attempts: 0,
-        lastSentAt: new Date()
-      });
+    // Delete any old OTP record for this specific order from the Otp collection
+    if (order.deliveryOtp) {
+      await Otp.deleteMany({ email, otp: order.deliveryOtp });
     }
+
+    await Otp.create({
+      email,
+      otp: otpCode,
+      expiresAt,
+      attempts: 0,
+      lastSentAt: new Date()
+    });
+
+    // Save OTP to the order document directly so it can be queried/rendered on the buyer dashboard
+    order.deliveryOtp = otpCode;
+    order.deliveryOtpExpiry = expiresAt;
+    order.deliveryOtpAttempts = 0;
+    await order.save();
 
     const otpHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
@@ -1859,7 +1892,8 @@ exports.verifyDeliveryOtp = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Buyer contact email not found' });
     }
 
-    const otpRecord = await Otp.findOne({ email, isVerified: false }).sort({ createdAt: -1 });
+    // Isolate OTP verification record specifically matching this order's OTP code
+    const otpRecord = await Otp.findOne({ email, otp: order.deliveryOtp, isVerified: false });
     if (!otpRecord) {
       return res.status(400).json({ success: false, error: 'No active OTP verification code found. Please request a new code.' });
     }
@@ -1881,19 +1915,47 @@ exports.verifyDeliveryOtp = async (req, res) => {
     // Code is correct
     otpRecord.isVerified = true;
     await otpRecord.save();
-    await Otp.deleteMany({ email });
+    await Otp.deleteMany({ email, otp });
 
-    // Transition statuses to delivered
+    // Transition statuses to delivered and automatically release funds
     order.deliveryStatus = 'delivered';
-    order.status = 'DELIVERED';
+    order.status = '🔓 FUNDS RELEASED';
     order.deliveryPhoto = deliveryPhoto;
     order.deliveredAt = new Date();
+    order.deliveryOtp = undefined;
+    order.deliveryOtpExpiry = undefined;
+    order.deliveryOtpAttempts = 0;
+
+    try {
+      const PlatformSettings = require('../models/PlatformSettings');
+      let settings = await PlatformSettings.findOne({ docId: 'global' });
+      if (!settings) {
+        settings = await PlatformSettings.create({ docId: 'global', platformFeePercent: 4 });
+      }
+      const feePercent = settings.platformFeePercent;
+
+      const orderTotal = order.total || 0;
+      const productAmount = order.productAmount || orderTotal;
+      const penaltyAmount = order.penaltyAmount || 0;
+      const feeAmount = parseFloat(((productAmount * feePercent) / 100).toFixed(2));
+      const netPayout = parseFloat((productAmount - feeAmount - penaltyAmount).toFixed(2));
+
+      order.paymentReleased = true;
+      order.paymentReleasedAt = new Date();
+      order.paymentStatus = 'released';
+      order.platformFeePercent = feePercent;
+      order.platformFeeAmount = feeAmount;
+      order.sellerNetPayout = netPayout;
+      console.log(`[Auto Escrow Release] Order #${orderId} delivered via OTP. Funds released automatically to seller ${order.sellerId}: netPayout = ₹${netPayout}`);
+    } catch (payErr) {
+      console.error('[Auto Escrow Release Error]', payErr);
+    }
 
     const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     order.timeline.push({
-      status: 'DELIVERED',
-      label: 'Delivered',
-      desc: `Package delivered successfully. Verified via secure OTP.`,
+      status: '🔓 FUNDS RELEASED',
+      label: 'Delivered & Payment Released',
+      desc: `Package delivered successfully. Verified via secure OTP. Escrow funds automatically released to merchant.`,
       date: dateStr
     });
     await order.save();
@@ -1910,7 +1972,7 @@ exports.verifyDeliveryOtp = async (req, res) => {
       assignmentId: assignment?._id,
       orderId,
       status: 'delivered',
-      location: { latitude: Number(latitude), longitude: Number(longitude) },
+      location: `${latitude},${longitude}`,
       remarks: 'Delivery completed. Verified via secure OTP.'
     });
 
@@ -2008,7 +2070,7 @@ exports.uploadArrivedPhoto = async (req, res) => {
       assignmentId: assignment?._id,
       orderId,
       status: 'arrived',
-      location: { latitude: Number(latitude), longitude: Number(longitude) },
+      location: `${latitude},${longitude}`,
       remarks: 'Courier partner arrived at destination. Verification photo uploaded.'
     });
 
@@ -2038,3 +2100,299 @@ exports.uploadArrivedPhoto = async (req, res) => {
     res.status(500).json({ success: false, error: 'Server error uploading arrival photo' });
   }
 };
+
+// Helper to automatically assign a single order to the best eligible partner
+async function autoAssignOrderInternal(order) {
+  try {
+    if (!order) return null;
+    console.log(`[AutoAssign Debug] Order ID: ${order.orderId}, status: ${order.status}, deliveryStatus: ${order.deliveryStatus}, deliveryPartnerId: ${order.deliveryPartnerId}`);
+    if (order.deliveryPartnerId || order.deliveryStatus !== 'unassigned') {
+      console.log(`[AutoAssign Debug] Skipping because partner already set or deliveryStatus is not unassigned`);
+      return null;
+    }
+
+    let orderCity = '';
+    const rawCity = (order.deliveryAddress?.city || '').trim();
+    const knownCity = rawCity.length >= 3 ? detectCityAndState(rawCity).city : '';
+    orderCity = (knownCity || rawCity.length >= 3 ? rawCity : '').toLowerCase();
+
+    if (!orderCity || orderCity.length < 3) {
+      const buyerAddr = order.buyerLocation?.address || order.deliveryAddress?.address || '';
+      const detected = detectCityAndState(buyerAddr);
+      if (detected.city) orderCity = detected.city.trim().toLowerCase();
+    }
+
+    let sellerCity = '';
+    if (order.sellerId) {
+      const sellerUser = await User.findById(order.sellerId);
+      if (sellerUser) {
+        sellerCity = (sellerUser.currentCity || sellerUser.city || '').trim().toLowerCase();
+      }
+    }
+    if (!sellerCity && order.sellerLocation?.address) {
+      const detected = detectCityAndState(order.sellerLocation.address);
+      sellerCity = (detected.city || '').trim().toLowerCase();
+    }
+
+    const isSameCityOrder = sellerCity && orderCity && sellerCity === orderCity;
+
+    // Find active and approved partners
+    const partners = await User.find({
+      role: 'delivery',
+      status: 'approved',
+      isActivePartner: { $ne: false }
+    });
+    console.log(`[AutoAssign Debug] Found ${partners.length} active/approved partners`);
+
+    const eligiblePartners = [];
+    const buyerLat = order.buyerLocation?.latitude;
+    const buyerLon = order.buyerLocation?.longitude;
+
+    for (const partner of partners) {
+      const pCities = (partner.coveredCities && partner.coveredCities.length > 0)
+        ? partner.coveredCities.map(c => c.trim().toLowerCase())
+        : [(partner.currentCity || partner.city || '').trim().toLowerCase()].filter(Boolean);
+
+      const coversBuyer = orderCity ? pCities.includes(orderCity) : false;
+      const coversSeller = sellerCity ? pCities.includes(sellerCity) : false;
+      console.log(`[AutoAssign Debug] Partner ${partner.name}: coveredCities=${JSON.stringify(pCities)}, coversBuyer=${coversBuyer}, coversSeller=${coversSeller}`);
+
+      if (orderCity && !coversBuyer) {
+        console.log(`[AutoAssign Debug] Partner ${partner.name} skipped: doesn't cover buyer city ${orderCity}`);
+        continue;
+      }
+      if (!isSameCityOrder && sellerCity && orderCity && !coversSeller) {
+        console.log(`[AutoAssign Debug] Partner ${partner.name} skipped: intercity and doesn't cover seller city ${sellerCity}`);
+        continue;
+      }
+
+      const isCityMatch = coversBuyer || coversSeller;
+
+      let isRadiusMatch = true;
+      let distToBuyer = 0;
+      if (buyerLat !== undefined && buyerLon !== undefined && partner.latitude !== undefined && partner.longitude !== undefined) {
+        distToBuyer = getHaversineDistance(partner.latitude, partner.longitude, buyerLat, buyerLon);
+        isRadiusMatch = distToBuyer <= (partner.serviceRadius || 15);
+      }
+      console.log(`[AutoAssign Debug] Partner ${partner.name}: isCityMatch=${isCityMatch}, distToBuyer=${distToBuyer.toFixed(2)}km, isRadiusMatch=${isRadiusMatch}`);
+
+      eligiblePartners.push({
+        partner,
+        isCityMatch,
+        isRadiusMatch,
+        distanceToBuyer: distToBuyer
+      });
+    }
+
+    eligiblePartners.sort((a, b) => {
+      const scoreA = (a.isCityMatch ? 2 : 0) + (a.isRadiusMatch ? 1 : 0);
+      const scoreB = (b.isCityMatch ? 2 : 0) + (b.isRadiusMatch ? 1 : 0);
+      return scoreB - scoreA || a.distanceToBuyer - b.distanceToBuyer;
+    });
+
+    if (eligiblePartners.length > 0) {
+      const bestPartner = eligiblePartners[0].partner;
+      const deliveryPartnerId = bestPartner._id;
+
+      const perKmRate = 2;
+      const totalCost = parseFloat(((order.distanceKm || 5) * perKmRate).toFixed(2));
+
+      order.deliveryPartnerId = deliveryPartnerId;
+      order.carrier = bestPartner.name;
+      order.carrierPhone = bestPartner.phone;
+      order.deliveryStatus = 'assigned';
+      order.status = 'DELIVERY_ASSIGNED';
+      order.deliveryCost = totalCost;
+      order.deliveryCharge = totalCost;
+
+      // Generate and save secure OTP immediately on assignment
+      await generateAndSaveDeliveryOtp(order);
+
+      const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      order.timeline.push({
+        status: 'DELIVERY_ASSIGNED',
+        label: 'Delivery Assigned',
+        desc: `Order automatically assigned to courier partner: ${bestPartner.name}. Waiting for partner acceptance.`,
+        date: dateStr
+      });
+
+      await order.save();
+
+      let assignment = await DeliveryAssignment.findOne({ orderId: order.orderId });
+      if (!assignment) {
+        assignment = new DeliveryAssignment({
+          orderId: order.orderId,
+          sellerId: order.sellerId,
+          buyerId: order.userId,
+          deliveryPartnerId,
+          distance: order.distanceKm || 5,
+          deliveryCharge: totalCost,
+          currentStatus: 'assigned'
+        });
+      } else {
+        assignment.deliveryPartnerId = deliveryPartnerId;
+        assignment.deliveryCharge = totalCost;
+        assignment.currentStatus = 'assigned';
+      }
+      await assignment.save();
+
+      await DeliveryTracking.create({
+        assignmentId: assignment._id,
+        orderId: order.orderId,
+        status: 'assigned',
+        remarks: `Automatically assigned to partner ${bestPartner.name}. Waiting for acceptance.`
+      });
+
+      await Notification.create({
+        recipient: deliveryPartnerId,
+        recipientModel: 'User',
+        title: 'New Delivery Assigned (Auto)',
+        message: `You have been automatically assigned order #${order.orderId}. Click to view details.`,
+        isRead: false
+      });
+
+      await Notification.create({
+        recipient: order.userId,
+        recipientModel: 'User',
+        title: 'Delivery Partner Assigned (Auto)',
+        message: `Your order #${order.orderId} has been automatically assigned to ${bestPartner.name}.`,
+        isRead: false
+      });
+
+      console.log(`[Auto-Assignment] Order #${order.orderId} automatically assigned to partner: ${bestPartner.name}`);
+      return bestPartner;
+    }
+  } catch (err) {
+    console.error('Error in autoAssignOrderInternal:', err);
+  }
+  return null;
+}
+
+// Helper to assign pending/unassigned orders to a specific partner upon approval/registration
+async function autoAssignPendingOrdersToPartner(partner) {
+  try {
+    if (!partner || partner.role !== 'delivery' || partner.status !== 'approved' || !partner.isActivePartner) {
+      return;
+    }
+
+    const unassignedOrders = await Order.find({
+      deliveryStatus: 'unassigned',
+      status: { $in: ['APPROVED', 'READY_FOR_PICKUP'] }
+    });
+
+    for (const order of unassignedOrders) {
+      let orderCity = '';
+      const rawCity = (order.deliveryAddress?.city || '').trim();
+      const knownCity = rawCity.length >= 3 ? detectCityAndState(rawCity).city : '';
+      orderCity = (knownCity || rawCity.length >= 3 ? rawCity : '').toLowerCase();
+
+      if (!orderCity || orderCity.length < 3) {
+        const buyerAddr = order.buyerLocation?.address || order.deliveryAddress?.address || '';
+        const detected = detectCityAndState(buyerAddr);
+        if (detected.city) orderCity = detected.city.trim().toLowerCase();
+      }
+
+      let sellerCity = '';
+      if (order.sellerId) {
+        const sellerUser = await User.findById(order.sellerId);
+        if (sellerUser) {
+          sellerCity = (sellerUser.currentCity || sellerUser.city || '').trim().toLowerCase();
+        }
+      }
+
+      const pCities = (partner.coveredCities && partner.coveredCities.length > 0)
+        ? partner.coveredCities.map(c => c.trim().toLowerCase())
+        : [(partner.currentCity || partner.city || '').trim().toLowerCase()].filter(Boolean);
+
+      const coversBuyer = orderCity ? pCities.includes(orderCity) : false;
+      const coversSeller = sellerCity ? pCities.includes(sellerCity) : false;
+      const isSameCityOrder = sellerCity && orderCity && sellerCity === orderCity;
+
+      if (orderCity && !coversBuyer) continue;
+      if (!isSameCityOrder && sellerCity && orderCity && !coversSeller) continue;
+
+      let isRadiusMatch = true;
+      const buyerLat = order.buyerLocation?.latitude;
+      const buyerLon = order.buyerLocation?.longitude;
+      if (buyerLat !== undefined && buyerLon !== undefined && partner.latitude !== undefined && partner.longitude !== undefined) {
+        const distToBuyer = getHaversineDistance(partner.latitude, partner.longitude, buyerLat, buyerLon);
+        isRadiusMatch = distToBuyer <= (partner.serviceRadius || 15);
+      }
+
+      if (isRadiusMatch) {
+        const deliveryPartnerId = partner._id;
+        const perKmRate = 2;
+        const totalCost = parseFloat(((order.distanceKm || 5) * perKmRate).toFixed(2));
+
+        order.deliveryPartnerId = deliveryPartnerId;
+        order.carrier = partner.name;
+        order.carrierPhone = partner.phone;
+        order.deliveryStatus = 'assigned';
+        order.status = 'DELIVERY_ASSIGNED';
+        order.deliveryCost = totalCost;
+        order.deliveryCharge = totalCost;
+
+        // Generate and save secure OTP immediately on assignment
+        await generateAndSaveDeliveryOtp(order);
+
+        const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        order.timeline.push({
+          status: 'DELIVERY_ASSIGNED',
+          label: 'Delivery Assigned',
+          desc: `Order automatically assigned to newly approved partner: ${partner.name}. Waiting for acceptance.`,
+          date: dateStr
+        });
+
+        await order.save();
+
+        let assignment = await DeliveryAssignment.findOne({ orderId: order.orderId });
+        if (!assignment) {
+          assignment = new DeliveryAssignment({
+            orderId: order.orderId,
+            sellerId: order.sellerId,
+            buyerId: order.userId,
+            deliveryPartnerId,
+            distance: order.distanceKm || 5,
+            deliveryCharge: totalCost,
+            currentStatus: 'assigned'
+          });
+        } else {
+          assignment.deliveryPartnerId = deliveryPartnerId;
+          assignment.deliveryCharge = totalCost;
+          assignment.currentStatus = 'assigned';
+        }
+        await assignment.save();
+
+        await DeliveryTracking.create({
+          assignmentId: assignment._id,
+          orderId: order.orderId,
+          status: 'assigned',
+          remarks: `Automatically assigned to newly approved partner ${partner.name}. Waiting for acceptance.`
+        });
+
+        await Notification.create({
+          recipient: deliveryPartnerId,
+          recipientModel: 'User',
+          title: 'New Delivery Assigned (Auto)',
+          message: `You have been automatically assigned order #${order.orderId}. Click to view details.`,
+          isRead: false
+        });
+
+        await Notification.create({
+          recipient: order.userId,
+          recipientModel: 'User',
+          title: 'Delivery Partner Assigned (Auto)',
+          message: `Your order #${order.orderId} has been automatically assigned to ${partner.name}.`,
+          isRead: false
+        });
+
+        console.log(`[Auto-Assignment] Order #${order.orderId} automatically assigned to newly approved partner: ${partner.name}`);
+      }
+    }
+  } catch (err) {
+    console.error('Error in autoAssignPendingOrdersToPartner:', err);
+  }
+}
+
+exports.autoAssignOrderInternal = autoAssignOrderInternal;
+exports.autoAssignPendingOrdersToPartner = autoAssignPendingOrdersToPartner;

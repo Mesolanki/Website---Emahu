@@ -1501,6 +1501,62 @@ export default function EmahuProDashboard() {
     return found ? found.raw : null;
   }, [selectedDetailedOrderId, orders]);
 
+  // Logistics tracking states
+  const [carrier, setCarrier] = useState('Delhivery');
+  const [trackingId, setTrackingId] = useState('');
+  const [packageWeight, setPackageWeight] = useState('');
+  const [deliveryCost, setDeliveryCost] = useState('80');
+  const [estDays, setEstDays] = useState('2-4 Days');
+
+  useEffect(() => {
+    if (selectedDetailedOrder) {
+      const defaultCarrier = selectedDetailedOrder.carrier || 'Delhivery';
+      setCarrier(defaultCarrier);
+      if (selectedDetailedOrder.trackingId) {
+        setTrackingId(selectedDetailedOrder.trackingId);
+        setPackageWeight(selectedDetailedOrder.packageWeight || '');
+        setDeliveryCost(selectedDetailedOrder.deliveryCost !== undefined ? String(selectedDetailedOrder.deliveryCost) : '80');
+        setEstDays(selectedDetailedOrder.estDays || '2-4 Days');
+      } else {
+        // Defaults based on carrier
+        let defaults = { trackingId: '', packageWeight: '', deliveryCost: '80', estDays: '2-4 Days' };
+        if (defaultCarrier === 'Delhivery') {
+          defaults = {
+            trackingId: `DLV${Math.floor(100000000 + Math.random() * 900000000)}`,
+            packageWeight: '0.8 kg',
+            deliveryCost: '80',
+            estDays: '2-4 Days'
+          };
+        } else if (defaultCarrier === 'Blue Dart') {
+          defaults = {
+            trackingId: `BD${Math.floor(100000000 + Math.random() * 900000000)}`,
+            packageWeight: '1.2 kg',
+            deliveryCost: '120',
+            estDays: '1-3 Days'
+          };
+        } else if (defaultCarrier === 'EmahuXpress') {
+          defaults = {
+            trackingId: `EMH${Math.floor(100000000 + Math.random() * 900000000)}`,
+            packageWeight: '0.5 kg',
+            deliveryCost: '75',
+            estDays: '2-5 Days'
+          };
+        } else {
+          defaults = {
+            trackingId: `FEDEX${Math.floor(100000000 + Math.random() * 900000000)}`,
+            packageWeight: '1.5 kg',
+            deliveryCost: '220',
+            estDays: '1-3 Days'
+          };
+        }
+        setTrackingId(defaults.trackingId);
+        setPackageWeight(defaults.packageWeight);
+        setDeliveryCost(defaults.deliveryCost);
+        setEstDays(defaults.estDays);
+      }
+    }
+  }, [selectedDetailedOrder]);
+
   const [liveTrackingDetails, setLiveTrackingDetails] = useState(null);
 
   useEffect(() => {
@@ -2055,6 +2111,77 @@ export default function EmahuProDashboard() {
     } catch (err) {
       console.error(err);
       triggerToast('Error', 'Failed to generate shipping label.', 'danger');
+    } finally {
+      setOrderLoading(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleCarrierChange = (value) => {
+    setCarrier(value);
+    let defaults = { trackingId: '', packageWeight: '', deliveryCost: '80', estDays: '2-4 Days' };
+    if (value === 'Delhivery') {
+      defaults = {
+        trackingId: `DLV${Math.floor(100000000 + Math.random() * 900000000)}`,
+        packageWeight: '0.8 kg',
+        deliveryCost: '80',
+        estDays: '2-4 Days'
+      };
+    } else if (value === 'Blue Dart') {
+      defaults = {
+        trackingId: `BD${Math.floor(100000000 + Math.random() * 900000000)}`,
+        packageWeight: '1.2 kg',
+        deliveryCost: '120',
+        estDays: '1-3 Days'
+      };
+    } else if (value === 'EmahuXpress') {
+      defaults = {
+        trackingId: `EMH${Math.floor(100000000 + Math.random() * 900000000)}`,
+        packageWeight: '0.5 kg',
+        deliveryCost: '75',
+        estDays: '2-5 Days'
+      };
+    } else {
+      defaults = {
+        trackingId: `FEDEX${Math.floor(100000000 + Math.random() * 900000000)}`,
+        packageWeight: '1.5 kg',
+        deliveryCost: '220',
+        estDays: '1-3 Days'
+      };
+    }
+    setTrackingId(defaults.trackingId);
+    setPackageWeight(defaults.packageWeight);
+    setDeliveryCost(defaults.deliveryCost);
+    setEstDays(defaults.estDays);
+  };
+
+  const handleSaveTrackingDetails = async (orderId) => {
+    if (orderLoading[orderId]) return;
+    try {
+      setOrderLoading(prev => ({ ...prev, [orderId]: true }));
+      const storedOrders = localStorage.getItem('emahu_orders');
+      if (storedOrders) {
+        const parsed = JSON.parse(storedOrders);
+        const updated = parsed.map(o => {
+          if (o.orderId === orderId) {
+            return {
+              ...o,
+              carrier,
+              trackingId,
+              packageWeight,
+              deliveryCost: Number(deliveryCost),
+              estDays
+            };
+          }
+          return o;
+        });
+        safeSetLocalStorageOrders(updated);
+        window.dispatchEvent(new Event('storage'));
+        triggerToast('Success', 'Tracking details updated.', 'success');
+        await syncOrderToDatabase(orderId, updated);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Failed to save tracking details.', 'danger');
     } finally {
       setOrderLoading(prev => ({ ...prev, [orderId]: false }));
     }
@@ -6526,7 +6653,7 @@ export default function EmahuProDashboard() {
 
       {/* --- ORDER DETAILS & ACTION PANEL MODAL --- */}
       {selectedDetailedOrderId && selectedDetailedOrder && (() => {
-        const isSeller = sellerUser && (sellerUser.role === 'seller' || localStorage.getItem('emahu_seller_logged_in') === 'true');
+        const isSeller = sellerUser && (sellerUser.role === 'seller' || (typeof window !== 'undefined' && localStorage.getItem('emahu_seller_logged_in') === 'true'));
         const ownsOrder = selectedDetailedOrder.items?.some(item => {
           const sellerUserId = sellerUser?._id || sellerUser?.id;
           if (typeof item.seller === 'string') {
@@ -6973,255 +7100,239 @@ export default function EmahuProDashboard() {
                         </div>
                       )}
 
-                      {/* APPROVED or READY_FOR_PICKUP (without assigned carrier) */}
-                      {(selectedDetailedOrder.status === 'APPROVED' || (selectedDetailedOrder.status === 'READY_FOR_PICKUP' && !selectedDetailedOrder.carrier)) && (
-                        <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '18px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                            <span style={{ width: '22px', height: '22px', background: '#16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>✓</span>
-                            <span style={{ fontSize: '0.82rem', color: '#15803d', fontWeight: '700' }}>Order Approved — Assign Delivery Partner</span>
-                          </div>
-                          <p style={{ fontSize: '0.8rem', color: '#15803d', margin: '0 0 14px 0', lineHeight: '1.4' }}>
-                            Order approved. Scan city hubs for active Emahu Logistics Partners to handle last-mile delivery transit.
-                          </p>
-                          <button onClick={() => { setSelectedOrderId(selectedDetailedOrder.orderId); setIsDeliveryModalOpen(true); }}
-                            style={{ width: '100%', padding: '12px 0', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}>
-                            🚚 Scan &amp; Assign Delivery Partner
-                          </button>
-                        </div>
-                      )}
-
-                      {/* DELIVERY_ASSIGNED */}
-                      {selectedDetailedOrder.status === 'DELIVERY_ASSIGNED' && (
-                        <div style={{ background: '#eff6ff', border: '1.5px solid #93c5fd', borderRadius: '12px', padding: '18px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                            <span style={{ width: '22px', height: '22px', background: '#2563eb', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>🚚</span>
-                            <span style={{ fontSize: '0.82rem', color: '#1e3a8a', fontWeight: '700' }}>Courier Assigned</span>
-                          </div>
-                          <p style={{ fontSize: '0.8rem', color: '#1e3a8a', margin: '0 0 14px 0', lineHeight: '1.4' }}>
-                            Order assigned to <strong>{selectedDetailedOrder.carrier}</strong>. Tracking ID <strong>{selectedDetailedOrder.trackingId}</strong> has been registered.
-                            Generate the shipping label to prepare packaging.
-                          </p>
-                          <button onClick={() => handleGenerateLabel(selectedDetailedOrder.orderId)} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
-                            style={{ width: '100%', padding: '12px 0', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.88rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
-                            {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Generating...' : '🏷️ Generate Shipping Label'}
-                          </button>
-                        </div>
-                      )}
-
-                      {/* LABEL_GENERATED */}
-                      {selectedDetailedOrder.status === 'LABEL_GENERATED' && (
-                        <div style={{ background: '#f0f9ff', border: '1.5px solid #7dd3fc', borderRadius: '12px', padding: '18px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                            <span style={{ width: '22px', height: '22px', background: '#0284c7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>🏷️</span>
-                            <span style={{ fontSize: '0.82rem', color: '#0369a1', fontWeight: '700' }}>Shipping Label Generated</span>
-                          </div>
-                          <p style={{ fontSize: '0.8rem', color: '#0369a1', margin: '0 0 14px 0', lineHeight: '1.4' }}>
-                            Label generated. Print the shipping label / manifest and mark the package as ready for courier pickup.
-                          </p>
-                          <div style={{ display: 'flex', gap: '10px' }}>
-                            <button onClick={() => { setActiveLabelOrder(selectedDetailedOrder); setIsLabelModalOpen(true); }}
-                              style={{ flex: 1, padding: '11px 0', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}>
-                              🖨️ Print Label
-                            </button>
-                            <button onClick={() => handleMarkReadyForPickup(selectedDetailedOrder.orderId)} disabled={!!orderLoading[selectedDetailedOrder.orderId]}
-                              style={{ flex: 1, padding: '11px 0', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer', opacity: orderLoading[selectedDetailedOrder.orderId] ? 0.6 : 1 }}>
-                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '📦 Mark Ready'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* READY_FOR_PICKUP */}
-                      {selectedDetailedOrder.status === 'READY_FOR_PICKUP' && (
-                        <div style={{ background: '#fff7ed', border: '1.5px solid #fdba74', borderRadius: '12px', padding: '18px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                            <span style={{ width: '22px', height: '22px', background: '#ea580c', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>📦</span>
-                            <span style={{ fontSize: '0.82rem', color: '#c2410c', fontWeight: '700' }}>Ready for Carrier Pickup</span>
-                          </div>
-                          <p style={{ fontSize: '0.8rem', color: '#9a3412', margin: '0 0 4px 0', lineHeight: '1.4' }}>
-                            The package is sealed and waiting at your dispatch desk.
-                          </p>
-                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#ea580c', fontWeight: '600', fontStyle: 'italic', marginTop: '6px', marginBottom: '10px' }}>
-                            ⌛ Awaiting pickup confirmation from the assigned logistics partner.
-                          </span>
-                          
-                          <button
-                            onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'PICKED_UP', `🚀 Package picked up by ${selectedDetailedOrder.carrier ? 'courier partner ' + selectedDetailedOrder.carrier : 'Seller (Self-Delivery)'}.`)}
-                            disabled={!!orderLoading[selectedDetailedOrder.orderId]}
-                            style={{
-                              width: '100%',
-                              padding: '11px 0',
-                              background: '#ea580c',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: '8px',
-                              fontWeight: '700',
-                              fontSize: '0.85rem',
-                              cursor: 'pointer',
-                              boxShadow: '0 4px 10px rgba(234,88,12,0.2)',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🚀 Dispatch Order (Mark Picked Up)'}
-                          </button>
-                        </div>
-                      )}
-
-                      {/* PICKED_UP / IN_TRANSIT / OUT_FOR_DELIVERY */}
-                      {['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(selectedDetailedOrder.status) && (
-                        <div style={{ background: '#faf5ff', border: '1.5px solid #d8b4fe', borderRadius: '12px', padding: '18px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                            <span style={{ width: '22px', height: '22px', background: '#7c3aed', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.7rem', fontWeight: '700' }}>
-                              {selectedDetailedOrder.status === 'PICKED_UP' ? '🚀' : selectedDetailedOrder.status === 'IN_TRANSIT' ? '🚛' : '🛵'}
-                            </span>
-                            <span style={{ fontSize: '0.82rem', color: '#6d28d9', fontWeight: '700' }}>
-                              {selectedDetailedOrder.status === 'PICKED_UP' ? 'Package Picked Up' : selectedDetailedOrder.status === 'IN_TRANSIT' ? 'Package In Transit' : 'Package Out For Delivery'}
-                            </span>
-                          </div>
-                          <p style={{ fontSize: '0.8rem', color: '#6d28d9', margin: '0 0 4px 0', lineHeight: '1.4' }}>
-                            {selectedDetailedOrder.status === 'PICKED_UP' && 'The shipment has been picked up by the courier.'}
-                            {selectedDetailedOrder.status === 'IN_TRANSIT' && 'The shipment is in transit on the EV logistics corridor.'}
-                            {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && 'The delivery agent is en route.'}
-                          </p>
-                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#7c3aed', fontWeight: '600', fontStyle: 'italic', marginTop: '6px', marginBottom: '10px' }}>
-                            🚚 Delivery status and tracking updates are managed dynamically by the courier.
-                          </span>
-
-                          {selectedDetailedOrder.status === 'PICKED_UP' && (
-                            <button
-                              onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'IN_TRANSIT', '🚚 Order package is in transit via EV corridor.')}
-                              disabled={!!orderLoading[selectedDetailedOrder.orderId]}
-                              style={{
-                                width: '100%',
-                                padding: '11px 0',
-                                background: '#7c3aed',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontWeight: '700',
-                                fontSize: '0.85rem',
-                                cursor: 'pointer',
-                                boxShadow: '0 4px 10px rgba(124,58,237,0.2)',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🚛 Advance to In Transit'}
-                            </button>
-                          )}
-
-                          {selectedDetailedOrder.status === 'IN_TRANSIT' && (
-                            <button
-                              onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'OUT_FOR_DELIVERY', '🛵 Package is out for delivery with local dispatch rider.')}
-                              disabled={!!orderLoading[selectedDetailedOrder.orderId]}
-                              style={{
-                                width: '100%',
-                                padding: '11px 0',
-                                background: '#7c3aed',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontWeight: '700',
-                                fontSize: '0.85rem',
-                                cursor: 'pointer',
-                                boxShadow: '0 4px 10px rgba(124,58,237,0.2)',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '🛵 Mark Out for Delivery'}
-                            </button>
-                          )}
-
-                          {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && (
-                            <button
-                              onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'DELIVERED', '✅ Order delivered successfully.')}
-                              disabled={!!orderLoading[selectedDetailedOrder.orderId]}
-                              style={{
-                                width: '100%',
-                                padding: '11px 0',
-                                background: '#16a34a',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontWeight: '700',
-                                fontSize: '0.85rem',
-                                cursor: 'pointer',
-                                boxShadow: '0 4px 10px rgba(22,163,74,0.2)',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              {orderLoading[selectedDetailedOrder.orderId] ? '⌛ Processing...' : '✅ Confirm Delivery'}
-                            </button>
-                          )}
-                        </div>
-                      )}
-
-                      {/* COMPLETED / DELIVERED */}
-                      {/* COMPLETED / DELIVERED / RELEASED */}
-                      {selectedDetailedOrder.status === '🔓 FUNDS RELEASED' || selectedDetailedOrder.paymentReleased ? (() => {
-                        const orderTotal = selectedDetailedOrder.total || 0;
-                        const productAmount = selectedDetailedOrder.productAmount || orderTotal;
-                        const feePercent = selectedDetailedOrder.platformFeePercent || platformFeePercent;
-                        const feeAmount = selectedDetailedOrder.platformFeeAmount !== undefined ? selectedDetailedOrder.platformFeeAmount : parseFloat(((productAmount * feePercent) / 100).toFixed(2));
-                        const netPayout = selectedDetailedOrder.sellerNetPayout !== undefined ? selectedDetailedOrder.sellerNetPayout : parseFloat((productAmount - feeAmount).toFixed(2));
-                        const releaseDate = selectedDetailedOrder.paymentReleasedAt ? new Date(selectedDetailedOrder.paymentReleasedAt).toLocaleString('en-IN') : new Date().toLocaleString('en-IN');
-
-                        return (
-                          <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '24px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '2.8rem', marginBottom: '10px' }}>💰</div>
-                            <p style={{ color: '#15803d', fontWeight: '700', fontSize: '1.05rem', margin: '0 0 4px 0' }}>Payout Released</p>
+                      {/* Fulfillment & Courier Console */}
+                      {selectedDetailedOrder.status !== 'PENDING_APPROVAL' && selectedDetailedOrder.status !== 'REJECTED' && !selectedDetailedOrder.sellerRejected && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.01)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>COURIER CORRIDOR TRACKING PROVISIONS</span>
                             
-                            <div style={{ background: '#ffffff', border: '1px solid #dcfce7', borderRadius: '10px', padding: '12px', margin: '14px 0', textAlign: 'left', fontSize: '0.82rem' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#475569' }}>
-                                <span>Order Total (Products)</span>
-                                <span style={{ fontWeight: '600', color: '#0f172a' }}>₹{productAmount.toLocaleString('en-IN')}</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Logistics Carrier</label>
+                                <select 
+                                  className="select-filter" 
+                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
+                                  value={carrier}
+                                  onChange={(e) => handleCarrierChange(e.target.value)}
+                                  disabled={isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
+                                >
+                                  <option value="Delhivery">Delhivery Logistics</option>
+                                  <option value="Blue Dart">Blue Dart Premium</option>
+                                  <option value="EmahuXpress">Emahu Xpress Direct</option>
+                                  <option value="FedEx">FedEx International</option>
+                                </select>
                               </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #f0fdf4', color: '#dc2626' }}>
-                                <span>Platform Fee ({feePercent}%)</span>
-                                <span style={{ fontWeight: '600' }}>- ₹{feeAmount.toLocaleString('en-IN')}</span>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', color: '#15803d', fontSize: '0.88rem' }}>
-                                <span>Net Payout Settled</span>
-                                <span>₹{netPayout.toLocaleString('en-IN')}</span>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Tracking Identifier</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. EMH-TRK-983"
+                                  className="form-input"
+                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
+                                  value={trackingId}
+                                  onChange={(e) => setTrackingId(e.target.value)}
+                                  disabled={isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
+                                />
                               </div>
                             </div>
-                            
-                            <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b' }}>
-                              Released on: {releaseDate}
-                            </span>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Package Weight</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 0.8 kg"
+                                  className="form-input"
+                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
+                                  value={packageWeight}
+                                  onChange={(e) => setPackageWeight(e.target.value)}
+                                  disabled={isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Ship Cost (₹)</label>
+                                <input
+                                  type="number"
+                                  placeholder="80"
+                                  className="form-input"
+                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
+                                  value={deliveryCost}
+                                  onChange={(e) => setDeliveryCost(e.target.value)}
+                                  disabled={isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Transit Time</label>
+                                <input
+                                  type="text"
+                                  placeholder="2-4 Days"
+                                  className="form-input"
+                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
+                                  value={estDays}
+                                  onChange={(e) => setEstDays(e.target.value)}
+                                  disabled={isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
+                                />
+                              </div>
+                            </div>
+
+                            <button
+                              className="btn-secondary"
+                              style={{ height: '34px', fontSize: '0.78rem', display: 'flex', alignSelf: 'flex-end', padding: '0 16px', marginTop: '10px' }}
+                              onClick={() => handleSaveTrackingDetails(selectedDetailedOrder.orderId)}
+                              disabled={orderLoading[selectedDetailedOrder.orderId] || isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
+                            >
+                              {orderLoading[selectedDetailedOrder.orderId] ? 'Saving...' : '💾 Save Tracking Details'}
+                            </button>
                           </div>
-                        );
-                      })() : isCompleted && !selectedDetailedOrder.paymentReleased ? (
-                        <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '24px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '2.8rem', marginBottom: '10px' }}>🎉</div>
-                          <p style={{ color: '#15803d', fontWeight: '700', fontSize: '1.05rem', margin: '0 0 4px 0' }}>Transaction Completed</p>
-                          <p style={{ color: '#16a34a', fontSize: '0.8rem', margin: '0 0 16px 0', lineHeight: '1.4' }}>
-                            The order has been successfully delivered. You can now release the escrow funds to your settlement account.
-                          </p>
-                          
-                          <button
-                            onClick={() => setIsReleaseModalOpen(true)}
-                            style={{
-                              width: '100%',
-                              padding: '12px 0',
-                              background: '#10b981',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: '8px',
-                              fontWeight: '700',
-                              fontSize: '0.88rem',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px',
-                              boxShadow: '0 4px 12px rgba(16,185,129,0.2)',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            💰 Release Payment
-                          </button>
+
+                          {/* Progress Shipping State buttons */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>TRANSIT WORKFLOW ADVANCEMENT ACTIONS</span>
+                            
+                            {(selectedDetailedOrder.status === 'APPROVED' || (selectedDetailedOrder.status === 'READY_FOR_PICKUP' && !selectedDetailedOrder.carrier)) && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <button
+                                  className="btn-primary"
+                                  style={{ height: '40px', fontSize: '0.88rem', width: '100%' }}
+                                  onClick={() => handleAssignAndGenerateLabel(selectedDetailedOrder.orderId, carrier)}
+                                  disabled={orderLoading[selectedDetailedOrder.orderId]}
+                                >
+                                  🚚 Assign Courier &amp; Generate Label
+                                </button>
+                                <button
+                                  className="btn-secondary"
+                                  style={{ height: '40px', fontSize: '0.88rem', width: '100%' }}
+                                  onClick={() => { setSelectedOrderId(selectedDetailedOrder.orderId); setIsDeliveryModalOpen(true); }}
+                                >
+                                  🔍 Scan &amp; Assign Delivery Partner
+                                </button>
+                              </div>
+                            )}
+
+                            {selectedDetailedOrder.status === 'DELIVERY_ASSIGNED' && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <button
+                                  className="btn-primary"
+                                  style={{ height: '40px', fontSize: '0.88rem', width: '100%' }}
+                                  onClick={() => handleGenerateLabel(selectedDetailedOrder.orderId)}
+                                  disabled={orderLoading[selectedDetailedOrder.orderId]}
+                                >
+                                  📄 Generate Shipping Label
+                                </button>
+                                <button
+                                  className="btn-secondary"
+                                  style={{ height: '40px', fontSize: '0.88rem', width: '100%' }}
+                                  onClick={() => { setSelectedOrderId(selectedDetailedOrder.orderId); setIsDeliveryModalOpen(true); }}
+                                >
+                                  🔄 Reassign Delivery Partner
+                                </button>
+                              </div>
+                            )}
+
+                            {selectedDetailedOrder.status === 'LABEL_GENERATED' && (
+                              <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                  className="btn-secondary"
+                                  style={{ flex: 1, height: '40px', fontSize: '0.85rem' }}
+                                  onClick={() => { setActiveLabelOrder(selectedDetailedOrder); setIsLabelModalOpen(true); }}
+                                >
+                                  🖨️ Print Label
+                                </button>
+                                <button
+                                  className="btn-primary"
+                                  style={{ flex: 1, height: '40px', fontSize: '0.85rem' }}
+                                  onClick={() => handleMarkReadyForPickup(selectedDetailedOrder.orderId)}
+                                  disabled={orderLoading[selectedDetailedOrder.orderId]}
+                                >
+                                  📦 Mark Package Ready
+                                </button>
+                              </div>
+                            )}
+
+                            {selectedDetailedOrder.status === 'READY_FOR_PICKUP' && (
+                              <button
+                                className="btn-primary"
+                                style={{ height: '40px', fontSize: '0.88rem', width: '100%' }}
+                                onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'PICKED_UP', `🚀 Package picked up by ${selectedDetailedOrder.carrier ? 'courier partner ' + selectedDetailedOrder.carrier : 'Seller (Self-Delivery)'}.`)}
+                                disabled={orderLoading[selectedDetailedOrder.orderId]}
+                              >
+                                🚀 Mark Shipped / Picked Up
+                              </button>
+                            )}
+
+                            {selectedDetailedOrder.status === 'PICKED_UP' && (
+                              <button
+                                className="btn-primary"
+                                style={{ height: '40px', fontSize: '0.88rem', width: '100%' }}
+                                onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'IN_TRANSIT', '🚚 Order package is in transit via EV corridor.')}
+                                disabled={orderLoading[selectedDetailedOrder.orderId]}
+                              >
+                                🚛 Move into Transit Route
+                              </button>
+                            )}
+
+                            {selectedDetailedOrder.status === 'IN_TRANSIT' && (
+                              <button
+                                className="btn-primary"
+                                style={{ height: '40px', fontSize: '0.88rem', width: '100%' }}
+                                onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'OUT_FOR_DELIVERY', '🛵 Package is out for delivery with local dispatch rider.')}
+                                disabled={orderLoading[selectedDetailedOrder.orderId]}
+                              >
+                                🛵 Dispatch for Out for Delivery
+                              </button>
+                            )}
+
+                            {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && (
+                              <button
+                                className="btn-primary"
+                                style={{
+                                  height: '40px',
+                                  fontSize: '0.88rem',
+                                  width: '100%',
+                                  background: '#10b981',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px',
+                                  boxShadow: '0 4px 12px rgba(16,185,129,0.2)',
+                                  transition: 'all 0.2s',
+                                  border: 'none',
+                                  color: '#fff',
+                                  borderRadius: '8px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'DELIVERED', '✅ Order delivered successfully.')}
+                                disabled={orderLoading[selectedDetailedOrder.orderId]}
+                              >
+                                🎉 Mark Order Delivered
+                              </button>
+                            )}
+
+                            {isCompleted && (
+                              <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '16px', textAlign: 'center', marginTop: '10px' }}>
+                                <div style={{ fontSize: '1.8rem', marginBottom: '6px' }}>🎉</div>
+                                <p style={{ color: '#15803d', fontWeight: '700', fontSize: '0.9rem', margin: '0 0 4px 0' }}>Order Delivered</p>
+                                <p style={{ color: '#16a34a', fontSize: '0.78rem', margin: 0, lineHeight: '1.4' }}>
+                                  {selectedDetailedOrder.paymentStatus === 'released' || selectedDetailedOrder.paymentReleased ? 
+                                    '💰 Payout has been successfully released to your merchant account.' : 
+                                    'Awaiting payout clearance from Admin settlement processing.'}
+                                </p>
+                              </div>
+                            )}
+
+                            {selectedDetailedOrder.status === '🔓 FUNDS RELEASED' && (
+                              <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '16px', textAlign: 'center', marginTop: '10px' }}>
+                                <div style={{ fontSize: '1.8rem', marginBottom: '6px' }}>💰</div>
+                                <p style={{ color: '#15803d', fontWeight: '700', fontSize: '0.9rem', margin: '0 0 4px 0' }}>Payout Released</p>
+                                <p style={{ color: '#16a34a', fontSize: '0.78rem', margin: 0, lineHeight: '1.4' }}>
+                                  Funds settled. You can verify transaction details under Settings &gt; Billing.
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      ) : null}
+                      )}
 
                       {/* REJECTED */}
                       {isRejected && (

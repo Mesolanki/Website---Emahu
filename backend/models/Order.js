@@ -195,6 +195,16 @@ const orderSchema = new mongoose.Schema(
     penaltyReason: {
       type: String,
       default: ''
+    },
+    deliveryOtp: {
+      type: String
+    },
+    deliveryOtpExpiry: {
+      type: Date
+    },
+    deliveryOtpAttempts: {
+      type: Number,
+      default: 0
     }
   },
   {

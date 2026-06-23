@@ -252,7 +252,12 @@ export default function OrdersPage() {
             if (anyArrived || anyDelivered) {
               overallStatus = '🎁 ARRIVED - Awaiting Confirmation';
             } else {
-              overallStatus = '✓ Delivery Confirmed by Seller';
+              const anyTransit = group.ordersList.some(o => ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(o.status) || ['picked_up', 'in_transit', 'out_for_delivery'].includes(o.deliveryStatus));
+              if (anyTransit) {
+                overallStatus = '🚚 In Transit';
+              } else {
+                overallStatus = '📦 Preparing Shipment';
+              }
             }
           } else if (isPending) {
             overallStatus = 'PENDING_APPROVAL';
@@ -477,31 +482,8 @@ export default function OrdersPage() {
                 <div 
                   key={ord.billId} 
                   className={`order-card ${isDisputed ? 'order-card--disputed' : ''} ${isReleased ? 'order-card--released' : ''} ${isLocked ? 'order-card--locked' : ''}`}
-                  style={isArrived ? {
-                    border: '2.5px solid #d97706',
-                    boxShadow: '0 0 16px rgba(217, 119, 6, 0.18)',
-                    background: 'rgba(254, 252, 232, 0.02)',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  } : {}}
+                  style={{}}
                 >
-                  {isArrived && (
-                    <div style={{
-                      background: '#d97706',
-                      color: '#fff',
-                      padding: '10px 16px',
-                      fontSize: '0.82rem',
-                      fontWeight: '800',
-                      textAlign: 'center',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px'
-                    }}>
-                      <span className="pulse-dot-yellow" />
-                      ⚠️ ACTION REQUIRED: This package has arrived! Please inspect the items and click "Release Vault to Merchant" below to confirm delivery.
-                    </div>
-                  )}
                   
                   {/* Card Header summary */}
                   <div className="order-card-header">
@@ -626,6 +608,81 @@ export default function OrdersPage() {
                             </div>
                           </div>
                       </div>
+                      
+                      {/* Delivery Partner Assignment Section */}
+                      {ord.ordersList.map((subOrd) => {
+                        const hasPartner = subOrd.deliveryPartnerId || subOrd.carrier;
+                        if (!hasPartner) return null;
+
+                        const partner = subOrd.deliveryPartnerId;
+                        const partnerName = partner?.name || subOrd.carrier;
+                        const partnerPhone = partner?.phone || subOrd.carrierPhone;
+                        const partnerCategory = partner?.category || 'carrier';
+                        const vehicleType = partner?.vehicleType || subOrd.vehicleType;
+                        const isDelivered = ['delivered', 'completed'].includes(subOrd.deliveryStatus?.toLowerCase()) || ['delivered', 'completed'].includes(subOrd.status?.toLowerCase());
+
+                        // Privacy rule: Hide personal details for individual delivery boy category before completion
+                        const isSingleTwoBoy = partnerCategory === 'single_two_boy' || partnerCategory === 'delivery_boy';
+                        const hideDetails = isSingleTwoBoy && !isDelivered;
+                        const displayName = hideDetails ? 'Emahu EV Delivery Partner' : partnerName;
+                        const displayPhone = hideDetails ? null : partnerPhone;
+
+                        return (
+                          <div key={`partner-${subOrd.orderId}`} style={{ marginTop: '12px', padding: '12px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.03)', border: '1px solid rgba(59, 130, 246, 0.12)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                              <div>
+                                <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>
+                                  Assigned Courier Partner (Order #{subOrd.orderId})
+                                </span>
+                                <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>
+                                  🏍️ {displayName}
+                                </strong>
+
+                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
+                                  Category: <span style={{ textTransform: 'capitalize' }}>{partnerCategory.replace(/_/g, ' ')}</span> 
+                                  {vehicleType && ` • Vehicle: ${vehicleType.toUpperCase()}`}
+                                </div>
+                              </div>
+                              
+                              <div style={{ textAlign: 'right' }}>
+                                <span style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '12px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: '700',
+                                  backgroundColor: isDelivered ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                                  color: isDelivered ? '#10b981' : '#d97706',
+                                  textTransform: 'capitalize'
+                                }}>
+                                  {isDelivered ? '✓ Delivered' : subOrd.deliveryStatus || 'Assigned'}
+                                </span>
+                                {subOrd.deliveredAt && (
+                                  <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>
+                                    Delivered: {new Date(subOrd.deliveredAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Show Proof of Delivery Photo if delivered */}
+                            {isDelivered && subOrd.deliveryPhoto && (
+                              <div style={{ marginTop: '10px', borderTop: '1px dashed rgba(0,0,0,0.06)', paddingTop: '10px' }}>
+                                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+                                  📸 Proof of Delivery Package Receipt
+                                </span>
+                                <div style={{ borderRadius: '6px', overflow: 'hidden', border: '1px solid #e2e8f0', maxWidth: '200px', background: '#f8fafc' }}>
+                                  <img 
+                                    src={subOrd.deliveryPhoto} 
+                                    alt="Delivery Proof" 
+                                    style={{ width: '100%', height: 'auto', display: 'block', cursor: 'pointer' }}
+                                    onClick={() => window.open(subOrd.deliveryPhoto, '_blank')}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
 
                   {/* Escrow assurance operations */}
@@ -755,107 +812,65 @@ export default function OrdersPage() {
                             🔄 Retry Rejected Items
                           </button>
                         </div>
-                      ) : ord.ordersList.some(o => o.sellerConfirmed) ? (
-                        <div style={{
-                          width: '100%',
-                          background: 'rgba(16, 185, 129, 0.08)',
-                          border: '1.5px solid #10b981',
-                          borderRadius: '10px',
-                          padding: '12px 16px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                          margin: '8px 0'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '20px',
-                              height: '20px',
-                              borderRadius: '50%',
-                              backgroundColor: '#10b981',
-                              color: '#fff',
-                              fontSize: '0.75rem',
-                              fontWeight: 'bold'
-                            }}>✓</span>
-                            <span style={{ color: '#065f46', fontWeight: '800', fontSize: '0.9rem' }}>Delivery Confirmed by Seller</span>
-                          </div>
-                          <span style={{ fontSize: '0.78rem', color: '#047857' }}>
-                            Escrow Protected: Your money is safe in the vault. The seller cannot withdraw balance until you authorize release.
-                          </span>
-                        </div>
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', margin: '8px 0', border: '1px solid #cbd5e1', borderRadius: '10px', background: '#f8fafc' }}>
                           <svg className="footer-icon-locked" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4169e1" strokeWidth="2.5">
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                           </svg>
-                          <span style={{ fontSize: '0.8rem', color: '#475569' }}>Escrow Protected: Money remains inside safety vault. Seller cannot withdraw balance.</span>
+                          <span style={{ fontSize: '0.8rem', color: '#475569' }}>
+                            Escrow Protected: Money remains inside safety vault. Share the secure OTP with the courier partner to complete delivery and release funds.
+                          </span>
                         </div>
                       )}
                     </div>
 
                     {/* Arrived Sub-Orders Receipt Confirmation */}
                     {!isReleased && !isDisputed && ord.ordersList.map((subOrd) => {
-                      if (subOrd.status === 'ARRIVED' || subOrd.deliveryStatus === 'arrived') {
-                        return (
-                          <div key={subOrd.orderId} style={{
-                            margin: '12px 0',
-                            padding: '12px 16px',
-                            background: 'rgba(16, 185, 129, 0.08)',
-                            border: '1.5px solid #10b981',
-                            borderRadius: '10px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
-                            gap: '12px'
-                          }}>
-                            <div style={{ textAlign: 'left' }}>
-                              <strong style={{ color: '#065f46', fontSize: '0.88rem' }}>📦 Courier Has Arrived (Order #{subOrd.orderId})</strong>
-                              <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#047857' }}>
-                                The package has been delivered to your location. Please verify the contents of your package.
+                      const isDelivered = ['delivered', 'completed'].includes(subOrd.deliveryStatus?.toLowerCase()) || ['delivered', 'completed'].includes(subOrd.status?.toLowerCase());
+                      const showOtp = (!!subOrd.deliveryOtp || ['out_for_delivery', 'arrived'].includes(subOrd.deliveryStatus?.toLowerCase()) || ['out_for_delivery', 'arrived'].includes(subOrd.status?.toLowerCase())) && !isDelivered;
+                      const showArrivalConfirm = (subOrd.status === 'ARRIVED' || subOrd.deliveryStatus === 'arrived') && !isDelivered;
+                      
+                      return (
+                        <div key={subOrd.orderId} style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '8px 0' }}>
+                          {showOtp && (
+                            <div style={{
+                              padding: '12px 16px',
+                              background: 'rgba(15, 23, 42, 0.04)',
+                              border: '1.5px solid #0f172a',
+                              borderRadius: '10px',
+                              textAlign: 'left'
+                            }}>
+                              <strong style={{ color: '#0f172a', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                🔑 Secure Delivery OTP for Order #{subOrd.orderId}: 
+                                <span style={{ fontFamily: 'monospace', letterSpacing: '2px', background: '#f8fafc', padding: '2px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '1.1rem', color: '#000000', fontWeight: 'bold' }}>
+                                  {subOrd.deliveryOtp || 'Not generated'}
+                                </span>
+                              </strong>
+                              <p style={{ margin: '6px 0 0 0', fontSize: '0.78rem', color: '#475569' }}>
+                                Provide this code to the courier partner only when they deliver your items.
                               </p>
                             </div>
-                            <button 
-                              onClick={() => handleConfirmReceipt(subOrd.orderId)}
-                              style={{
-                                background: '#10b981',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: '6px',
-                                padding: '8px 16px',
-                                fontSize: '0.8rem',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 4px rgba(16,185,129,0.2)'
-                              }}
-                            >
-                              ✓ Received Order
-                            </button>
-                          </div>
-                        );
-                      }
-                      return null;
+                          )}
+
+                          {showArrivalConfirm && (
+                            <div style={{
+                              padding: '12px 16px',
+                              background: 'rgba(16, 185, 129, 0.08)',
+                              border: '1.5px solid #10b981',
+                              borderRadius: '10px',
+                              textAlign: 'left'
+                            }}>
+                              <strong style={{ color: '#065f46', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}>📦 Courier Has Arrived (Order #{subOrd.orderId})</strong>
+                              <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#047857' }}>
+                                The courier partner has arrived. Please share the secure OTP shown above with them to verify and complete delivery.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
                     })}
 
-                    <div className="order-actions">
-                      <Link href={`/buyer/track?id=${ord.billId}`} className="orders-btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.8rem', fontWeight: '750', textDecoration: 'none', border: '1.5px solid #cbd5e1', color: '#475569', borderRadius: '6px' }}>
-                        🚛 Track Transit
-                      </Link>
-                      {!isReleased && !isDisputed && !ord.allRejected && ord.sellerConfirmed && (
-                        <>
-                          <button className="orders-btn-outline-danger" onClick={() => setDisputedOrderId(ord.billId)}>
-                            ⚠️ Raise Dispute / Reject
-                          </button>
-                          <button className="orders-btn-success" onClick={() => handleReleaseFunds(ord.billId, ord.ordersList)}>
-                            🔓 Release Vault to Merchant
-                          </button>
-                        </>
-                      )}
-                    </div>
                   </div>
 
                 </div>

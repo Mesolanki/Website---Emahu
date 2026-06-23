@@ -43,6 +43,14 @@ exports.createOrder = async (req, res) => {
   try {
     const orderData = req.body;
     
+    // Auto-generate orderId and date if missing
+    if (!orderData.orderId) {
+      orderData.orderId = `EMH_${Math.floor(100000 + Math.random() * 900000)}`;
+    }
+    if (!orderData.date) {
+      orderData.date = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    
     // Auto-detect city/state from buyer address
     const bAddr = orderData.buyerLocation?.address || orderData.deliveryAddress?.address || '';
     if (!orderData.deliveryAddress) {
@@ -71,7 +79,8 @@ exports.createOrder = async (req, res) => {
       }
     }
     
-    // Check if the buyer has any unconfirmed delivered orders
+    // Check if the buyer has any unconfirmed delivered orders (Removed per request)
+    /*
     if (orderData.userId) {
       const hasUnconfirmedDelivered = await Order.findOne({
         userId: orderData.userId,
@@ -84,6 +93,7 @@ exports.createOrder = async (req, res) => {
         });
       }
     }
+    */
 
     // Calculate and verify delivery charges
     let distanceKm = 0;
@@ -106,14 +116,17 @@ exports.createOrder = async (req, res) => {
     let productAmount = 0;
     if (orderData.items && orderData.items.length > 0) {
       const Product = require('../models/Product');
+      const mongoose = require('mongoose');
       for (const item of orderData.items) {
-        const product = await Product.findById(item.productId);
-        if (product) {
-          productAmount += product.price * (item.quantity || 1);
-        } else {
-          // Fallback if product not found in DB
-          productAmount += (item.price || 0) * (item.quantity || 1);
+        if (mongoose.Types.ObjectId.isValid(item.productId)) {
+          const product = await Product.findById(item.productId);
+          if (product) {
+            productAmount += product.price * (item.quantity || 1);
+            continue;
+          }
         }
+        // Fallback if product not found in DB or not a valid ObjectId
+        productAmount += (item.price || 0) * (item.quantity || 1);
       }
     }
 
@@ -133,6 +146,22 @@ exports.createOrder = async (req, res) => {
       }
     }
 
+    // Override or fill in missing coordinates if request body provides sellerLocation details
+    if (orderData.sellerLocation) {
+      if (orderData.sellerLocation.latitude !== undefined && orderData.sellerLocation.latitude !== null) {
+        sLat = orderData.sellerLocation.latitude;
+      }
+      if (orderData.sellerLocation.longitude !== undefined && orderData.sellerLocation.longitude !== null) {
+        sLon = orderData.sellerLocation.longitude;
+      }
+      if (orderData.sellerLocation.shopName) {
+        sName = orderData.sellerLocation.shopName;
+      }
+      if (orderData.sellerLocation.address) {
+        sAddress = orderData.sellerLocation.address;
+      }
+    }
+
     // Resolve Buyer Location
     let bLat = orderData.buyerLocation?.latitude;
     let bLon = orderData.buyerLocation?.longitude;
@@ -144,7 +173,11 @@ exports.createOrder = async (req, res) => {
     }
 
     // Compute distance and charge
-    distanceKm = getHaversineDistance(bLat, bLon, sLat, sLon);
+    if (orderData.distanceKm !== undefined && orderData.distanceKm !== null && orderData.distanceKm > 0) {
+      distanceKm = orderData.distanceKm;
+    } else {
+      distanceKm = getHaversineDistance(bLat, bLon, sLat, sLon);
+    }
     
     // Validate Max Distance
     if (distanceKm > settings.maxDeliveryDistance) {
@@ -283,7 +316,7 @@ exports.getOrders = async (req, res) => {
       ];
     }
 
-    const orders = await Order.find(filter).sort({ createdAt: -1 });
+    const orders = await Order.find(filter).populate('deliveryPartnerId', 'name phone role category vehicleType vehicleNumber').sort({ createdAt: -1 });
     res.status(200).json({
       success: true,
       orders
@@ -320,7 +353,7 @@ exports.updateOrder = async (req, res) => {
       { orderId: id },
       { $set: updateData },
       { new: true, runValidators: true }
-    );
+    ).populate('deliveryPartnerId', 'name phone role category vehicleType vehicleNumber');
 
     if (!order) {
       return res.status(404).json({
@@ -328,6 +361,17 @@ exports.updateOrder = async (req, res) => {
         error: `Order with ID ${id} not found`
       });
     }
+
+    // Auto-assignment hook disabled (Seller chooses delivery partner manually)
+    /*
+    if (
+      ['APPROVED', 'READY_FOR_PICKUP'].includes(order.status) &&
+      (!order.deliveryPartnerId || order.deliveryStatus === 'unassigned')
+    ) {
+      const { autoAssignOrderInternal } = require('./deliveryController');
+      await autoAssignOrderInternal(order);
+    }
+    */
 
     res.status(200).json({
       success: true,

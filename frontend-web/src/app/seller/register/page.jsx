@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './register.css';
 import { registerUser, saveAuthSession } from '@/utils/auth';
+import API_BASE from '@/utils/config';
 
 /**
  * SellerRegister Component
@@ -92,8 +93,7 @@ export default function SellerRegister() {
     setOtpSending(true);
     setOtpError('');
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const res = await fetch(`${apiUrl}/api/auth/send-otp`, {
+      const res = await fetch(`${API_BASE}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email })
@@ -129,8 +129,7 @@ export default function SellerRegister() {
     setLoading(true);
     setOtpError('');
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const res = await fetch(`${apiUrl}/api/auth/verify-otp`, {
+      const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, otp: otpInput.trim() })
@@ -248,7 +247,12 @@ export default function SellerRegister() {
 
   const handleNext = () => {
     if (step === 1 && validateStep1()) {
-      triggerSendOtp();
+      const isGoogleReg = formData.password && formData.password.startsWith('GoogleAuthPass_');
+      if (isGoogleReg) {
+        setStep(2);
+      } else {
+        triggerSendOtp();
+      }
     }
     if (step === 2 && validateStep2()) setStep(3);
   };
@@ -287,9 +291,8 @@ export default function SellerRegister() {
         
         // Automatically submit documents upon registration
         if (data.accessToken) {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
           const docUrl = 'https://emahu-documents.s3.amazonaws.com/' + (formData.kycFile ? encodeURIComponent(formData.kycFile.name) : 'kyc_document.jpg');
-          await fetch(apiUrl + '/api/auth/seller/documents', {
+          await fetch(API_BASE + '/api/auth/seller/documents', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -301,7 +304,7 @@ export default function SellerRegister() {
             })
           });
 
-          await fetch(apiUrl + '/api/auth/seller/documents', {
+          await fetch(API_BASE + '/api/auth/seller/documents', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -835,6 +838,22 @@ export default function SellerRegister() {
                 textAlign: 'left'
               }}>
                 {otpError}
+              </div>
+            )}
+
+            {devEmailOtp && (
+              <div style={{
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.2)',
+                color: '#38bdf8',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                marginBottom: '16px',
+                textAlign: 'center'
+              }}>
+                🔑 Dev Mode OTP Code: <code style={{ letterSpacing: '2px', fontSize: '1rem', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>{devEmailOtp}</code>
               </div>
             )}
 

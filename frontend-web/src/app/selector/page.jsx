@@ -245,10 +245,7 @@ export default function RoleSelector() {
 
   // Merge hardcoded + dynamic backend categories for the welcome screen
   const mergedCategories = useMemo(() => {
-    if (!dbCategories.length) return CATEGORIES;
-    
-    const hardcodedSlugs = CATEGORIES.map(c => c.id);
-    const hardcodedNamesLC = CATEGORIES.map(c => c.name.toLowerCase());
+    if (!dbCategories || !dbCategories.length) return [];
     
     const dynamicCats = [];
     let accentIdx = 0;
@@ -257,40 +254,34 @@ export default function RoleSelector() {
       const nameLC = dbCat.name.toLowerCase();
       const slug = dbCat.slug || nameLC.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       
-      // Skip if this DB category already matches a hardcoded one
-      const matchesHardcoded = hardcodedSlugs.includes(slug) ||
-        hardcodedNamesLC.some(hn => hn.includes(nameLC) || nameLC.includes(hn));
-      
-      if (!matchesHardcoded) {
-        let icon = '📦';
-        for (const [key, emoji] of Object.entries(DYNAMIC_CATEGORY_ICONS)) {
-          if (nameLC.includes(key)) { icon = emoji; break; }
-        }
-        
-        const accent = DYNAMIC_ACCENTS[accentIdx % DYNAMIC_ACCENTS.length];
-        accentIdx++;
-        const r = parseInt(accent.slice(1, 3), 16);
-        const g = parseInt(accent.slice(3, 5), 16);
-        const b = parseInt(accent.slice(5, 7), 16);
-        
-        const subcats = ['All ' + dbCat.name];
-        if (dbCat.children && dbCat.children.length > 0) {
-          dbCat.children.forEach(child => subcats.push(child.name));
-        }
-        
-        dynamicCats.push({
-          id: slug,
-          name: dbCat.name,
-          icon,
-          desc: `Browse ${dbCat.name} products from verified sellers on EMAHU.`,
-          subcategories: subcats,
-          gradient: `linear-gradient(135deg, rgba(${r}, ${g}, ${b}, 0.08) 0%, rgba(${r}, ${g}, ${b}, 0.04) 100%)`,
-          accent
-        });
+      let icon = '📦';
+      for (const [key, emoji] of Object.entries(DYNAMIC_CATEGORY_ICONS)) {
+        if (nameLC.includes(key)) { icon = emoji; break; }
       }
+      
+      const accent = DYNAMIC_ACCENTS[accentIdx % DYNAMIC_ACCENTS.length];
+      accentIdx++;
+      const r = parseInt(accent.slice(1, 3), 16);
+      const g = parseInt(accent.slice(3, 5), 16);
+      const b = parseInt(accent.slice(5, 7), 16);
+      
+      const subcats = ['All ' + dbCat.name];
+      if (dbCat.children && dbCat.children.length > 0) {
+        dbCat.children.forEach(child => subcats.push(child.name));
+      }
+      
+      dynamicCats.push({
+        id: slug,
+        name: dbCat.name,
+        icon,
+        desc: `Browse ${dbCat.name} products from verified sellers on EMAHU.`,
+        subcategories: subcats,
+        gradient: `linear-gradient(135deg, rgba(${r}, ${g}, ${b}, 0.08) 0%, rgba(${r}, ${g}, ${b}, 0.04) 100%)`,
+        accent
+      });
     });
     
-    return [...CATEGORIES, ...dynamicCats];
+    return dynamicCats;
   }, [dbCategories]);
 
   // Build category name → root category ID lookup for product mapping

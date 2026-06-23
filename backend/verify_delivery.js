@@ -12,7 +12,8 @@
  * 6. No-OTP photo upload + Buyer-confirm flow.
  */
 
-const BASE_URL = 'http://localhost:5000';
+const PORT = process.env.TEST_PORT || '5000';
+const BASE_URL = `http://localhost:${PORT}`;
 
 async function requestAndVerifyOtp(email) {
   const sendRes = await fetch(`${BASE_URL}/api/auth/send-otp`, {
@@ -49,7 +50,38 @@ async function runTests() {
   let buyerId, sellerId, partnerAhdId, partnerSuratId;
   let orderAhdId, orderSuratId;
 
+  const mongoose = require('mongoose');
+  const dbUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/emahu';
+
+  // Load models in current process to compile schemas
+  const User = require('./models/User');
+  const Order = require('./models/Order');
+  const DeliveryAssignment = require('./models/DeliveryAssignment');
+  const DeliveryTracking = require('./models/DeliveryTracking');
+  const Otp = require('./models/Otp');
+
   try {
+    console.log('👉 Connecting to MongoDB for pre-test cleanup...');
+    await mongoose.connect(dbUri);
+
+    console.log('🧹 Cleaning up old test data to prevent pollution...');
+    await User.deleteMany({
+      $or: [
+        { email: /emahu\.com/i },
+        { email: /thiefness\.com/i },
+        { name: /^sd$/i }
+      ]
+    });
+    await Order.deleteMany({
+      $or: [
+        { 'deliveryAddress.email': /emahu\.com/i },
+        { sellerEmail: /emahu\.com/i }
+      ]
+    });
+    await DeliveryAssignment.deleteMany({});
+    await DeliveryTracking.deleteMany({});
+    await Otp.deleteMany({});
+    console.log('✅ Pre-test database cleanup completed.');
     // -------------------------------------------------------------------------
     // 1. REGISTER USERS
     // -------------------------------------------------------------------------
@@ -153,8 +185,8 @@ async function runTests() {
         serviceAreaState: 'Gujarat',
         currentArea: 'Gota',
         pincode: '382481',
-        latitude: 23.0225,
-        longitude: 72.5714,
+        latitude: 23.0800,
+        longitude: 72.5310,
         perKmRate: 2,
         perItemCharge: 2,
         vehicleType: 'bike',
@@ -172,6 +204,14 @@ async function runTests() {
     });
     partnerAhdToken = (await partnerAhdLogin.json()).accessToken;
     console.log(`✅ Ahmedabad Driver registered. ID: ${partnerAhdId}`);
+
+    // Approve Ahmedabad Driver via admin decision
+    await fetch(`${BASE_URL}/api/auth/admin/delivery-partners/${partnerAhdId}/decision`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({ decision: 'approve' })
+    });
+    console.log('✅ Ahmedabad Driver approved by admin.');
 
     // Register Surat Driver Partner
     await requestAndVerifyOtp(partnerSuratEmail);
@@ -209,6 +249,14 @@ async function runTests() {
     });
     partnerSuratToken = (await partnerSuratLogin.json()).accessToken;
     console.log(`✅ Surat Driver registered. ID: ${partnerSuratId}`);
+
+    // Approve Surat Driver via admin decision
+    await fetch(`${BASE_URL}/api/auth/admin/delivery-partners/${partnerSuratId}/decision`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({ decision: 'approve' })
+    });
+    console.log('✅ Surat Driver approved by admin.');
 
     // -------------------------------------------------------------------------
     // 2. CREATE TEST ORDERS (Ahmedabad vs Surat)
@@ -305,12 +353,14 @@ async function runTests() {
     });
     const queueAhdData = await queueAhdRes.json();
     const ahdAvailableIds = (queueAhdData.availableOrders || []).map(o => o.orderId);
-    console.log(`Ahmedabad driver available orders: ${JSON.stringify(ahdAvailableIds)}`);
+    const ahdAssignedIds = (queueAhdData.orders || []).map(o => o.orderId);
+    const ahdAllIds = [...ahdAvailableIds, ...ahdAssignedIds];
+    console.log(`Ahmedabad driver available orders: ${JSON.stringify(ahdAvailableIds)}, assigned: ${JSON.stringify(ahdAssignedIds)}`);
 
-    if (!ahdAvailableIds.includes(orderAhdId)) {
-      throw new Error(`Expected Ahmedabad order #${orderAhdId} in Ahmedabad driver available queue.`);
+    if (!ahdAllIds.includes(orderAhdId)) {
+      throw new Error(`Expected Ahmedabad order #${orderAhdId} in Ahmedabad driver queue.`);
     }
-    if (ahdAvailableIds.includes(orderSuratId)) {
+    if (ahdAllIds.includes(orderSuratId)) {
       throw new Error(`Surat order #${orderSuratId} should NOT appear in Ahmedabad driver queue.`);
     }
     console.log('✅ Ahmedabad driver filtering passed.');
@@ -321,12 +371,14 @@ async function runTests() {
     });
     const queueSuratData = await queueSuratRes.json();
     const suratAvailableIds = (queueSuratData.availableOrders || []).map(o => o.orderId);
-    console.log(`Surat driver available orders: ${JSON.stringify(suratAvailableIds)}`);
+    const suratAssignedIds = (queueSuratData.orders || []).map(o => o.orderId);
+    const suratAllIds = [...suratAvailableIds, ...suratAssignedIds];
+    console.log(`Surat driver available orders: ${JSON.stringify(suratAvailableIds)}, assigned: ${JSON.stringify(suratAssignedIds)}`);
 
-    if (!suratAvailableIds.includes(orderSuratId)) {
-      throw new Error(`Expected Surat order #${orderSuratId} in Surat driver available queue.`);
+    if (!suratAllIds.includes(orderSuratId)) {
+      throw new Error(`Expected Surat order #${orderSuratId} in Surat driver queue.`);
     }
-    if (suratAvailableIds.includes(orderAhdId)) {
+    if (suratAllIds.includes(orderAhdId)) {
       throw new Error(`Ahmedabad order #${orderAhdId} should NOT appear in Surat driver queue.`);
     }
     console.log('✅ Surat driver filtering passed.');
@@ -357,7 +409,9 @@ async function runTests() {
     console.log('✅ Live GPS coordinates updated successfully.');
 
     // Check live tracking details retrieval
-    const trackDetailsRes = await fetch(`${BASE_URL}/api/delivery/track/live/${orderAhdId}`);
+    const trackDetailsRes = await fetch(`${BASE_URL}/api/delivery/track/live/${orderAhdId}`, {
+      headers: { 'Authorization': `Bearer ${buyerToken}` }
+    });
     const trackDetails = await trackDetailsRes.json();
     if (!trackDetails.success) throw new Error('Get tracking details failed');
     console.log(`✅ Live details retrieved. Courier GPS: ${JSON.stringify(trackDetails.partnerLocation)}. Remaining Distance: ${trackDetails.remainingDistanceKm} KM. ETA: ${trackDetails.etaMinutes} mins.`);
@@ -428,12 +482,8 @@ async function runTests() {
     // Let's look at the database using a check script, or we can fetch the OTP from the Otp collection directly!
     // Since verify_delivery.js runs locally, it can connect to Mongoose and extract the active OTP code!
     // Let's see: yes! We can require Mongoose, load the Otp model, and fetch the otp code!
-    console.log('👉 Connecting to MongoDB to fetch active OTP code...');
-    const mongoose = require('mongoose');
-    const dbUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/emahu';
-    await mongoose.connect(dbUri);
-    const OtpModel = mongoose.model('Otp');
-    const otpDoc = await OtpModel.findOne({ email: buyerEmail }).sort({ createdAt: -1 });
+    console.log('👉 Querying MongoDB to fetch active OTP code...');
+    const otpDoc = await Otp.findOne({ email: buyerEmail }).sort({ createdAt: -1 });
     if (!otpDoc) throw new Error('OTP document not found in MongoDB!');
     const activeOtp = otpDoc.otp;
     console.log(`🔑 Retrieved active OTP code from DB: ${activeOtp}`);
@@ -477,8 +527,7 @@ async function runTests() {
     }
 
     // Reset attempts in database to test successful validation
-    otpDoc.attempts = 0;
-    await otpDoc.save();
+    await Otp.updateOne({ email: buyerEmail }, { $set: { attempts: 0 } });
     console.log('👉 Resetting failures in MongoDB to verify successful OTP handover...');
 
     // Proximity Verify: Try to verify OTP from distant location (Mumbai coords)

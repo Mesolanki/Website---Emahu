@@ -1152,7 +1152,7 @@ export default function AdminDashboard() {
         setEditPartnerOperatingLocation(selectedDetailPartner.operatingLocation || '');
         setEditPartnerSalaryRequirement(selectedDetailPartner.salaryRequirement || '');
         setEditPartnerServiceAreaCountry(selectedDetailPartner.serviceAreaCountry || 'India');
-        setEditPartnerServiceAreaRegion(selectedDetailPartner.serviceAreaRegion || '');
+        setEditPartnerServiceAreaRegion(selectedDetailPartner.serviceAreaRegion || selectedDetailPartner.currentArea || '');
         setEditPartnerServiceAreaDistrict(selectedDetailPartner.serviceAreaDistrict || '');
         setEditPartnerServiceAreaState(selectedDetailPartner.serviceAreaState || '');
         setEditPartnerServiceAreaCity(selectedDetailPartner.serviceAreaCity || '');
@@ -1953,21 +1953,35 @@ export default function AdminDashboard() {
             <div className="ad-detail-header-block">
               <div className="ad-detail-title-section">
                 <h3 className="ad-detail-store-name">{selectedDetailPartner.name || 'Delivery Partner'}</h3>
-                <div className="ad-detail-store-meta">
+                <div className="ad-detail-store-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
                   <span>📍 Hub: {selectedDetailPartner.operatingLocation || 'Unspecified Hub'}</span>
                   <span>•</span>
                   <span>📞 Phone: {selectedDetailPartner.phone || 'N/A'}</span>
+                  <span>•</span>
+                  <span>📧 Email: {selectedDetailPartner.email || 'N/A'}</span>
                 </div>
                 {selectedDetailPartner.address && (
                   <div style={{ fontSize: '0.8rem', color: 'var(--color-admin-muted)', marginTop: '4px' }}>
                     🏢 HQ Address: {selectedDetailPartner.address}
                   </div>
                 )}
-                {selectedDetailPartner.vehicleNumber && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--color-admin-muted)', marginTop: '2px' }}>
-                    ⚙️ Fleet Details: {selectedDetailPartner.vehicleNumber}
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '2px' }}>
+                  {selectedDetailPartner.vehicleNumber && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--color-admin-muted)' }}>
+                      ⚙️ Fleet Number: {selectedDetailPartner.vehicleNumber}
+                    </span>
+                  )}
+                  {selectedDetailPartner.vehicleType && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--color-admin-muted)' }}>
+                      • 🏍️ Type: {selectedDetailPartner.vehicleType.toUpperCase()}
+                    </span>
+                  )}
+                  {selectedDetailPartner.pincode && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--color-admin-muted)' }}>
+                      • 📮 Pincode: {selectedDetailPartner.pincode}
+                    </span>
+                  )}
+                </div>
               </div>
               <span className={`ad-status-badge ${selectedDetailPartner.status}`} style={{ fontSize: '0.85rem', padding: '6px 14px' }}>
                 {selectedDetailPartner.status?.toUpperCase()}
@@ -2590,9 +2604,51 @@ export default function AdminDashboard() {
                           <div key={doc._id} className="ad-detail-doc-item">
                             <div className="ad-detail-doc-info">
                               <span className="ad-detail-doc-title">{doc.documentType?.replace(/_/g, ' ')}</span>
-                              <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="ad-detail-doc-link">
+                              <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="ad-detail-doc-link" style={{ display: 'inline-block', marginBottom: '8px' }}>
                                 🔗 Open Document File Reference
                               </a>
+                              {isRealImage(doc.fileUrl) ? (
+                                <div style={{ 
+                                  marginTop: '8px', 
+                                  borderRadius: '8px', 
+                                  overflow: 'hidden', 
+                                  border: '1px solid var(--color-admin-border)', 
+                                  maxWidth: '100%', 
+                                  maxHeight: '240px',
+                                  background: 'rgba(0,0,0,0.2)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>
+                                  <img 
+                                    src={cleanImageUrl(doc.fileUrl)} 
+                                    alt={doc.documentType} 
+                                    style={{ maxWidth: '100%', maxHeight: '240px', objectFit: 'contain', cursor: 'pointer' }}
+                                    onClick={() => window.open(cleanImageUrl(doc.fileUrl), '_blank')}
+                                  />
+                                </div>
+                              ) : doc.fileUrl && doc.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                                <div style={{ 
+                                  marginTop: '8px', 
+                                  padding: '12px', 
+                                  borderRadius: '8px', 
+                                  background: 'rgba(255,255,255,0.02)', 
+                                  border: '1px solid var(--color-admin-border)', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '10px' 
+                                }}>
+                                  <span style={{ fontSize: '1.8rem' }}>📄</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '0.85rem', color: '#fff', fontWeight: '500' }}>
+                                      {doc.fileUrl.split('/').pop() || 'document.pdf'}
+                                    </span>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>
+                                      PDF Document
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : null}
                               {doc.feedback && (
                                 <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>
                                   Audit Rejection Reason: {doc.feedback}
@@ -3616,169 +3672,45 @@ export default function AdminDashboard() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.01)', padding: '14px', borderRadius: '8px', border: '1px solid var(--color-admin-border)' }}>
                       <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>COURIER CORRIDOR TRACKING PROVISIONS</span>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '0.74rem', color: 'var(--color-admin-muted)', fontStyle: 'italic' }}>
+                        * Logistics are managed directly by the merchant seller.
+                      </p>
                       
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.8rem' }}>
                         <div>
-                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '4px' }}>Logistics Carrier</label>
-                          <select 
-                            className="ad-modal-input" 
-                            style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px' }}
-                            value={carrier}
-                            onChange={(e) => handleCarrierChange(e.target.value)}
-                          >
-                            <option value="Delhivery">Delhivery Logistics</option>
-                            <option value="Blue Dart">Blue Dart Premium</option>
-                            <option value="EmahuXpress">Emahu Xpress Direct</option>
-                            <option value="FedEx">FedEx International</option>
-                          </select>
+                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '2px' }}>Logistics Carrier</label>
+                          <strong style={{ color: '#fff' }}>{selectedDetailOrder.carrier || 'Not Assigned'}</strong>
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '4px' }}>Tracking Identifier</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. EMH-TRK-983"
-                            className="ad-modal-input"
-                            style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%' }}
-                            value={trackingId}
-                            onChange={(e) => setTrackingId(e.target.value)}
-                          />
+                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '2px' }}>Tracking Identifier</label>
+                          <strong style={{ color: '#fff', fontFamily: 'monospace' }}>{selectedDetailOrder.trackingId || 'N/A'}</strong>
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '0.8rem', marginTop: '10px' }}>
                         <div>
-                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '4px' }}>Package Weight</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 0.8 kg"
-                            className="ad-modal-input"
-                            style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%' }}
-                            value={packageWeight}
-                            onChange={(e) => setPackageWeight(e.target.value)}
-                          />
+                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '2px' }}>Package Weight</label>
+                          <strong style={{ color: '#fff' }}>{selectedDetailOrder.packageWeight || 'N/A'}</strong>
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '4px' }}>Ship Cost (₹)</label>
-                          <input
-                            type="number"
-                            placeholder="80"
-                            className="ad-modal-input"
-                            style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%' }}
-                            value={deliveryCost}
-                            onChange={(e) => setDeliveryCost(e.target.value)}
-                          />
+                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '2px' }}>Ship Cost (₹)</label>
+                          <strong style={{ color: '#fff' }}>{selectedDetailOrder.deliveryCost !== undefined ? `₹${selectedDetailOrder.deliveryCost}` : 'N/A'}</strong>
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '4px' }}>Transit Time</label>
-                          <input
-                            type="text"
-                            placeholder="2-4 Days"
-                            className="ad-modal-input"
-                            style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%' }}
-                            value={estDays}
-                            onChange={(e) => setEstDays(e.target.value)}
-                          />
+                          <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '2px' }}>Transit Time</label>
+                          <strong style={{ color: '#fff' }}>{selectedDetailOrder.estDays || 'N/A'}</strong>
                         </div>
                       </div>
-
-                      <button
-                        className="ad-btn-sec"
-                        style={{ height: '34px', fontSize: '0.78rem', display: 'flex', alignSelf: 'flex-end', padding: '0 16px' }}
-                        onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'UPDATE_TRACKING_INFO')}
-                        disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
-                      >
-                        {actionLoadingOrder[selectedDetailOrder.orderId] ? 'Saving...' : '💾 Save Tracking Details'}
-                      </button>
                     </div>
 
-                    {/* Progress Shipping State buttons */}
+                    {/* Progress Shipping State / Payout Info (Read-only) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>TRANSIT WORKFLOW ADVANCEMENT ACTIONS</span>
-                      
-                      {selectedDetailOrder.status === 'APPROVED' && (
-                        <button
-                          className="ad-btn-action approve"
-                          style={{ height: '40px', fontSize: '0.88rem' }}
-                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'ASSIGN_CARRIER')}
-                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
-                        >
-                          🚚 Assign Courier &amp; Generate Label
-                        </button>
-                      )}
-
-                      {selectedDetailOrder.status === 'DELIVERY_ASSIGNED' && (
-                        <button
-                          className="ad-btn-action approve"
-                          style={{ height: '40px', fontSize: '0.88rem' }}
-                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'ASSIGN_CARRIER')}
-                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
-                        >
-                          📄 Generate Shipping Label
-                        </button>
-                      )}
-
-                      {selectedDetailOrder.status === 'LABEL_GENERATED' && (
-                        <button
-                          className="ad-btn-action approve"
-                          style={{ height: '40px', fontSize: '0.88rem' }}
-                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'MARK_READY')}
-                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
-                        >
-                          📦 Mark Package Ready For Pickup
-                        </button>
-                      )}
-
-                      {selectedDetailOrder.status === 'READY_FOR_PICKUP' && (
-                        <button
-                          className="ad-btn-action approve"
-                          style={{ height: '40px', fontSize: '0.88rem' }}
-                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'SHIP')}
-                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
-                        >
-                          🚀 Mark Shipped / Picked Up
-                        </button>
-                      )}
-
-                      {selectedDetailOrder.status === 'PICKED_UP' && (
-                        <button
-                          className="ad-btn-action approve"
-                          style={{ height: '40px', fontSize: '0.88rem' }}
-                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'IN_TRANSIT')}
-                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
-                        >
-                          🚛 Move into Transit Route
-                        </button>
-                      )}
-
-                      {selectedDetailOrder.status === 'IN_TRANSIT' && (
-                        <button
-                          className="ad-btn-action approve"
-                          style={{ height: '40px', fontSize: '0.88rem' }}
-                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'OUT_FOR_DELIVERY')}
-                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
-                        >
-                          🛵 Dispatch for Out for Delivery
-                        </button>
-                      )}
-
-                      {selectedDetailOrder.status === 'OUT_FOR_DELIVERY' && (
-                        <button
-                          className="ad-btn-action approve"
-                          style={{ height: '40px', fontSize: '0.88rem', background: '#10b981' }}
-                          onClick={() => handleOrderFulfillmentAction(selectedDetailOrder, 'DELIVER')}
-                          disabled={actionLoadingOrder[selectedDetailOrder.orderId]}
-                        >
-                          🎉 Mark Delivered &amp; Release Funds
-                        </button>
-                      )}
-
                       {['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].some(s => selectedDetailOrder.status?.includes(s)) && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px', marginTop: '4px' }}>
                           <div style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', padding: '14px', color: '#10b981', fontSize: '0.82rem', textAlign: 'center', fontWeight: 'bold' }}>
                             ✓ Fulfillment Cycle Completed Successfully
                           </div>
 
-                          {/* Payout Flow */}
                           {selectedDetailOrder.paymentStatus === 'paid' ? (
                             <div style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: '8px', padding: '14px', fontSize: '0.82rem', color: '#60a5fa' }}>
                               <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
@@ -3798,70 +3730,11 @@ export default function AdminDashboard() {
                               )}
                             </div>
                           ) : (
-                            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '14px' }}>
-                              <div style={{ fontWeight: 'bold', fontSize: '0.82rem', color: '#fff', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                💰 Confirm Merchant Payout
-                              </div>
-                              <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: '#94a3b8', lineHeight: '1.4' }}>
-                                Confirm that you have transferred the net payout amount to the seller&apos;s bank account and upload the transaction receipt/screenshot below.
+                            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '14px', fontSize: '0.8rem', color: '#10b981', textAlign: 'center' }}>
+                              🎉 <strong>Order Delivered Successfully</strong>
+                              <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#94a3b8', lineHeight: '1.4' }}>
+                                Payout settlement is processed exclusively under the <strong>Registered Merchants &gt; Settlement</strong> tab.
                               </p>
-
-                              {/* Penalty Inputs */}
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px', marginBottom: '12px' }}>
-                                <div className="form-group" style={{ margin: 0 }}>
-                                  <label style={{ fontSize: '0.72rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Penalty (₹)</label>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    className="ad-modal-input"
-                                    style={{ margin: 0, height: '36px', background: '#0a0b10', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', padding: '0 8px', width: '100%' }}
-                                    value={adminPenaltyAmount}
-                                    onChange={(e) => setAdminPenaltyAmount(e.target.value)}
-                                  />
-                                </div>
-                                <div className="form-group" style={{ margin: 0 }}>
-                                  <label style={{ fontSize: '0.72rem', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Reason for penalty</label>
-                                  <input
-                                    type="text"
-                                    placeholder="e.g. Delayed dispatch"
-                                    className="ad-modal-input"
-                                    style={{ margin: 0, height: '36px', background: '#0a0b10', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', padding: '0 8px', width: '100%' }}
-                                    value={adminPenaltyReason}
-                                    onChange={(e) => setAdminPenaltyReason(e.target.value)}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Premium Uploader */}
-                              <div style={{ position: 'relative', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: '6px', padding: '12px 10px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', cursor: 'pointer', marginBottom: '12px' }}>
-                                <input 
-                                  type="file" 
-                                  accept="image/*,application/pdf"
-                                  onChange={handlePayoutFileChange}
-                                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-                                />
-                                {payoutReceiptFile ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                                    <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: '500' }}>✓ Receipt File Loaded</span>
-                                    <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Click or drag to change file</span>
-                                  </div>
-                                ) : (
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                                    <span style={{ fontSize: '0.75rem', color: '#38bdf8' }}>📁 Upload Transfer Receipt</span>
-                                    <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Supports image or document screenshot</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              <button
-                                className="ad-btn-action approve"
-                                style={{ height: '36px', fontSize: '0.82rem', width: '100%', margin: 0, background: payoutReceiptFile ? 'var(--color-admin-primary)' : 'rgba(255,255,255,0.05)', borderColor: payoutReceiptFile ? 'var(--color-admin-primary)' : 'rgba(255,255,255,0.08)', cursor: payoutReceiptFile ? 'pointer' : 'not-allowed', color: payoutReceiptFile ? '#fff' : '#64748b' }}
-                                disabled={!payoutReceiptFile || payoutSubmitting}
-                                onClick={() => submitMerchantPayout(selectedDetailOrder.orderId)}
-                              >
-                                {payoutSubmitting ? 'Confirming...' : '💰 Confirm Transfer & Release Funds'}
-                              </button>
                             </div>
                           )}
                         </div>

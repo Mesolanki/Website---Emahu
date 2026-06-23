@@ -26,8 +26,11 @@ export default function ForgotPassword() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('role') === 'seller') {
+      const r = params.get('role');
+      if (r === 'seller') {
         setRole('seller');
+      } else if (r === 'delivery') {
+        setRole('delivery');
       }
     }
   }, []);
@@ -275,7 +278,7 @@ export default function ForgotPassword() {
       setStep('success');
       // Redirect after 3 seconds
       setTimeout(() => {
-        router.push(role === 'seller' ? '/seller/login' : '/buyer/login');
+        router.push(role === 'seller' ? '/seller/login' : role === 'delivery' ? '/delivery' : '/buyer/login');
       }, 3000);
     } catch (err) {
       setError(err.message || 'Failed to reset password.');
@@ -353,7 +356,7 @@ export default function ForgotPassword() {
 
             <div style={{ textAlign: 'center', marginTop: '12px' }}>
               <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>Remember your credentials? </span>
-              <Link href={role === 'seller' ? "/seller/login" : "/buyer/login"} className="fp-resend-link" style={{ fontSize: '0.82rem' }}>
+              <Link href={role === 'seller' ? "/seller/login" : role === 'delivery' ? "/delivery" : "/buyer/login"} className="fp-resend-link" style={{ fontSize: '0.82rem' }}>
                 Sign In
               </Link>
             </div>
@@ -497,7 +500,7 @@ export default function ForgotPassword() {
             <p className="fp-subtitle" style={{ fontSize: '0.88rem', color: '#94a3b8', marginTop: '8px' }}>
               Your credentials are secured. Redirecting you to the Sign In screen...
             </p>
-            <Link href={role === 'seller' ? "/seller/login" : "/buyer/login"} className="fp-btn" style={{ marginTop: '24px', textDecoration: 'none' }}>
+            <Link href={role === 'seller' ? "/seller/login" : role === 'delivery' ? "/delivery" : "/buyer/login"} className="fp-btn" style={{ marginTop: '24px', textDecoration: 'none' }}>
               Sign In Now
             </Link>
           </div>
