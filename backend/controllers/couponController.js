@@ -1,4 +1,4 @@
-const Coupon = require('../models/Coupon');
+ const Coupon = require('../models/Coupon');
 
 // @desc    Validate a coupon code
 // @route   GET /api/coupons/validate
