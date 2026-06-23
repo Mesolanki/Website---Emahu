@@ -60,6 +60,7 @@ export default function AdminDashboard() {
   const [adminUser, setAdminUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [activeTab, setActiveTab] = useState('sellers');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Payout states
   const [payoutReceiptFile, setPayoutReceiptFile] = useState('');
@@ -3758,8 +3759,13 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Mobile sidebar backdrop */}
+      {mobileSidebarOpen && (
+        <div className="ad-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} aria-hidden="true" />
+      )}
+
       {/* Sidebar */}
-      <aside className="ad-sidebar">
+      <aside className={`ad-sidebar ${mobileSidebarOpen ? 'ad-sidebar--mobile-open' : ''}`}>
         <Link href="/" className="ad-sidebar-brand">
           <div className="ad-sidebar-logo">
             <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
@@ -3773,7 +3779,7 @@ export default function AdminDashboard() {
 
         <ul className="ad-sidebar-menu">
           <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'new-sellers' ? 'active' : ''}`} onClick={() => setActiveTab('new-sellers')}>
+            <button className={`ad-sidebar-btn ${activeTab === 'new-sellers' ? 'active' : ''}`} onClick={() => { setActiveTab('new-sellers'); setMobileSidebarOpen(false); }}>
               🆕 New Seller Approvals {sellers.filter(s => s.status === 'pending' || s.status === 'more_info_requested').length > 0 && (
                 <span style={{ background: '#f59e0b', color: '#000', borderRadius: '50%', padding: '2px 8px', fontSize: '0.7rem', marginLeft: '6px', fontWeight: 'bold' }}>
                   {sellers.filter(s => s.status === 'pending' || s.status === 'more_info_requested').length}
@@ -3782,12 +3788,12 @@ export default function AdminDashboard() {
             </button>
           </li>
           <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'sellers' ? 'active' : ''}`} onClick={() => setActiveTab('sellers')}>
+            <button className={`ad-sidebar-btn ${activeTab === 'sellers' ? 'active' : ''}`} onClick={() => { setActiveTab('sellers'); setMobileSidebarOpen(false); }}>
               👥 Registered Merchants
             </button>
           </li>
           <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'products-hub' ? 'active' : ''}`} onClick={() => setActiveTab('products-hub')}>
+            <button className={`ad-sidebar-btn ${activeTab === 'products-hub' ? 'active' : ''}`} onClick={() => { setActiveTab('products-hub'); setMobileSidebarOpen(false); }}>
               📦 Products Hub {products.filter(p => p.approvalStatus === 'pending' || p.approvalStatus === 'changes_requested').length > 0 && (
                 <span style={{ background: '#f59e0b', color: '#000', borderRadius: '50%', padding: '2px 8px', fontSize: '0.7rem', marginLeft: '6px', fontWeight: 'bold' }}>
                   {products.filter(p => p.approvalStatus === 'pending' || p.approvalStatus === 'changes_requested').length}
@@ -3796,7 +3802,7 @@ export default function AdminDashboard() {
             </button>
           </li>
           <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>
+            <button className={`ad-sidebar-btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => { setActiveTab('orders'); setMobileSidebarOpen(false); }}>
               🚚 Fulfillment Hub {orders.filter(o => o.status !== 'DELIVERED' && o.status !== 'COMPLETED' && o.status !== 'REJECTED' && o.status !== '❌ Order Rejected by Seller').length > 0 && (
                 <span style={{ background: '#6366f1', color: '#fff', borderRadius: '50%', padding: '2px 8px', fontSize: '0.7rem', marginLeft: '6px', fontWeight: 'bold' }}>
                   {orders.filter(o => o.status !== 'DELIVERED' && o.status !== 'COMPLETED' && o.status !== 'REJECTED' && o.status !== '❌ Order Rejected by Seller').length}
@@ -3805,7 +3811,7 @@ export default function AdminDashboard() {
             </button>
           </li>
           <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'delivery-partners' ? 'active' : ''}`} onClick={() => setActiveTab('delivery-partners')}>
+            <button className={`ad-sidebar-btn ${activeTab === 'delivery-partners' ? 'active' : ''}`} onClick={() => { setActiveTab('delivery-partners'); setMobileSidebarOpen(false); }}>
               🏍️ Delivery Partners {deliveryPartners.filter(p => p.status === 'pending').length > 0 && (
                 <span style={{ background: '#f59e0b', color: '#000', borderRadius: '50%', padding: '2px 8px', fontSize: '0.7rem', marginLeft: '6px', fontWeight: 'bold' }}>
                   {deliveryPartners.filter(p => p.status === 'pending').length}
@@ -3814,17 +3820,17 @@ export default function AdminDashboard() {
             </button>
           </li>
           <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>
+            <button className={`ad-sidebar-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => { setActiveTab('stats'); setMobileSidebarOpen(false); }}>
               📈 System Stats
             </button>
           </li>
           <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'notifications' ? 'active' : ''}`} onClick={() => setActiveTab('notifications')}>
+            <button className={`ad-sidebar-btn ${activeTab === 'notifications' ? 'active' : ''}`} onClick={() => { setActiveTab('notifications'); setMobileSidebarOpen(false); }}>
               🔔 Notifications {notifications.some(n => !n.isRead) && <span style={{ background: '#ef4444', color: '#fff', borderRadius: '50%', padding: '2px 6px', fontSize: '0.65rem', marginLeft: '4px' }}>!</span>}
             </button>
           </li>
           <li>
-            <button className={`ad-sidebar-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+            <button className={`ad-sidebar-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setMobileSidebarOpen(false); }}>
               ⚙️ Settings
             </button>
           </li>
@@ -3842,7 +3848,20 @@ export default function AdminDashboard() {
       {/* Main View Area */}
       <div className="ad-main-wrapper">
         <header className="ad-header">
-          <h2>EMAHU Central Administration</h2>
+          <div className="ad-header-left">
+            {/* Mobile hamburger button */}
+            <button
+              className="ad-hamburger"
+              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+              aria-label="Toggle sidebar"
+              aria-expanded={mobileSidebarOpen}
+            >
+              <span className="ad-hamburger__line" />
+              <span className="ad-hamburger__line" />
+              <span className="ad-hamburger__line" />
+            </button>
+            <h2>EMAHU Admin</h2>
+          </div>
           <div className="ad-header-badge">Secure Control Center</div>
         </header>
 

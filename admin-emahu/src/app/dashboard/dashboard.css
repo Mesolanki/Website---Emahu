@@ -995,4 +995,307 @@ input.ad-modal-input {
   max-width: 480px;
 }
 
+/* ─────────────────────────────────────────────
+   HAMBURGER BUTTON — Mobile Admin Nav Toggle
+   ───────────────────────────────────────────── */
+.ad-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-admin-border);
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 8px;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
 
+.ad-hamburger:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.ad-hamburger__line {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--color-admin-text);
+  border-radius: 4px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center;
+}
+
+.ad-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ad-header-left h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* ─────────────────────────────────────────────
+   MOBILE SIDEBAR BACKDROP OVERLAY
+   ───────────────────────────────────────────── */
+.ad-sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+  z-index: 998;
+  animation: adFadeIn 0.25s ease forwards;
+}
+
+@keyframes adFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ─────────────────────────────────────────────
+   RESPONSIVE BREAKPOINTS — ADMIN DASHBOARD
+   ───────────────────────────────────────────── */
+
+/* Large tablets and below: 1024px */
+@media (max-width: 1024px) {
+  .ad-view-container {
+    padding: 24px;
+  }
+
+  .ad-header {
+    padding: 16px 24px;
+  }
+
+  .ad-detail-grid-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Tablets: 768px */
+@media (max-width: 768px) {
+  /* Show hamburger, hide sidebar by default */
+  .ad-hamburger {
+    display: flex;
+  }
+
+  /* Show sidebar backdrop on mobile */
+  .ad-sidebar-backdrop {
+    display: block;
+  }
+
+  /* Full-page layout switch: no flex side-by-side */
+  .ad-layout {
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* Sidebar: fixed drawer, hidden off-screen */
+  .ad-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    width: 280px;
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 999;
+    box-shadow: 4px 0 30px rgba(0, 0, 0, 0.4);
+    overflow-y: auto;
+  }
+
+  /* Slide sidebar in when open */
+  .ad-sidebar--mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Main content takes full width */
+  .ad-main-wrapper {
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  /* Header: compact for mobile */
+  .ad-header {
+    padding: 14px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(15, 17, 26, 0.95);
+    backdrop-filter: blur(10px);
+  }
+
+  .ad-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .ad-view-container {
+    padding: 16px;
+  }
+
+  /* Tables: horizontal scroll on mobile */
+  .ad-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ad-table {
+    min-width: 640px;
+  }
+
+  .ad-table th,
+  .ad-table td {
+    padding: 14px 16px;
+  }
+
+  /* Stats grid: 2 columns on tablet */
+  .ad-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  /* Detail info grid: single column */
+  .ad-detail-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Detail modal */
+  .ad-detail-modal {
+    width: 95%;
+    max-width: 95%;
+    padding: 20px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .ad-detail-grid-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  /* Toast: full width on mobile */
+  .ad-toast-container {
+    top: 16px;
+    right: 16px;
+    left: 16px;
+  }
+
+  .ad-toast {
+    width: 100%;
+  }
+
+  /* View header on mobile */
+  .ad-view-header {
+    margin-bottom: 20px;
+  }
+
+  .ad-view-header h3 {
+    font-size: 1.25rem;
+  }
+
+  /* Action buttons */
+  .ad-actions-row {
+    flex-wrap: wrap;
+  }
+
+  .ad-btn-action {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+  }
+
+  /* Modal adjustments */
+  .ad-modal {
+    width: 95%;
+    padding: 20px;
+  }
+}
+
+/* Small mobile: 480px */
+@media (max-width: 480px) {
+  .ad-header {
+    padding: 12px;
+  }
+
+  .ad-header-badge {
+    display: none; /* Hide badge on very small screens */
+  }
+
+  .ad-view-container {
+    padding: 12px;
+  }
+
+  /* Stats grid: single column on small phones */
+  .ad-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .ad-stat-card .value {
+    font-size: 1.8rem;
+  }
+
+  /* Detail modal: full screen on small phones */
+  .ad-detail-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+    padding: 16px;
+  }
+
+  .ad-detail-grid-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .ad-detail-metric-card {
+    padding: 12px;
+  }
+
+  .ad-detail-tabs-nav {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+  }
+
+  .ad-detail-tab-trigger {
+    white-space: nowrap;
+    padding: 10px 12px;
+    font-size: 0.82rem;
+  }
+
+  /* Sidebar slightly narrower on very small screens */
+  .ad-sidebar {
+    width: 260px;
+  }
+
+  .ad-sidebar-btn {
+    font-size: 0.88rem;
+    padding: 10px 12px;
+  }
+
+  /* Decision bar: stack buttons vertically */
+  .ad-detail-decision-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ad-detail-decision-bar .ad-btn-action,
+  .ad-detail-decision-bar .ad-btn-sec {
+    width: 100%;
+  }
+
+  .ad-modal-actions {
+    flex-direction: column;
+  }
+
+  .ad-modal-actions button {
+    width: 100%;
+  }
+}
