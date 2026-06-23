@@ -843,32 +843,30 @@ exports.sellerDecision = async (req, res) => {
       details: { decision, feedback }
     });
 
-    // Send Email to seller
-    try {
-      const sendEmail = require('../utils/sendEmail');
-      let emailSubject = '';
-      let emailText = '';
-      
-      if (seller.status === 'approved') {
-        emailSubject = 'Congratulations! Your Emahu Seller Store Account is Approved';
-        emailText = `Hello ${seller.name},\n\nWe are excited to inform you that your seller account for store "${seller.storeName}" has been approved by the EMAHU admin team!\n\nYou can now log in to the Emahu Seller Dashboard and start listing your products for sale.\n\nBest regards,\nThe Emahu Team`;
-      } else if (seller.status === 'rejected') {
-        emailSubject = 'Update regarding your Emahu Seller Store Account Registration';
-        emailText = `Hello ${seller.name},\n\nThank you for your interest in registering as a seller on EMAHU. After reviewing your store details and documents, our administration team has rejected your application.\n\nReason/Feedback: ${feedback || 'None provided.'}\n\nPlease review the feedback and resubmit your details with corrected documents if applicable.\n\nBest regards,\nThe Emahu Team`;
-      } else if (seller.status === 'more_info_requested') {
-        emailSubject = 'Action Required: More Information Requested for your Emahu Seller Account';
-        emailText = `Hello ${seller.name},\n\nOur admin team reviewed your registration for store "${seller.storeName}" and requires more information to proceed.\n\nAdmin Feedback/Request: ${feedback || 'None provided.'}\n\nPlease log in to your seller dashboard and provide the requested details.\n\nBest regards,\nThe Emahu Team`;
-      }
+    // Send Email to seller (Asynchronously in background)
+    const sendEmail = require('../utils/sendEmail');
+    let emailSubject = '';
+    let emailText = '';
+    
+    if (seller.status === 'approved') {
+      emailSubject = 'Congratulations! Your Emahu Seller Store Account is Approved';
+      emailText = `Hello ${seller.name},\n\nWe are excited to inform you that your seller account for store "${seller.storeName}" has been approved by the EMAHU admin team!\n\nYou can now log in to the Emahu Seller Dashboard and start listing your products for sale.\n\nBest regards,\nThe Emahu Team`;
+    } else if (seller.status === 'rejected') {
+      emailSubject = 'Update regarding your Emahu Seller Store Account Registration';
+      emailText = `Hello ${seller.name},\n\nThank you for your interest in registering as a seller on EMAHU. After reviewing your store details and documents, our administration team has rejected your application.\n\nReason/Feedback: ${feedback || 'None provided.'}\n\nPlease review the feedback and resubmit your details with corrected documents if applicable.\n\nBest regards,\nThe Emahu Team`;
+    } else if (seller.status === 'more_info_requested') {
+      emailSubject = 'Action Required: More Information Requested for your Emahu Seller Account';
+      emailText = `Hello ${seller.name},\n\nOur admin team reviewed your registration for store "${seller.storeName}" and requires more information to proceed.\n\nAdmin Feedback/Request: ${feedback || 'None provided.'}\n\nPlease log in to your seller dashboard and provide the requested details.\n\nBest regards,\nThe Emahu Team`;
+    }
 
-      if (emailSubject) {
-        await sendEmail({
-          to: seller.email,
-          subject: emailSubject,
-          text: emailText
-        });
-      }
-    } catch (mailErr) {
-      console.error('Failed to send status update email to seller:', mailErr.message);
+    if (emailSubject) {
+      sendEmail({
+        to: seller.email,
+        subject: emailSubject,
+        text: emailText
+      }).catch(mailErr => {
+        console.error('Failed to send status update email to seller:', mailErr.message);
+      });
     }
 
     res.status(200).json({

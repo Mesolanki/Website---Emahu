@@ -1823,22 +1823,22 @@ exports.sendDeliveryOtp = async (req, res) => {
       </div>
     `;
 
-    // 1. Send Email
-    await sendEmail({
+    // 1. Send Email (Asynchronously in background)
+    sendEmail({
       to: email,
       subject: `🔑 Delivery Confirmation Code: ${otpCode} | Emahu Marketplace`,
       text: `Your delivery OTP is ${otpCode}. Share this with your driver to confirm delivery.`,
       html: otpHtml
-    });
+    }).catch(err => console.error('Delivery OTP email error:', err));
 
-    // 2. Send SMS
+    // 2. Send SMS (Asynchronously in background)
     const sendSms = require('../utils/sendSms');
     const buyerPhone = order.deliveryAddress?.phone || order.buyerPhone || '';
     if (buyerPhone) {
-      await sendSms({
+      sendSms({
         to: buyerPhone,
         body: `Your Emahu delivery confirmation OTP is ${otpCode}. Share this with the delivery partner only when you receive your package.`
-      });
+      }).catch(err => console.error('Delivery OTP SMS error:', err));
     }
 
     // 3. Create In-App Notification

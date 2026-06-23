@@ -164,7 +164,7 @@ exports.releasePayment = async (req, res) => {
           dateStyle: 'full',
           timeStyle: 'short'
         });
-        await sendEmail({
+        sendEmail({
           to: order.sellerEmail,
           subject: `💰 Payment Released – Order #${orderId} | Emahu Marketplace`,
           text: `Dear Seller,\n\nGreat news! Your payment for Order #${orderId} has been released.\n\nPAYMENT BREAKDOWN\n─────────────────────\nOrder Total (Products): ₹${productAmount}\nEmahu Platform Fee (${feePercent}%): - ₹${feeAmount}\n${penaltyAmount > 0 ? `Admin Penalty Deduction: - ₹${penaltyAmount} (${order.penaltyReason || 'Penalty'})\n` : ''}Net Payout to You: ₹${netPayout}\n─────────────────────\n\nRelease Date: ${releaseDate}\n\nThank you for selling on Emahu Marketplace!\n\nBest Regards,\nEmahu Team`,
@@ -208,10 +208,12 @@ exports.releasePayment = async (req, res) => {
               </div>
             </div>
           `
+        }).catch(emailErr => {
+          console.warn('Failed to send payment release email asynchronously:', emailErr.message);
         });
       }
     } catch (emailErr) {
-      console.warn('Failed to send payment release email:', emailErr.message);
+      console.warn('Failed to construct payment release email:', emailErr.message);
     }
 
     res.status(200).json({

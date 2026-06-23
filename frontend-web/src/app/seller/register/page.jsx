@@ -51,6 +51,48 @@ export default function SellerRegister() {
 
 
 
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedData = localStorage.getItem('emahu_seller_register_draft');
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData);
+          setFormData((prev) => ({
+            ...prev,
+            ...parsed,
+            kycFile: null // file object cannot be serialized
+          }));
+        } catch (err) {
+          console.error('Failed to parse seller register draft:', err);
+        }
+      }
+      const savedStep = localStorage.getItem('emahu_seller_register_step');
+      if (savedStep) {
+        const parsedStep = parseInt(savedStep, 10);
+        if (parsedStep >= 1 && parsedStep <= 4) {
+          setStep(parsedStep);
+        }
+      }
+      setDraftLoaded(true);
+    }
+  }, []);
+
+  // Save draft to localStorage on changes
+  useEffect(() => {
+    if (!draftLoaded) return;
+    const { kycFile, password, ...serializableData } = formData;
+    localStorage.setItem('emahu_seller_register_draft', JSON.stringify(serializableData));
+  }, [formData, draftLoaded]);
+
+  useEffect(() => {
+    if (!draftLoaded) return;
+    localStorage.setItem('emahu_seller_register_step', step.toString());
+  }, [step, draftLoaded]);
+
+
   // If already logged in, redirect directly to the seller dashboard
   useEffect(() => {
     if (localStorage.getItem('emahu_seller_logged_in') === 'true') {
@@ -318,6 +360,10 @@ export default function SellerRegister() {
         }
 
         setLoading(false);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('emahu_seller_register_draft');
+          localStorage.removeItem('emahu_seller_register_step');
+        }
         setStep(4);
       } catch (err) {
         setLoading(false);

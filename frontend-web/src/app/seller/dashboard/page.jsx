@@ -3387,7 +3387,7 @@ export default function EmahuProDashboard() {
 
           {/* TAB: VERIFICATION STATUS (FOR UNAPPROVED SELLERS) */}
           {activeTab === 'status' && (
-            <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px 0' }}>
+            <div className="verification-status-container">
               <div style={{ marginBottom: '32px', textAlign: 'center' }}>
                 <h2 style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)' }}>
                   Verification Desk
@@ -3559,12 +3559,7 @@ export default function EmahuProDashboard() {
                         border: '1px solid var(--border-color)',
                         borderRadius: '12px'
                       }}>
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          width: '100%'
-                        }}>
+                        <div className="doc-status-row">
                           <div>
                             <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem', display: 'block' }}>{docName}</strong>
                             {doc ? (
@@ -4157,7 +4152,7 @@ export default function EmahuProDashboard() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '24px', alignItems: 'start', marginTop: '24px' }}>
+                <div className="requests-grid-container" style={{ marginTop: '24px' }}>
 
                   {/* LEFT COLUMN: CREATE REQUEST FORM */}
                   <div className="card" style={{ padding: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px' }}>
@@ -4281,8 +4276,9 @@ export default function EmahuProDashboard() {
                       📋 Verification History
                     </h3>
 
-                    <div style={{ maxHeight: '550px', overflowY: 'auto' }}>
-                      <table className="portal-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                    <div style={{ overflowX: 'auto', width: '100%' }}>
+                      <div style={{ maxHeight: '550px', overflowY: 'auto' }}>
+                        <table className="portal-table" style={{ width: '100%', minWidth: '500px', fontSize: '0.85rem' }}>
                         <thead>
                           <tr>
                             <th style={{ textAlign: 'left', padding: '10px' }}>Product</th>
@@ -4442,6 +4438,7 @@ export default function EmahuProDashboard() {
                           )}
                         </tbody>
                       </table>
+                    </div>
                     </div>
                   </div>
 

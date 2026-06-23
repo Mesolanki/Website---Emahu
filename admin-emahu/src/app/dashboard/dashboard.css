@@ -6,6 +6,7 @@
   --color-admin-text: #f3f4f6;
   --color-admin-muted: #64748b;
   --color-admin-border: rgba(255, 255, 255, 0.08);
+  --color-admin-warning: #f59e0b;
 }
 
 *, *::before, *::after {

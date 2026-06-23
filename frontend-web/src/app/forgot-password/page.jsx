@@ -386,6 +386,11 @@ export default function ForgotPassword() {
               </div>
             </div>
 
+            {devOtp && (
+              <div style={{ background: 'rgba(99, 102, 241, 0.12)', border: '1px dashed rgba(99, 102, 241, 0.3)', color: '#818cf8', padding: '10px', borderRadius: '8px', textAlign: 'center', fontSize: '0.85rem', marginBottom: '16px', fontWeight: '600' }}>
+                🔧 Dev Mode OTP: <strong style={{ color: '#fff', fontSize: '0.95rem', letterSpacing: '1px', marginLeft: '4px' }}>{devOtp}</strong>
+              </div>
+            )}
 
             <div className="fp-timer-row">
               {timer > 0 ? (

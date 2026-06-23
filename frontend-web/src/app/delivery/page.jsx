@@ -67,6 +67,99 @@ export default function DeliveryPortal() {
   const [otpLoading, setOtpLoading] = useState(false);
   const [devOtp, setDevOtp] = useState('');
 
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
+  // Load draft on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedDraft = localStorage.getItem('emahu_delivery_register_draft');
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft);
+          if (draft.regCategory !== undefined) setRegCategory(draft.regCategory);
+          if (draft.deliveryName !== undefined) setDeliveryName(draft.deliveryName);
+          if (draft.ownerName !== undefined) setOwnerName(draft.ownerName);
+          if (draft.fleetSize !== undefined) setFleetSize(draft.fleetSize);
+          if (draft.contactName !== undefined) setContactName(draft.contactName);
+          if (draft.gstNumber !== undefined) setGstNumber(draft.gstNumber);
+          if (draft.email !== undefined) setEmail(draft.email);
+          if (draft.phoneNumber !== undefined) setPhoneNumber(draft.phoneNumber);
+          if (draft.currentCity !== undefined) setCurrentCity(draft.currentCity);
+          if (draft.currentArea !== undefined) setCurrentArea(draft.currentArea);
+          if (draft.pincode !== undefined) setPincode(draft.pincode);
+          if (draft.serviceRadius !== undefined) setServiceRadius(draft.serviceRadius);
+          if (draft.vehicleType !== undefined) setVehicleType(draft.vehicleType);
+          if (draft.vehicleNumber !== undefined) setVehicleNumber(draft.vehicleNumber);
+          if (draft.dispatchNotes !== undefined) setDispatchNotes(draft.dispatchNotes);
+          if (draft.serviceAreaState !== undefined) setServiceAreaState(draft.serviceAreaState);
+          if (draft.selectedStates !== undefined) setSelectedStates(draft.selectedStates);
+          if (draft.address !== undefined) setAddress(draft.address);
+          if (draft.deliveryScope !== undefined) setDeliveryScope(draft.deliveryScope);
+          if (draft.coveredCities !== undefined) setCoveredCities(draft.coveredCities);
+          if (draft.perKmRate !== undefined) setPerKmRate(draft.perKmRate);
+        } catch (err) {
+          console.error('Failed to load delivery registration draft:', err);
+        }
+      }
+      setDraftLoaded(true);
+    }
+  }, []);
+
+  // Save delivery registration draft to localStorage
+  useEffect(() => {
+    if (!draftLoaded) return;
+    if (typeof window !== 'undefined') {
+      const draft = {
+        regCategory,
+        deliveryName,
+        ownerName,
+        fleetSize,
+        contactName,
+        gstNumber,
+        email,
+        phoneNumber,
+        currentCity,
+        currentArea,
+        pincode,
+        serviceRadius,
+        vehicleType,
+        vehicleNumber,
+        dispatchNotes,
+        serviceAreaState,
+        selectedStates,
+        address,
+        deliveryScope,
+        coveredCities,
+        perKmRate
+      };
+      localStorage.setItem('emahu_delivery_register_draft', JSON.stringify(draft));
+    }
+  }, [
+    draftLoaded,
+    regCategory,
+    deliveryName,
+    ownerName,
+    fleetSize,
+    contactName,
+    gstNumber,
+    email,
+    phoneNumber,
+    currentCity,
+    currentArea,
+    pincode,
+    serviceRadius,
+    vehicleType,
+    vehicleNumber,
+    dispatchNotes,
+    serviceAreaState,
+    selectedStates,
+    address,
+    deliveryScope,
+    coveredCities,
+    perKmRate
+  ]);
+
+
   // --- Login States ---
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -453,6 +546,9 @@ export default function DeliveryPortal() {
       setToken(data.accessToken);
       setIsLoggedIn(true);
       setPortalMode('dashboard');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('emahu_delivery_register_draft');
+      }
 
       setLoading(false);
       setSubmitted(true);
@@ -675,6 +771,11 @@ export default function DeliveryPortal() {
             </div>
             {errors.otp && <span className="form-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
 
+            {devOtp && (
+              <div style={{ background: 'rgba(49, 151, 149, 0.12)', border: '1px dashed rgba(49, 151, 149, 0.3)', color: '#319795', padding: '8px', borderRadius: '6px', textAlign: 'center', fontSize: '0.8rem', marginTop: '8px', fontWeight: '600' }}>
+                🔧 Dev Mode OTP: <strong style={{ color: '#fff', fontSize: '0.9rem', letterSpacing: '1px', marginLeft: '4px' }}>{devOtp}</strong>
+              </div>
+            )}
           </div>
         )}
 
@@ -1345,6 +1446,11 @@ export default function DeliveryPortal() {
                           </div>
                           {errors.otp && <span className="form-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
 
+                          {devOtp && (
+                            <div style={{ background: 'rgba(49, 151, 149, 0.12)', border: '1px dashed rgba(49, 151, 149, 0.3)', color: '#319795', padding: '8px', borderRadius: '6px', textAlign: 'center', fontSize: '0.8rem', marginTop: '8px', fontWeight: '600' }}>
+                              🔧 Dev Mode OTP: <strong style={{ color: '#fff', fontSize: '0.9rem', letterSpacing: '1px', marginLeft: '4px' }}>{devOtp}</strong>
+                            </div>
+                          )}
                         </div>
                       )}
 

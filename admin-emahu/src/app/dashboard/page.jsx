@@ -62,6 +62,21 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('sellers');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  // Restore active tab from localStorage on mount (client-side only to avoid hydration mismatches)
+  useEffect(() => {
+    const saved = localStorage.getItem('emahu_admin_active_tab');
+    if (saved) {
+      setActiveTab(saved);
+    }
+  }, []);
+
+  // Persist active tab changes to localStorage
+  useEffect(() => {
+    if (activeTab) {
+      localStorage.setItem('emahu_admin_active_tab', activeTab);
+    }
+  }, [activeTab]);
+
   // Payout states
   const [payoutReceiptFile, setPayoutReceiptFile] = useState('');
   const [payoutSubmitting, setPayoutSubmitting] = useState(false);
@@ -1508,7 +1523,11 @@ export default function AdminDashboard() {
     setFeedbackType(type);
     setFeedbackTargetId(id);
     setFeedbackDecision(decision);
-    setFeedbackText('');
+    setFeedbackText(
+      decision === 'more_info_requested' 
+        ? 'Please provide additional details or verify your uploaded documents.' 
+        : ''
+    );
     setIsFeedbackModalOpen(true);
   };
 
@@ -3116,7 +3135,7 @@ export default function AdminDashboard() {
                   </button>
                   <button
                     className="ad-btn-action approve"
-                    style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem', background: 'var(--color-yellow)', color: '#000' }}
+                    style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem', background: 'var(--color-admin-warning, #f59e0b)', color: '#000' }}
                     onClick={() => {
                       openFeedbackModal('seller', selectedDetailSeller._id, 'more_info_requested');
                     }}
