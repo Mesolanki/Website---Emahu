@@ -333,7 +333,7 @@ export default function SellerRegister() {
         
         // Automatically submit documents upon registration
         if (data.accessToken) {
-          const docUrl = 'https://emahu-documents.s3.amazonaws.com/' + (formData.kycFile ? encodeURIComponent(formData.kycFile.name) : 'kyc_document.jpg');
+          const docUrl = API_BASE + '/api/auth/kyc_document.jpg';
           await fetch(API_BASE + '/api/auth/seller/documents', {
             method: 'POST',
             headers: {
@@ -354,7 +354,7 @@ export default function SellerRegister() {
             },
             body: JSON.stringify({
               documentType: 'business_registration',
-              fileUrl: 'https://emahu-documents.s3.amazonaws.com/gst_certificate_stub.pdf'
+              fileUrl: API_BASE + '/api/auth/gst_certificate_stub.pdf'
             })
           });
         }

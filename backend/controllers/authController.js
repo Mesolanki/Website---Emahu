@@ -347,18 +347,78 @@ exports.login = async (req, res) => {
     // Check if 2FA is active
     if (user.isTwoFactorEnabled) {
       if (!twoFactorCode) {
+        // Generate secure 6-digit OTP and save on user
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        user.otpCode = otpCode;
+        user.otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes validity
+        user.otpAttempts = 0;
+        await user.save();
+
+        // Send verification code to email
+        const sendEmail = require('../utils/sendEmail');
+        const htmlContent = `
+          <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+            <div style="background: linear-gradient(135deg, #6366f1, #4f46e5); padding: 40px 32px; text-align: center; color: #ffffff;">
+              <div style="font-size: 24px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px;">EMAHU</div>
+              <h1 style="color: #ffffff; margin: 0; font-size: 1.8rem; font-weight: 700;">Admin 2FA Security Code</h1>
+              <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 0.95rem;">Authorized Administrator Login Verification</p>
+            </div>
+            <div style="padding: 36px 32px; background: #ffffff;">
+              <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 24px 0;">Hello,</p>
+              <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">A login request was initiated for your Administrator account. Please enter the secure 6-digit verification code below to authorize access. This code is valid for <strong>5 minutes</strong>.</p>
+              
+              <div style="text-align: center; margin: 32px 0;">
+                <div style="display: inline-block; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 12px; padding: 16px 36px; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #4c1d95; font-family: monospace;">
+                  ${otpCode}
+                </div>
+              </div>
+    
+              <p style="color: #64748b; font-size: 0.88rem; line-height: 1.6; margin: 28px 0 0 0;">If you did not request this login attempt, please secure your password immediately.</p>
+            </div>
+            <div style="background: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 0.8rem;">
+              <p style="margin: 0 0 4px 0;">Emahu Marketplace Inc.</p>
+              <p style="margin: 0;">Securing premium local trade.</p>
+            </div>
+          </div>
+        `;
+
+        sendEmail({
+          to: user.email,
+          subject: 'EMAHU Admin Login Verification Code',
+          text: `Hello,\n\nYour 6-digit login verification code is: ${otpCode}\n\nThis code is valid for 5 minutes.\n\nRegards,\nThe Emahu Team`,
+          html: htmlContent
+        }).catch(err => console.error('Admin 2FA email error:', err));
+
         return res.status(200).json({
           success: true,
           requires2FA: true,
-          message: 'Admin 2FA verification code required'
+          message: 'Admin 2FA verification code sent to your email',
+          ...(process.env.NODE_ENV === 'development' ? { devOtp: otpCode } : {})
         });
       }
       
-      const is2FAVerified = verifyTOTP(user.twoFactorSecret, twoFactorCode);
+      let is2FAVerified = false;
+      
+      // Verify email OTP
+      if (user.otpCode && user.otpExpiry && new Date() < user.otpExpiry) {
+        if (user.otpCode === twoFactorCode) {
+          is2FAVerified = true;
+          user.otpCode = undefined;
+          user.otpExpiry = undefined;
+          user.otpAttempts = 0;
+          await user.save();
+        }
+      }
+      
+      // Fallback to TOTP code
+      if (!is2FAVerified && user.twoFactorSecret) {
+        is2FAVerified = verifyTOTP(user.twoFactorSecret, twoFactorCode);
+      }
+      
       if (!is2FAVerified) {
         return res.status(401).json({
           success: false,
-          error: 'Invalid 2FA verification code'
+          error: 'Invalid or expired 2FA verification code'
         });
       }
     }
@@ -1006,6 +1066,12 @@ exports.uploadDocument = async (req, res) => {
     // Check if document of this type already exists, if so overwrite or update
     let doc = await SellerDocument.findOne({ seller: req.user._id, documentType });
     if (doc) {
+      if (doc.status === 'approved') {
+        return res.status(400).json({
+          success: false,
+          error: 'This document has already been verified and approved. It cannot be updated or replaced.'
+        });
+      }
       doc.fileUrl = fileUrl;
       doc.status = 'pending';
       doc.feedback = '';
@@ -1079,6 +1145,13 @@ exports.verifySellerDocument = async (req, res) => {
     const doc = await SellerDocument.findById(req.params.docId);
     if (!doc) {
       return res.status(404).json({ success: false, error: 'Document not found' });
+    }
+
+    if (doc.status === 'approved') {
+      return res.status(400).json({
+        success: false,
+        error: 'This document has already been approved and confirmed. Status changes are not permitted.'
+      });
     }
 
     doc.status = status;
@@ -1295,7 +1368,8 @@ exports.sendOtp = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `OTP verification email sent successfully to ${cleanEmail}.`
+      message: `OTP verification email sent successfully to ${cleanEmail}.`,
+      ...(process.env.NODE_ENV === 'development' ? { devOtp: otpCode } : {})
     });
   } catch (error) {
     console.error('Send OTP Error:', error);
@@ -1551,7 +1625,8 @@ exports.forgotPassword = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'OTP sent successfully.'
+      message: 'OTP sent successfully.',
+      ...(process.env.NODE_ENV === 'development' ? { devOtp: otpCode } : {})
     });
   } catch (error) {
     console.error('Forgot Password API Error:', error);
@@ -1638,7 +1713,8 @@ exports.resendOtp = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'OTP resent successfully.'
+      message: 'OTP resent successfully.',
+      ...(process.env.NODE_ENV === 'development' ? { devOtp: otpCode } : {})
     });
   } catch (error) {
     console.error('Resend OTP Error:', error);
@@ -1711,5 +1787,34 @@ exports.resetPassword = async (req, res) => {
     console.error('Reset Password Error:', error);
     res.status(500).json({ success: false, error: 'Server error while resetting password' });
   }
+};
+
+// @desc    Serve dummy GST stub certificate PDF
+// @route   GET /api/auth/gst_certificate_stub.pdf
+// @access  Public
+exports.getGstCertificateStub = (req, res) => {
+  const minimalPDF = Buffer.from(
+    'JVBERi0xLjQKMSAwIG9iagogIDw8L1R5cGUvQ2F0YWxvZwogICAvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iagogIDw8L1R5cGUvUGFnZXMKICAgL0tpZHNbMyAwIFJdCiAgIC9Db3VudCAxPj4KZW5kb2JqCjMgMCBvYmoKICA8PC9UeXBlL1BhZ2UKICAgL1BhcmVudCAyIDAgUgogICAvTWVkaWFCb3hbMCAwIDU5NSA4NDJdCiAgIC9SZXNvdXJjZXMgPDwvRm9udDw8L0YxIDQgMCBSPj4+PgogICAvQ29udGVudHMgNSAwIFI+PgplbmRvYmoKNCAwIG9iagogIDw8L1R5cGUvRm9udAogICAvU3VidHlwZS9UeXBlMQogICAvQmFzZUZvbnQvSGVsdmV0aWNhPj4KZW5kb2JqCjUgMCBvYmoKICA8PC9MZW5ndGggNDQ+PnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDcwMCBUZAooRU1BSFUgR1NUIENFUlRJRklDQVRFIFNUVUIpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbCAKMDAwMDAwMDExNSAwMDAwMCBsIAowMDAwMDAwMjQ0IDAwMDAwIGwgCjAwMDAwMDAzMTggMDAwMDAgbCAKdHJhaWxlcgogIDw8L1NpemUgNgogICAvUm9vdCAxIDAgUj4+CnN0YXJ0eHJlZgozOTcKJSVFT0Y=',
+    'base64'
+  );
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'inline; filename="gst_certificate_stub.pdf"');
+  res.send(minimalPDF);
+};
+
+// @desc    Serve dummy KYC stub image PNG
+// @route   GET /api/auth/kyc_document.jpg
+// @access  Public
+exports.getKycDocumentStub = (req, res) => {
+  const svgContent = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200">
+      <rect width="400" height="200" fill="#f1f5f9" rx="12"/>
+      <rect x="20" y="20" width="360" height="160" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="6 4" rx="8"/>
+      <text x="50%" y="45%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui, sans-serif" font-size="18" font-weight="bold" fill="#4f46e5">EMAHU KYC STUB DOCUMENT</text>
+      <text x="50%" y="65%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">Verified &amp; Approved Placeholder</text>
+    </svg>
+  `.trim();
+  res.setHeader('Content-Type', 'image/svg+xml');
+  res.send(svgContent);
 };
 

@@ -7,6 +7,28 @@ import './dashboard.css';
 import { logoutUser, clearAuthSession } from '@/utils/auth';
 import { indiaStatesCities } from '@/utils/indiaStatesCities';
 let toastIdCounter = 0;
+if (typeof window !== 'undefined') {
+  let url = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+  url = url.trim();
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    process.env.NEXT_PUBLIC_API_URL = url.replace('localhost', '127.0.0.1');
+  } else {
+    process.env.NEXT_PUBLIC_API_URL = url.replace('localhost', hostname).replace('127.0.0.1', hostname);
+  }
+}
+
+const resolveDocUrl = (url) => {
+  if (!url || typeof url !== 'string') return '';
+  let clean = url.trim();
+  if (clean.startsWith('data:')) {
+    return clean;
+  }
+  let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+  apiUrl = apiUrl.replace(/\/api\/auth$/, '').replace(/\/api$/, '').replace(/\/$/, '');
+  clean = clean.replace(/^http:\/\/(localhost|127\.0\.0\.1):5000/, apiUrl);
+  return clean;
+};
 
 const cleanImageUrl = (img) => {
   if (!img || typeof img !== 'string') return '';
@@ -27,12 +49,44 @@ const cleanImageUrl = (img) => {
       }
     }
   }
-  return clean;
+  return resolveDocUrl(clean);
 };
 
 const isRealImage = (img) => {
   const clean = cleanImageUrl(img);
+  if (clean.toLowerCase().endsWith('.pdf')) return false;
   return clean.startsWith('http') || clean.startsWith('data:image');
+};
+
+const openDocInNewTab = (url) => {
+  if (!url) return;
+  const clean = resolveDocUrl(url);
+  if (clean.startsWith('data:')) {
+    const newTab = window.open();
+    if (newTab) {
+      newTab.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>View Submitted Document</title>
+            <style>
+              body { margin: 0; display: flex; justify-content: center; align-items: center; background: #0f172a; height: 100vh; overflow: hidden; }
+              img, embed { max-width: 100%; max-height: 100%; object-fit: contain; }
+            </style>
+          </head>
+          <body>
+            ${clean.startsWith('data:application/pdf') ? 
+              '<embed src="' + clean + '" type="application/pdf" width="100%" height="100%" />' : 
+              '<img src="' + clean + '" alt="Document Preview" />'
+            }
+          </body>
+        </html>
+      `);
+      newTab.document.close();
+    }
+  } else {
+    window.open(clean, '_blank');
+  }
 };
 
 const decodeToken = (token) => {
@@ -2624,7 +2678,12 @@ export default function AdminDashboard() {
                           <div key={doc._id} className="ad-detail-doc-item">
                             <div className="ad-detail-doc-info">
                               <span className="ad-detail-doc-title">{doc.documentType?.replace(/_/g, ' ')}</span>
-                              <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="ad-detail-doc-link" style={{ display: 'inline-block', marginBottom: '8px' }}>
+                              <a 
+                                href="#" 
+                                onClick={(e) => { e.preventDefault(); openDocInNewTab(doc.fileUrl); }} 
+                                className="ad-detail-doc-link" 
+                                style={{ display: 'inline-block', marginBottom: '8px' }}
+                              >
                                 🔗 Open Document File Reference
                               </a>
                               {isRealImage(doc.fileUrl) ? (
@@ -2644,7 +2703,7 @@ export default function AdminDashboard() {
                                     src={cleanImageUrl(doc.fileUrl)} 
                                     alt={doc.documentType} 
                                     style={{ maxWidth: '100%', maxHeight: '240px', objectFit: 'contain', cursor: 'pointer' }}
-                                    onClick={() => window.open(cleanImageUrl(doc.fileUrl), '_blank')}
+                                    onClick={() => openDocInNewTab(cleanImageUrl(doc.fileUrl))}
                                   />
                                 </div>
                               ) : doc.fileUrl && doc.fileUrl.toLowerCase().endsWith('.pdf') ? (
@@ -2677,6 +2736,11 @@ export default function AdminDashboard() {
                             </div>
                             
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              {doc.status === 'approved' && (
+                                <span style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+                                  🔒 Confirmed & Locked
+                                </span>
+                              )}
                               <span style={{
                                 padding: '4px 10px',
                                 borderRadius: '12px',

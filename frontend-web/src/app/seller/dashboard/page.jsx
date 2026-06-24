@@ -18,6 +18,18 @@ if (typeof window !== 'undefined') {
   }
 }
 
+const resolveDocUrl = (url) => {
+  if (!url || typeof url !== 'string') return '';
+  let clean = url.trim();
+  if (clean.startsWith('data:')) {
+    return clean;
+  }
+  let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+  apiUrl = apiUrl.replace(/\/api\/auth$/, '').replace(/\/api$/, '').replace(/\/$/, '');
+  clean = clean.replace(/^http:\/\/(localhost|127\.0\.0\.1):5000/, apiUrl);
+  return clean;
+};
+
 const cleanImageUrl = (img) => {
   if (!img || typeof img !== 'string') return '';
   let clean = img.trim();
@@ -37,12 +49,44 @@ const cleanImageUrl = (img) => {
       }
     }
   }
-  return clean;
+  return resolveDocUrl(clean);
 };
 
 const isRealImage = (img) => {
   const clean = cleanImageUrl(img);
+  if (clean.toLowerCase().endsWith('.pdf')) return false;
   return clean.startsWith('http') || clean.startsWith('data:image');
+};
+
+const openDocInNewTab = (url) => {
+  if (!url) return;
+  const clean = resolveDocUrl(url);
+  if (clean.startsWith('data:')) {
+    const newTab = window.open();
+    if (newTab) {
+      newTab.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>View Submitted Document</title>
+            <style>
+              body { margin: 0; display: flex; justify-content: center; align-items: center; background: #0f172a; height: 100vh; overflow: hidden; }
+              img, embed { max-width: 100%; max-height: 100%; object-fit: contain; }
+            </style>
+          </head>
+          <body>
+            ${clean.startsWith('data:application/pdf') ? 
+              '<embed src="' + clean + '" type="application/pdf" width="100%" height="100%" />' : 
+              '<img src="' + clean + '" alt="Document Preview" />'
+            }
+          </body>
+        </html>
+      `);
+      newTab.document.close();
+    }
+  } else {
+    window.open(clean, '_blank');
+  }
 };
 
 const decodeToken = (token) => {
@@ -3564,9 +3608,22 @@ export default function EmahuProDashboard() {
                             <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem', display: 'block' }}>{docName}</strong>
                             {doc ? (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
-                                <a href={doc.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#4f46e5', fontSize: '0.8rem', textDecoration: 'underline', fontWeight: '500' }}>
+                                <button
+                                  onClick={(e) => { e.preventDefault(); openDocInNewTab(doc.fileUrl); }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#4f46e5',
+                                    fontSize: '0.8rem',
+                                    textDecoration: 'underline',
+                                    fontWeight: '500',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    fontFamily: 'inherit'
+                                  }}
+                                >
                                   View Submitted Document
-                                </a>
+                                </button>
                                 {doc.feedback && (
                                   <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>(Feedback: {doc.feedback})</span>
                                 )}
@@ -3576,6 +3633,11 @@ export default function EmahuProDashboard() {
                             )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {doc?.status === 'approved' && (
+                              <span style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+                                🔒 Confirmed
+                              </span>
+                            )}
                             {doc?.status !== 'approved' && editingDocType !== type && (
                               <button
                                 onClick={() => { setEditingDocType(type); setInputDocUrl(doc ? doc.fileUrl : ''); }}
@@ -5789,9 +5851,21 @@ export default function EmahuProDashboard() {
                         </div>
 
                         <div style={{ marginTop: '8px', textAlign: 'right' }}>
-                          <a href={doc.fileUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', color: 'var(--color-primary)', textDecoration: 'underline' }}>
+                          <button
+                            onClick={(e) => { e.preventDefault(); openDocInNewTab(doc.fileUrl); }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--color-primary)',
+                              fontSize: '0.75rem',
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                              padding: 0,
+                              fontFamily: 'inherit'
+                            }}
+                          >
                             Download/Open Original File
-                          </a>
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -7742,10 +7816,24 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const isBusinessApproved = (documents || []).some(d => d.documentType === 'business_registration' && d.status === 'approved');
+  const isIdApproved = (documents || []).some(d => d.documentType === 'id_proof' && d.status === 'approved');
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!businessDocUrl.trim() && !idDocUrl.trim()) {
+    const needsBusiness = !isBusinessApproved;
+    const needsId = !isIdApproved;
+
+    if (needsBusiness && needsId && !businessDocUrl.trim() && !idDocUrl.trim()) {
       setError('Please attach at least one document to resubmit.');
+      return;
+    }
+    if (needsBusiness && !needsId && !businessDocUrl.trim()) {
+      setError('Please attach Business Registration Document to resubmit.');
+      return;
+    }
+    if (needsId && !needsBusiness && !idDocUrl.trim()) {
+      setError('Please attach ID Proof to resubmit.');
       return;
     }
     setError('');
@@ -7754,7 +7842,7 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
     try {
       const token = localStorage.getItem('emahu_seller_token');
 
-      if (businessDocUrl.trim()) {
+      if (needsBusiness && businessDocUrl.trim()) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents`, {
           method: 'POST',
           headers: {
@@ -7778,7 +7866,7 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
         }
       }
 
-      if (idDocUrl.trim()) {
+      if (needsId && idDocUrl.trim()) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents`, {
           method: 'POST',
           headers: {
@@ -7819,16 +7907,54 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <DocumentUploader
-          label="Resubmit Business Registration Document"
-          value={businessDocUrl}
-          onChange={setBusinessDocUrl}
-        />
-        <DocumentUploader
-          label="Resubmit ID Proof (PAN / Aadhaar)"
-          value={idDocUrl}
-          onChange={setIdDocUrl}
-        />
+        {isBusinessApproved ? (
+          <div style={{
+            padding: '16px',
+            background: 'rgba(16, 185, 129, 0.05)',
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <span style={{ fontSize: '1.2rem', color: '#10b981' }}>✓</span>
+            <div>
+              <strong style={{ display: 'block', fontSize: '0.85rem', color: '#10b981' }}>Business Registration Document</strong>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Verified and Approved. This document cannot be modified.</span>
+            </div>
+          </div>
+        ) : (
+          <DocumentUploader
+            label="Resubmit Business Registration Document"
+            value={businessDocUrl}
+            onChange={setBusinessDocUrl}
+          />
+        )}
+
+        {isIdApproved ? (
+          <div style={{
+            padding: '16px',
+            background: 'rgba(16, 185, 129, 0.05)',
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <span style={{ fontSize: '1.2rem', color: '#10b981' }}>✓</span>
+            <div>
+              <strong style={{ display: 'block', fontSize: '0.85rem', color: '#10b981' }}>ID Proof (PAN / Aadhaar)</strong>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Verified and Approved. This document cannot be modified.</span>
+            </div>
+          </div>
+        ) : (
+          <DocumentUploader
+            label="Resubmit ID Proof (PAN / Aadhaar)"
+            value={idDocUrl}
+            onChange={setIdDocUrl}
+          />
+        )}
+
         <button
           type="submit"
           className="company-portal-btn"

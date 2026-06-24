@@ -27,7 +27,9 @@ const {
   verifyPhoneOtp,
   forgotPassword,
   resendOtp,
-  resetPassword
+  resetPassword,
+  getGstCertificateStub,
+  getKycDocumentStub
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -44,6 +46,12 @@ router.post('/verify-phone-otp', verifyPhoneOtp);
 router.post('/forgot-password', forgotPassword);
 router.post('/resend-otp', resendOtp);
 router.post('/reset-password', resetPassword);
+router.get('/gst_certificate_stub.pdf', getGstCertificateStub);
+router.get('/kyc_document.jpg', getKycDocumentStub);
+router.get('/:filename.png', getKycDocumentStub);
+router.get('/:filename.jpg', getKycDocumentStub);
+router.get('/:filename.jpeg', getKycDocumentStub);
+router.get('/:filename.pdf', getGstCertificateStub);
 
 // Protected endpoints (requires valid JWT token in Authorization header)
 router.get('/me', protect, getMe);

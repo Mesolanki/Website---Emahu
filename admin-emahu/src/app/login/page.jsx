@@ -12,6 +12,7 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [requires2FA, setRequires2FA] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [devOtp, setDevOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -45,6 +46,9 @@ export default function AdminLogin() {
 
       if (data.requires2FA) {
         setRequires2FA(true);
+        if (data.devOtp) {
+          setDevOtp(data.devOtp);
+        }
         setLoading(false);
         setError('');
         return;
@@ -167,12 +171,17 @@ export default function AdminLogin() {
                     required
                   />
                 </div>
+                {devOtp && (
+                  <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#6366f1', fontWeight: '600' }}>
+                    🔑 Dev Mode OTP Code: <code style={{ background: 'rgba(99,102,241,0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.85rem' }}>{devOtp}</code>
+                  </div>
+                )}
                 <p style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '8px', lineHeight: '1.4' }}>
-                  Two-Factor Authentication is enabled on your account. Enter the code from your authenticator app to log in.
+                  Two-Factor Authentication is enabled on your account. Enter the 6-digit code sent to your email or from your authenticator app to log in.
                 </p>
                 <button
                   type="button"
-                  onClick={() => { setRequires2FA(false); setTwoFactorCode(''); }}
+                  onClick={() => { setRequires2FA(false); setTwoFactorCode(''); setDevOtp(''); }}
                   style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: '0.8rem', cursor: 'pointer', marginTop: '12px', padding: 0 }}
                 >
                   ← Back to password login
