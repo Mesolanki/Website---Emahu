@@ -1823,22 +1823,29 @@ exports.sendDeliveryOtp = async (req, res) => {
       </div>
     `;
 
-    // 1. Send Email (Asynchronously in background)
-    sendEmail({
+    // 1. Send Email (Awaited to prevent Vercel container termination)
+    const emailResult = await sendEmail({
       to: email,
       subject: `🔑 Delivery Confirmation Code: ${otpCode} | Emahu Marketplace`,
       text: `Your delivery OTP is ${otpCode}. Share this with your driver to confirm delivery.`,
       html: otpHtml
-    }).catch(err => console.error('Delivery OTP email error:', err));
+    });
 
-    // 2. Send SMS (Asynchronously in background)
+    if (!emailResult.success) {
+      return res.status(500).json({ success: false, error: `Failed to send delivery OTP email: ${emailResult.error}` });
+    }
+
+    // 2. Send SMS
     const sendSms = require('../utils/sendSms');
     const buyerPhone = order.deliveryAddress?.phone || order.buyerPhone || '';
     if (buyerPhone) {
-      sendSms({
+      const smsResult = await sendSms({
         to: buyerPhone,
         body: `Your Emahu delivery confirmation OTP is ${otpCode}. Share this with the delivery partner only when you receive your package.`
-      }).catch(err => console.error('Delivery OTP SMS error:', err));
+      });
+      if (!smsResult.success && !smsResult.simulated) {
+        console.error('Delivery OTP SMS sending failed:', smsResult.error);
+      }
     }
 
     // 3. Create In-App Notification
@@ -1893,45 +1900,29 @@ exports.verifyDeliveryOtp = async (req, res) => {
     }
 
     // Isolate OTP verification record specifically matching this order's OTP code
-    let otpRecord = await Otp.findOne({ email, otp: order.deliveryOtp, isVerified: false });
-    if (otp === '123456') {
-      if (!otpRecord) {
-        // If there's no otpRecord, create a dummy one so the deletion doesn't fail
-        otpRecord = await Otp.create({
-          email,
-          otp: '123456',
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-          attempts: 0,
-          lastSentAt: new Date(),
-          isVerified: false
-        });
-      } else {
-        otpRecord.otp = '123456';
-      }
-    } else {
-      if (!otpRecord) {
-        return res.status(400).json({ success: false, error: 'No active OTP verification code found. Please request a new code.' });
-      }
+    const otpRecord = await Otp.findOne({ email, otp: order.deliveryOtp, isVerified: false });
+    if (!otpRecord) {
+      return res.status(400).json({ success: false, error: 'No active OTP verification code found. Please request a new code.' });
+    }
 
-      if (new Date() > new Date(otpRecord.expiresAt)) {
-        return res.status(400).json({ success: false, error: 'Verification code has expired. Request a new OTP.' });
-      }
+    if (new Date() > new Date(otpRecord.expiresAt)) {
+      return res.status(400).json({ success: false, error: 'Verification code has expired. Request a new OTP.' });
+    }
 
-      if (otpRecord.attempts >= 5) {
-        return res.status(400).json({ success: false, error: 'Too many incorrect attempts. Please generate a new OTP code.' });
-      }
+    if (otpRecord.attempts >= 5) {
+      return res.status(400).json({ success: false, error: 'Too many incorrect attempts. Please generate a new OTP code.' });
+    }
 
-      if (otpRecord.otp !== otp) {
-        otpRecord.attempts += 1;
-        await otpRecord.save();
-        return res.status(400).json({ success: false, error: `Incorrect verification code. ${5 - otpRecord.attempts} attempts remaining.` });
-      }
+    if (otpRecord.otp !== otp) {
+      otpRecord.attempts += 1;
+      await otpRecord.save();
+      return res.status(400).json({ success: false, error: `Incorrect verification code. ${5 - otpRecord.attempts} attempts remaining.` });
     }
 
     // Code is correct
     otpRecord.isVerified = true;
     await otpRecord.save();
-    await Otp.deleteMany({ email, otp: otpRecord.otp });
+    await Otp.deleteMany({ email, otp });
 
     // Transition statuses to delivered and automatically release funds
     order.deliveryStatus = 'delivered';

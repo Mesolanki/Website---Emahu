@@ -382,12 +382,16 @@ exports.login = async (req, res) => {
           </div>
         `;
 
-        sendEmail({
+        const emailResult = await sendEmail({
           to: user.email,
           subject: 'EMAHU Admin Login Verification Code',
           text: `Hello,\n\nYour 6-digit login verification code is: ${otpCode}\n\nThis code is valid for 5 minutes.\n\nRegards,\nThe Emahu Team`,
           html: htmlContent
-        }).catch(err => console.error('Admin 2FA email error:', err));
+        });
+
+        if (!emailResult.success) {
+          return res.status(500).json({ success: false, error: `Failed to send Admin 2FA verification email: ${emailResult.error}` });
+        }
 
         return res.status(200).json({
           success: true,
@@ -401,7 +405,7 @@ exports.login = async (req, res) => {
       
       // Verify email OTP
       if (user.otpCode && user.otpExpiry && new Date() < user.otpExpiry) {
-        if (user.otpCode === twoFactorCode || twoFactorCode === '123456') {
+        if (user.otpCode === twoFactorCode) {
           is2FAVerified = true;
           user.otpCode = undefined;
           user.otpExpiry = undefined;
@@ -1359,12 +1363,16 @@ exports.sendOtp = async (req, res) => {
       </div>
     `;
 
-    sendEmail({
+    const emailResult = await sendEmail({
       to: cleanEmail,
       subject: 'EMAHU Account Registration Verification Code',
       text: `Hello,\n\nThank you for choosing EMAHU. Your 6-digit verification code is:\n\n🔑 ${otpCode}\n\nPlease enter this code to confirm your email and complete your registration.\n\nBest regards,\nThe Emahu Team`,
       html: htmlContent
-    }).catch(err => console.error('Background sendEmail error:', err));
+    });
+
+    if (!emailResult.success) {
+      return res.status(500).json({ success: false, error: `Failed to send verification email: ${emailResult.error}` });
+    }
 
     res.status(200).json({
       success: true,
@@ -1401,7 +1409,7 @@ exports.verifyOtp = async (req, res) => {
         return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
       }
 
-      if (user.otpCode !== otpCode && otpCode !== '123456') {
+      if (user.otpCode !== otpCode) {
         user.otpAttempts += 1;
         await user.save();
         const remaining = 5 - user.otpAttempts;
@@ -1431,34 +1439,18 @@ exports.verifyOtp = async (req, res) => {
 
     // Default registration OTP verify flow
     const Otp = require('../models/Otp');
-    let otpRecord = await Otp.findOne({ email: cleanEmail });
-    if (otpCode === '123456') {
-      if (!otpRecord) {
-        otpRecord = await Otp.create({
-          email: cleanEmail,
-          otp: '123456',
-          expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-          isVerified: true
-        });
-      } else {
-        otpRecord.otp = '123456';
-        otpRecord.isVerified = true;
-        otpRecord.expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-        await otpRecord.save();
-      }
-    } else {
-      if (!otpRecord) {
-        return res.status(400).json({ success: false, error: 'OTP has expired or does not exist. Please request a new one.' });
-      }
+    const otpRecord = await Otp.findOne({ email: cleanEmail });
+    if (!otpRecord) {
+      return res.status(400).json({ success: false, error: 'OTP has expired or does not exist. Please request a new one.' });
+    }
 
-      if (otpRecord.expiresAt && new Date(otpRecord.expiresAt) < new Date()) {
-        await Otp.deleteOne({ _id: otpRecord._id });
-        return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
-      }
+    if (otpRecord.expiresAt && new Date(otpRecord.expiresAt) < new Date()) {
+      await Otp.deleteOne({ _id: otpRecord._id });
+      return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
+    }
 
-      if (otpRecord.otp !== otpCode) {
-        return res.status(400).json({ success: false, error: 'Invalid OTP code. Please try again.' });
-      }
+    if (otpRecord.otp !== otpCode) {
+      return res.status(400).json({ success: false, error: 'Invalid OTP code. Please try again.' });
     }
 
     otpRecord.isVerified = true;
@@ -1512,12 +1504,16 @@ exports.sendPhoneOtp = async (req, res) => {
       expiresAt
     });
 
-    // Call sendSms utility to send real SMS in the background
+    // Call sendSms utility to send real SMS
     const sendSms = require('../utils/sendSms');
-    sendSms({
+    const smsResult = await sendSms({
       to: cleanPhone,
       body: `Your Emahu mobile verification code is: ${otpCode}. Valid for 5 minutes.`
-    }).catch(err => console.error('Background sendSms error:', err));
+    });
+
+    if (!smsResult.success && !smsResult.simulated) {
+      return res.status(500).json({ success: false, error: `Failed to send phone OTP: ${smsResult.error}` });
+    }
 
     res.status(200).json({
       success: true,
@@ -1544,29 +1540,19 @@ exports.verifyPhoneOtp = async (req, res) => {
 
     const Otp = require('../models/Otp');
 
-    let otpRecord = await Otp.findOne({ phone: cleanPhone });
-    if (otpCode === '123456') {
-      if (!otpRecord) {
-        otpRecord = await Otp.create({
-          phone: cleanPhone,
-          otp: '123456',
-          expiresAt: new Date(Date.now() + 15 * 60 * 1000)
-        });
-      }
-    } else {
-      if (!otpRecord) {
-        return res.status(400).json({ success: false, error: 'OTP has expired or does not exist. Please request a new one.' });
-      }
+    const otpRecord = await Otp.findOne({ phone: cleanPhone });
+    if (!otpRecord) {
+      return res.status(400).json({ success: false, error: 'OTP has expired or does not exist. Please request a new one.' });
+    }
 
-      // Strict Javascript validation to prevent database TTL index clock skew issues
-      if (otpRecord.expiresAt && new Date(otpRecord.expiresAt) < new Date()) {
-        await Otp.deleteOne({ _id: otpRecord._id });
-        return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
-      }
+    // Strict Javascript validation to prevent database TTL index clock skew issues
+    if (otpRecord.expiresAt && new Date(otpRecord.expiresAt) < new Date()) {
+      await Otp.deleteOne({ _id: otpRecord._id });
+      return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
+    }
 
-      if (otpRecord.otp !== otpCode) {
-        return res.status(400).json({ success: false, error: 'Invalid OTP code. Please try again.' });
-      }
+    if (otpRecord.otp !== otpCode) {
+      return res.status(400).json({ success: false, error: 'Invalid OTP code. Please try again.' });
     }
 
     // OTP verified successfully - delete it
@@ -1644,12 +1630,16 @@ exports.forgotPassword = async (req, res) => {
       </div>
     `;
 
-    sendEmail({
+    const emailResult = await sendEmail({
       to: cleanEmail,
       subject: 'Password Reset OTP',
       text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`,
       html: htmlContent
-    }).catch(err => console.error('Background forgotPassword sendEmail error:', err));
+    });
+
+    if (!emailResult.success) {
+      return res.status(500).json({ success: false, error: `Failed to send password reset email: ${emailResult.error}` });
+    }
 
     res.status(200).json({
       success: true,
@@ -1732,12 +1722,16 @@ exports.resendOtp = async (req, res) => {
       </div>
     `;
 
-    sendEmail({
+    const emailResult = await sendEmail({
       to: cleanEmail,
       subject: 'Password Reset OTP',
       text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`,
       html: htmlContent
-    }).catch(err => console.error('Background resendOtp sendEmail error:', err));
+    });
+
+    if (!emailResult.success) {
+      return res.status(500).json({ success: false, error: `Failed to resend password reset email: ${emailResult.error}` });
+    }
 
     res.status(200).json({
       success: true,

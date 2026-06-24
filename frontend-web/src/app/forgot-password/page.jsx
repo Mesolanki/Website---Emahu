@@ -392,6 +392,8 @@ export default function ForgotPassword() {
               </div>
             )}
 
+
+
             <div className="fp-timer-row">
               {timer > 0 ? (
                 <span>Resend code in <strong>{timer}s</strong></span>

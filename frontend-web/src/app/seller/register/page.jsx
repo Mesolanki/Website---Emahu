@@ -910,6 +910,8 @@ export default function SellerRegister() {
               </div>
             )}
 
+
+
             <form onSubmit={handleVerifyOtp}>
               <div style={{ marginBottom: '20px' }}>
                 <input
