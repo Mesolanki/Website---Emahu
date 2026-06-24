@@ -22,10 +22,16 @@ const dns = require('dns').promises;
 /**
  * Resolve a hostname to its first IPv4 address.
  * Falls back to the original hostname if DNS lookup fails (e.g. in local dev).
+ * Uses a short 3-second timeout so it never blocks the request.
  */
 const resolveIPv4 = async (hostname) => {
   try {
-    const addresses = await dns.resolve4(hostname);
+    const addresses = await Promise.race([
+      dns.resolve4(hostname),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('DNS timeout')), 3000)
+      )
+    ]);
     if (addresses && addresses.length > 0) {
       console.log(`🌐 Resolved ${hostname} → ${addresses[0]} (IPv4)`);
       return addresses[0];
@@ -42,9 +48,9 @@ const buildTransporter = (host, port, user, pass, servername) => {
     port,
     secure: port === 465,          // true → SSL on 465 | false → STARTTLS on 587
     auth: { user, pass },
-    connectionTimeout: 10000,      // 10 s TCP connect timeout
-    greetingTimeout: 10000,        // 10 s SMTP greeting timeout
-    socketTimeout: 20000,          // 20 s socket inactivity limit
+    connectionTimeout: 5000,       // 5 s TCP connect timeout  (was 10s)
+    greetingTimeout: 5000,         // 5 s SMTP greeting timeout (was 10s)
+    socketTimeout: 8000,           // 8 s socket inactivity limit (was 20s)
     tls: {
       rejectUnauthorized: true,
       servername: servername || host // Original hostname for SNI / cert validation
@@ -52,7 +58,7 @@ const buildTransporter = (host, port, user, pass, servername) => {
   });
 };
 
-const sendEmail = async (options, retryCount = 1) => {
+const sendEmail = async (options, retryCount = 0) => {
   const smtpHostname = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const port         = parseInt(process.env.EMAIL_PORT || '587', 10);
   const user         = process.env.EMAIL_USER;
@@ -60,7 +66,7 @@ const sendEmail = async (options, retryCount = 1) => {
   const from         = process.env.EMAIL_FROM || `"Emahu Marketplace" <${user}>`;
 
   console.log('\n=================================================');
-  console.log(`✉️  PREPARING OUTBOUND EMAIL TO: ${options.to} (attempt ${2 - retryCount} of 2)`);
+  console.log(`✉️  PREPARING OUTBOUND EMAIL TO: ${options.to} (attempt ${1 + (1 - retryCount)} of 1)`);
   console.log(`📌  SUBJECT: ${options.subject}`);
   console.log(`📝  BODY PREVIEW: ${(options.text || '').substring(0, 80)}...`);
   console.log('=================================================\n');
@@ -97,7 +103,7 @@ const sendEmail = async (options, retryCount = 1) => {
     return { success: true, messageId: info.messageId };
 
   } catch (error) {
-    console.error(`❌ SMTP Error (attempt ${2 - retryCount}): ${error.message}`);
+    console.error(`❌ SMTP Error: ${error.message}`);
 
     if (retryCount > 0) {
       console.log(`🔄 Retrying email dispatch (${retryCount} attempt(s) remaining)...`);

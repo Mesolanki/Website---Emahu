@@ -1363,21 +1363,28 @@ exports.sendOtp = async (req, res) => {
       </div>
     `;
 
-    const emailResult = await sendEmail({
-      to: cleanEmail,
-      subject: 'EMAHU Account Registration Verification Code',
-      text: `Hello,\n\nThank you for choosing EMAHU. Your 6-digit verification code is:\n\n🔑 ${otpCode}\n\nPlease enter this code to confirm your email and complete your registration.\n\nBest regards,\nThe Emahu Team`,
-      html: htmlContent
-    });
-
-    if (!emailResult.success) {
-      return res.status(500).json({ success: false, error: `Failed to send verification email: ${emailResult.error}` });
-    }
-
+    // ✅ Respond immediately — OTP is already saved in DB.
+    // Email is dispatched in the background so the user isn't blocked by SMTP.
     res.status(200).json({
       success: true,
       message: `OTP verification email sent successfully to ${cleanEmail}.`,
       ...(process.env.NODE_ENV === 'development' ? { devOtp: otpCode } : {})
+    });
+
+    // Fire-and-forget: send the email without blocking the HTTP response
+    sendEmail({
+      to: cleanEmail,
+      subject: 'EMAHU Account Registration Verification Code',
+      text: `Hello,\n\nThank you for choosing EMAHU. Your 6-digit verification code is:\n\n🔑 ${otpCode}\n\nPlease enter this code to confirm your email and complete your registration.\n\nBest regards,\nThe Emahu Team`,
+      html: htmlContent
+    }).then(emailResult => {
+      if (!emailResult.success) {
+        console.error(`❌ Background email delivery failed for ${cleanEmail}: ${emailResult.error}`);
+      } else {
+        console.log(`✔️  OTP email delivered to ${cleanEmail}`);
+      }
+    }).catch(mailErr => {
+      console.error(`❌ Background email error for ${cleanEmail}:`, mailErr.message);
     });
   } catch (error) {
     console.error('Send OTP Error:', error);
@@ -1630,21 +1637,27 @@ exports.forgotPassword = async (req, res) => {
       </div>
     `;
 
-    const emailResult = await sendEmail({
-      to: cleanEmail,
-      subject: 'Password Reset OTP',
-      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`,
-      html: htmlContent
-    });
-
-    if (!emailResult.success) {
-      return res.status(500).json({ success: false, error: `Failed to send password reset email: ${emailResult.error}` });
-    }
-
+    // ✅ Respond immediately — OTP is already saved in DB.
     res.status(200).json({
       success: true,
       message: 'OTP sent successfully.',
       ...(process.env.NODE_ENV === 'development' ? { devOtp: otpCode } : {})
+    });
+
+    // Fire-and-forget: send email in background without blocking the response
+    sendEmail({
+      to: cleanEmail,
+      subject: 'Password Reset OTP',
+      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`,
+      html: htmlContent
+    }).then(emailResult => {
+      if (!emailResult.success) {
+        console.error(`❌ Background forgot-password email failed for ${cleanEmail}: ${emailResult.error}`);
+      } else {
+        console.log(`✔️  Password reset OTP email delivered to ${cleanEmail}`);
+      }
+    }).catch(mailErr => {
+      console.error(`❌ Background forgot-password email error for ${cleanEmail}:`, mailErr.message);
     });
   } catch (error) {
     console.error('Forgot Password API Error:', error);
@@ -1722,21 +1735,27 @@ exports.resendOtp = async (req, res) => {
       </div>
     `;
 
-    const emailResult = await sendEmail({
-      to: cleanEmail,
-      subject: 'Password Reset OTP',
-      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`,
-      html: htmlContent
-    });
-
-    if (!emailResult.success) {
-      return res.status(500).json({ success: false, error: `Failed to resend password reset email: ${emailResult.error}` });
-    }
-
+    // ✅ Respond immediately — OTP is already saved in DB.
     res.status(200).json({
       success: true,
       message: 'OTP resent successfully.',
       ...(process.env.NODE_ENV === 'development' ? { devOtp: otpCode } : {})
+    });
+
+    // Fire-and-forget: send email in background without blocking the response
+    sendEmail({
+      to: cleanEmail,
+      subject: 'Password Reset OTP',
+      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`,
+      html: htmlContent
+    }).then(emailResult => {
+      if (!emailResult.success) {
+        console.error(`❌ Background resend-OTP email failed for ${cleanEmail}: ${emailResult.error}`);
+      } else {
+        console.log(`✔️  Resend OTP email delivered to ${cleanEmail}`);
+      }
+    }).catch(mailErr => {
+      console.error(`❌ Background resend-OTP email error for ${cleanEmail}:`, mailErr.message);
     });
   } catch (error) {
     console.error('Resend OTP Error:', error);
