@@ -115,9 +115,9 @@ export default function ForgotPassword() {
         throw new Error(data.error || 'Failed to send OTP');
       }
 
-      setSuccessMsg('OTP sent successfully.');
-      if (data.devOtp) {
-        setDevOtp(data.devOtp);
+      setSuccessMsg('Verification code sent!');
+      if (data.otpCode) {
+        setDevOtp(data.otpCode);
       }
       setStep('otp');
       startTimer();
@@ -225,9 +225,9 @@ export default function ForgotPassword() {
       }
 
       setResendAttempts((prev) => prev + 1);
-      setSuccessMsg('OTP resent successfully.');
-      if (data.devOtp) {
-        setDevOtp(data.devOtp);
+      setSuccessMsg('Verification code resent!');
+      if (data.otpCode) {
+        setDevOtp(data.otpCode);
       }
       startTimer();
       setOtpValues(['', '', '', '', '', '']);
@@ -387,8 +387,16 @@ export default function ForgotPassword() {
             </div>
 
             {devOtp && (
-              <div style={{ background: 'rgba(99, 102, 241, 0.12)', border: '1px dashed rgba(99, 102, 241, 0.3)', color: '#818cf8', padding: '10px', borderRadius: '8px', textAlign: 'center', fontSize: '0.85rem', marginBottom: '16px', fontWeight: '600' }}>
-                🔧 Dev Mode OTP: <strong style={{ color: '#fff', fontSize: '0.95rem', letterSpacing: '1px', marginLeft: '4px' }}>{devOtp}</strong>
+              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '12px', borderRadius: '10px', textAlign: 'center', marginBottom: '16px' }}>
+                <div style={{ fontSize: '0.8rem', marginBottom: '6px', opacity: 0.85 }}>📧 Email sent! Your code is also shown here:</div>
+                <div
+                  style={{ letterSpacing: '6px', fontSize: '1.5rem', fontWeight: '800', color: '#fff', background: 'rgba(0,0,0,0.25)', padding: '6px 14px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
+                  onClick={() => { const d=[...devOtp.split('')]; setOtpValues(d); }}
+                  title="Click to auto-fill"
+                >
+                  {devOtp}
+                </div>
+                <div style={{ marginTop: '5px', fontSize: '0.72rem', opacity: 0.7 }}>👆 Click to auto-fill</div>
               </div>
             )}
 

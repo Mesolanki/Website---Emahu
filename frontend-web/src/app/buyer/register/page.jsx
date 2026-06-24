@@ -139,8 +139,8 @@ export default function BuyerRegister() {
       const data = await res.json();
       if (data.success) {
         setIsEmailOtpSent(true);
-        if (data.devOtp) {
-          setDevOtp(data.devOtp);
+        if (data.otpCode) {
+          setDevOtp(data.otpCode);
         }
         setErrors((prev) => ({ ...prev, general: '' }));
       } else {
@@ -437,6 +437,28 @@ export default function BuyerRegister() {
                             </button>
                           </div>
                           {errors.otp && <span className="br-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
+
+                          {/* OTP Code Display — always shown as backup since no verified email domain */}
+                          {devOtp && (
+                            <div style={{
+                              marginTop: '10px',
+                              background: 'rgba(16, 185, 129, 0.08)',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              borderRadius: '8px',
+                              padding: '10px 12px',
+                              textAlign: 'center'
+                            }}>
+                              <div style={{ fontSize: '0.75rem', color: '#10b981', marginBottom: '4px' }}>📧 Code also shown here (check spam too):</div>
+                              <div
+                                style={{ letterSpacing: '5px', fontSize: '1.4rem', fontWeight: '800', color: '#1a202c', cursor: 'pointer', userSelect: 'all' }}
+                                onClick={() => setEmailOtp(devOtp)}
+                                title="Click to auto-fill"
+                              >
+                                {devOtp}
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '3px' }}>👆 Click to auto-fill</div>
+                            </div>
+                          )}
                         </div>
                       )}
 

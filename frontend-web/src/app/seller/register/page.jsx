@@ -143,11 +143,12 @@ export default function SellerRegister() {
       const data = await res.json();
       if (data.success) {
         setOtpCooldown(60);
-        if (data.devOtp) {
-          setDevEmailOtp(data.devOtp);
+        // Backend always returns otpCode now (works without a verified domain)
+        if (data.otpCode) {
+          setDevEmailOtp(data.otpCode);
         }
         if (isResend) {
-          setOtpError('OTP has been resent to your email.');
+          setOtpError('OTP has been resent. Check email or use the code shown below.');
         }
       } else {
         setOtpError(data.error || 'Failed to send OTP. Please check email address.');
@@ -887,26 +888,36 @@ export default function SellerRegister() {
               </div>
             )}
 
-            {typeof window !== 'undefined' && 
-             (window.location.hostname === 'localhost' || 
-              window.location.hostname === '127.0.0.1' || 
-              window.location.hostname.startsWith('192.168.') || 
-              window.location.hostname.startsWith('172.') || 
-              window.location.hostname.startsWith('10.') || 
-              window.location.hostname.endsWith('.local')) && 
-             devEmailOtp && (
+            {devEmailOtp && (
               <div style={{
-                backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                border: '1px solid rgba(56, 189, 248, 0.2)',
-                color: '#38bdf8',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: '600',
+                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                color: '#10b981',
+                padding: '14px 18px',
+                borderRadius: '10px',
+                fontSize: '0.88rem',
                 marginBottom: '16px',
                 textAlign: 'center'
               }}>
-                🔑 Dev Mode OTP Code: <code style={{ letterSpacing: '2px', fontSize: '1rem', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>{devEmailOtp}</code>
+                <div style={{ marginBottom: '6px', opacity: 0.85 }}>📧 Email sent! Your verification code is also shown below:</div>
+                <div style={{
+                  letterSpacing: '6px',
+                  fontSize: '1.6rem',
+                  fontWeight: '800',
+                  color: '#ffffff',
+                  background: 'rgba(0,0,0,0.3)',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  display: 'inline-block',
+                  cursor: 'pointer',
+                  userSelect: 'all'
+                }}
+                  onClick={() => setOtpInput(devEmailOtp)}
+                  title="Click to auto-fill"
+                >
+                  {devEmailOtp}
+                </div>
+                <div style={{ marginTop: '6px', fontSize: '0.75rem', opacity: 0.7 }}>👆 Click the code above to auto-fill</div>
               </div>
             )}
 

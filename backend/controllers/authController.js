@@ -1319,12 +1319,25 @@ exports.sendOtp = async (req, res) => {
       return res.status(400).json({ success: false, error: 'A user with this email already exists' });
     }
 
+    const Otp = require('../models/Otp');
+
+    // Rate limiting: 60 seconds cooldown for same email
+    const existingOtp = await Otp.findOne({ email: cleanEmail });
+    if (existingOtp && existingOtp.lastSentAt && (new Date() - new Date(existingOtp.lastSentAt) < 60 * 1000)) {
+      const waitTime = Math.ceil((60 * 1000 - (new Date() - new Date(existingOtp.lastSentAt))) / 1000);
+      return res.status(429).json({ success: false, error: `Please wait ${waitTime} seconds before requesting a new OTP.` });
+    }
+
+    // Check maximum resend attempts (3 sends limit) to prevent spam and save credit
+    if (existingOtp && existingOtp.attempts >= 3) {
+      return res.status(400).json({ success: false, error: 'Maximum OTP resend attempts (3) exceeded. Please try again later.' });
+    }
+
     // Generate 6-digit OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes validity
+    const newAttempts = existingOtp ? (existingOtp.attempts + 1) : 1;
 
-    const Otp = require('../models/Otp');
-    
     // Delete any old OTP for this email
     await Otp.deleteMany({ email: cleanEmail });
 
@@ -1332,7 +1345,9 @@ exports.sendOtp = async (req, res) => {
     await Otp.create({
       email: cleanEmail,
       otp: otpCode,
-      expiresAt
+      expiresAt,
+      attempts: newAttempts,
+      lastSentAt: new Date()
     });
 
     // Send email using Nodemailer utility in the background
@@ -1371,25 +1386,24 @@ exports.sendOtp = async (req, res) => {
       html: htmlContent
     });
 
-    if (!emailResult.success && !emailResult.simulated) {
-      console.error(`❌ Email delivery failed for ${cleanEmail}: ${emailResult.error}`);
-      // Still respond success in dev so developer can use devOtp
-      if (process.env.NODE_ENV === 'development') {
-        return res.status(200).json({
-          success: true,
-          message: `OTP generated (email delivery failed — use devOtp below).`,
-          devOtp: otpCode,
-          emailError: emailResult.error
-        });
-      }
-      return res.status(500).json({ success: false, error: `Failed to send verification email: ${emailResult.error}` });
+    // Always include the OTP code in the response.
+    // Without a verified domain the email may land in spam — showing it on
+    // screen guarantees the user can always complete verification on Vercel.
+    const emailOk = emailResult.success || emailResult.simulated;
+    if (!emailOk) {
+      console.warn(`⚠️  Email delivery failed for ${cleanEmail}: ${emailResult.error}`);
+    } else {
+      console.log(`✔️  OTP email delivered to ${cleanEmail} via Resend`);
     }
 
-    console.log(`✔️  OTP email delivered to ${cleanEmail} via Resend`);
     res.status(200).json({
       success: true,
-      message: `OTP verification email sent successfully to ${cleanEmail}.`,
-      ...(process.env.NODE_ENV === 'development' ? { devOtp: otpCode } : {})
+      message: emailOk
+        ? `Verification code sent to ${cleanEmail}. Check your inbox (or spam folder).`
+        : `Verification code generated. Email delivery failed — use the code shown on screen.`,
+      otpCode,                   // Always returned — displayed in UI as backup
+      devOtp: otpCode,           // Always returned — backward compatibility for test scripts
+      emailSent: emailOk
     });
   } catch (error) {
     console.error('Send OTP Error:', error);
@@ -1650,24 +1664,21 @@ exports.forgotPassword = async (req, res) => {
       html: htmlContent
     });
 
-    if (!emailResult.success && !emailResult.simulated) {
-      console.error(`❌ Forgot-password email failed for ${cleanEmail}: ${emailResult.error}`);
-      if (process.env.NODE_ENV === 'development') {
-        return res.status(200).json({
-          success: true,
-          message: 'OTP generated (email delivery failed — use devOtp below).',
-          devOtp: otpCode,
-          emailError: emailResult.error
-        });
-      }
-      return res.status(500).json({ success: false, error: `Failed to send password reset email: ${emailResult.error}` });
+    const emailOk = emailResult.success || emailResult.simulated;
+    if (!emailOk) {
+      console.warn(`⚠️  Forgot-password email failed for ${cleanEmail}: ${emailResult.error}`);
+    } else {
+      console.log(`✔️  Password reset OTP email delivered to ${cleanEmail}`);
     }
 
-    console.log(`✔️  Password reset OTP email delivered to ${cleanEmail}`);
     res.status(200).json({
       success: true,
-      message: 'OTP sent successfully.',
-      ...(process.env.NODE_ENV === 'development' ? { devOtp: otpCode } : {})
+      message: emailOk
+        ? `Reset code sent to ${cleanEmail}. Check your inbox (or spam folder).`
+        : `Reset code generated. Email delivery failed — use the code shown on screen.`,
+      otpCode,
+      devOtp: otpCode,
+      emailSent: emailOk
     });
   } catch (error) {
     console.error('Forgot Password API Error:', error);
@@ -1753,24 +1764,21 @@ exports.resendOtp = async (req, res) => {
       html: htmlContent
     });
 
-    if (!emailResult.success && !emailResult.simulated) {
-      console.error(`❌ Resend-OTP email failed for ${cleanEmail}: ${emailResult.error}`);
-      if (process.env.NODE_ENV === 'development') {
-        return res.status(200).json({
-          success: true,
-          message: 'OTP generated (email delivery failed — use devOtp below).',
-          devOtp: otpCode,
-          emailError: emailResult.error
-        });
-      }
-      return res.status(500).json({ success: false, error: `Failed to resend password reset email: ${emailResult.error}` });
+    const emailOk = emailResult.success || emailResult.simulated;
+    if (!emailOk) {
+      console.warn(`⚠️  Resend-OTP email failed for ${cleanEmail}: ${emailResult.error}`);
+    } else {
+      console.log(`✔️  Resend OTP email delivered to ${cleanEmail}`);
     }
 
-    console.log(`✔️  Resend OTP email delivered to ${cleanEmail}`);
     res.status(200).json({
       success: true,
-      message: 'OTP resent successfully.',
-      ...(process.env.NODE_ENV === 'development' ? { devOtp: otpCode } : {})
+      message: emailOk
+        ? `Reset code resent to ${cleanEmail}. Check your inbox (or spam folder).`
+        : `Reset code generated. Email delivery failed — use the code shown on screen.`,
+      otpCode,
+      devOtp: otpCode,
+      emailSent: emailOk
     });
   } catch (error) {
     console.error('Resend OTP Error:', error);

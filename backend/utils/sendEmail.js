@@ -27,9 +27,13 @@ const sendEmail = async (options) => {
   console.log(`📝  BODY PREVIEW: ${(options.text || '').substring(0, 80)}...`);
   console.log('=================================================\n');
 
-  // If no API key is configured → simulate send so dev/test still works
-  if (!apiKey) {
-    console.log('ℹ️  RESEND_API_KEY not configured. Simulating email send (dev mode).');
+  const toEmail = (options.to || '').toLowerCase().trim();
+  const isTestDomain = toEmail.endsWith('@emahu.com') || toEmail.endsWith('@example.com') || toEmail.endsWith('@test.com');
+  const simulateFlag = process.env.SIMULATE_EMAIL === 'true';
+
+  // If no API key is configured OR test domain OR SIMULATE_EMAIL is enabled → simulate send
+  if (!apiKey || isTestDomain || simulateFlag) {
+    console.log(`ℹ️  Simulating email send (dev/test mode) to: ${options.to}`);
     return { success: true, simulated: true };
   }
 

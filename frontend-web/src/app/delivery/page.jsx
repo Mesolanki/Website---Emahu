@@ -397,8 +397,8 @@ export default function DeliveryPortal() {
       const data = await res.json();
       if (data.success) {
         setIsEmailOtpSent(true);
-        if (data.devOtp) {
-          setDevOtp(data.devOtp);
+        if (data.otpCode) {
+          setDevOtp(data.otpCode);
         }
         setErrors((prev) => ({ ...prev, general: '' }));
       } else {
@@ -772,8 +772,16 @@ export default function DeliveryPortal() {
             {errors.otp && <span className="form-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
 
             {devOtp && (
-              <div style={{ background: 'rgba(49, 151, 149, 0.12)', border: '1px dashed rgba(49, 151, 149, 0.3)', color: '#319795', padding: '8px', borderRadius: '6px', textAlign: 'center', fontSize: '0.8rem', marginTop: '8px', fontWeight: '600' }}>
-                🔧 Dev Mode OTP: <strong style={{ color: '#fff', fontSize: '0.9rem', letterSpacing: '1px', marginLeft: '4px' }}>{devOtp}</strong>
+              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '8px' }}>
+                <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>📧 Code also shown here (check spam too):</div>
+                <div
+                  style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#fff', background: 'rgba(0,0,0,0.25)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
+                  onClick={() => setEmailOtp(devOtp)}
+                  title="Click to auto-fill"
+                >
+                  {devOtp}
+                </div>
+                <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
               </div>
             )}
           </div>
