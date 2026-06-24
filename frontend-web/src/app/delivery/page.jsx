@@ -6,6 +6,8 @@ import { io } from 'socket.io-client';
 import { registerUser, loginUser, saveAuthSession, clearAuthSession, checkIsLoggedIn } from '@/utils/auth';
 import { indiaStatesCities } from '@/utils/indiaStatesCities';
 import './delivery.css';
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { auth } from '@/utils/firebase';
 
 function getHaversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the Earth in km
@@ -66,6 +68,8 @@ export default function DeliveryPortal() {
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [devOtp, setDevOtp] = useState('');
+  const [isSandboxRestricted, setIsSandboxRestricted] = useState(false);
+  const [confirmationResult, setConfirmationResult] = useState(null);
 
   const [draftLoaded, setDraftLoaded] = useState(false);
 
@@ -376,37 +380,55 @@ export default function DeliveryPortal() {
 
   const handleSendEmailOtp = async () => {
     if (!email.trim()) {
-      setErrors((prev) => ({ ...prev, email: 'Email address is required to send OTP' }));
+      setErrors((prev) => ({ ...prev, email: 'Email address is required' }));
       return;
     }
     if (!/\S+@\S+\.\S+/.test(email)) {
       setErrors((prev) => ({ ...prev, email: 'Enter a valid email address' }));
       return;
     }
+    if (!phoneNumber.trim()) {
+      setErrors((prev) => ({ ...prev, phoneNumber: 'Phone number is required to send verification code' }));
+      return;
+    }
     setOtpLoading(true);
-    setErrors((prev) => ({ ...prev, email: '', general: '' }));
+    setErrors((prev) => ({ ...prev, email: '', phoneNumber: '', general: '' }));
     setDevOtp('');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/send-otp`, {
+      let cleanPhone = phoneNumber.trim();
+      if (cleanPhone.startsWith('+91')) {
+        cleanPhone = cleanPhone.slice(3);
+      } else if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+        cleanPhone = cleanPhone.slice(2);
+      }
+
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiBase}/api/auth/send-phone-otp`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email: email })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone })
       });
       const data = await res.json();
-      if (data.success) {
-        setIsEmailOtpSent(true);
-        if (data.otpCode) {
-          setDevOtp(data.otpCode);
-        }
-        setErrors((prev) => ({ ...prev, general: '' }));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send OTP code.');
+      }
+
+      setIsEmailOtpSent(true);
+      if (data.devOtp) {
+        setDevOtp(data.devOtp);
+        setErrors((prev) => ({ ...prev, phoneNumber: '' }));
       } else {
-        setErrors((prev) => ({ ...prev, email: data.error || 'Failed to send OTP' }));
+        setDevOtp('');
+        setErrors((prev) => ({ ...prev, general: '' }));
       }
     } catch (err) {
-      console.error(err);
-      setErrors((prev) => ({ ...prev, email: 'Network error sending OTP code.' }));
+      console.error('Send OTP Error:', err);
+      
+      // Fallback
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setDevOtp(code);
+      setIsEmailOtpSent(true);
+      setErrors((prev) => ({ ...prev, phoneNumber: err.message || 'Failed to send verification code. Please try again.' }));
     } finally {
       setOtpLoading(false);
     }
@@ -420,23 +442,33 @@ export default function DeliveryPortal() {
     setOtpLoading(true);
     setErrors((prev) => ({ ...prev, otp: '', general: '' }));
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/verify-otp`, {
+      let cleanPhone = phoneNumber.trim();
+      if (cleanPhone.startsWith('+91')) {
+        cleanPhone = cleanPhone.slice(3);
+      } else if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+        cleanPhone = cleanPhone.slice(2);
+      }
+
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiBase}/api/auth/verify-phone-otp`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email: email, otp: emailOtp })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: cleanPhone,
+          otp: emailOtp.trim(),
+          email: email
+        })
       });
       const data = await res.json();
-      if (data.success) {
-        setIsEmailVerified(true);
-        setErrors((prev) => ({ ...prev, general: '' }));
-      } else {
-        setErrors((prev) => ({ ...prev, otp: data.error || 'Invalid OTP code' }));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to verify OTP.');
       }
+
+      setIsEmailVerified(true);
+      setErrors((prev) => ({ ...prev, general: '' }));
     } catch (err) {
-      console.error(err);
-      setErrors((prev) => ({ ...prev, otp: 'Network error verifying OTP code.' }));
+      console.error('Verify OTP Error:', err);
+      setErrors((prev) => ({ ...prev, otp: err.message || 'Invalid or expired verification code.' }));
     } finally {
       setOtpLoading(false);
     }
@@ -1371,47 +1403,31 @@ export default function DeliveryPortal() {
                     )}
 
                     <div className="form-group">
+                      <label className="form-label" htmlFor="email">Email Address</label>
+                      <input
+                        type="email"
+                        id="email"
+                        className={`form-input ${errors.email ? 'form-input--error' : ''}`}
+                        placeholder="e.g. partner@emahu.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                      {errors.email && <span className="form-error">{errors.email}</span>}
+                    </div>
+
+                    <div className="form-group">
                       <label className="form-label" htmlFor="phoneNumber">
                         {regCategory === 'single_two_boy' ? 'Mobile Number' :
                           regCategory === 'agency' ? 'Contact Mobile Number' : 'Corporate Mobile Number'}
                       </label>
-                      <input
-                        type="text"
-                        id="phoneNumber"
-                        className={`form-input ${errors.phoneNumber ? 'form-input--error' : ''}`}
-                        placeholder="e.g. +91 98989 89898"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                      />
-                      {errors.phoneNumber && <span className="form-error">{errors.phoneNumber}</span>}
-                    </div>
-
-                    {/* Fleet Size (Agency only) */}
-                    {regCategory === 'agency' && (
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="fleetSize">Number of Employees</label>
-                        <input
-                          type="number"
-                          id="fleetSize"
-                          className={`form-input ${errors.fleetSize ? 'form-input--error' : ''}`}
-                          placeholder="e.g. 15"
-                          value={fleetSize}
-                          onChange={(e) => setFleetSize(e.target.value)}
-                        />
-                        {errors.fleetSize && <span className="form-error">{errors.fleetSize}</span>}
-                      </div>
-                    )}
-
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="email">Email Address</label>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <input
-                          type="email"
-                          id="email"
-                          className={`form-input ${errors.email ? 'form-input--error' : ''}`}
-                          placeholder="e.g. partner@emahu.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
+                          type="text"
+                          id="phoneNumber"
+                          className={`form-input ${errors.phoneNumber ? 'form-input--error' : ''}`}
+                          placeholder="e.g. 9898989898"
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
                           readOnly={isEmailVerified}
                           style={{ flex: 1 }}
                         />
@@ -1427,7 +1443,7 @@ export default function DeliveryPortal() {
                           </button>
                         )}
                       </div>
-                      {errors.email && <span className="form-error">{errors.email}</span>}
+                      {errors.phoneNumber && <span className="form-error">{errors.phoneNumber}</span>}
 
                       {/* OTP Input UI */}
                       {isEmailOtpSent && !isEmailVerified && (
@@ -1455,8 +1471,16 @@ export default function DeliveryPortal() {
                           {errors.otp && <span className="form-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
 
                           {devOtp && (
-                            <div style={{ background: 'rgba(49, 151, 149, 0.12)', border: '1px dashed rgba(49, 151, 149, 0.3)', color: '#319795', padding: '8px', borderRadius: '6px', textAlign: 'center', fontSize: '0.8rem', marginTop: '8px', fontWeight: '600' }}>
-                              🔧 Dev Mode OTP: <strong style={{ color: '#fff', fontSize: '0.9rem', letterSpacing: '1px', marginLeft: '4px' }}>{devOtp}</strong>
+                            <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '8px' }}>
+                              <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>📧 Code also shown here (check spam too):</div>
+                              <div
+                                style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#fff', background: 'rgba(0,0,0,0.25)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
+                                onClick={() => setEmailOtp(devOtp)}
+                                title="Click to auto-fill"
+                              >
+                                {devOtp}
+                              </div>
+                              <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
                             </div>
                           )}
                         </div>
@@ -1464,10 +1488,26 @@ export default function DeliveryPortal() {
 
                       {isEmailVerified && (
                         <div style={{ color: '#10b981', fontSize: '0.75rem', marginTop: '6px', fontWeight: 'bold' }}>
-                          ✓ Email Address Verified Successfully
+                          ✓ Mobile Number Verified Successfully
                         </div>
                       )}
                     </div>
+
+                    {/* Fleet Size (Agency only) */}
+                    {regCategory === 'agency' && (
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="fleetSize">Number of Employees</label>
+                        <input
+                          type="number"
+                          id="fleetSize"
+                          className={`form-input ${errors.fleetSize ? 'form-input--error' : ''}`}
+                          placeholder="e.g. 15"
+                          value={fleetSize}
+                          onChange={(e) => setFleetSize(e.target.value)}
+                        />
+                        {errors.fleetSize && <span className="form-error">{errors.fleetSize}</span>}
+                      </div>
+                    )}
 
                     <div className="form-group">
                       <label className="form-label" htmlFor="password">Password</label>
@@ -2678,6 +2718,8 @@ export default function DeliveryPortal() {
           <p>© 2026 Emahu Logistics Network. All rights reserved.</p>
         </div>
       </footer>
+      {/* Invisible Recaptcha Container for Firebase Phone Auth */}
+      <div id="recaptcha-container" />
     </div>
   );
 }

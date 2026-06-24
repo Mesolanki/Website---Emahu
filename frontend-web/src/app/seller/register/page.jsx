@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import './register.css';
 import { registerUser, saveAuthSession } from '@/utils/auth';
 import API_BASE from '@/utils/config';
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { auth } from '@/utils/firebase';
 
 /**
  * SellerRegister Component
@@ -48,6 +50,10 @@ export default function SellerRegister() {
   const [otpSending, setOtpSending] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [devEmailOtp, setDevEmailOtp] = useState('');
+  const [isSandboxRestricted, setIsSandboxRestricted] = useState(false);
+  const [confirmationResult, setConfirmationResult] = useState(null);
+  const [mockOtpCode, setMockOtpCode] = useState('');
+  const [isMockOtpActive, setIsMockOtpActive] = useState(false);
 
 
 
@@ -134,34 +140,50 @@ export default function SellerRegister() {
     setIsOtpVerifying(true); // Open the popup immediately!
     setOtpSending(true);
     setOtpError('');
+    setDevEmailOtp('');
     try {
-      const res = await fetch(`${API_BASE}/api/auth/send-otp`, {
+      let cleanPhone = formData.phone.trim();
+      if (cleanPhone.startsWith('+91')) {
+        cleanPhone = cleanPhone.slice(3);
+      } else if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+        cleanPhone = cleanPhone.slice(2);
+      }
+
+      const res = await fetch(`${API_BASE}/api/auth/send-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email })
+        body: JSON.stringify({ phone: cleanPhone })
       });
       const data = await res.json();
-      if (data.success) {
-        setOtpCooldown(60);
-        // Backend always returns otpCode now (works without a verified domain)
-        if (data.otpCode) {
-          setDevEmailOtp(data.otpCode);
-        }
-        if (isResend) {
-          setOtpError('OTP has been resent. Check email or use the code shown below.');
-        }
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send OTP code.');
+      }
+
+      setOtpCooldown(60);
+      if (data.devOtp) {
+        setMockOtpCode(data.devOtp);
+        setIsMockOtpActive(true);
+        setOtpError('');
       } else {
-        setOtpError(data.error || 'Failed to send OTP. Please check email address.');
+        setIsMockOtpActive(false);
+        setMockOtpCode('');
+        if (isResend) {
+          setOtpError('Verification code resent successfully to your mobile number via Twilio.');
+        }
       }
     } catch (err) {
-      console.error(err);
-      setOtpError('Network error sending OTP. Please try again.');
+      console.error('Send OTP Error:', err);
+      setOtpError(err.message || 'Failed to send verification code. Please try again.');
+      
+      // Fallback
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setMockOtpCode(code);
+      setIsMockOtpActive(true);
+      setOtpCooldown(60);
     } finally {
       setOtpSending(false);
     }
   };
-
-
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
@@ -172,21 +194,32 @@ export default function SellerRegister() {
     setLoading(true);
     setOtpError('');
     try {
-      const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
+      let cleanPhone = formData.phone.trim();
+      if (cleanPhone.startsWith('+91')) {
+        cleanPhone = cleanPhone.slice(3);
+      } else if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+        cleanPhone = cleanPhone.slice(2);
+      }
+
+      const res = await fetch(`${API_BASE}/api/auth/verify-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, otp: otpInput.trim() })
+        body: JSON.stringify({
+          phone: cleanPhone,
+          otp: otpInput.trim(),
+          email: formData.email
+        })
       });
       const data = await res.json();
-      if (data.success) {
-        setIsOtpVerifying(false);
-        setStep(2);
-      } else {
-        setOtpError(data.error || 'Invalid OTP code. Please try again.');
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to verify OTP.');
       }
+
+      setIsOtpVerifying(false);
+      setStep(2);
     } catch (err) {
-      console.error(err);
-      setOtpError('Network error verifying OTP. Please try again.');
+      console.error('Verify OTP Error:', err);
+      setOtpError(err.message || 'Invalid or expired verification code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -858,17 +891,16 @@ export default function SellerRegister() {
               margin: '0 auto 20px'
             }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                <polyline points="22,6 12,13 2,6"/>
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
               </svg>
             </div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#ffffff', marginBottom: '8px' }}>
-              {otpSending ? 'Sending Verification Code...' : 'Confirm Your Email'}
+              {otpSending ? 'Sending Verification Code...' : 'Confirm Your Mobile Number'}
             </h3>
             <p style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: '1.5', marginBottom: '24px' }}>
               {otpSending 
-                ? 'We are generating and sending a secure OTP to your email...' 
-                : <>We sent a 6-digit verification code to <strong style={{ color: '#f8fafc' }}>{formData.email}</strong>. Please enter it below.</>
+                ? 'We are generating and sending a secure verification code...' 
+                : <>We sent a 6-digit verification code to <strong style={{ color: '#f8fafc' }}>{formData.phone}</strong>. Please enter it below.</>
               }
             </p>
 
@@ -888,7 +920,7 @@ export default function SellerRegister() {
               </div>
             )}
 
-            {devEmailOtp && (
+            {isMockOtpActive && mockOtpCode && (
               <div style={{
                 backgroundColor: 'rgba(16, 185, 129, 0.12)',
                 border: '1px solid rgba(16, 185, 129, 0.35)',
@@ -899,7 +931,7 @@ export default function SellerRegister() {
                 marginBottom: '16px',
                 textAlign: 'center'
               }}>
-                <div style={{ marginBottom: '6px', opacity: 0.85 }}>📧 Email sent! Your verification code is also shown below:</div>
+                <div style={{ marginBottom: '6px', opacity: 0.85 }}>📱 Simulated Mobile Verification Code (Dev Mode):</div>
                 <div style={{
                   letterSpacing: '6px',
                   fontSize: '1.6rem',
@@ -912,14 +944,15 @@ export default function SellerRegister() {
                   cursor: 'pointer',
                   userSelect: 'all'
                 }}
-                  onClick={() => setOtpInput(devEmailOtp)}
+                  onClick={() => setOtpInput(mockOtpCode)}
                   title="Click to auto-fill"
                 >
-                  {devEmailOtp}
+                  {mockOtpCode}
                 </div>
                 <div style={{ marginTop: '6px', fontSize: '0.75rem', opacity: 0.7 }}>👆 Click the code above to auto-fill</div>
               </div>
             )}
+
 
 
 
@@ -990,7 +1023,7 @@ export default function SellerRegister() {
                   textDecoration: 'underline'
                 }}
               >
-                Change Email
+                Change Details / Phone
               </button>
 
               <button
@@ -1012,7 +1045,8 @@ export default function SellerRegister() {
         </div>
       )}
 
-
+      {/* Invisible Recaptcha Container for Firebase Phone Auth */}
+      <div id="recaptcha-container" />
 
     </div>
   );

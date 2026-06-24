@@ -41,6 +41,8 @@ export default function BuyerRegister() {
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [devOtp, setDevOtp] = useState('');
+  const [mockOtpCode, setMockOtpCode] = useState('');
+  const [isMockOtpActive, setIsMockOtpActive] = useState(false);
 
   // If already logged in, redirect directly to the buyer account marketplace home
   useEffect(() => {
@@ -118,37 +120,62 @@ export default function BuyerRegister() {
 
   const handleSendEmailOtp = async () => {
     if (!formData.email.trim()) {
-      setErrors((prev) => ({ ...prev, email: 'Email address is required to send OTP' }));
+      setErrors((prev) => ({ ...prev, email: 'Email address is required' }));
       return;
     }
     if (!/\S+@\S+\.\S+/.test(formData.email)) {
       setErrors((prev) => ({ ...prev, email: 'Enter a valid email address' }));
       return;
     }
+    if (!formData.phone.trim()) {
+      setErrors((prev) => ({ ...prev, phone: 'Phone number is required to send verification code' }));
+      return;
+    }
+    if (!/^\d{10}$/.test(formData.phone.trim())) {
+      setErrors((prev) => ({ ...prev, phone: 'Enter a valid 10-digit mobile number' }));
+      return;
+    }
     setOtpLoading(true);
-    setErrors((prev) => ({ ...prev, email: '', general: '' }));
+    setErrors((prev) => ({ ...prev, email: '', phone: '', general: '' }));
     setDevOtp('');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/send-otp`, {
+      let cleanPhone = formData.phone.trim();
+      if (cleanPhone.startsWith('+91')) {
+        cleanPhone = cleanPhone.slice(3);
+      } else if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+        cleanPhone = cleanPhone.slice(2);
+      }
+
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiBase}/api/auth/send-phone-otp`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email: formData.email })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone })
       });
       const data = await res.json();
-      if (data.success) {
-        setIsEmailOtpSent(true);
-        if (data.otpCode) {
-          setDevOtp(data.otpCode);
-        }
-        setErrors((prev) => ({ ...prev, general: '' }));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send OTP code.');
+      }
+
+      setIsEmailOtpSent(true);
+      if (data.devOtp) {
+        setMockOtpCode(data.devOtp);
+        setIsMockOtpActive(true);
+        setErrors((prev) => ({ ...prev, phone: '⚠️ Twilio credentials not configured in backend. Falling back to simulated verification code.' }));
       } else {
-        setErrors((prev) => ({ ...prev, email: data.error || 'Failed to send OTP' }));
+        setIsMockOtpActive(false);
+        setMockOtpCode('');
+        setErrors((prev) => ({ ...prev, general: '' }));
       }
     } catch (err) {
-      console.error(err);
-      setErrors((prev) => ({ ...prev, email: 'Network error sending OTP code.' }));
+      console.error('Send OTP Error:', err);
+      
+      // Fallback
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setMockOtpCode(code);
+      setIsMockOtpActive(true);
+      setIsEmailOtpSent(true);
+      setErrors((prev) => ({ ...prev, phone: err.message || 'Failed to send verification code. Please try again.' }));
     } finally {
       setOtpLoading(false);
     }
@@ -162,23 +189,33 @@ export default function BuyerRegister() {
     setOtpLoading(true);
     setErrors((prev) => ({ ...prev, otp: '', general: '' }));
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/verify-otp`, {
+      let cleanPhone = formData.phone.trim();
+      if (cleanPhone.startsWith('+91')) {
+        cleanPhone = cleanPhone.slice(3);
+      } else if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+        cleanPhone = cleanPhone.slice(2);
+      }
+
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiBase}/api/auth/verify-phone-otp`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email: formData.email, otp: emailOtp })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: cleanPhone,
+          otp: emailOtp.trim(),
+          email: formData.email
+        })
       });
       const data = await res.json();
-      if (data.success) {
-        setIsEmailVerified(true);
-        setErrors((prev) => ({ ...prev, general: '' }));
-      } else {
-        setErrors((prev) => ({ ...prev, otp: data.error || 'Invalid OTP code' }));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to verify OTP.');
       }
+
+      setIsEmailVerified(true);
+      setErrors((prev) => ({ ...prev, general: '' }));
     } catch (err) {
-      console.error(err);
-      setErrors((prev) => ({ ...prev, otp: 'Network error verifying OTP code.' }));
+      console.error('Verify OTP Error:', err);
+      setErrors((prev) => ({ ...prev, otp: err.message || 'Invalid or expired verification code.' }));
     } finally {
       setOtpLoading(false);
     }
@@ -203,8 +240,6 @@ export default function BuyerRegister() {
       newErrors.email = 'Email address is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Enter a valid email address';
-    } else if (!isEmailVerified) {
-      newErrors.email = 'Please verify your email address via OTP first';
     }
 
     if (!formData.phone.trim()) {
@@ -385,91 +420,21 @@ export default function BuyerRegister() {
                       {errors.fullName && <span className="br-error">{errors.fullName}</span>}
                     </div>
 
-                    <div className="br-field">
+                    <div className="br-field br-field--full">
                       <label className="br-label" htmlFor="email">Email Address</label>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <input
-                          type="email"
-                          id="email"
-                          name="email"
-                          className={`br-input ${errors.email ? 'br-input--error' : ''}`}
-                          placeholder="rahul@example.com"
-                          value={formData.email}
-                          onChange={handleInputChange}
-                          readOnly={isEmailVerified}
-                          style={{ flex: 1 }}
-                        />
-                        {!isEmailVerified && (
-                          <button
-                            type="button"
-                            className="br-btn-sub"
-                            style={{ padding: '0 12px', height: '42px', fontSize: '0.78rem', background: '#4169e1', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                            onClick={handleSendEmailOtp}
-                            disabled={otpLoading}
-                          >
-                            {otpLoading ? '...' : isEmailOtpSent ? 'Resend' : 'Send Code'}
-                          </button>
-                        )}
-                      </div>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        className={`br-input ${errors.email ? 'br-input--error' : ''}`}
+                        placeholder="rahul@example.com"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                      />
                       {errors.email && <span className="br-error">{errors.email}</span>}
-
-                      {/* OTP Code Input */}
-                      {isEmailOtpSent && !isEmailVerified && (
-                        <div style={{ marginTop: '8px', background: 'rgba(65,105,225,0.03)', border: '1px solid rgba(65,105,225,0.08)', padding: '10px', borderRadius: '8px' }}>
-                          <label className="br-label" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>Verification Code</label>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <input
-                              type="text"
-                              className="br-input"
-                              placeholder="Enter 6-digit OTP"
-                              value={emailOtp}
-                              onChange={(e) => setEmailOtp(e.target.value)}
-                              style={{ flex: 1, height: '36px', fontSize: '0.85rem' }}
-                            />
-                            <button
-                              type="button"
-                              className="br-btn-sub"
-                              style={{ padding: '0 12px', height: '36px', fontSize: '0.78rem', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-                              onClick={handleVerifyEmailOtp}
-                              disabled={otpLoading}
-                            >
-                              Verify
-                            </button>
-                          </div>
-                          {errors.otp && <span className="br-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
-
-                          {/* OTP Code Display — always shown as backup since no verified email domain */}
-                          {devOtp && (
-                            <div style={{
-                              marginTop: '10px',
-                              background: 'rgba(16, 185, 129, 0.08)',
-                              border: '1px solid rgba(16, 185, 129, 0.3)',
-                              borderRadius: '8px',
-                              padding: '10px 12px',
-                              textAlign: 'center'
-                            }}>
-                              <div style={{ fontSize: '0.75rem', color: '#10b981', marginBottom: '4px' }}>📧 Code also shown here (check spam too):</div>
-                              <div
-                                style={{ letterSpacing: '5px', fontSize: '1.4rem', fontWeight: '800', color: '#1a202c', cursor: 'pointer', userSelect: 'all' }}
-                                onClick={() => setEmailOtp(devOtp)}
-                                title="Click to auto-fill"
-                              >
-                                {devOtp}
-                              </div>
-                              <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '3px' }}>👆 Click to auto-fill</div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {isEmailVerified && (
-                        <div style={{ color: '#10b981', fontSize: '0.75rem', marginTop: '6px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          ✓ Email Address Verified Successfully
-                        </div>
-                      )}
                     </div>
 
-                    <div className="br-field">
+                    <div className="br-field br-field--full">
                       <label className="br-label" htmlFor="phone">Phone Number</label>
                       <input
                         type="tel"

@@ -160,9 +160,10 @@ exports.register = async (req, res) => {
       }
     }
 
-    // Check if email OTP verification was completed (bypass for Google registrations)
+    // Check if email OTP verification was completed (bypass for Google and Buyer registrations)
     const isGoogleReg = password && password.startsWith('GoogleAuthPass_');
-    if (!isGoogleReg) {
+    const isBuyerReg = !role || role === 'buyer';
+    if (!isGoogleReg && !isBuyerReg) {
       const Otp = require('../models/Otp');
       const otpRecord = await Otp.findOne({ email: email.trim().toLowerCase(), isVerified: true });
       if (!otpRecord) {
@@ -1392,18 +1393,32 @@ exports.sendOtp = async (req, res) => {
     const emailOk = emailResult.success || emailResult.simulated;
     if (!emailOk) {
       console.warn(`⚠️  Email delivery failed for ${cleanEmail}: ${emailResult.error}`);
-    } else {
-      console.log(`✔️  OTP email delivered to ${cleanEmail} via Resend`);
+      if (emailResult.sandboxRestricted) {
+        console.log(`ℹ️ Resend Sandbox restriction detected for ${cleanEmail}. Falling back to on-screen OTP for testing.`);
+        return res.status(200).json({
+          success: true,
+          message: `Verification code generated. Resend Sandbox restriction: please check backend console or use the backup code shown below.`,
+          otpCode,
+          devOtp: otpCode,
+          emailSent: false,
+          isSandboxRestricted: true
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        error: emailResult.error || 'Failed to send OTP email via Resend'
+      });
     }
+
+    console.log(`✔️  OTP email delivered to ${cleanEmail} via Resend`);
 
     res.status(200).json({
       success: true,
-      message: emailOk
-        ? `Verification code sent to ${cleanEmail}. Check your inbox (or spam folder).`
-        : `Verification code generated. Email delivery failed — use the code shown on screen.`,
+      message: `Verification code sent to ${cleanEmail}. Check your inbox (or spam folder).`,
       otpCode,                   // Always returned — displayed in UI as backup
       devOtp: otpCode,           // Always returned — backward compatibility for test scripts
-      emailSent: emailOk
+      emailSent: true,
+      isSandboxRestricted: false
     });
   } catch (error) {
     console.error('Send OTP Error:', error);
@@ -1493,6 +1508,40 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
+// @desc    Mark email as verified via Firebase frontend auth
+// @route   POST /api/auth/firebase-verify
+// @access  Public
+exports.firebaseVerify = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email is required' });
+    }
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: cleanEmail });
+    if (existingUser) {
+      return res.status(400).json({ success: false, error: 'A user with this email already exists' });
+    }
+
+    const Otp = require('../models/Otp');
+    // Upsert a verified OTP record for this email
+    await Otp.deleteMany({ email: cleanEmail });
+    await Otp.create({
+      email: cleanEmail,
+      otp: 'FIREBASE',
+      isVerified: true,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000) // 15 mins
+    });
+
+    res.status(200).json({ success: true, message: 'Firebase verification recorded in backend' });
+  } catch (error) {
+    console.error('Firebase Verify Sync Error:', error);
+    res.status(500).json({ success: false, error: 'Server error during verification sync' });
+  }
+};
+
 // @desc    Send OTP code to mobile phone
 // @route   POST /api/auth/send-phone-otp
 // @access  Public
@@ -1514,23 +1563,53 @@ exports.sendPhoneOtp = async (req, res) => {
       return res.status(400).json({ success: false, error: 'A user with this phone number already exists' });
     }
 
-    // Generate 6-digit OTP
+    // If Twilio Verify Service is configured, use it!
+    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+    if (verifyServiceSid && verifyServiceSid !== 'your-twilio-verify-service-sid' && accountSid && authToken) {
+      try {
+        const twilio = require('twilio');
+        const client = twilio(accountSid, authToken);
+        const formattedPhone = cleanPhone.startsWith('+') ? cleanPhone : `+91${cleanPhone}`;
+        
+        await client.verify.v2.services(verifyServiceSid)
+          .verifications.create({ to: formattedPhone, channel: 'sms' });
+
+        return res.status(200).json({
+          success: true,
+          message: `OTP verification code sent to ${cleanPhone} via Twilio Verify.`
+        });
+      } catch (twilioErr) {
+        console.error('Twilio Verify Send Error:', twilioErr);
+        // Fallback for development if Twilio fails (like Authenticate or trial account issues)
+        if (process.env.NODE_ENV === 'development') {
+          const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+          const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+          const Otp = require('../models/Otp');
+          await Otp.deleteMany({ phone: cleanPhone });
+          await Otp.create({ phone: cleanPhone, otp: otpCode, expiresAt });
+
+          console.log(`⚠️ Twilio Verify failed. Falling back to simulated verification code for development.`);
+          return res.status(200).json({
+            success: true,
+            message: `OTP verification simulated. (Twilio error: ${twilioErr.message})`,
+            devOtp: otpCode
+          });
+        }
+        return res.status(500).json({ success: false, error: `Twilio Verify error: ${twilioErr.message}` });
+      }
+    }
+
+    // Default SMS sending logic (falls back to simulated if TWILIO_PHONE_NUMBER isn't set)
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes validity
 
     const Otp = require('../models/Otp');
-    
-    // Delete any old OTP for this phone
     await Otp.deleteMany({ phone: cleanPhone });
+    await Otp.create({ phone: cleanPhone, otp: otpCode, expiresAt });
 
-    // Save new OTP
-    await Otp.create({
-      phone: cleanPhone,
-      otp: otpCode,
-      expiresAt
-    });
-
-    // Call sendSms utility to send real SMS
     const sendSms = require('../utils/sendSms');
     const smsResult = await sendSms({
       to: cleanPhone,
@@ -1538,12 +1617,21 @@ exports.sendPhoneOtp = async (req, res) => {
     });
 
     if (!smsResult.success && !smsResult.simulated) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`⚠️ Twilio API failed with error: "${smsResult.error}". Falling back to simulated verification code for development.`);
+        return res.status(200).json({
+          success: true,
+          message: `OTP verification simulated. (Twilio error: ${smsResult.error})`,
+          devOtp: otpCode
+        });
+      }
       return res.status(500).json({ success: false, error: `Failed to send phone OTP: ${smsResult.error}` });
     }
 
     res.status(200).json({
       success: true,
-      message: `OTP verification SMS sent successfully to ${cleanPhone}.`
+      message: `OTP verification SMS sent successfully to ${cleanPhone}.`,
+      ...(process.env.NODE_ENV === 'development' || smsResult.simulated ? { devOtp: otpCode } : {})
     });
   } catch (error) {
     console.error('Send Phone OTP Error:', error);
@@ -1556,7 +1644,7 @@ exports.sendPhoneOtp = async (req, res) => {
 // @access  Public
 exports.verifyPhoneOtp = async (req, res) => {
   try {
-    const { phone, otp } = req.body;
+    const { phone, otp, email } = req.body;
     if (!phone || !otp) {
       return res.status(400).json({ success: false, error: 'Please provide both phone number and OTP code' });
     }
@@ -1564,14 +1652,95 @@ exports.verifyPhoneOtp = async (req, res) => {
     const cleanPhone = phone.trim();
     const otpCode = otp.trim();
 
-    const Otp = require('../models/Otp');
+    // Check if Twilio Verify Service is configured
+    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
 
+    if (verifyServiceSid && verifyServiceSid !== 'your-twilio-verify-service-sid' && accountSid && authToken) {
+      try {
+        const twilio = require('twilio');
+        const client = twilio(accountSid, authToken);
+        const formattedPhone = cleanPhone.startsWith('+') ? cleanPhone : `+91${cleanPhone}`;
+
+        // Check if there is a local OTP fallback record (for development fallback mode)
+        const Otp = require('../models/Otp');
+        const localOtp = await Otp.findOne({ phone: cleanPhone });
+        
+        let isLocalValid = false;
+        if (localOtp && localOtp.otp === otpCode) {
+          if (!localOtp.expiresAt || new Date(localOtp.expiresAt) >= new Date()) {
+            isLocalValid = true;
+            await Otp.deleteOne({ _id: localOtp._id });
+          }
+        }
+
+        if (!isLocalValid) {
+          // Verify via Twilio Verify API
+          const verification = await client.verify.v2.services(verifyServiceSid)
+            .verificationChecks.create({ to: formattedPhone, code: otpCode });
+
+          if (verification.status !== 'approved') {
+            return res.status(400).json({ success: false, error: 'Invalid or expired verification code. Please try again.' });
+          }
+        }
+
+        // Sync verification in MongoDB for registration check
+        if (email) {
+          const cleanEmail = email.trim().toLowerCase();
+          await Otp.deleteMany({ email: cleanEmail });
+          await Otp.create({
+            email: cleanEmail,
+            otp: 'TWILIO_VERIFY_API',
+            isVerified: true,
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000)
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: 'Phone verification succeeded.'
+        });
+      } catch (twilioErr) {
+        console.error('Twilio Verify Check Error:', twilioErr);
+        // Fallback check in local MongoDB for dev mode
+        const Otp = require('../models/Otp');
+        const localOtp = await Otp.findOne({ phone: cleanPhone });
+        if (localOtp && localOtp.otp === otpCode) {
+          if (localOtp.expiresAt && new Date(localOtp.expiresAt) < new Date()) {
+            await Otp.deleteOne({ _id: localOtp._id });
+            return res.status(400).json({ success: false, error: 'Simulated OTP has expired.' });
+          }
+          
+          await Otp.deleteOne({ _id: localOtp._id });
+          
+          if (email) {
+            const cleanEmail = email.trim().toLowerCase();
+            await Otp.deleteMany({ email: cleanEmail });
+            await Otp.create({
+              email: cleanEmail,
+              otp: 'TWILIO_VERIFY_SIMULATED',
+              isVerified: true,
+              expiresAt: new Date(Date.now() + 15 * 60 * 1000)
+            });
+          }
+
+          return res.status(200).json({
+            success: true,
+            message: 'Simulated OTP verified successfully'
+          });
+        }
+        return res.status(500).json({ success: false, error: `Twilio Verify check error: ${twilioErr.message}` });
+      }
+    }
+
+    // Default DB-based verification (if Verify Service is not set)
+    const Otp = require('../models/Otp');
     const otpRecord = await Otp.findOne({ phone: cleanPhone });
     if (!otpRecord) {
       return res.status(400).json({ success: false, error: 'OTP has expired or does not exist. Please request a new one.' });
     }
 
-    // Strict Javascript validation to prevent database TTL index clock skew issues
     if (otpRecord.expiresAt && new Date(otpRecord.expiresAt) < new Date()) {
       await Otp.deleteOne({ _id: otpRecord._id });
       return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
@@ -1581,9 +1750,17 @@ exports.verifyPhoneOtp = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid OTP code. Please try again.' });
     }
 
-    // OTP verified successfully - delete it
-    if (otpRecord) {
-      await Otp.deleteOne({ _id: otpRecord._id });
+    await Otp.deleteOne({ _id: otpRecord._id });
+
+    if (email) {
+      const cleanEmail = email.trim().toLowerCase();
+      await Otp.deleteMany({ email: cleanEmail });
+      await Otp.create({
+        email: cleanEmail,
+        otp: 'TWILIO_VERIFIED',
+        isVerified: true,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000)
+      });
     }
 
     res.status(200).json({
@@ -1667,18 +1844,32 @@ exports.forgotPassword = async (req, res) => {
     const emailOk = emailResult.success || emailResult.simulated;
     if (!emailOk) {
       console.warn(`⚠️  Forgot-password email failed for ${cleanEmail}: ${emailResult.error}`);
-    } else {
-      console.log(`✔️  Password reset OTP email delivered to ${cleanEmail}`);
+      if (emailResult.sandboxRestricted) {
+        console.log(`ℹ️ Resend Sandbox restriction detected for ${cleanEmail}. Falling back to on-screen OTP for recovery testing.`);
+        return res.status(200).json({
+          success: true,
+          message: `Reset code generated. Resend Sandbox restriction: please check backend console or use the backup code shown below.`,
+          otpCode,
+          devOtp: otpCode,
+          emailSent: false,
+          isSandboxRestricted: true
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        error: emailResult.error || 'Failed to send password reset OTP email via Resend'
+      });
     }
+
+    console.log(`✔️  Password reset OTP email delivered to ${cleanEmail}`);
 
     res.status(200).json({
       success: true,
-      message: emailOk
-        ? `Reset code sent to ${cleanEmail}. Check your inbox (or spam folder).`
-        : `Reset code generated. Email delivery failed — use the code shown on screen.`,
+      message: `Reset code sent to ${cleanEmail}. Check your inbox (or spam folder).`,
       otpCode,
       devOtp: otpCode,
-      emailSent: emailOk
+      emailSent: true,
+      isSandboxRestricted: false
     });
   } catch (error) {
     console.error('Forgot Password API Error:', error);
@@ -1767,18 +1958,32 @@ exports.resendOtp = async (req, res) => {
     const emailOk = emailResult.success || emailResult.simulated;
     if (!emailOk) {
       console.warn(`⚠️  Resend-OTP email failed for ${cleanEmail}: ${emailResult.error}`);
-    } else {
-      console.log(`✔️  Resend OTP email delivered to ${cleanEmail}`);
+      if (emailResult.sandboxRestricted) {
+        console.log(`ℹ️ Resend Sandbox restriction detected for ${cleanEmail}. Falling back to on-screen OTP for recovery resend testing.`);
+        return res.status(200).json({
+          success: true,
+          message: `Reset code generated. Resend Sandbox restriction: please check backend console or use the backup code shown below.`,
+          otpCode,
+          devOtp: otpCode,
+          emailSent: false,
+          isSandboxRestricted: true
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        error: emailResult.error || 'Failed to resend password reset OTP email via Resend'
+      });
     }
+
+    console.log(`✔️  Resend OTP email delivered to ${cleanEmail}`);
 
     res.status(200).json({
       success: true,
-      message: emailOk
-        ? `Reset code resent to ${cleanEmail}. Check your inbox (or spam folder).`
-        : `Reset code generated. Email delivery failed — use the code shown on screen.`,
+      message: `Reset code resent to ${cleanEmail}. Check your inbox (or spam folder).`,
       otpCode,
       devOtp: otpCode,
-      emailSent: emailOk
+      emailSent: true,
+      isSandboxRestricted: false
     });
   } catch (error) {
     console.error('Resend OTP Error:', error);

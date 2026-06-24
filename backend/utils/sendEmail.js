@@ -27,7 +27,20 @@ const sendEmail = async (options) => {
   console.log(`📝  BODY PREVIEW: ${(options.text || '').substring(0, 80)}...`);
   console.log('=================================================\n');
 
-  const toEmail = (options.to || '').toLowerCase().trim();
+  // Pre-validate options.to before hitting the Resend SDK
+  if (!options.to || typeof options.to !== 'string' || !options.to.trim()) {
+    console.error('❌ Email failed: Recipient email address ("to") is missing or empty.');
+    return { success: false, error: 'Recipient email address ("to") is required.' };
+  }
+
+  const cleanTo = options.to.trim();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(cleanTo)) {
+    console.error(`❌ Email failed: Invalid recipient email address format: "${options.to}"`);
+    return { success: false, error: 'Recipient email address format is invalid. Example format: email@example.com' };
+  }
+
+  const toEmail = cleanTo.toLowerCase();
   const isTestDomain = toEmail.endsWith('@emahu.com') || toEmail.endsWith('@example.com') || toEmail.endsWith('@test.com');
   const simulateFlag = process.env.SIMULATE_EMAIL === 'true';
 
@@ -42,7 +55,7 @@ const sendEmail = async (options) => {
 
     const { data, error } = await resend.emails.send({
       from,
-      to: [options.to],
+      to: [cleanTo],
       subject: options.subject,
       text: options.text,
       html: options.html || undefined
@@ -50,7 +63,16 @@ const sendEmail = async (options) => {
 
     if (error) {
       console.error('❌ Resend API Error:', error);
-      return { success: false, error: error.message || JSON.stringify(error) };
+      const isSandbox = (error.message || '').includes('You can only send testing emails to your own email address') 
+        || error.statusCode === 403 
+        || (error.message || '').includes('Unable to fetch data')
+        || (error.message || '').includes('could not be resolved')
+        || (error.message || '').toLowerCase().includes('fetch failed');
+      return { 
+        success: false, 
+        error: error.message || JSON.stringify(error),
+        sandboxRestricted: isSandbox
+      };
     }
 
     console.log(`✔️  Email sent successfully via Resend. ID: ${data?.id}`);
@@ -58,7 +80,15 @@ const sendEmail = async (options) => {
 
   } catch (err) {
     console.error('❌ Resend SDK Exception:', err.message);
-    return { success: false, error: err.message };
+    const isSandbox = (err.message || '').includes('You can only send testing emails to your own email address')
+      || (err.message || '').includes('Unable to fetch data')
+      || (err.message || '').includes('could not be resolved')
+      || (err.message || '').toLowerCase().includes('fetch failed');
+    return { 
+      success: false, 
+      error: err.message,
+      sandboxRestricted: isSandbox
+    };
   }
 };
 

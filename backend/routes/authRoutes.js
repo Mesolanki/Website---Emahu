@@ -23,6 +23,7 @@ const {
   getApprovedDeliveryPartners,
   sendOtp,
   verifyOtp,
+  firebaseVerify,
   sendPhoneOtp,
   verifyPhoneOtp,
   forgotPassword,
@@ -41,6 +42,7 @@ router.post('/refresh', refresh);
 router.post('/logout', logout);
 router.post('/send-otp', sendOtp);
 router.post('/verify-otp', verifyOtp);
+router.post('/firebase-verify', firebaseVerify);
 router.post('/send-phone-otp', sendPhoneOtp);
 router.post('/verify-phone-otp', verifyPhoneOtp);
 router.post('/forgot-password', forgotPassword);

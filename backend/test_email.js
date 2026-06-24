@@ -4,7 +4,7 @@ const sendEmail = require('./utils/sendEmail');
 async function test() {
   console.log('Testing Resend email delivery...');
   const result = await sendEmail({
-    to: 'mksolanki527@gmail.com',
+    to: 'mihirsolanki4065@gmail.com',
     subject: 'EMAHU OTP Test - 123456',
     text: 'Your test OTP is: 123456\n\nThis is an automated test from EMAHU backend.',
   });

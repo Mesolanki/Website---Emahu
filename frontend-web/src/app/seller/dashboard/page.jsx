@@ -2092,6 +2092,9 @@ export default function EmahuProDashboard() {
 
   const handleAssignAndGenerateLabel = async (orderId, carrierName) => {
     if (orderLoading[orderId]) return;
+    if (!window.confirm(`Are you sure you want to assign ${carrierName} as the logistics carrier for Order #${orderId} and generate a shipping label?`)) {
+      return;
+    }
     try {
       setOrderLoading(prev => ({ ...prev, [orderId]: true }));
       const storedOrders = localStorage.getItem('emahu_orders');
@@ -6396,27 +6399,21 @@ export default function EmahuProDashboard() {
                     <span style={{ fontSize: '1rem' }}>✓</span>
                     <span><strong>{isSelfDelivery ? 'Self-Delivery (sd)' : partner?.name}</strong>{partner?.currentCity ? ` · ${partner.currentCity}` : ''} · {isSelfDelivery ? 'Merchant-managed' : `₹${partner?.totalCost} estimated`}</span>
                   </div>
-                  {/* Confirmation checkbox */}
-                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: '#374151', fontSize: '0.8rem', cursor: 'pointer', marginBottom: '10px' }}>
-                    <input type="checkbox" checked={isConfirmChecked} onChange={(e) => setIsConfirmChecked(e.target.checked)}
-                      style={{ cursor: 'pointer', width: '15px', height: '15px', marginTop: '2px', accentColor: '#10b981', flexShrink: 0 }} />
-                    <span>I confirm assigning <strong style={{ color: '#0f172a' }}>{isSelfDelivery ? 'Self-Delivery (sd)' : partner?.name}</strong> as the delivery partner. This will update the order status.</span>
-                  </label>
                   {/* Assign Button */}
                   <button
-                    disabled={!isConfirmChecked || !!orderLoading[selectedOrderId]}
+                    disabled={!!orderLoading[selectedOrderId]}
                     onClick={() => { if (partner) { handleSelectDeliveryPartner(selectedOrderId, partner._id, partner.name, partner.totalCost); setIsDeliveryModalOpen(false); } }}
                     style={{
                       width: '100%', padding: '11px', borderRadius: '10px', border: 'none',
-                      background: isConfirmChecked ? 'linear-gradient(135deg, #10b981, #059669)' : '#e2e8f0',
-                      color: isConfirmChecked ? '#fff' : '#94a3b8',
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
+                      color: '#fff',
                       fontWeight: '700', fontSize: '0.9rem',
-                      cursor: isConfirmChecked && !orderLoading[selectedOrderId] ? 'pointer' : 'not-allowed',
+                      cursor: !orderLoading[selectedOrderId] ? 'pointer' : 'not-allowed',
                       transition: 'all 0.2s',
-                      boxShadow: isConfirmChecked ? '0 4px 14px rgba(16,185,129,0.25)' : 'none'
+                      boxShadow: '0 4px 14px rgba(16,185,129,0.25)'
                     }}
                   >
-                    {orderLoading[selectedOrderId] ? '⌛ Assigning...' : `🚚 Confirm & Assign ${isSelfDelivery ? 'Self-Delivery (sd)' : partner?.name}`}
+                    {orderLoading[selectedOrderId] ? '⌛ Assigning...' : `🚚 Assign ${isSelfDelivery ? 'Self-Delivery (sd)' : partner?.name}`}
                   </button>
                 </div>
               );
