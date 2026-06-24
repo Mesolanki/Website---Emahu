@@ -243,9 +243,13 @@ export default function RoleSelector() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Merge hardcoded + dynamic backend categories for the welcome screen
+  // Merge hardcoded + dynamic backend categories for the welcome screen.
+  // If the DB returns nothing (API down / empty DB), fall back to hardcoded CATEGORIES.
   const mergedCategories = useMemo(() => {
-    if (!dbCategories || !dbCategories.length) return [];
+    if (!dbCategories || !dbCategories.length) {
+      // Fallback: use the hardcoded CATEGORIES list so the page is never blank
+      return CATEGORIES;
+    }
     
     const dynamicCats = [];
     let accentIdx = 0;
@@ -281,7 +285,8 @@ export default function RoleSelector() {
       });
     });
     
-    return dynamicCats;
+    // If dynamic cats built successfully, return them; else fallback
+    return dynamicCats.length > 0 ? dynamicCats : CATEGORIES;
   }, [dbCategories]);
 
   // Build category name → root category ID lookup for product mapping

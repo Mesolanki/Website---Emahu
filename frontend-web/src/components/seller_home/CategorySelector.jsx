@@ -3,6 +3,49 @@
 import { useState, useEffect, useMemo } from 'react';
 import RequestCategoryModal from './RequestCategoryModal';
 
+// Fallback categories used when the backend API is unreachable (Vercel cold start, DB empty, etc.)
+const FALLBACK_CATEGORIES = [
+  { id: 'tech', name: 'Electronics & Tech', children: [
+    { id: 'backpacks', name: 'Backpacks', children: [] },
+    { id: 'mice', name: 'Mice', children: [] },
+    { id: 'audio', name: 'Audio & Headphones', children: [] },
+    { id: 'smart-devices', name: 'Smart Devices', children: [
+      { id: 'smart-watches', name: 'Smart Watches', children: [] },
+      { id: 'smart-thermostats', name: 'Smart Thermostats', children: [] }
+    ]}
+  ]},
+  { id: 'shoes', name: 'Shoes & Footwear', children: [
+    { id: 'running-shoes', name: 'Running Shoes', children: [] },
+    { id: 'hiking-boots', name: 'Hiking Boots', children: [] },
+    { id: 'sneakers', name: 'Sneakers', children: [] }
+  ]},
+  { id: 'kitchen', name: 'Kitchen & Dining', children: [
+    { id: 'cookware', name: 'Cookware', children: [] },
+    { id: 'teaware', name: 'Teaware', children: [] },
+    { id: 'kitchen-tools', name: 'Kitchen Tools', children: [] }
+  ]},
+  { id: 'apparel', name: 'Apparel & Fashion', children: [
+    { id: 'gym-wear', name: 'Gym Wear', children: [] },
+    { id: 'outerwear', name: 'Outerwear', children: [] }
+  ]},
+  { id: 'lifestyle', name: 'Lifestyle & Home', children: [
+    { id: 'home-decor', name: 'Home Decor', children: [] },
+    { id: 'aromatherapy', name: 'Aromatherapy', children: [] }
+  ]},
+  { id: 'beauty', name: 'Beauty & Cosmetics', children: [
+    { id: 'skincare', name: 'Skincare', children: [] },
+    { id: 'makeup', name: 'Makeup', children: [] }
+  ]},
+  { id: 'sports', name: 'Sports & Outdoors', children: [
+    { id: 'fitness-gear', name: 'Fitness Gear', children: [] },
+    { id: 'activewear', name: 'Activewear', children: [] }
+  ]},
+  { id: 'grocery', name: 'Grocery & Essentials', children: [
+    { id: 'snacks', name: 'Snacks', children: [] },
+    { id: 'beverages', name: 'Beverages', children: [] }
+  ]}
+];
+
 /**
  * Helper to trace the list of ancestor IDs for a given target category ID or name in the category tree.
  */
@@ -41,16 +84,21 @@ export default function CategorySelector({ value, onChange }) {
   const [selectedPath, setSelectedPath] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch categories from Backend API
+  // Fetch categories from Backend API, fall back to hardcoded list if API fails
   const fetchCategories = async () => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories?status=approved`);
       const data = await res.json();
-      if (data.success && data.data) {
+      if (data.success && data.data && data.data.length > 0) {
         setCategories(data.data);
+      } else {
+        // API returned empty or failed — use fallback so seller isn't stuck
+        console.warn('Categories API returned empty. Using fallback categories.');
+        setCategories(FALLBACK_CATEGORIES);
       }
     } catch (err) {
-      console.error('Error fetching categories:', err);
+      console.error('Error fetching categories, using fallback:', err);
+      setCategories(FALLBACK_CATEGORIES);
     } finally {
       setLoading(false);
     }

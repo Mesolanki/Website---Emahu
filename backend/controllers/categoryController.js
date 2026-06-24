@@ -164,3 +164,84 @@ exports.approveCategory = async (req, res) => {
     });
   }
 };
+
+/**
+ * @desc    Seed default categories into the database (Admin only)
+ *          Useful for Vercel / production environments where you can't run local seed scripts.
+ *          WARNING: Clears all existing categories before seeding.
+ * @route   POST /api/categories/seed
+ * @access  Private (Admin only)
+ */
+exports.seedDefaultCategories = async (req, res) => {
+  try {
+    const adminId = req.user._id;
+
+    const DEFAULT_CATEGORIES = [
+      { name: 'Electronics & Tech', children: [
+        { name: 'Backpacks' }, { name: 'Mice' }, { name: 'Audio & Headphones' },
+        { name: 'Smart Devices', children: [
+          { name: 'Smart Watches' }, { name: 'Smart Thermostats' }
+        ]}
+      ]},
+      { name: 'Shoes & Footwear', children: [
+        { name: 'Running Shoes' }, { name: 'Hiking Boots' }, { name: 'Sneakers' }
+      ]},
+      { name: 'Kitchen & Dining', children: [
+        { name: 'Cookware' }, { name: 'Teaware' }, { name: 'Kitchen Tools' }
+      ]},
+      { name: 'Apparel & Fashion', children: [
+        { name: 'Gym Wear' }, { name: 'Outerwear' }
+      ]},
+      { name: 'Lifestyle & Home', children: [
+        { name: 'Home Decor' }, { name: 'Aromatherapy' }
+      ]},
+      { name: 'Beauty & Cosmetics', children: [
+        { name: 'Skincare' }, { name: 'Makeup' }, { name: 'Fragrance' }
+      ]},
+      { name: 'Sports & Outdoors', children: [
+        { name: 'Fitness Gear' }, { name: 'Activewear' }, { name: 'Outdoor Equipment' }
+      ]},
+      { name: 'Books & Stationery', children: [
+        { name: 'Fiction' }, { name: 'Self-Help' }, { name: 'Stationery' }
+      ]},
+      { name: 'Grocery & Essentials', children: [
+        { name: 'Snacks' }, { name: 'Beverages' }, { name: 'Pantry' }
+      ]}
+    ];
+
+    // Clear existing categories
+    await Category.deleteMany({});
+    let totalCreated = 0;
+
+    // Recursive insert helper
+    const insertCategories = async (items, parentId = null) => {
+      for (const item of items) {
+        const cat = await Category.create({
+          name: item.name,
+          slug: slugify(item.name),
+          parentId,
+          status: 'approved',
+          createdBy: adminId
+        });
+        totalCreated++;
+        if (item.children && item.children.length > 0) {
+          await insertCategories(item.children, cat._id);
+        }
+      }
+    };
+
+    await insertCategories(DEFAULT_CATEGORIES);
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully seeded ${totalCreated} categories into the database.`,
+      totalCreated
+    });
+  } catch (err) {
+    console.error('Error in seedDefaultCategories:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server Error while seeding categories: ' + err.message
+    });
+  }
+};
