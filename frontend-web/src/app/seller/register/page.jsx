@@ -887,21 +887,8 @@ export default function SellerRegister() {
               </div>
             )}
 
-            {devEmailOtp && (
-              <div style={{
-                backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                border: '1px solid rgba(56, 189, 248, 0.2)',
-                color: '#38bdf8',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: '600',
-                marginBottom: '16px',
-                textAlign: 'center'
-              }}>
-                🔑 Dev Mode OTP Code: <code style={{ letterSpacing: '2px', fontSize: '1rem', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>{devEmailOtp}</code>
-              </div>
-            )}
+
+
 
             <form onSubmit={handleVerifyOtp}>
               <div style={{ marginBottom: '20px' }}>

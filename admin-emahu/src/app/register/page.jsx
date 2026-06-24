@@ -249,11 +249,7 @@ export default function AdminRegister() {
                       Verify
                     </button>
                   </div>
-                  {devOtp && (
-                    <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#6366f1', fontWeight: '600' }}>
-                      🔑 Dev Mode OTP Code: <code style={{ background: 'rgba(99,102,241,0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.85rem' }}>{devOtp}</code>
-                    </div>
-                  )}
+
                 </div>
               )}
 
