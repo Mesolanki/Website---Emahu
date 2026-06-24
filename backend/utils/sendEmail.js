@@ -7,6 +7,8 @@ const nodemailer = require('nodemailer');
  * @param {Object} options - { to, subject, text, html }
  * @returns {Promise<Object>} { success, messageId, simulated, error }
  */
+let cachedTransporter = null;
+
 const sendEmail = async (options) => {
   const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.EMAIL_PORT || '587', 10);
@@ -26,15 +28,23 @@ const sendEmail = async (options) => {
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465, // true for 465, false for other ports
-      auth: {
-        user,
-        pass,
-      },
-    });
+    if (!cachedTransporter) {
+      console.log('✨ Initializing pooled SMTP transporter...');
+      cachedTransporter = nodemailer.createTransport({
+        pool: true, // Use pooling to keep connection warm
+        host,
+        port,
+        secure: port === 465, // true for 465, false for other ports
+        auth: {
+          user,
+          pass,
+        },
+        maxConnections: 5,
+        maxMessages: 100,
+        rateDelta: 1000,
+        rateLimit: 5
+      });
+    }
 
     const mailOptions = {
       from,
@@ -51,12 +61,13 @@ const sendEmail = async (options) => {
       }
     };
 
-    const info = await transporter.sendMail(mailOptions);
+    const info = await cachedTransporter.sendMail(mailOptions);
     console.log(`✔️  Email sent successfully: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('❌ Error sending email via SMTP:', error.message);
-    // Return success: false but do not crash the calling function
+    // Invalidate cached transporter on error to force a re-connect next time
+    cachedTransporter = null;
     return { success: false, error: error.message };
   }
 };
