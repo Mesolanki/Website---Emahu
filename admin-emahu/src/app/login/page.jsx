@@ -171,7 +171,18 @@ export default function AdminLogin() {
                     required
                   />
                 </div>
-
+                {typeof window !== 'undefined' && 
+                 (window.location.hostname === 'localhost' || 
+                  window.location.hostname === '127.0.0.1' || 
+                  window.location.hostname.startsWith('192.168.') || 
+                  window.location.hostname.startsWith('172.') || 
+                  window.location.hostname.startsWith('10.') || 
+                  window.location.hostname.endsWith('.local')) && 
+                 devOtp && (
+                  <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#6366f1', fontWeight: '600' }}>
+                    🔑 Dev Mode OTP Code: <code style={{ background: 'rgba(99,102,241,0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.85rem' }}>{devOtp}</code>
+                  </div>
+                )}
                 <p style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '8px', lineHeight: '1.4' }}>
                   Two-Factor Authentication is enabled on your account. Enter the 6-digit code sent to your email or from your authenticator app to log in.
                 </p>
