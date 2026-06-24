@@ -8,10 +8,10 @@ const nodemailer = require('nodemailer');
  * @returns {Promise<Object>} { success, messageId, simulated, error }
  */
 const sendEmail = async (options) => {
-  const host = process.env.EMAIL_HOST || '';
+  const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.EMAIL_PORT || '587', 10);
-  const user = process.env.EMAIL_USER || '';
-  const pass = process.env.EMAIL_PASS || '';
+  const user = process.env.EMAIL_USER || 'mksolanki527@gmail.com';
+  const pass = process.env.EMAIL_PASS || 'pdvi vcic ugsy nwmq';
   const from = process.env.EMAIL_FROM || `"Emahu Marketplace" <${user}>`;
 
   console.log('\n=================================================');
