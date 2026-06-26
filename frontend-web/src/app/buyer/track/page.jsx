@@ -181,11 +181,15 @@ function TrackOrderContent() {
   useEffect(() => {
     // 1. Load from localStorage first for instant initial paint
     try {
+      const disableMockData = 
+        process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' || 
+        process.env.NODE_ENV === 'production';
+
       const storedOrders = localStorage.getItem('emahu_orders');
       if (storedOrders) {
         const parsed = JSON.parse(storedOrders);
         setTimeout(() => setAllOrders(parsed), 0);
-      } else {
+      } else if (!disableMockData) {
         const seedOrders = [
           {
             orderId: 'EMH_772918',
@@ -223,6 +227,8 @@ function TrackOrderContent() {
         ];
         localStorage.setItem('emahu_orders', JSON.stringify(seedOrders));
         setTimeout(() => setAllOrders(seedOrders), 0);
+      } else {
+        setTimeout(() => setAllOrders([]), 0);
       }
     } catch (e) {
       console.error(e);

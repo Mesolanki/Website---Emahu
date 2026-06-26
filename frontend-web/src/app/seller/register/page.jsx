@@ -19,6 +19,44 @@ export default function SellerRegister() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [regSuccessData, setRegSuccessData] = useState(null);
+  const [dbCategories, setDbCategories] = useState([]);
+
+  // Fallback category names (Amazon-like comprehensive list)
+  const FALLBACK_CATEGORIES = [
+    'Electronics & Tech',
+    'Apparel & Fashion',
+    'Shoes & Footwear',
+    'Kitchen & Dining',
+    'Lifestyle & Home',
+    'Beauty & Cosmetics',
+    'Sports & Outdoors',
+    'Books & Stationery',
+    'Grocery & Essentials',
+    'Toys & Games',
+    'Health & Wellness',
+    'Pet Supplies',
+    'Baby Care',
+    'Automotive & Tools'
+  ];
+
+  // Fetch approved root categories from DB on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/categories?status=approved`);
+        const data = await res.json();
+        if (data.success && data.data && data.data.length > 0) {
+          setDbCategories(data.data.map(cat => cat.name));
+        } else {
+          setDbCategories(FALLBACK_CATEGORIES);
+        }
+      } catch (err) {
+        console.error('Error fetching categories in register:', err);
+        setDbCategories(FALLBACK_CATEGORIES);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   // Form State Values
   const [formData, setFormData] = useState({
@@ -595,13 +633,11 @@ export default function SellerRegister() {
                     onChange={handleInputChange}
                   >
                     <option value="" disabled>Select category...</option>
-                    <option value="electronics">Electronics & Gadgets</option>
-                    <option value="fashion">Fashion & Apparel</option>
-                    <option value="groceries">Groceries & Food</option>
-                    <option value="home">Home & Kitchen</option>
-                    <option value="beauty">Beauty & Personal Care</option>
-                    <option value="stationery">Books & Stationery</option>
-                    <option value="other">Other Business Type</option>
+                    {dbCategories.map((catName) => (
+                      <option key={catName} value={catName}>
+                        {catName}
+                      </option>
+                    ))}
                   </select>
                   {errors.category && <span className="sr-error-text">{errors.category}</span>}
                 </div>

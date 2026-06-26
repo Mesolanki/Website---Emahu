@@ -127,7 +127,11 @@ export default function OrdersPage() {
 
         let parsedOrders = JSON.parse(storedOrders);
 
-        if (parsedOrders.length === 0) {
+        const disableMockData = 
+          process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' || 
+          process.env.NODE_ENV === 'production';
+
+        if (parsedOrders.length === 0 && !disableMockData) {
           // Mock seed orders if none exist for a professional look (using current date so it is not filtered)
           const todayDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
           const seedOrders = [

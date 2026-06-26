@@ -43,11 +43,20 @@ async function seed() {
 
     // Seed Level 0 (Roots)
     const roots = [
-      { name: 'Electronics & Tech', parentId: null },
-      { name: 'Shoes & Footwear', parentId: null },
-      { name: 'Kitchen & Dining', parentId: null },
-      { name: 'Apparel & Fashion', parentId: null },
-      { name: 'Lifestyle & Home', parentId: null }
+      { name: 'Electronics & Tech' },
+      { name: 'Apparel & Fashion' },
+      { name: 'Shoes & Footwear' },
+      { name: 'Kitchen & Dining' },
+      { name: 'Lifestyle & Home' },
+      { name: 'Beauty & Cosmetics' },
+      { name: 'Sports & Outdoors' },
+      { name: 'Books & Stationery' },
+      { name: 'Grocery & Essentials' },
+      { name: 'Toys & Games' },
+      { name: 'Health & Wellness' },
+      { name: 'Pet Supplies' },
+      { name: 'Baby Care' },
+      { name: 'Automotive & Tools' }
     ];
 
     const seededRoots = [];
@@ -72,28 +81,83 @@ async function seed() {
     // Seed Level 1 (Children)
     const children1 = [
       // Electronics
-      { name: 'Backpacks', parentName: 'Electronics & Tech' },
-      { name: 'Mice', parentName: 'Electronics & Tech' },
+      { name: 'Smartphones & Tablets', parentName: 'Electronics & Tech' },
+      { name: 'Computers & Accessories', parentName: 'Electronics & Tech' },
       { name: 'Audio & Headphones', parentName: 'Electronics & Tech' },
+      { name: 'Cameras & Photo', parentName: 'Electronics & Tech' },
       { name: 'Smart Devices', parentName: 'Electronics & Tech' },
+
+      // Apparel
+      { name: 'Men\'s Clothing', parentName: 'Apparel & Fashion' },
+      { name: 'Women\'s Clothing', parentName: 'Apparel & Fashion' },
+      { name: 'Kids\' Clothing', parentName: 'Apparel & Fashion' },
+      { name: 'Jewelry & Accessories', parentName: 'Apparel & Fashion' },
+      { name: 'Gym Wear', parentName: 'Apparel & Fashion' },
+      { name: 'Outerwear', parentName: 'Apparel & Fashion' },
       
       // Shoes
       { name: 'Running Shoes', parentName: 'Shoes & Footwear' },
       { name: 'Hiking Boots', parentName: 'Shoes & Footwear' },
       { name: 'Sneakers', parentName: 'Shoes & Footwear' },
+      { name: 'Sandals', parentName: 'Shoes & Footwear' },
 
       // Kitchen
       { name: 'Cookware', parentName: 'Kitchen & Dining' },
       { name: 'Teaware', parentName: 'Kitchen & Dining' },
       { name: 'Kitchen Tools', parentName: 'Kitchen & Dining' },
-
-      // Apparel
-      { name: 'Gym Wear', parentName: 'Apparel & Fashion' },
-      { name: 'Outerwear', parentName: 'Apparel & Fashion' },
+      { name: 'Tableware', parentName: 'Kitchen & Dining' },
 
       // Lifestyle
+      { name: 'Furniture', parentName: 'Lifestyle & Home' },
       { name: 'Home Decor', parentName: 'Lifestyle & Home' },
-      { name: 'Aromatherapy', parentName: 'Lifestyle & Home' }
+      { name: 'Aromatherapy', parentName: 'Lifestyle & Home' },
+      { name: 'Bedding & Linen', parentName: 'Lifestyle & Home' },
+
+      // Beauty
+      { name: 'Skincare', parentName: 'Beauty & Cosmetics' },
+      { name: 'Makeup', parentName: 'Beauty & Cosmetics' },
+      { name: 'Fragrances', parentName: 'Beauty & Cosmetics' },
+      { name: 'Haircare', parentName: 'Beauty & Cosmetics' },
+
+      // Sports
+      { name: 'Fitness Gear', parentName: 'Sports & Outdoors' },
+      { name: 'Activewear', parentName: 'Sports & Outdoors' },
+      { name: 'Outdoor Equipment', parentName: 'Sports & Outdoors' },
+      { name: 'Camping & Hiking', parentName: 'Sports & Outdoors' },
+
+      // Books
+      { name: 'Fiction & Literature', parentName: 'Books & Stationery' },
+      { name: 'Biographies', parentName: 'Books & Stationery' },
+      { name: 'Textbooks', parentName: 'Books & Stationery' },
+      { name: 'Stationery & Journals', parentName: 'Books & Stationery' },
+
+      // Grocery
+      { name: 'Snacks & Sweets', parentName: 'Grocery & Essentials' },
+      { name: 'Beverages', parentName: 'Grocery & Essentials' },
+      { name: 'Pantry Staples', parentName: 'Grocery & Essentials' },
+      { name: 'Organic Foods', parentName: 'Grocery & Essentials' },
+
+      // Toys
+      { name: 'Board Games', parentName: 'Toys & Games' },
+      { name: 'Puzzles', parentName: 'Toys & Games' },
+      { name: 'Educational Toys', parentName: 'Toys & Games' },
+
+      // Health
+      { name: 'Vitamins & Supplements', parentName: 'Health & Wellness' },
+      { name: 'Wellness Devices', parentName: 'Health & Wellness' },
+
+      // Pets
+      { name: 'Dog Supplies', parentName: 'Pet Supplies' },
+      { name: 'Cat Supplies', parentName: 'Pet Supplies' },
+
+      // Baby
+      { name: 'Baby Gear', parentName: 'Baby Care' },
+      { name: 'Baby Apparel', parentName: 'Baby Care' },
+      { name: 'Baby Toys', parentName: 'Baby Care' },
+
+      // Automotive
+      { name: 'Car Accessories', parentName: 'Automotive & Tools' },
+      { name: 'Hand Tools', parentName: 'Automotive & Tools' }
     ];
 
     const seededChildren1 = [];

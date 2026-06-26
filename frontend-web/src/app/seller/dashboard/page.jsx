@@ -1384,7 +1384,11 @@ export default function EmahuProDashboard() {
           console.log('Filtered Orders count:', myOrders.length);
           console.groupEnd();
 
-          if (myOrders.length === 0) {
+          const disableMockData = 
+            process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' || 
+            process.env.NODE_ENV === 'production';
+
+          if (myOrders.length === 0 && !disableMockData) {
             // Seed multiple demo orders with different statuses so sellers can see the full workflow
             const sellerRef = {
               _id: sellerUser._id || sellerUser.id || 'mock_seller_id',

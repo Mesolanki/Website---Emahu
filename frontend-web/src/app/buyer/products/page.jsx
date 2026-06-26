@@ -10,12 +10,33 @@ import './products.css';
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 
 /* ─── DATA ─── */
-const CATEGORY_TILES = [
-  { label: 'Tech & Gadgets', value: 'Tech',      img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&q=80' },
-  { label: 'Shoes',           value: 'Shoes',     img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80' },
-  { label: 'Kitchen',         value: 'Kitchen',   img: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&q=80' },
-  { label: 'Apparel',         value: 'Apparel',   img: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=400&q=80' },
-  { label: 'Lifestyle',       value: 'Lifestyle', img: 'https://images.unsplash.com/photo-1608181831718-c9e37e3b9d70?w=400&q=80' },
+const CATEGORY_IMAGES = {
+  'electronics & tech': 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&q=80',
+  'apparel & fashion': 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=400&q=80',
+  'shoes & footwear': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80',
+  'kitchen & dining': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&q=80',
+  'lifestyle & home': 'https://images.unsplash.com/photo-1608181831718-c9e37e3b9d70?w=400&q=80',
+  'beauty & cosmetics': 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&q=80',
+  'sports & outdoors': 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=400&q=80',
+  'books & stationery': 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400&q=80',
+  'grocery & essentials': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80',
+  'toys & games': 'https://images.unsplash.com/photo-1539627831859-a911cf04d3cd?w=400&q=80',
+  'health & wellness': 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400&q=80',
+  'pet supplies': 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?w=400&q=80',
+  'baby care': 'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=400&q=80',
+  'automotive & tools': 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=400&q=80'
+};
+
+const FALLBACK_CATEGORY_TILES = [
+  { label: 'Electronics & Tech', value: 'Electronics & Tech', img: CATEGORY_IMAGES['electronics & tech'] },
+  { label: 'Apparel & Fashion', value: 'Apparel & Fashion', img: CATEGORY_IMAGES['apparel & fashion'] },
+  { label: 'Shoes & Footwear', value: 'Shoes & Footwear', img: CATEGORY_IMAGES['shoes & footwear'] },
+  { label: 'Kitchen & Dining', value: 'Kitchen & Dining', img: CATEGORY_IMAGES['kitchen & dining'] },
+  { label: 'Lifestyle & Home', value: 'Lifestyle & Home', img: CATEGORY_IMAGES['lifestyle & home'] },
+  { label: 'Beauty & Cosmetics', value: 'Beauty & Cosmetics', img: CATEGORY_IMAGES['beauty & cosmetics'] },
+  { label: 'Sports & Outdoors', value: 'Sports & Outdoors', img: CATEGORY_IMAGES['sports & outdoors'] },
+  { label: 'Books & Stationery', value: 'Books & Stationery', img: CATEGORY_IMAGES['books & stationery'] },
+  { label: 'Grocery & Essentials', value: 'Grocery & Essentials', img: CATEGORY_IMAGES['grocery & essentials'] }
 ];
 
 const ALL_PRODUCTS = STATIC_PRODUCTS;
@@ -93,6 +114,41 @@ export default function ProductsPage() {
   const [page, setPage]                 = useState(1);
   const [dbProducts, setDbProducts]     = useState([]);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [categoryTiles, setCategoryTiles] = useState(FALLBACK_CATEGORY_TILES);
+
+  // Fetch dynamic categories for buyer search page
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories?status=approved`);
+        const data = await res.json();
+        if (data.success && data.data && data.data.length > 0) {
+          const mapped = data.data.map(cat => {
+            const nameLC = cat.name.toLowerCase();
+            let img = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80'; // default
+            for (const [key, url] of Object.entries(CATEGORY_IMAGES)) {
+              if (nameLC.includes(key) || key.includes(nameLC)) {
+                img = url;
+                break;
+              }
+            }
+            return {
+              label: cat.name,
+              value: cat.name,
+              img
+            };
+          });
+          setCategoryTiles(mapped);
+        } else {
+          setCategoryTiles(FALLBACK_CATEGORY_TILES);
+        }
+      } catch (err) {
+        console.error('Error fetching categories in buyer products:', err);
+        setCategoryTiles(FALLBACK_CATEGORY_TILES);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   // Fetch products from database
   useEffect(() => {
@@ -113,10 +169,22 @@ export default function ProductsPage() {
   // Format database products to match buyer product dashboard structure
   const formattedDbProducts = useMemo(() => {
     return dbProducts.map(p => {
-      // Smart category mapping
-      let mappedCategory = p.category;
-      if (p.category === 'Electronics') mappedCategory = 'Tech';
-      else if (p.category === 'Fitness' || p.category === 'Furniture') mappedCategory = 'Lifestyle';
+      // Smart category mapping to align dynamic categories
+      let mappedCategory = p.category || 'Lifestyle & Home';
+      const catLC = mappedCategory.toLowerCase();
+      if (catLC === 'electronics' || catLC === 'tech' || catLC === 'tech & gadgets') {
+        mappedCategory = 'Electronics & Tech';
+      } else if (catLC === 'apparel' || catLC === 'fashion') {
+        mappedCategory = 'Apparel & Fashion';
+      } else if (catLC === 'shoes') {
+        mappedCategory = 'Shoes & Footwear';
+      } else if (catLC === 'kitchen') {
+        mappedCategory = 'Kitchen & Dining';
+      } else if (catLC === 'lifestyle' || catLC === 'fitness' || catLC === 'furniture') {
+        mappedCategory = 'Lifestyle & Home';
+      } else if (catLC === 'grocery' || catLC === 'groceries') {
+        mappedCategory = 'Grocery & Essentials';
+      }
 
       const cleanedImg = cleanImageUrl(p.image);
       const imageToShow = isRealImage(p.image) ? cleanedImg : (p.image || '📦');
@@ -145,7 +213,28 @@ export default function ProductsPage() {
 
   // Combine database products (shown at top) with default static ones
   const allProductsCombined = useMemo(() => {
-    return [...formattedDbProducts, ...ALL_PRODUCTS];
+    const formattedStatic = ALL_PRODUCTS.map(p => {
+      let mappedCategory = p.category || 'Lifestyle & Home';
+      const catLC = mappedCategory.toLowerCase();
+      if (catLC === 'electronics' || catLC === 'tech' || catLC === 'tech & gadgets') {
+        mappedCategory = 'Electronics & Tech';
+      } else if (catLC === 'apparel' || catLC === 'fashion') {
+        mappedCategory = 'Apparel & Fashion';
+      } else if (catLC === 'shoes') {
+        mappedCategory = 'Shoes & Footwear';
+      } else if (catLC === 'kitchen') {
+        mappedCategory = 'Kitchen & Dining';
+      } else if (catLC === 'lifestyle' || catLC === 'fitness' || catLC === 'furniture') {
+        mappedCategory = 'Lifestyle & Home';
+      } else if (catLC === 'grocery' || catLC === 'groceries') {
+        mappedCategory = 'Grocery & Essentials';
+      }
+      return {
+        ...p,
+        category: mappedCategory
+      };
+    });
+    return [...formattedDbProducts, ...formattedStatic];
   }, [formattedDbProducts]);
 
   // Sync state on mount
@@ -284,12 +373,12 @@ export default function ProductsPage() {
       {/* Hero + Category tiles */}
       <div className="bp-hero">
         <h1 className="bp-hero__title">
-          {category === 'All' ? 'All Products' : (CATEGORY_TILES.find(c => c.value === category)?.label || category)}
+          {category === 'All' ? 'All Products' : (categoryTiles.find(c => c.value === category)?.label || category)}
         </h1>
 
         {/* Category image row */}
         <div className="bp-cat-row">
-          {CATEGORY_TILES.map(tile => (
+          {categoryTiles.map(tile => (
             <button
               key={tile.value}
               className={`bp-cat-tile ${category === tile.value ? 'bp-cat-tile--active' : ''}`}
@@ -419,7 +508,7 @@ export default function ProductsPage() {
               <span className="bp-filter-group__title">Category</span>
               <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
             </div>
-            {[{ label: 'All Products', value: 'All' }, ...CATEGORY_TILES].map(item => (
+            {[{ label: 'All Products', value: 'All' }, ...categoryTiles].map(item => (
               <label key={item.value} className="bp-check-item" style={{ cursor:'pointer' }} onClick={(e) => { e.preventDefault(); setCategory(item.value); setPage(1); }}>
                 <input type="checkbox" readOnly checked={category === item.value} style={{ accentColor:'#0d0d0d' }} />
                 {item.label}

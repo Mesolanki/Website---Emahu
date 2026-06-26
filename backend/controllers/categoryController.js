@@ -178,34 +178,50 @@ exports.seedDefaultCategories = async (req, res) => {
 
     const DEFAULT_CATEGORIES = [
       { name: 'Electronics & Tech', children: [
-        { name: 'Backpacks' }, { name: 'Mice' }, { name: 'Audio & Headphones' },
-        { name: 'Smart Devices', children: [
+        { name: 'Smartphones & Tablets' }, { name: 'Computers & Accessories' }, { name: 'Audio & Headphones' },
+        { name: 'Cameras & Photo' }, { name: 'Smart Devices', children: [
           { name: 'Smart Watches' }, { name: 'Smart Thermostats' }
         ]}
       ]},
+      { name: 'Apparel & Fashion', children: [
+        { name: 'Men\'s Clothing' }, { name: 'Women\'s Clothing' }, { name: 'Kids\' Clothing' },
+        { name: 'Jewelry & Accessories' }, { name: 'Gym Wear' }, { name: 'Outerwear' }
+      ]},
       { name: 'Shoes & Footwear', children: [
-        { name: 'Running Shoes' }, { name: 'Hiking Boots' }, { name: 'Sneakers' }
+        { name: 'Running Shoes' }, { name: 'Hiking Boots' }, { name: 'Sneakers' }, { name: 'Sandals' }
       ]},
       { name: 'Kitchen & Dining', children: [
-        { name: 'Cookware' }, { name: 'Teaware' }, { name: 'Kitchen Tools' }
-      ]},
-      { name: 'Apparel & Fashion', children: [
-        { name: 'Gym Wear' }, { name: 'Outerwear' }
+        { name: 'Cookware' }, { name: 'Teaware' }, { name: 'Kitchen Tools' }, { name: 'Tableware' }
       ]},
       { name: 'Lifestyle & Home', children: [
-        { name: 'Home Decor' }, { name: 'Aromatherapy' }
+        { name: 'Furniture' }, { name: 'Home Decor' }, { name: 'Aromatherapy' }, { name: 'Bedding & Linen' }
       ]},
       { name: 'Beauty & Cosmetics', children: [
-        { name: 'Skincare' }, { name: 'Makeup' }, { name: 'Fragrance' }
+        { name: 'Skincare' }, { name: 'Makeup' }, { name: 'Fragrances' }, { name: 'Haircare' }
       ]},
       { name: 'Sports & Outdoors', children: [
-        { name: 'Fitness Gear' }, { name: 'Activewear' }, { name: 'Outdoor Equipment' }
+        { name: 'Fitness Gear' }, { name: 'Activewear' }, { name: 'Outdoor Equipment' }, { name: 'Camping & Hiking' }
       ]},
       { name: 'Books & Stationery', children: [
-        { name: 'Fiction' }, { name: 'Self-Help' }, { name: 'Stationery' }
+        { name: 'Fiction & Literature' }, { name: 'Biographies' }, { name: 'Textbooks' }, { name: 'Stationery & Journals' }
       ]},
       { name: 'Grocery & Essentials', children: [
-        { name: 'Snacks' }, { name: 'Beverages' }, { name: 'Pantry' }
+        { name: 'Snacks & Sweets' }, { name: 'Beverages' }, { name: 'Pantry Staples' }, { name: 'Organic Foods' }
+      ]},
+      { name: 'Toys & Games', children: [
+        { name: 'Board Games' }, { name: 'Puzzles' }, { name: 'Educational Toys' }
+      ]},
+      { name: 'Health & Wellness', children: [
+        { name: 'Vitamins & Supplements' }, { name: 'Wellness Devices' }
+      ]},
+      { name: 'Pet Supplies', children: [
+        { name: 'Dog Supplies' }, { name: 'Cat Supplies' }
+      ]},
+      { name: 'Baby Care', children: [
+        { name: 'Baby Gear' }, { name: 'Baby Apparel' }, { name: 'Baby Toys' }
+      ]},
+      { name: 'Automotive & Tools', children: [
+        { name: 'Car Accessories' }, { name: 'Hand Tools' }
       ]}
     ];
 

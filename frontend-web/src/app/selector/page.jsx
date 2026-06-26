@@ -123,8 +123,8 @@ const DYNAMIC_CATEGORY_ICONS = {
   'apparel': '👕', 'fashion': '👗', 'clothing': '👔', 'lifestyle': '🏠', 'home': '🏡',
   'beauty': '💄', 'cosmetics': '💅', 'sports': '⚽', 'fitness': '🏋️', 'books': '📚',
   'toys': '🧸', 'games': '🎮', 'automotive': '🚗', 'jewelry': '💍', 'watches': '⌚',
-  'grocery': '🛒', 'health': '💊', 'music': '🎵', 'pets': '🐾', 'garden': '🌱',
-  'baby': '👶', 'tools': '🔧', 'art': '🎨', 'travel': '✈️', 'stationery': '📝', 'office': '🖊️'
+  'grocery': '🛒', 'gourmet': '🍷', 'health': '💊', 'wellness': '🧘', 'music': '🎵', 'pets': '🐾', 'pet': '🐾', 'garden': '🌱',
+  'baby': '👶', 'tools': '🔧', 'hand-tools': '🔨', 'art': '🎨', 'travel': '✈️', 'stationery': '📝', 'office': '🖊️', 'outdoor': '⛺'
 };
 const DYNAMIC_ACCENTS = ['#0ea5e9', '#d946ef', '#14b8a6', '#f97316', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16', '#e11d48', '#7c3aed'];
 
@@ -214,6 +214,8 @@ export default function RoleSelector() {
       }
     };
     fetchDbProducts();
+    const interval = setInterval(fetchDbProducts, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch dynamic categories from Backend API
@@ -230,6 +232,8 @@ export default function RoleSelector() {
       }
     };
     fetchCategories();
+    const interval = setInterval(fetchCategories, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   // Close delivery dropdown on click outside

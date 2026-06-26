@@ -17,7 +17,7 @@ const REVIEWS = [
   { id:4, name:'Sneha R.',   rating:5, date:'Mar 2025', text:'I was skeptical at first but the verified badge and inspection scores convinced me. Zero regrets — perfect purchase!', tags:['Trusted Platform','Premium Feel'], color:'#10b981', verified:true },
 ];
 
-const RELATED = [
+const STATIC_RELATED = [
   { id:3,  name:'Sony WH-1000XM5',      brand:'Sony',    price:26999, img:'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=400&q=80' },
   { id:4,  name:'MacBook Air M3',        brand:'Apple',   price:114999, img:'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&q=80' },
   { id:14, name:'Samsung 55" QLED 4K',   brand:'Samsung', price:69999, img:'https://images.unsplash.com/photo-1593359677879-a4bb92f829e1?w=400&q=80' },
@@ -82,6 +82,74 @@ export default function ProductDetailPage() {
   const [wishlist,    setWishlist]    = useState(false);
   const [added,       setAdded]       = useState(false);
   const [activeTab,   setActiveTab]   = useState('desc');
+  const [relatedProducts, setRelatedProducts] = useState([]);
+
+  // Load related products dynamically from database/static fallback
+  useEffect(() => {
+    if (!product) return;
+    const fetchRelated = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
+        const data = await res.json();
+        if (data.success && data.products) {
+          const productCategory = product.category;
+          
+          // Helper to normalize category name comparison
+          const getNormCat = (c) => {
+            const clean = String(c || '').toLowerCase();
+            if (clean.includes('electronics') || clean.includes('tech')) return 'tech';
+            if (clean.includes('apparel') || clean.includes('fashion') || clean.includes('clothing')) return 'apparel';
+            if (clean.includes('shoes') || clean.includes('footwear')) return 'shoes';
+            if (clean.includes('kitchen') || clean.includes('dining')) return 'kitchen';
+            if (clean.includes('lifestyle') || clean.includes('furniture') || clean.includes('home')) return 'lifestyle';
+            if (clean.includes('beauty') || clean.includes('cosmetics')) return 'beauty';
+            if (clean.includes('sports') || clean.includes('fitness') || clean.includes('outdoor')) return 'sports';
+            if (clean.includes('books') || clean.includes('stationery')) return 'books';
+            if (clean.includes('grocery') || clean.includes('essentials') || clean.includes('food')) return 'grocery';
+            return clean;
+          };
+
+          const prodCatNorm = getNormCat(productCategory);
+
+          // Filter products in the same category, excluding current product
+          let matched = data.products.filter(p => {
+            return getNormCat(p.category) === prodCatNorm && String(p._id || p.id) !== String(product.id);
+          });
+
+          // Fallback if not enough category items
+          if (matched.length < 4) {
+            const extra = data.products.filter(p => String(p._id || p.id) !== String(product.id));
+            extra.forEach(p => {
+              if (matched.length < 4 && !matched.some(m => String(m._id || m.id) === String(p._id || p.id))) {
+                matched.push(p);
+              }
+            });
+          }
+
+          // Format dynamic related products
+          const formatted = matched.slice(0, 4).map(p => {
+            const cleanedImg = cleanImageUrl(p.image);
+            const imageToShow = isRealImage(p.image) ? cleanedImg : (p.image || '📦');
+            return {
+              id: p.id || p._id,
+              name: p.name,
+              brand: p.brand || p.seller?.name || 'Emahu Seller',
+              price: p.price,
+              img: imageToShow,
+              isEmoji: (!p.image || !isRealImage(p.image))
+            };
+          });
+          setRelatedProducts(formatted);
+        } else {
+          setRelatedProducts(STATIC_RELATED);
+        }
+      } catch (err) {
+        console.error('Error fetching related products:', err);
+        setRelatedProducts(STATIC_RELATED);
+      }
+    };
+    fetchRelated();
+  }, [product]);
 
   // ── Review system state ──
   const [hasPurchased,   setHasPurchased]   = useState(false);
@@ -811,10 +879,14 @@ export default function ProductDetailPage() {
       <section className="pd-related">
         <h2 className="pd-related__title">You Might Also Like</h2>
         <div className="pd-related-grid">
-          {RELATED.map(r => (
+          {relatedProducts.map(r => (
             <Link key={r.id} href={`/buyer/products/${r.id}`} className="pd-related-card">
-              <div className="pd-related-img-wrap">
-                <img src={r.img} alt={r.name} className="pd-related-img" loading="lazy" />
+              <div className="pd-related-img-wrap" style={r.isEmoji ? { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' } : {}}>
+                {r.isEmoji ? (
+                  <span>{r.img}</span>
+                ) : (
+                  <img src={r.img} alt={r.name} className="pd-related-img" loading="lazy" />
+                )}
               </div>
               <p className="pd-related-brand">{r.brand}</p>
               <p className="pd-related-name">{r.name}</p>
