@@ -45,6 +45,8 @@ exports.createProduct = async (req, res) => {
       description,
       image,
       images: req.body.images || [],
+      sizes: Array.isArray(req.body.sizes) ? req.body.sizes : [],
+      colors: Array.isArray(req.body.colors) ? req.body.colors : [],
       seller: req.user.id,
       approvalStatus: 'pending',
       adminCode: undefined,
@@ -357,6 +359,8 @@ exports.resubmitProduct = async (req, res) => {
     product.description = description.trim();
     product.image = image.trim();
     product.images = req.body.images || [];
+    product.sizes = Array.isArray(req.body.sizes) ? req.body.sizes : product.sizes;
+    product.colors = Array.isArray(req.body.colors) ? req.body.colors : product.colors;
 
     // Reset verification to false / pending admin approval
     product.approvalStatus = 'pending';

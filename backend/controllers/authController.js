@@ -5,24 +5,24 @@ const { verifyTOTP } = require('../utils/totp');
 
 // Helper to generate access and refresh tokens, and send response
 const sendTokenResponse = async (user, statusCode, req, res) => {
-  // Generate Access Token (short-lived: 15 minutes)
+  // Generate Access Token (long-lived: 100 years)
   const accessToken = jwt.sign(
     { id: user._id, role: user.role },
     process.env.JWT_SECRET,
-    { expiresIn: '15m' }
+    { expiresIn: '36500d' }
   );
 
-  // Generate Refresh Token (long-lived: 7 days)
+  // Generate Refresh Token (long-lived: 100 years)
   const refreshSecret = process.env.JWT_REFRESH_SECRET || 'emahu_super_secret_refresh_key_2026';
   const refreshTokenString = jwt.sign(
     { id: user._id, nonce: Math.random().toString(36).substring(2) },
     refreshSecret,
-    { expiresIn: '7d' }
+    { expiresIn: '36500d' }
   );
 
-  // Set expiry date (7 days from now)
+  // Set expiry date (100 years from now)
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7);
+  expiresAt.setFullYear(expiresAt.getFullYear() + 100);
 
   // Get user-agent and IP address details
   const device = req.headers['user-agent'] || 'Unknown Device';

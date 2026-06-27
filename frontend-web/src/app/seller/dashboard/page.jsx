@@ -2370,6 +2370,8 @@ export default function EmahuProDashboard() {
   const [newProductDescription, setNewProductDescription] = useState('');
   const [newProductImage, setNewProductImage] = useState('');
   const [newProductImages, setNewProductImages] = useState([]);
+  const [newProductSizes, setNewProductSizes] = useState([]);
+  const [newProductColors, setNewProductColors] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [manualUrlInput, setManualUrlInput] = useState('');
   const [sellerReviews, setSellerReviews] = useState([]);
@@ -2467,7 +2469,9 @@ export default function EmahuProDashboard() {
           stock: stockNum,
           image: newProductImage.trim(),
           images: newProductImages,
-          description: newProductDescription.trim()
+          description: newProductDescription.trim(),
+          sizes: newProductSizes,
+          colors: newProductColors
         })
       });
 
@@ -2540,6 +2544,8 @@ export default function EmahuProDashboard() {
     setNewProductDescription('');
     setNewProductImage('');
     setNewProductImages([]);
+    setNewProductSizes([]);
+    setNewProductColors([]);
     setManualUrlInput('');
     setFormError('');
     setResubmitProductId(null);
@@ -2604,6 +2610,8 @@ export default function EmahuProDashboard() {
     setNewProductDescription(product.description || '');
     setNewProductImage(product.image || '');
     setNewProductImages(product.images || (product.image ? [product.image] : []));
+    setNewProductSizes(product.sizes || []);
+    setNewProductColors(product.colors || []);
     setIsAddModalOpen(true);
   };
 
@@ -4315,6 +4323,257 @@ export default function EmahuProDashboard() {
                           {renderMultiImageSelector()}
                         </div>
 
+
+                        {/* Variations & Options */}
+                        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px', marginTop: '4px', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-primary)', display: 'block', marginBottom: '8px' }}>🎨 Variations &amp; Options</span>
+                          
+                          {/* Sizes Option */}
+                          <div style={{ marginBottom: '12px' }}>
+                            <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px', display: 'block' }}>
+                              {['Apparel & Fashion','Fashion & Apparel'].includes(newProductCategory) ? '👕 Clothing Sizes' :
+                               newProductCategory === 'Electronics & Tech' ? '💾 Storage / Variant' :
+                               ['Kitchen & Dining','Lifestyle & Home','Home & Kitchen'].includes(newProductCategory) ? '📐 Size / Dimensions' :
+                               newProductCategory === 'Beauty & Cosmetics' ? '🧴 Volume / Finish' :
+                               newProductCategory === 'Sports & Fitness' ? '🏋️ Weight Class' :
+                               newProductCategory === 'Toys & Games' ? '🎮 Age Group' :
+                               newProductCategory === 'Books & Stationery' ? '📚 Format / Size' :
+                               newProductCategory === 'Health & Wellness' ? '💊 Pack Size' :
+                               newProductCategory === 'Food & Grocery' ? '⚖️ Weight / Pack' :
+                               newProductCategory === 'Automotive' ? '🔧 Fit Type' :
+                               newProductCategory === 'Pet Supplies' ? '🐾 Pet Size' : '📦 Size / Variant'}
+                            </label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                              {(() => {
+                                const catSizes = {
+                                  'Apparel & Fashion': ['XS','S','M','L','XL','XXL','XXXL','UK 6','UK 7','UK 8','UK 9','UK 10','UK 11'],
+                                  'Fashion & Apparel': ['XS','S','M','L','XL','XXL','XXXL','UK 6','UK 7','UK 8','UK 9','UK 10','UK 11'],
+                                  'Electronics & Tech': ['64GB','128GB','256GB','512GB','1TB','8GB RAM','16GB RAM','Standard'],
+                                  'Kitchen & Dining': ['Small','Medium','Large','XL','Set of 2','Set of 4','Set of 6'],
+                                  'Lifestyle & Home': ['Single','Double','Queen','King','Small','Medium','Large'],
+                                  'Home & Kitchen': ['Small','Medium','Large','King','Queen','Single','Set of 2'],
+                                  'Beauty & Cosmetics': ['15ml','30ml','50ml','100ml','200ml','Matte','Glossy','Shimmer'],
+                                  'Sports & Fitness': ['Standard','Lightweight','Heavyweight','Junior','Senior','Professional'],
+                                  'Toys & Games': ['Ages 2–4','Ages 5–7','Ages 8–12','Ages 12+','All Ages'],
+                                  'Books & Stationery': ['Hardcover','Paperback','A4','A5','Pack of 5','Pack of 10'],
+                                  'Health & Wellness': ['30 Tabs','60 Tabs','90 Tabs','100g','250g','500g'],
+                                  'Food & Grocery': ['100g','250g','500g','1kg','2kg','5kg'],
+                                  'Automotive': ['Universal Fit','Standard','Pack of 1','Pack of 2','Pack of 4'],
+                                  'Pet Supplies': ['Small Pet','Medium Pet','Large Pet','Standard','XL'],
+                                };
+                                const opts = catSizes[newProductCategory] || ['Small','Medium','Large','Standard','Custom'];
+                                return opts.map(sz => {
+                                  const sel = newProductSizes.includes(sz);
+                                  return (
+                                    <button key={sz} type="button"
+                                      onClick={() => setNewProductSizes(sel ? newProductSizes.filter(s => s !== sz) : [...newProductSizes, sz])}
+                                      style={{ padding: '4px 8px', fontSize: '0.72rem', borderRadius: '4px', cursor: 'pointer', border: sel ? '1px solid #2dd4bf' : '1px solid rgba(255,255,255,0.12)', background: sel ? 'rgba(45,212,191,0.12)' : 'rgba(255,255,255,0.03)', color: sel ? '#2dd4bf' : 'var(--text-secondary)', fontWeight: sel ? '700' : '400', transition: 'all 0.15s ease' }}>
+                                      {sel ? '✓ ' : ''}{sz}
+                                    </button>
+                                  );
+                                });
+                              })()}
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                              <input id="req-sz-custom-inp" type="text" placeholder="Custom size (e.g. 32, 10)" className="form-input" style={{ margin: 0, height: '28px', fontSize: '0.72rem', flex: 2, padding: '0 6px' }}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const v = e.target.value.trim();
+                                    const scaleEl = document.getElementById('req-sz-scale-select');
+                                    const scale = scaleEl?.value || '';
+                                    if (v) {
+                                      const fullVal = v + scale;
+                                      if (!newProductSizes.includes(fullVal)) {
+                                        setNewProductSizes([...newProductSizes, fullVal]);
+                                        e.target.value = '';
+                                      }
+                                    }
+                                  }
+                                }}
+                              />
+                              <select id="req-sz-scale-select" className="form-input" style={{ margin: 0, height: '28px', fontSize: '0.72rem', flex: 1.5, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', padding: '0 2px' }}>
+                                {(() => {
+                                  if (['Apparel & Fashion', 'Fashion & Apparel'].includes(newProductCategory)) {
+                                    return (
+                                      <>
+                                        <option value="">No unit</option>
+                                        <option value=" inches">inches</option>
+                                        <option value=" cm">cm</option>
+                                        <option value=" UK">UK Size</option>
+                                        <option value=" US">US Size</option>
+                                        <option value=" EU">EU Size</option>
+                                      </>
+                                    );
+                                  }
+                                  if (newProductCategory === 'Electronics & Tech') {
+                                    return (
+                                      <>
+                                        <option value="">No unit</option>
+                                        <option value="GB">GB</option>
+                                        <option value="TB">TB</option>
+                                        <option value="GB RAM">GB RAM</option>
+                                        <option value="V">Volt (V)</option>
+                                        <option value="W">Watt (W)</option>
+                                        <option value="mAh">mAh</option>
+                                        <option value=" Inches">Inches (Screen)</option>
+                                      </>
+                                    );
+                                  }
+                                  if (['Food & Grocery', 'Health & Wellness', 'Beauty & Cosmetics'].includes(newProductCategory)) {
+                                    return (
+                                      <>
+                                        <option value="">No unit</option>
+                                        <option value=" Kg">Kg</option>
+                                        <option value=" g">g</option>
+                                        <option value=" mg">mg</option>
+                                        <option value=" L">L</option>
+                                        <option value=" ml">ml</option>
+                                        <option value=" Tabs">Tablets</option>
+                                        <option value=" Pack">Pack</option>
+                                      </>
+                                    );
+                                  }
+                                  if (['Kitchen & Dining', 'Lifestyle & Home', 'Home & Kitchen'].includes(newProductCategory)) {
+                                    return (
+                                      <>
+                                        <option value="">No unit</option>
+                                        <option value=" inches">inches</option>
+                                        <option value=" cm">cm</option>
+                                        <option value=" feet">feet</option>
+                                        <option value=" meters">meters</option>
+                                        <option value=" Set of 2">Set of 2</option>
+                                        <option value=" Set of 4">Set of 4</option>
+                                        <option value=" Set of 6">Set of 6</option>
+                                        <option value=" Pack of 2">Pack of 2</option>
+                                        <option value=" Pack of 4">Pack of 4</option>
+                                      </>
+                                    );
+                                  }
+                                  return (
+                                    <>
+                                      <option value="">No unit</option>
+                                      <option value=" inches">inches</option>
+                                      <option value=" cm">cm</option>
+                                      <option value=" UK">UK</option>
+                                      <option value=" US">US</option>
+                                      <option value=" EU">EU</option>
+                                      <option value=" Kg">Kg</option>
+                                      <option value=" g">g</option>
+                                      <option value=" L">L</option>
+                                      <option value=" ml">ml</option>
+                                      <option value=" GB">GB</option>
+                                      <option value=" TB">TB</option>
+                                    </>
+                                  );
+                                })()}
+                              </select>
+                              <button type="button" onClick={() => {
+                                const el = document.getElementById('req-sz-custom-inp');
+                                const scaleEl = document.getElementById('req-sz-scale-select');
+                                const v = el?.value.trim();
+                                const scale = scaleEl?.value || '';
+                                if (v) {
+                                  const fullVal = v + scale;
+                                  if (!newProductSizes.includes(fullVal)) {
+                                    setNewProductSizes([...newProductSizes, fullVal]);
+                                    el.value = '';
+                                  }
+                                }
+                              }}
+                                style={{ height: '28px', padding: '0 8px', fontSize: '0.72rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Add</button>
+                            </div>
+                            {newProductSizes.length > 0 && (
+                              <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {newProductSizes.map(sz => (
+                                  <span key={sz} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.3)', color: '#2dd4bf', borderRadius: '20px', padding: '1px 8px', fontSize: '0.7rem', fontWeight: '600' }}>
+                                    {sz}
+                                    <button type="button" onClick={() => setNewProductSizes(newProductSizes.filter(s => s !== sz))} style={{ background: 'none', border: 'none', color: '#2dd4bf', cursor: 'pointer', padding: '0', fontSize: '0.8rem', lineHeight: 1 }}>×</button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Colors Option */}
+                          <div>
+                            <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px', display: 'block' }}>🎨 Available Colors</label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                              {[
+                                {name:'Red',hex:'#ef4444'},{name:'Blue',hex:'#3b82f6'},{name:'Black',hex:'#1a1a1a'},
+                                {name:'White',hex:'#f5f5f5'},{name:'Green',hex:'#22c55e'},{name:'Yellow',hex:'#eab308'},
+                                {name:'Orange',hex:'#f97316'},{name:'Purple',hex:'#a855f7'},{name:'Pink',hex:'#ec4899'},
+                                {name:'Gray',hex:'#6b7280'},{name:'Brown',hex:'#92400e'},{name:'Navy',hex:'#1e3a8a'},
+                                {name:'Beige',hex:'#d4b896'},{name:'Silver',hex:'#cbd5e1'},{name:'Gold',hex:'#d97706'},
+                              ].map(col => {
+                                const sel = newProductColors.includes(col.name);
+                                return (
+                                  <button key={col.name} type="button"
+                                    onClick={() => setNewProductColors(sel ? newProductColors.filter(c => c !== col.name) : [...newProductColors, col.name])}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', fontSize: '0.72rem', borderRadius: '4px', cursor: 'pointer', border: sel ? '1.5px solid #2dd4bf' : '1px solid rgba(255,255,255,0.12)', background: sel ? 'rgba(45,212,191,0.12)' : 'rgba(255,255,255,0.03)', color: sel ? '#2dd4bf' : 'var(--text-secondary)', fontWeight: sel ? '700' : '400', transition: 'all 0.15s ease' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: col.hex, display: 'inline-block', flexShrink: 0, border: '1px solid rgba(255,255,255,0.2)' }} />
+                                    {col.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center' }}>
+                              <input id="req-col-custom-inp" type="text" placeholder="Custom color name…" className="form-input" style={{ margin: 0, height: '28px', fontSize: '0.72rem', flex: 2, padding: '0 6px' }}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const v = e.target.value.trim();
+                                    const picker = document.getElementById('req-col-picker-inp');
+                                    const hex = picker?.value || '#319795';
+                                    if (v) {
+                                      const fullVal = `${v} (${hex})`;
+                                      if (!newProductColors.includes(fullVal)) {
+                                        setNewProductColors([...newProductColors, fullVal]);
+                                        e.target.value = '';
+                                      }
+                                    } else {
+                                      if (!newProductColors.includes(hex)) {
+                                        setNewProductColors([...newProductColors, hex]);
+                                      }
+                                    }
+                                  }
+                                }}
+                              />
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '4px', padding: '2px 4px', height: '28px', boxSizing: 'border-box' }}>
+                                <input id="req-col-picker-inp" type="color" defaultValue="#319795" style={{ border: 'none', background: 'none', width: '20px', height: '20px', cursor: 'pointer', padding: 0 }} />
+                              </div>
+                              <button type="button" onClick={() => {
+                                const el = document.getElementById('req-col-custom-inp');
+                                const picker = document.getElementById('req-col-picker-inp');
+                                const v = el?.value.trim();
+                                const hex = picker?.value || '#319795';
+                                if (v) {
+                                  const fullVal = `${v} (${hex})`;
+                                  if (!newProductColors.includes(fullVal)) {
+                                    setNewProductColors([...newProductColors, fullVal]);
+                                    el.value = '';
+                                  }
+                                } else {
+                                  if (!newProductColors.includes(hex)) {
+                                    setNewProductColors([...newProductColors, hex]);
+                                  }
+                                }
+                              }}
+                                style={{ height: '28px', padding: '0 8px', fontSize: '0.72rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Add</button>
+                            </div>
+                            {newProductColors.length > 0 && (
+                              <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {newProductColors.map(c => (
+                                  <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.3)', color: '#2dd4bf', borderRadius: '20px', padding: '1px 8px', fontSize: '0.7rem', fontWeight: '600' }}>
+                                    {c}
+                                    <button type="button" onClick={() => setNewProductColors(newProductColors.filter(x => x !== c))} style={{ background: 'none', border: 'none', color: '#2dd4bf', cursor: 'pointer', padding: '0', fontSize: '0.8rem', lineHeight: 1 }}>×</button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         <div className="form-group">
                           <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Description *</label>
                           <textarea
@@ -5703,6 +5962,56 @@ export default function EmahuProDashboard() {
                 </div>
               </div>
 
+              {/* Product Variations Details (Category-wise label) */}
+              {((selectedDetailedProduct.sizes && selectedDetailedProduct.sizes.length > 0) || 
+                (selectedDetailedProduct.colors && selectedDetailedProduct.colors.length > 0)) && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <div>
+                    <strong style={{ color: 'var(--text-secondary)' }}>
+                      {['Apparel & Fashion','Fashion & Apparel'].includes(selectedDetailedProduct.category) ? '👕 Sizes:' :
+                       selectedDetailedProduct.category === 'Electronics & Tech' ? '💾 Storage/Specs:' :
+                       ['Kitchen & Dining','Lifestyle & Home','Home & Kitchen'].includes(selectedDetailedProduct.category) ? '📐 Dimensions:' :
+                       selectedDetailedProduct.category === 'Beauty & Cosmetics' ? '🧴 Vol/Finish:' :
+                       selectedDetailedProduct.category === 'Sports & Fitness' ? '🏋️ Weight:' :
+                       '📦 Sizes/Variants:'}
+                    </strong>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                      {selectedDetailedProduct.sizes && selectedDetailedProduct.sizes.length > 0 ? (
+                        selectedDetailedProduct.sizes.map(sz => (
+                          <span key={sz} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600' }}>{sz}</span>
+                        ))
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.75rem' }}>None Selected</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--text-secondary)' }}>🎨 Colors:</strong>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                      {selectedDetailedProduct.colors && selectedDetailedProduct.colors.length > 0 ? (
+                        selectedDetailedProduct.colors.map(colName => {
+                          const hexMap = {
+                            Red: '#ef4444', Blue: '#3b82f6', Black: '#1a1a1a', White: '#f5f5f5', Green: '#22c55e',
+                            Yellow: '#eab308', Orange: '#f97316', Purple: '#a855f7', Pink: '#ec4899', Gray: '#6b7280',
+                            Brown: '#92400e', Navy: '#1e3a8a', Beige: '#d4b896', Silver: '#cbd5e1', Gold: '#d97706'
+                          };
+                          const hexMatch = colName.match(/#(?:[0-9a-fA-F]{3}){1,2}\b/);
+                          const hex = hexMatch ? hexMatch[0] : (hexMap[colName] || (colName.startsWith('#') ? colName : 'rgba(255,255,255,0.1)'));
+                          return (
+                            <span key={colName} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600' }}>
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: hex, display: 'inline-block', border: (colName === 'White' || hex === '#f5f5f5' || hex === '#ffffff') ? '1px solid rgba(255,255,255,0.2)' : 'none' }} />
+                              {colName}
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.75rem' }}>None Selected</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <strong style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Description:</strong>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-primary)' }}>{selectedDetailedProduct.description}</p>
@@ -6115,25 +6424,274 @@ export default function EmahuProDashboard() {
 
                 </div>
 
+                {/* --- SECTION 3: VARIATIONS & OPTIONS --- */}
+                <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginTop: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🎨</span> Variations & Options
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
+                    Select available options for this <strong style={{ color: 'var(--text-primary)' }}>{newProductCategory}</strong> listing. Buyers can choose these at checkout.
+                  </p>
+                  <div className="form-grid-2">
+
+                    {/* SIZES / SPECS */}
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: '600', marginBottom: '10px', display: 'block' }}>
+                        {['Apparel & Fashion','Fashion & Apparel'].includes(newProductCategory) ? '👕 Clothing Sizes' :
+                         newProductCategory === 'Electronics & Tech' ? '💾 Storage / Variant' :
+                         ['Kitchen & Dining','Lifestyle & Home','Home & Kitchen'].includes(newProductCategory) ? '📐 Size / Dimensions' :
+                         newProductCategory === 'Beauty & Cosmetics' ? '🧴 Volume / Finish' :
+                         newProductCategory === 'Sports & Fitness' ? '🏋️ Weight Class' :
+                         newProductCategory === 'Toys & Games' ? '🎮 Age Group' :
+                         newProductCategory === 'Books & Stationery' ? '📚 Format / Size' :
+                         newProductCategory === 'Health & Wellness' ? '💊 Pack Size' :
+                         newProductCategory === 'Food & Grocery' ? '⚖️ Weight / Pack' :
+                         newProductCategory === 'Automotive' ? '🔧 Fit Type' :
+                         newProductCategory === 'Pet Supplies' ? '🐾 Pet Size' : '📦 Size / Variant'}
+                      </label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+                        {(() => {
+                          const catSizes = {
+                            'Apparel & Fashion': ['XS','S','M','L','XL','XXL','XXXL','UK 6','UK 7','UK 8','UK 9','UK 10','UK 11'],
+                            'Fashion & Apparel': ['XS','S','M','L','XL','XXL','XXXL','UK 6','UK 7','UK 8','UK 9','UK 10','UK 11'],
+                            'Electronics & Tech': ['64GB','128GB','256GB','512GB','1TB','8GB RAM','16GB RAM','Standard'],
+                            'Kitchen & Dining': ['Small','Medium','Large','XL','Set of 2','Set of 4','Set of 6'],
+                            'Lifestyle & Home': ['Single','Double','Queen','King','Small','Medium','Large'],
+                            'Home & Kitchen': ['Small','Medium','Large','King','Queen','Single','Set of 2'],
+                            'Beauty & Cosmetics': ['15ml','30ml','50ml','100ml','200ml','Matte','Glossy','Shimmer'],
+                            'Sports & Fitness': ['Standard','Lightweight','Heavyweight','Junior','Senior','Professional'],
+                            'Toys & Games': ['Ages 2–4','Ages 5–7','Ages 8–12','Ages 12+','All Ages'],
+                            'Books & Stationery': ['Hardcover','Paperback','A4','A5','Pack of 5','Pack of 10'],
+                            'Health & Wellness': ['30 Tabs','60 Tabs','90 Tabs','100g','250g','500g'],
+                            'Food & Grocery': ['100g','250g','500g','1kg','2kg','5kg'],
+                            'Automotive': ['Universal Fit','Standard','Pack of 1','Pack of 2','Pack of 4'],
+                            'Pet Supplies': ['Small Pet','Medium Pet','Large Pet','Standard','XL'],
+                          };
+                          const opts = catSizes[newProductCategory] || ['Small','Medium','Large','Standard','Custom'];
+                          return opts.map(sz => {
+                            const sel = newProductSizes.includes(sz);
+                            return (
+                              <button key={sz} type="button"
+                                onClick={() => setNewProductSizes(sel ? newProductSizes.filter(s => s !== sz) : [...newProductSizes, sz])}
+                                style={{ padding: '5px 12px', fontSize: '0.75rem', borderRadius: '6px', cursor: 'pointer', border: sel ? '1.5px solid #2dd4bf' : '1px solid rgba(255,255,255,0.12)', background: sel ? 'rgba(45,212,191,0.12)' : 'rgba(255,255,255,0.03)', color: sel ? '#2dd4bf' : 'var(--text-secondary)', fontWeight: sel ? '700' : '400', transition: 'all 0.15s ease' }}>
+                                {sel ? '✓ ' : ''}{sz}
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                        <input id="sz-custom-inp" type="text" placeholder="Custom size (e.g. 32, 10)" className="form-input" style={{ margin: 0, height: '34px', fontSize: '0.75rem', flex: 2 }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const v = e.target.value.trim();
+                              const scaleEl = document.getElementById('sz-scale-select');
+                              const scale = scaleEl?.value || '';
+                              if (v) {
+                                const fullVal = v + scale;
+                                if (!newProductSizes.includes(fullVal)) {
+                                  setNewProductSizes([...newProductSizes, fullVal]);
+                                  e.target.value = '';
+                                }
+                              }
+                            }
+                          }}
+                        />
+                        <select id="sz-scale-select" className="form-input" style={{ margin: 0, height: '34px', fontSize: '0.75rem', flex: 1.5, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', padding: '0 4px' }}>
+                          {(() => {
+                            if (['Apparel & Fashion', 'Fashion & Apparel'].includes(newProductCategory)) {
+                              return (
+                                <>
+                                  <option value="">No unit</option>
+                                  <option value=" inches">inches</option>
+                                  <option value=" cm">cm</option>
+                                  <option value=" UK">UK Size</option>
+                                  <option value=" US">US Size</option>
+                                  <option value=" EU">EU Size</option>
+                                </>
+                              );
+                            }
+                            if (newProductCategory === 'Electronics & Tech') {
+                              return (
+                                <>
+                                  <option value="">No unit</option>
+                                  <option value="GB">GB</option>
+                                  <option value="TB">TB</option>
+                                  <option value="GB RAM">GB RAM</option>
+                                  <option value="V">Volt (V)</option>
+                                  <option value="W">Watt (W)</option>
+                                  <option value="mAh">mAh</option>
+                                  <option value=" Inches">Inches (Screen)</option>
+                                </>
+                              );
+                            }
+                            if (['Food & Grocery', 'Health & Wellness', 'Beauty & Cosmetics'].includes(newProductCategory)) {
+                              return (
+                                <>
+                                  <option value="">No unit</option>
+                                  <option value=" Kg">Kg</option>
+                                  <option value=" g">g</option>
+                                  <option value=" mg">mg</option>
+                                  <option value=" L">L</option>
+                                  <option value=" ml">ml</option>
+                                  <option value=" Tabs">Tablets</option>
+                                  <option value=" Pack">Pack</option>
+                                </>
+                              );
+                            }
+                            if (['Kitchen & Dining', 'Lifestyle & Home', 'Home & Kitchen'].includes(newProductCategory)) {
+                              return (
+                                <>
+                                  <option value="">No unit</option>
+                                  <option value=" inches">inches</option>
+                                  <option value=" cm">cm</option>
+                                  <option value=" feet">feet</option>
+                                  <option value=" meters">meters</option>
+                                  <option value=" Set of 2">Set of 2</option>
+                                  <option value=" Set of 4">Set of 4</option>
+                                  <option value=" Set of 6">Set of 6</option>
+                                  <option value=" Pack of 2">Pack of 2</option>
+                                  <option value=" Pack of 4">Pack of 4</option>
+                                </>
+                              );
+                            }
+                            return (
+                              <>
+                                <option value="">No unit</option>
+                                <option value=" inches">inches</option>
+                                <option value=" cm">cm</option>
+                                <option value=" UK">UK</option>
+                                <option value=" US">US</option>
+                                <option value=" EU">EU</option>
+                                <option value=" Kg">Kg</option>
+                                <option value=" g">g</option>
+                                <option value=" L">L</option>
+                                <option value=" ml">ml</option>
+                                <option value=" GB">GB</option>
+                                <option value=" TB">TB</option>
+                              </>
+                            );
+                          })()}
+                        </select>
+                        <button type="button" onClick={() => {
+                          const el = document.getElementById('sz-custom-inp');
+                          const scaleEl = document.getElementById('sz-scale-select');
+                          const v = el?.value.trim();
+                          const scale = scaleEl?.value || '';
+                          if (v) {
+                            const fullVal = v + scale;
+                            if (!newProductSizes.includes(fullVal)) {
+                              setNewProductSizes([...newProductSizes, fullVal]);
+                              el.value = '';
+                            }
+                          }
+                        }}
+                          style={{ height: '34px', padding: '0 12px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Add</button>
+                      </div>
+                      {newProductSizes.length > 0 && (
+                        <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {newProductSizes.map(sz => (
+                            <span key={sz} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.3)', color: '#2dd4bf', borderRadius: '20px', padding: '2px 10px', fontSize: '0.72rem', fontWeight: '600' }}>
+                              {sz}
+                              <button type="button" onClick={() => setNewProductSizes(newProductSizes.filter(s => s !== sz))} style={{ background: 'none', border: 'none', color: '#2dd4bf', cursor: 'pointer', padding: '0', fontSize: '0.9rem', lineHeight: 1 }}>×</button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* COLORS */}
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: '600', marginBottom: '10px', display: 'block' }}>🎨 Available Colors</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+                        {[
+                          {name:'Red',hex:'#ef4444'},{name:'Blue',hex:'#3b82f6'},{name:'Black',hex:'#1a1a1a'},
+                          {name:'White',hex:'#f5f5f5'},{name:'Green',hex:'#22c55e'},{name:'Yellow',hex:'#eab308'},
+                          {name:'Orange',hex:'#f97316'},{name:'Purple',hex:'#a855f7'},{name:'Pink',hex:'#ec4899'},
+                          {name:'Gray',hex:'#6b7280'},{name:'Brown',hex:'#92400e'},{name:'Navy',hex:'#1e3a8a'},
+                          {name:'Beige',hex:'#d4b896'},{name:'Silver',hex:'#cbd5e1'},{name:'Gold',hex:'#d97706'},
+                        ].map(col => {
+                          const sel = newProductColors.includes(col.name);
+                          return (
+                            <button key={col.name} type="button"
+                              onClick={() => setNewProductColors(sel ? newProductColors.filter(c => c !== col.name) : [...newProductColors, col.name])}
+                              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 11px', fontSize: '0.75rem', borderRadius: '6px', cursor: 'pointer', border: sel ? '1.5px solid #2dd4bf' : '1px solid rgba(255,255,255,0.12)', background: sel ? 'rgba(45,212,191,0.12)' : 'rgba(255,255,255,0.03)', color: sel ? '#2dd4bf' : 'var(--text-secondary)', fontWeight: sel ? '700' : '400', transition: 'all 0.15s ease' }}>
+                              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: col.hex, display: 'inline-block', flexShrink: 0, border: '1px solid rgba(255,255,255,0.2)' }} />
+                              {col.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '10px', alignItems: 'center' }}>
+                        <input id="col-custom-inp" type="text" placeholder="Custom color name…" className="form-input" style={{ margin: 0, height: '34px', fontSize: '0.75rem', flex: 2 }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const v = e.target.value.trim();
+                              const picker = document.getElementById('col-picker-inp');
+                              const hex = picker?.value || '#319795';
+                              if (v) {
+                                const fullVal = `${v} (${hex})`;
+                                if (!newProductColors.includes(fullVal)) {
+                                  setNewProductColors([...newProductColors, fullVal]);
+                                  e.target.value = '';
+                                }
+                              } else {
+                                if (!newProductColors.includes(hex)) {
+                                  setNewProductColors([...newProductColors, hex]);
+                                }
+                              }
+                            }
+                          }}
+                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '2px 6px', height: '34px', boxSizing: 'border-box' }}>
+                          <input id="col-picker-inp" type="color" defaultValue="#319795" style={{ border: 'none', background: 'none', width: '24px', height: '24px', cursor: 'pointer', padding: 0 }} />
+                        </div>
+                        <button type="button" onClick={() => {
+                          const el = document.getElementById('col-custom-inp');
+                          const picker = document.getElementById('col-picker-inp');
+                          const v = el?.value.trim();
+                          const hex = picker?.value || '#319795';
+                          if (v) {
+                            const fullVal = `${v} (${hex})`;
+                            if (!newProductColors.includes(fullVal)) {
+                              setNewProductColors([...newProductColors, fullVal]);
+                              el.value = '';
+                            }
+                          } else {
+                            if (!newProductColors.includes(hex)) {
+                              setNewProductColors([...newProductColors, hex]);
+                            }
+                          }
+                        }}
+                          style={{ height: '34px', padding: '0 12px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Add</button>
+                      </div>
+                      {newProductColors.length > 0 && (
+                        <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {newProductColors.map(c => (
+                            <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.3)', color: '#2dd4bf', borderRadius: '20px', padding: '2px 10px', fontSize: '0.72rem', fontWeight: '600' }}>
+                              {c}
+                              <button type="button" onClick={() => setNewProductColors(newProductColors.filter(x => x !== c))} style={{ background: 'none', border: 'none', color: '#2dd4bf', cursor: 'pointer', padding: '0', fontSize: '0.9rem', lineHeight: 1 }}>×</button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                </div>
+
                 <div style={{ marginTop: '16px' }}>
                   {renderMultiImageSelector()}
                 </div>
 
-                {/* --- SECTION 3: MEDIA & SPECIFICATIONS --- */}
-                <div style={{
-                  fontSize: '0.9rem',
-                  fontWeight: '700',
-                  color: 'var(--text-primary)',
-                  borderBottom: '1px solid var(--border-color)',
-                  paddingBottom: '8px',
-                  marginTop: '20px',
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <span style={{ fontSize: '1.1rem' }}>ðŸ–¼ï¸</span> Product Copy and Specifications
+                {/* --- SECTION 4: MEDIA & SPECIFICATIONS --- */}
+                <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginTop: '20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🖼️</span> Product Copy and Specifications
                 </div>
+
 
                 <div className="form-group">
                   <label className="form-label">Description *</label>
@@ -7175,87 +7733,7 @@ export default function EmahuProDashboard() {
                       {/* Fulfillment & Courier Console */}
                       {selectedDetailedOrder.status !== 'PENDING_APPROVAL' && selectedDetailedOrder.status !== 'REJECTED' && !selectedDetailedOrder.sellerRejected && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.01)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>COURIER CORRIDOR TRACKING PROVISIONS</span>
-                            
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                              <div>
-                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Logistics Carrier</label>
-                                <select 
-                                  className="select-filter" 
-                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
-                                  value={carrier}
-                                  onChange={(e) => handleCarrierChange(e.target.value)}
-                                  disabled={isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
-                                >
-                                  <option value="Delhivery">Delhivery Logistics</option>
-                                  <option value="Blue Dart">Blue Dart Premium</option>
-                                  <option value="EmahuXpress">Emahu Xpress Direct</option>
-                                  <option value="FedEx">FedEx International</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Tracking Identifier</label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g. EMH-TRK-983"
-                                  className="form-input"
-                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
-                                  value={trackingId}
-                                  onChange={(e) => setTrackingId(e.target.value)}
-                                  disabled={isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
-                                />
-                              </div>
-                            </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                              <div>
-                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Package Weight</label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g. 0.8 kg"
-                                  className="form-input"
-                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
-                                  value={packageWeight}
-                                  onChange={(e) => setPackageWeight(e.target.value)}
-                                  disabled={isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
-                                />
-                              </div>
-                              <div>
-                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Ship Cost (₹)</label>
-                                <input
-                                  type="number"
-                                  placeholder="80"
-                                  className="form-input"
-                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
-                                  value={deliveryCost}
-                                  onChange={(e) => setDeliveryCost(e.target.value)}
-                                  disabled={isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
-                                />
-                              </div>
-                              <div>
-                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Transit Time</label>
-                                <input
-                                  type="text"
-                                  placeholder="2-4 Days"
-                                  className="form-input"
-                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
-                                  value={estDays}
-                                  onChange={(e) => setEstDays(e.target.value)}
-                                  disabled={isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
-                                />
-                              </div>
-                            </div>
-
-                            <button
-                              className="btn-secondary"
-                              style={{ height: '34px', fontSize: '0.78rem', display: 'flex', alignSelf: 'flex-end', padding: '0 16px', marginTop: '10px' }}
-                              onClick={() => handleSaveTrackingDetails(selectedDetailedOrder.orderId)}
-                              disabled={orderLoading[selectedDetailedOrder.orderId] || isCompleted || selectedDetailedOrder.status === '🔓 FUNDS RELEASED'}
-                            >
-                              {orderLoading[selectedDetailedOrder.orderId] ? 'Saving...' : '💾 Save Tracking Details'}
-                            </button>
-                          </div>
 
                           {/* Progress Shipping State buttons */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>

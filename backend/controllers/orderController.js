@@ -137,12 +137,15 @@ exports.createOrder = async (req, res) => {
     let sName = 'Emahu Seller';
     
     if (orderData.sellerId) {
-      const seller = await User.findById(orderData.sellerId);
-      if (seller) {
-        if (seller.latitude !== undefined && seller.latitude !== null) sLat = seller.latitude;
-        if (seller.longitude !== undefined && seller.longitude !== null) sLon = seller.longitude;
-        if (seller.address) sAddress = seller.address;
-        if (seller.storeName || seller.name) sName = seller.storeName || seller.name;
+      const mongoose = require('mongoose');
+      if (mongoose.Types.ObjectId.isValid(orderData.sellerId)) {
+        const seller = await User.findById(orderData.sellerId);
+        if (seller) {
+          if (seller.latitude !== undefined && seller.latitude !== null) sLat = seller.latitude;
+          if (seller.longitude !== undefined && seller.longitude !== null) sLon = seller.longitude;
+          if (seller.address) sAddress = seller.address;
+          if (seller.storeName || seller.name) sName = seller.storeName || seller.name;
+        }
       }
     }
 

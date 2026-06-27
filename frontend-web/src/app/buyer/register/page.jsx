@@ -443,7 +443,7 @@ export default function BuyerRegister() {
                         className={`br-input ${errors.phone ? 'br-input--error' : ''}`}
                         placeholder="9876543210"
                         value={formData.phone}
-                        onChange={handleInputChange}
+                        onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
                       />
                       {errors.phone && <span className="br-error">{errors.phone}</span>}
                     </div>

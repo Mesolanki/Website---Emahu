@@ -92,6 +92,14 @@ const productSchema = new mongoose.Schema(
     approvalAttempts: {
       type: Number,
       default: 0
+    },
+    sizes: {
+      type: [String],
+      default: []
+    },
+    colors: {
+      type: [String],
+      default: []
     }
   },
   {

@@ -201,13 +201,22 @@ export default function CheckoutPage() {
     if (isNaN(bLat) || isNaN(bLon)) return;
     
     // Determine seller coordinates
-    const sellerLocations = cartItems.map(item => {
+    let sellerLocations = cartItems.map(item => {
       const sellerObj = item.seller;
-      const sLat = (sellerObj && sellerObj.latitude !== undefined && sellerObj.latitude !== null) ? sellerObj.latitude : 23.0225;
-      const sLon = (sellerObj && sellerObj.longitude !== undefined && sellerObj.longitude !== null) ? sellerObj.longitude : 72.5714;
+      const sLat = (sellerObj && sellerObj.latitude !== undefined && sellerObj.latitude !== null) ? sellerObj.latitude : null;
+      const sLon = (sellerObj && sellerObj.longitude !== undefined && sellerObj.longitude !== null) ? sellerObj.longitude : null;
       const sName = (sellerObj && (sellerObj.storeName || sellerObj.name)) || 'Emahu Seller';
       return { latitude: sLat, longitude: sLon, name: sName };
     });
+
+    // Use only valid locations that have real coordinates
+    const realLocations = sellerLocations.filter(loc => loc.latitude !== null && loc.longitude !== null);
+    if (realLocations.length > 0) {
+      sellerLocations = realLocations;
+    } else {
+      // If no item has real coordinates, use the single default location as a fallback
+      sellerLocations = [{ latitude: 23.0225, longitude: 72.5714, name: 'Emahu Seller' }];
+    }
     
     if (!checkoutMapRef.current) {
       checkoutMapRef.current = window.L.map('checkout-route-map').setView([bLat, bLon], 10);
@@ -230,11 +239,18 @@ export default function CheckoutPage() {
     buyerMarkerRef.current = window.L.marker([bLat, bLon], {
       icon: window.L.divIcon({
         className: 'buyer-marker-icon',
-        html: '<div style="background-color: #3b82f6; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5)"></div>',
-        iconSize: [14, 14],
-        iconAnchor: [7, 7]
+        html: `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; width: 80px; height: 42px;">
+            <div style="background-color: #3b82f6; color: white; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 5px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); line-height: 1.2;">
+              Buyer (You)
+            </div>
+            <div style="background-color: #3b82f6; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-top: 2px;"></div>
+          </div>
+        `,
+        iconSize: [80, 42],
+        iconAnchor: [40, 36]
       })
-    }).addTo(checkoutMapRef.current).bindPopup('Your Location');
+    }).addTo(checkoutMapRef.current).bindPopup('Your Location (Buyer)');
     
     const points = [[bLat, bLon]];
     
@@ -242,11 +258,18 @@ export default function CheckoutPage() {
       const sMarker = window.L.marker([loc.latitude, loc.longitude], {
         icon: window.L.divIcon({
           className: 'seller-marker-icon',
-          html: '<div style="background-color: #10b981; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5)"></div>',
-          iconSize: [14, 14],
-          iconAnchor: [7, 7]
+          html: `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; width: 90px; height: 42px;">
+              <div style="background-color: #a855f7; color: white; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 5px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); line-height: 1.2;">
+                Retailer (Seller)
+              </div>
+              <div style="background-color: #a855f7; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-top: 2px;"></div>
+            </div>
+          `,
+          iconSize: [90, 42],
+          iconAnchor: [45, 36]
         })
-      }).addTo(checkoutMapRef.current).bindPopup(`Seller: ${loc.name}`);
+      }).addTo(checkoutMapRef.current).bindPopup(`Retailer: ${loc.name}`);
       
       sellerMarkersRef.current.push(sMarker);
       points.push([loc.latitude, loc.longitude]);
@@ -724,7 +747,7 @@ export default function CheckoutPage() {
             setCheckoutStep('success');
           } catch (dbErr) {
             console.error('DATABASE INSERT FAILURE:', dbErr);
-            alert('Failed to place order: Database connection error. Please try again.');
+            alert('Failed to place order: ' + dbErr.message);
             setCheckoutStep('idle');
           }
         })();
@@ -1082,8 +1105,13 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Submit button inside mobile viewport, else hidden */}
-                <button type="submit" className="co-btn-submit-mobile">
-                  Buy Now (₹{grandTotal.toLocaleString('en-IN')})
+                <button
+                  type="submit"
+                  className="co-btn-submit-mobile"
+                  disabled={!buyerCoordinates.latitude || !buyerCoordinates.longitude}
+                  style={(!buyerCoordinates.latitude || !buyerCoordinates.longitude) ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8' } : {}}
+                >
+                  {(!buyerCoordinates.latitude || !buyerCoordinates.longitude) ? 'Share GPS Location to Buy' : `Buy Now (₹${grandTotal.toLocaleString('en-IN')})`}
                 </button>
 
               </form>
@@ -1139,7 +1167,7 @@ export default function CheckoutPage() {
 
                   <div className="co-breakdown-row">
                     <span>Certified Shipping</span>
-                    <strong>₹{shippingFee}</strong>
+                    <strong>₹{Number(shippingFee).toFixed(2)}</strong>
                   </div>
 
                   {/* Per-seller breakdown */}
@@ -1149,7 +1177,7 @@ export default function CheckoutPage() {
                       {deliveryBreakdown.map((b, i) => (
                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#475569', padding: '3px 0' }}>
                           <span>{b.sellerName} — {b.distanceKm} km</span>
-                          <span style={{ fontWeight: '600' }}>₹{b.deliveryCharge}</span>
+                          <span style={{ fontWeight: '600' }}>₹{Number(b.deliveryCharge).toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
@@ -1180,12 +1208,14 @@ export default function CheckoutPage() {
                   <button 
                     onClick={handlePlaceOrder}
                     className="co-btn-lock-escrow"
+                    disabled={!buyerCoordinates.latitude || !buyerCoordinates.longitude}
+                    style={(!buyerCoordinates.latitude || !buyerCoordinates.longitude) ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8', boxShadow: 'none' } : {}}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '8px' }}>
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
-                    <span>Buy Now</span>
+                    <span>{(!buyerCoordinates.latitude || !buyerCoordinates.longitude) ? 'Share GPS Location to Buy' : 'Buy Now'}</span>
                   </button>
                 )}
 

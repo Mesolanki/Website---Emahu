@@ -39,15 +39,31 @@ function LiveTrackingMap({ orderId, trackingData, leafletLoaded }) {
       }).addTo(mapRef.current);
 
       const sellerIcon = window.L.divIcon({
-        html: '<div style="background-color:#dd6b20; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.3)"></div>',
+        html: `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; width: 90px; height: 42px;">
+            <div style="background-color: #a855f7; color: white; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 5px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); line-height: 1.2;">
+              Retailer (Seller)
+            </div>
+            <div style="background-color: #a855f7; width: 12px; height: 12px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.3); margin-top: 2px;"></div>
+          </div>
+        `,
         className: 'custom-div-icon',
-        iconSize: [14, 14]
+        iconSize: [90, 42],
+        iconAnchor: [45, 36]
       });
 
       const buyerIcon = window.L.divIcon({
-        html: '<div style="background-color:#e53e3e; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.3)"></div>',
+        html: `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; width: 80px; height: 42px;">
+            <div style="background-color: #3b82f6; color: white; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 5px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); line-height: 1.2;">
+              Buyer (You)
+            </div>
+            <div style="background-color: #3b82f6; width: 12px; height: 12px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.3); margin-top: 2px;"></div>
+          </div>
+        `,
         className: 'custom-div-icon',
-        iconSize: [14, 14]
+        iconSize: [80, 42],
+        iconAnchor: [40, 36]
       });
 
       const courierIcon = window.L.divIcon({
@@ -58,11 +74,11 @@ function LiveTrackingMap({ orderId, trackingData, leafletLoaded }) {
 
       markerSellerRef.current = window.L.marker([sLat, sLon], { icon: sellerIcon })
         .addTo(mapRef.current)
-        .bindPopup(`<strong>Merchant Pickup</strong>`);
+        .bindPopup(`<strong>Merchant Pickup (Retailer)</strong>`);
 
       markerBuyerRef.current = window.L.marker([bLat, bLon], { icon: buyerIcon })
         .addTo(mapRef.current)
-        .bindPopup(`<strong>Your Dropoff</strong>`);
+        .bindPopup(`<strong>Your Dropoff (Buyer)</strong>`);
 
       markerCourierRef.current = window.L.marker([cLat, cLon], { icon: courierIcon })
         .addTo(mapRef.current)

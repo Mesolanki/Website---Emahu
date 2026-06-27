@@ -223,9 +223,9 @@ export default function BuyerSettingsPage() {
                     type="text"
                     className="form-input"
                     value={profileForm.phone}
-                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                     required
-                    placeholder="e.g. +91 98765 43210"
+                    placeholder="e.g. 9876543210"
                   />
                 </div>
               </div>

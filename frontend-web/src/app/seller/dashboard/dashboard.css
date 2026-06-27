@@ -203,17 +203,27 @@ body {
 .sidebar-user-info {
   display: flex;
   flex-direction: column;
+  flex-grow: 1;
+  min-width: 0; /* Enable flex-child containment for truncation */
 }
 
 .sidebar-username {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
 }
 
 .sidebar-usertag {
   font-size: 0.725rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
 }
 
 .logout-btn {
@@ -1557,7 +1567,7 @@ body {
 /* --- RESPONSIVE ADAPTATIONS --- */
 /* Mobile Toggle Hamburger Button styling */
 .mobile-toggle-btn {
-  display: none; /* Hidden on desktop */
+  display: none !important; /* Hidden on desktop */
   background: none;
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -1692,7 +1702,7 @@ body {
   }
 
   .mobile-toggle-btn {
-    display: flex;
+    display: flex !important;
   }
 
   .stats-grid {

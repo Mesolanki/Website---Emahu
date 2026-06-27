@@ -788,7 +788,7 @@ export default function DeliveryPortal() {
                 className="form-input"
                 placeholder="Enter 6-digit OTP"
                 value={emailOtp}
-                onChange={(e) => setEmailOtp(e.target.value)}
+                onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 style={{ flex: 1, height: '36px', fontSize: '0.85rem' }}
               />
               <button
@@ -1427,7 +1427,7 @@ export default function DeliveryPortal() {
                           className={`form-input ${errors.phoneNumber ? 'form-input--error' : ''}`}
                           placeholder="e.g. 9898989898"
                           value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
                           readOnly={isEmailVerified}
                           style={{ flex: 1 }}
                         />
@@ -1455,7 +1455,7 @@ export default function DeliveryPortal() {
                               className="form-input"
                               placeholder="Enter 6-digit OTP"
                               value={emailOtp}
-                              onChange={(e) => setEmailOtp(e.target.value)}
+                              onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                               style={{ flex: 1, height: '36px', fontSize: '0.85rem' }}
                             />
                             <button
@@ -1870,17 +1870,7 @@ export default function DeliveryPortal() {
           {/* Header Stats Grid - Only visible for approved partners */}
           {user?.status === 'approved' && (
             <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-              <div className="benefit-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Active Status</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
-                  <span className={`status-pill ${user?.isActivePartner ? 'status-pill--active' : 'status-pill--inactive'}`}>
-                    {user?.isActivePartner ? 'Active (Ready)' : 'Inactive (Offline)'}
-                  </span>
-                  <button onClick={handleToggleActiveStatus} className="lp-btn lp-btn--secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
-                    Toggle
-                  </button>
-                </div>
-              </div>
+
 
               <div className="benefit-card" style={{ padding: '24px' }}>
                 <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Assigned Jobs</span>
@@ -2172,8 +2162,24 @@ export default function DeliveryPortal() {
           {/* TAB: NEW JOBS */}
           {activeTab === 'new' && !editProfileMode && user?.status === 'approved' && (() => {
             const assignedRequests = orders.filter(o => o.deliveryStatus === 'assigned' || o.assignmentStatus === 'assigned');
+            const activeOrder = orders.find(o => ['accepted', 'picked_up', 'in_transit', 'out_for_delivery', 'arrived'].includes(o.deliveryStatus));
             return (
               <div className="form-card-wrapper" style={{ padding: '32px' }}>
+                {activeOrder && (
+                  <div style={{
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    border: '1.5px dashed rgba(239, 68, 68, 0.3)',
+                    borderRadius: '10px',
+                    padding: '12px 16px',
+                    marginBottom: '20px',
+                    fontSize: '0.85rem',
+                    color: '#dc2626',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    ⚠️ Active Job Limit: You currently have an active delivery in progress (Order #{activeOrder.orderId}). Complete your current active delivery before you can accept new jobs.
+                  </div>
+                )}
                 {/* Direct requests panel */}
                 {assignedRequests.length > 0 && (
                   <div style={{ marginBottom: '28px', padding: '20px', background: 'rgba(49, 151, 149, 0.08)', border: '1.5px solid #319795', borderRadius: '12px' }}>
@@ -2212,7 +2218,22 @@ export default function DeliveryPortal() {
                                 <td style={{ padding: '12px', fontWeight: 700, color: '#319795' }}>₹{payout}</td>
                                 <td style={{ padding: '12px', textAlign: 'right' }}>
                                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                    <button onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')} className="lp-btn lp-btn--primary" style={{ padding: '6px 14px', fontSize: '0.8rem', backgroundColor: '#319795', border: 'none', color: '#fff', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+                                    <button 
+                                      onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')} 
+                                      className="lp-btn lp-btn--primary" 
+                                      disabled={!!activeOrder}
+                                      style={{ 
+                                        padding: '6px 14px', 
+                                        fontSize: '0.8rem', 
+                                        backgroundColor: activeOrder ? '#94a3b8' : '#319795', 
+                                        border: 'none', 
+                                        color: '#fff', 
+                                        borderRadius: '6px', 
+                                        fontWeight: 'bold', 
+                                        cursor: activeOrder ? 'not-allowed' : 'pointer',
+                                        opacity: activeOrder ? 0.6 : 1
+                                      }}
+                                    >
                                       Accept
                                     </button>
                                     <button onClick={() => handleUpdateJobStatus(order.orderId, 'rejected')} className="lp-btn" style={{ padding: '6px 14px', fontSize: '0.8rem', backgroundColor: '#ef4444', border: 'none', color: '#fff', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
@@ -2272,7 +2293,22 @@ export default function DeliveryPortal() {
                               <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
                               <td style={{ padding: '12px', fontWeight: 700, color: '#319795' }}>₹{payout}</td>
                               <td style={{ padding: '12px', textAlign: 'right' }}>
-                                <button onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')} className="lp-btn lp-btn--primary" style={{ padding: '6px 14px', fontSize: '0.8rem', backgroundColor: '#319795' }}>
+                                <button 
+                                  onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')} 
+                                  className="lp-btn lp-btn--primary" 
+                                  disabled={!!activeOrder}
+                                  style={{ 
+                                    padding: '6px 14px', 
+                                    fontSize: '0.8rem', 
+                                    backgroundColor: activeOrder ? '#94a3b8' : '#319795',
+                                    border: 'none',
+                                    color: '#fff',
+                                    borderRadius: '6px',
+                                    fontWeight: 'bold',
+                                    cursor: activeOrder ? 'not-allowed' : 'pointer',
+                                    opacity: activeOrder ? 0.6 : 1
+                                  }}
+                                >
                                   Accept Job
                                 </button>
                               </td>
@@ -2313,45 +2349,7 @@ export default function DeliveryPortal() {
                     </span>
                   </div>
 
-                  {/* Simulation Panel */}
-                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '12px', marginBottom: '20px', textAlign: 'left' }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: '800', color: '#475569', marginBottom: '8px' }}>
-                      🤖 SIMULATION PANEL (LOGISTICS DEMO CONTROLLER)
-                    </div>
-                    <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 12px 0' }}>
-                      Advance the simulated courier position step-by-step from Seller Hub to Buyer Address. Check proximity requirements live.
-                    </p>
-                    
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155' }}>
-                        Courier Position: <span style={{ color: '#319795' }}>{simStep === 0 ? 'At Seller Hub' : simStep === 5 ? 'Arrived at Buyer Address' : `In Transit (Step ${simStep}/5)`}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleAdvanceSimulation(activeOrder)}
-                          disabled={simStep >= 5}
-                          style={{ padding: '6px 12px', fontSize: '0.75rem', background: '#319795', color: '#fff', border: 'none', borderRadius: '6px', cursor: simStep >= 5 ? 'not-allowed' : 'pointer', opacity: simStep >= 5 ? 0.5 : 1, fontWeight: '700' }}
-                        >
-                          Advance Step ➔
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleResetSimulation(activeOrder)}
-                          style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'transparent', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: '700' }}
-                        >
-                          Reset Location
-                        </button>
-                      </div>
-                    </div>
 
-                    {simCoordinates && (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px', padding: '8px 12px', background: '#ffffff', borderRadius: '6px', border: '1px solid #edf2f7', fontSize: '0.75rem', color: '#475569' }}>
-                        <div><strong>Sim Lat:</strong> {simCoordinates.latitude}</div>
-                        <div><strong>Sim Lon:</strong> {simCoordinates.longitude}</div>
-                      </div>
-                    )}
-                  </div>
 
                   {/* Active Order Leaflet Map */}
                   <div id="active-delivery-map" style={{ height: '350px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #cbd5e1', marginBottom: '20px' }}></div>
@@ -2455,7 +2453,7 @@ export default function DeliveryPortal() {
                                     className="form-input"
                                     placeholder="e.g. 123456"
                                     value={enteredOtp}
-                                    onChange={(e) => setEnteredOtp(e.target.value)}
+                                    onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                     style={{ padding: '8px 12px', fontSize: '0.9rem', height: '38px', maxWidth: '200px' }}
                                   />
                                 </div>

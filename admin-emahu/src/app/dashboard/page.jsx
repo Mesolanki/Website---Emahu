@@ -672,10 +672,10 @@ export default function AdminDashboard() {
 
     if (actionType === 'ASSIGN_CARRIER') {
       const carrierName = customTrackingData?.carrier || carrier || 'Delhivery';
-      const trkId = customTrackingData?.trackingId || trackingId || `EMH-TRK-${Math.floor(100000 + Math.random() * 900000)}`;
-      const weight = customTrackingData?.packageWeight || packageWeight || '0.5 kg';
-      const cost = Number(customTrackingData?.deliveryCost || deliveryCost || 80);
-      const est = customTrackingData?.estDays || estDays || '2-4 Days';
+      const trkId = customTrackingData?.trackingId || trackingId || '';
+      const weight = customTrackingData?.packageWeight || packageWeight || '';
+      const cost = Number(customTrackingData?.deliveryCost || deliveryCost || 0);
+      const est = customTrackingData?.estDays || estDays || '';
 
       nextStatus = 'LABEL_GENERATED'; // transition directly to label generated as in seller dashboard
       
@@ -2588,6 +2588,131 @@ export default function AdminDashboard() {
                       </>
                     )}
                   </div>
+                  
+                  {/* Documents Section directly on profile tab for immediate approval */}
+                  <div className="ad-detail-info-section" style={{ marginTop: '24px' }}>
+                    <h4 style={{ marginBottom: '14px' }}>Uploaded Compliance Documents (Immediate Audit)</h4>
+                    {loadingDocsSellerId === selectedDetailSeller._id ? (
+                      <div style={{ color: 'var(--color-admin-primary)', padding: '20px 0', textAlign: 'center', fontWeight: 'bold' }}>
+                        Loading compliance documents checklist...
+                      </div>
+                    ) : selectedSellerDocs?.sellerId === selectedDetailSeller._id ? (
+                      <div className="ad-detail-docs-checklist">
+                        {selectedSellerDocs.documents.map(doc => (
+                          <div key={doc._id} className="ad-detail-doc-item">
+                            <div className="ad-detail-doc-info">
+                              <span className="ad-detail-doc-title">{doc.documentType?.replace(/_/g, ' ')}</span>
+                              <a 
+                                href="#" 
+                                onClick={(e) => { e.preventDefault(); openDocInNewTab(doc.fileUrl); }} 
+                                className="ad-detail-doc-link" 
+                                style={{ display: 'inline-block', marginBottom: '8px' }}
+                              >
+                                🔗 Open Document File Reference
+                              </a>
+                              {isRealImage(doc.fileUrl) ? (
+                                <div style={{ 
+                                  marginTop: '8px', 
+                                  borderRadius: '8px', 
+                                  overflow: 'hidden', 
+                                  border: '1px solid var(--color-admin-border)', 
+                                  maxWidth: '100%', 
+                                  maxHeight: '240px',
+                                  background: 'rgba(0,0,0,0.2)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>
+                                  <img 
+                                    src={cleanImageUrl(doc.fileUrl)} 
+                                    alt={doc.documentType} 
+                                    style={{ maxWidth: '100%', maxHeight: '240px', objectFit: 'contain', cursor: 'pointer' }}
+                                    onClick={() => openDocInNewTab(cleanImageUrl(doc.fileUrl))}
+                                  />
+                                </div>
+                              ) : doc.fileUrl && doc.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                                <div style={{ 
+                                  marginTop: '8px', 
+                                  padding: '12px', 
+                                  borderRadius: '8px', 
+                                  background: 'rgba(255,255,255,0.02)', 
+                                  border: '1px solid var(--color-admin-border)', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '10px' 
+                                }}>
+                                  <span style={{ fontSize: '1.8rem' }}>📄</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '0.85rem', color: '#fff', fontWeight: '500' }}>
+                                      {doc.fileUrl.split('/').pop() || 'document.pdf'}
+                                    </span>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>
+                                      PDF Document
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : null}
+                              {doc.feedback && (
+                                <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                                  Audit Rejection Reason: {doc.feedback}
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              {doc.status === 'approved' && (
+                                <span style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+                                  🔒 Confirmed & Locked
+                                </span>
+                              )}
+                              <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                fontSize: '0.72rem',
+                                fontWeight: '600',
+                                backgroundColor: doc.status === 'approved' ? 'rgba(16,185,129,0.1)' : doc.status === 'rejected' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
+                                color: doc.status === 'approved' ? '#10b981' : doc.status === 'rejected' ? '#ef4444' : '#f59e0b'
+                              }}>
+                                {doc.status.toUpperCase()}
+                              </span>
+                              {doc.status === 'pending' && (
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button
+                                    className="ad-btn-action approve"
+                                    style={{ height: '28px', fontSize: '0.75rem', padding: '0 10px' }}
+                                    onClick={() => handleVerifySellerDocument(selectedDetailSeller._id, doc._id, 'approved')}
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    className="ad-btn-action reject"
+                                    style={{ height: '28px', fontSize: '0.75rem', padding: '0 10px' }}
+                                    onClick={() => {
+                                      const feedback = prompt('Please enter rejection feedback for this document:');
+                                      if (feedback) {
+                                        handleVerifySellerDocument(selectedDetailSeller._id, doc._id, 'rejected', feedback);
+                                      }
+                                    }}
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {selectedSellerDocs.documents.length === 0 && (
+                          <div style={{ color: '#71717a', fontSize: '0.85rem', textAlign: 'center', padding: '16px 0' }}>
+                            No verification documents submitted by this merchant yet.
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ color: '#71717a', fontSize: '0.85rem', textAlign: 'center', padding: '16px 0' }}>
+                        Compliance records not loaded.
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -3313,6 +3438,45 @@ export default function AdminDashboard() {
                         {selectedDetailProduct.createdAt ? new Date(selectedDetailProduct.createdAt).toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' }) : 'N/A'}
                       </span>
                     </div>
+                    {selectedDetailProduct.sizes && selectedDetailProduct.sizes.length > 0 && (
+                      <div className="ad-detail-row">
+                        <span className="ad-detail-row-label">
+                          {['Apparel & Fashion','Fashion & Apparel'].includes(selectedDetailProduct.category) ? '👕 Sizes' :
+                           selectedDetailProduct.category === 'Electronics & Tech' ? '💾 Specs/Storage' :
+                           ['Kitchen & Dining','Lifestyle & Home','Home & Kitchen'].includes(selectedDetailProduct.category) ? '📐 Dimensions' :
+                           selectedDetailProduct.category === 'Beauty & Cosmetics' ? '🧴 Volume/Finish' :
+                           selectedDetailProduct.category === 'Sports & Fitness' ? '🏋️ Weight' :
+                           '📦 Sizes/Variants'}
+                        </span>
+                        <span className="ad-detail-row-val" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'flex-end' }}>
+                          {selectedDetailProduct.sizes.map(sz => (
+                            <span key={sz} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>{sz}</span>
+                          ))}
+                        </span>
+                      </div>
+                    )}
+                    {selectedDetailProduct.colors && selectedDetailProduct.colors.length > 0 && (
+                      <div className="ad-detail-row">
+                        <span className="ad-detail-row-label">🎨 Colors</span>
+                        <span className="ad-detail-row-val" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'flex-end' }}>
+                          {selectedDetailProduct.colors.map(colName => {
+                            const hexMap = {
+                              Red: '#ef4444', Blue: '#3b82f6', Black: '#1a1a1a', White: '#f5f5f5', Green: '#22c55e',
+                              Yellow: '#eab308', Orange: '#f97316', Purple: '#a855f7', Pink: '#ec4899', Gray: '#6b7280',
+                              Brown: '#92400e', Navy: '#1e3a8a', Beige: '#d4b896', Silver: '#cbd5e1', Gold: '#d97706'
+                            };
+                            const hexMatch = colName.match(/#(?:[0-9a-fA-F]{3}){1,2}\b/);
+                            const hex = hexMatch ? hexMatch[0] : (hexMap[colName] || (colName.startsWith('#') ? colName : 'rgba(255,255,255,0.1)'));
+                            return (
+                              <span key={colName} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: hex, display: 'inline-block', border: (colName === 'White' || hex === '#f5f5f5' || hex === '#ffffff') ? '1px solid rgba(255,255,255,0.4)' : 'none' }} />
+                                {colName}
+                              </span>
+                            );
+                          })}
+                        </span>
+                      </div>
+                    )}
                     <div style={{ marginTop: '10px' }}>
                       <span className="ad-detail-row-label" style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem' }}>Description Summary</span>
                       <p style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.5', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-admin-border)', maxHeight: '120px', overflowY: 'auto' }}>
@@ -3445,8 +3609,8 @@ export default function AdminDashboard() {
                       {actionLoading[selectedDetailProduct.id || selectedDetailProduct._id] ? 'Auditing...' : 'Approve & Assign SKU'}
                     </button>
                     <button
-                      className="ad-btn-action approve"
-                      style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem', background: 'var(--color-yellow)', color: '#000' }}
+                      className="ad-btn-action warning"
+                      style={{ height: '42px', padding: '0 24px', fontSize: '0.9rem' }}
                       onClick={() => {
                         openFeedbackModal('product', selectedDetailProduct.id || selectedDetailProduct._id, 'request_changes');
                       }}
@@ -3987,7 +4151,7 @@ export default function AdminDashboard() {
                       ⏳ Pending Fleet Registrations ({deliveryPartners.filter(p => p.status === 'pending' || p.status === 'more_info_requested').length})
                     </h4>
                     <div className="ad-table-wrapper">
-                      <table className="ad-table">
+                      <table className="ad-table ad-table--delivery">
                         <thead>
                           <tr>
                             <th>Fleet details</th>
@@ -4048,7 +4212,7 @@ export default function AdminDashboard() {
                       🏍️ Approved Dispatch Carriers ({deliveryPartners.filter(p => p.status === 'approved' || p.status === 'rejected').length})
                     </h4>
                     <div className="ad-table-wrapper">
-                      <table className="ad-table">
+                      <table className="ad-table ad-table--delivery">
                         <thead>
                           <tr>
                             <th>Fleet details</th>
@@ -4129,7 +4293,7 @@ export default function AdminDashboard() {
                 <div className="ad-loading">Fetching registration queue...</div>
               ) : (
                 <div className="ad-table-wrapper">
-                  <table className="ad-table">
+                  <table className="ad-table ad-table--new-sellers">
                     <thead>
                       <tr>
                         <th>Store Details</th>
@@ -4161,6 +4325,7 @@ export default function AdminDashboard() {
                                 onClick={() => {
                                   setSelectedDetailSeller(seller);
                                   setDetailTab('profile');
+                                  fetchSellerDocuments(seller._id);
                                 }}
                               >
                                 Review Application &amp; Audit
@@ -4203,7 +4368,7 @@ export default function AdminDashboard() {
                 <div className="ad-loading">Fetching sellers from directory...</div>
               ) : (
                 <div className="ad-table-wrapper">
-                  <table className="ad-table">
+                  <table className="ad-table ad-table--sellers">
                     <thead>
                       <tr>
                         <th>Store Details</th>
@@ -4242,6 +4407,7 @@ export default function AdminDashboard() {
                                 onClick={() => {
                                   setSelectedDetailSeller(seller);
                                   setDetailTab('profile');
+                                  fetchSellerDocuments(seller._id);
                                 }}
                               >
                                 View Profile Details
@@ -4333,7 +4499,7 @@ export default function AdminDashboard() {
                   {/* Sub-tab: ONBOARDING QUEUE */}
                   {productsHubSubTab === 'queue' && (
                     <div className="ad-table-wrapper">
-                      <table className="ad-table">
+                      <table className="ad-table ad-table--products-queue">
                         <thead>
                           <tr>
                             <th>Product Details</th>
@@ -4356,7 +4522,7 @@ export default function AdminDashboard() {
                                         cleanImageUrl(product.image) || '📦'
                                       )}
                                     </div>
-                                    <div>
+                                    <div style={{ textAlign: 'left' }}>
                                       <div className="ad-bold">{product.name}</div>
                                       <div className="ad-muted">Brand: {product.brand || 'N/A'} | Category: {product.category}</div>
                                       <div className="ad-muted" style={{ fontSize: '0.75rem', marginTop: '2px', color: '#cbd5e1' }}>
@@ -4411,7 +4577,7 @@ export default function AdminDashboard() {
                   {/* Sub-tab: LIVE CATALOG */}
                   {productsHubSubTab === 'live' && (
                     <div className="ad-table-wrapper">
-                      <table className="ad-table">
+                      <table className="ad-table ad-table--products-live">
                         <thead>
                           <tr>
                             <th>Product Details</th>
@@ -4435,7 +4601,7 @@ export default function AdminDashboard() {
                                         cleanImageUrl(product.image) || '📦'
                                       )}
                                     </div>
-                                    <div>
+                                    <div style={{ textAlign: 'left' }}>
                                       <div className="ad-bold">{product.name}</div>
                                       <div className="ad-muted">Brand: {product.brand || 'N/A'} | Category: {product.category}</div>
                                       <div className="ad-muted" style={{ fontSize: '0.75rem', marginTop: '2px', color: '#cbd5e1' }}>
@@ -4531,7 +4697,7 @@ export default function AdminDashboard() {
                         )}
 
                         <div className="ad-table-wrapper">
-                          <table className="ad-table">
+                          <table className="ad-table ad-table--products-rejected">
                             <thead>
                               <tr>
                                 <th>Product Details</th>
@@ -4554,7 +4720,7 @@ export default function AdminDashboard() {
                                             cleanImageUrl(product.image) || '📦'
                                           )}
                                         </div>
-                                        <div>
+                                        <div style={{ textAlign: 'left' }}>
                                           <div className="ad-bold">{product.name}</div>
                                           <div className="ad-muted">Brand: {product.brand || 'N/A'} | Category: {product.category}</div>
                                           <div className="ad-muted" style={{ fontSize: '0.75rem', marginTop: '2px', color: '#cbd5e1' }}>
@@ -4704,7 +4870,7 @@ export default function AdminDashboard() {
 
                     {/* Table wrapper */}
                     <div className="ad-table-wrapper">
-                      <table className="ad-table">
+                      <table className="ad-table ad-table--orders">
                         <thead>
                           <tr>
                             <th>Order Details</th>
@@ -4780,40 +4946,10 @@ export default function AdminDashboard() {
                                         setDeliveryCost(order.deliveryCost || '');
                                         setEstDays(order.estDays || '');
                                       } else {
-                                        let defaults = { trackingId: '', packageWeight: '', deliveryCost: '', estDays: '' };
-                                        if (defaultCarrier === 'Delhivery') {
-                                          defaults = {
-                                            trackingId: `DLV${Math.floor(100000000 + Math.random() * 900000000)}`,
-                                            packageWeight: '1.2 kg',
-                                            deliveryCost: '120',
-                                            estDays: '3-5 Days'
-                                          };
-                                        } else if (defaultCarrier === 'Blue Dart') {
-                                          defaults = {
-                                            trackingId: `BD${Math.floor(100000000 + Math.random() * 900000000)}`,
-                                            packageWeight: '1.5 kg',
-                                            deliveryCost: '180',
-                                            estDays: '1-2 Days'
-                                          };
-                                        } else if (defaultCarrier === 'EmahuXpress') {
-                                          defaults = {
-                                            trackingId: `EMH-TRK-${Math.floor(100 + Math.random() * 900)}`,
-                                            packageWeight: '0.8 kg',
-                                            deliveryCost: '80',
-                                            estDays: '2-4 Days'
-                                          };
-                                        } else if (defaultCarrier === 'FedEx') {
-                                          defaults = {
-                                            trackingId: `FDX${Math.floor(100000000 + Math.random() * 900000000)}`,
-                                            packageWeight: '2.0 kg',
-                                            deliveryCost: '250',
-                                            estDays: '2-3 Days'
-                                          };
-                                        }
-                                        setTrackingId(defaults.trackingId);
-                                        setPackageWeight(defaults.packageWeight);
-                                        setDeliveryCost(defaults.deliveryCost);
-                                        setEstDays(defaults.estDays);
+                                        setTrackingId('');
+                                        setPackageWeight('');
+                                        setDeliveryCost('');
+                                        setEstDays('');
                                       }
                                     }}
                                   >
@@ -4963,19 +5099,7 @@ export default function AdminDashboard() {
                   Define the default platform commission percentage deducted from merchant order bill totals when releasing payments.
                 </p>
 
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ color: '#e4e4e7', fontSize: '0.85rem', fontWeight: '500', display: 'block', marginBottom: '8px' }}>
-                    Commission Name (Label)
-                  </label>
-                  <input
-                    type="text"
-                    className="ad-modal-input"
-                    style={{ margin: 0, width: '100%', height: '40px', background: '#09090b', border: '1px solid #27272a', borderRadius: '8px', color: '#fff', padding: '0 12px' }}
-                    value={platformFeeName}
-                    onChange={(e) => setPlatformFeeName(e.target.value)}
-                    placeholder="e.g. Emahu Platform Fee"
-                  />
-                </div>
+
 
                 <div style={{ marginBottom: '24px' }}>
                   <label style={{ color: '#e4e4e7', fontSize: '0.85rem', fontWeight: '500', display: 'block', marginBottom: '8px' }}>

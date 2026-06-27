@@ -603,7 +603,7 @@ export default function SellerRegister() {
                     className={`sr-input ${errors.phone ? 'sr-input--error' : ''}`}
                     placeholder="9876543210"
                     value={formData.phone}
-                    onChange={handleInputChange}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
                   />
                   {errors.phone && <span className="sr-error-text">{errors.phone}</span>}
                 </div>
@@ -999,7 +999,7 @@ export default function SellerRegister() {
                   maxLength="6"
                   placeholder="000000"
                   value={otpInput}
-                  onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   disabled={otpSending}
                   style={{
                     width: '100%',

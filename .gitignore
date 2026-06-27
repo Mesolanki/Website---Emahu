@@ -1,0 +1,69 @@
+# Dependency directories
+node_modules/
+**/node_modules/
+jspm_packages/
+web_modules/
+
+# Next.js build directories
+.next/
+**/.next/
+out/
+**/out/
+
+# General build/dist outputs
+build/
+**/build/
+dist/
+**/dist/
+
+# Sensitive environment configuration files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+**/.env
+**/.env.*
+!**/.env.example
+
+# Logs and debug files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+logs
+**/logs/
+
+# Editor / IDE settings
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# System specific files
+.DS_Store
+.DS_Store?
+ehthumbs.db
+Thumbs.db
+
+# Diagnostic / Test coverage files
+coverage/
+**/coverage/
+.nyc_output/
+
+# ESLint/Parcel/Other caches
+.eslintcache
+.parcel-cache
+.cache/
+.serverless/
+.fusebox/
+.dynamodb/
+
+# Root temporary files
+diff_*.txt
+*.tmp

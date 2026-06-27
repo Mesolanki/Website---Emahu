@@ -297,35 +297,28 @@ exports.calculateDeliveryCharge = async (req, res) => {
       }
     }
     
-    const overallChargeResult = resolveCharge(maxDistance, 0, settings);
-    if (overallChargeResult.error) {
-      return res.status(400).json({
-        success: false,
-        error: overallChargeResult.error
-      });
-    }
-    
-    const totalDeliveryCharge = overallChargeResult.charge;
-    
-    // Identify the furthest seller to assign the charge in the breakdown list
-    for (const sId in sellerGroups) {
-      if (sellerDistances[sId] === maxDistance && maxDistanceSellerId === null) {
-        maxDistanceSellerId = sId;
-      }
-    }
-    
+    let totalDeliveryCharge = 0;
+
     for (const sId in sellerGroups) {
       const group = sellerGroups[sId];
       const distance = sellerDistances[sId];
-      const isFurthestSeller = (sId === maxDistanceSellerId);
-      const appliedCharge = isFurthestSeller ? totalDeliveryCharge : 0;
+      
+      const chargeResult = resolveCharge(distance, group.subtotal, settings);
+      if (chargeResult.error) {
+        return res.status(400).json({
+          success: false,
+          error: `Delivery calculation failed for seller "${group.sellerName}": ${chargeResult.error}`
+        });
+      }
+      
+      const sellerCharge = chargeResult.charge;
+      totalDeliveryCharge += sellerCharge;
       
       results.push({
         sellerId: sId,
         sellerName: group.sellerName,
         distanceKm: parseFloat(distance.toFixed(2)),
-        deliveryCharge: appliedCharge,
-
+        deliveryCharge: sellerCharge,
         subtotal: group.subtotal,
         items: group.items
       });
@@ -906,7 +899,7 @@ exports.getPartnerOrders = async (req, res) => {
       const status = assignmentMap[o.orderId];
       if (status !== 'rejected') {
         // Find seller user to get phone number
-        const sellerUser = await User.findById(o.sellerId);
+        const sellerUser = mongoose.Types.ObjectId.isValid(o.sellerId) ? await User.findById(o.sellerId) : null;
         orders.push({
           ...o,
           assignmentStatus: status,
@@ -935,7 +928,7 @@ exports.getPartnerOrders = async (req, res) => {
     for (const o of unassignedOrders) {
       const oCity = (o.deliveryAddress?.city || '').trim().toLowerCase();
       if (pCities.includes(oCity)) {
-        const sellerUser = await User.findById(o.sellerId);
+        const sellerUser = mongoose.Types.ObjectId.isValid(o.sellerId) ? await User.findById(o.sellerId) : null;
         availableOrders.push({
           ...o,
           assignmentStatus: 'unassigned',
@@ -1061,7 +1054,7 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
 
     let sellerCity = '';
     if (order && order.sellerId) {
-      const sellerUser = await User.findById(order.sellerId);
+      const sellerUser = mongoose.Types.ObjectId.isValid(order.sellerId) ? await User.findById(order.sellerId) : null;
       if (sellerUser) {
         sellerCity = (sellerUser.currentCity || sellerUser.city || '').trim().toLowerCase();
       }
@@ -2131,7 +2124,7 @@ async function autoAssignOrderInternal(order) {
 
     let sellerCity = '';
     if (order.sellerId) {
-      const sellerUser = await User.findById(order.sellerId);
+      const sellerUser = mongoose.Types.ObjectId.isValid(order.sellerId) ? await User.findById(order.sellerId) : null;
       if (sellerUser) {
         sellerCity = (sellerUser.currentCity || sellerUser.city || '').trim().toLowerCase();
       }
@@ -2301,7 +2294,7 @@ async function autoAssignPendingOrdersToPartner(partner) {
 
       let sellerCity = '';
       if (order.sellerId) {
-        const sellerUser = await User.findById(order.sellerId);
+        const sellerUser = mongoose.Types.ObjectId.isValid(order.sellerId) ? await User.findById(order.sellerId) : null;
         if (sellerUser) {
           sellerCity = (sellerUser.currentCity || sellerUser.city || '').trim().toLowerCase();
         }
