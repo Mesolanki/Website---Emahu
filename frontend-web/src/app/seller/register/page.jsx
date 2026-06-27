@@ -609,7 +609,7 @@ export default function SellerRegister() {
                 </div>
 
                 <div className="sr-input-group">
-                  <label className="sr-label" htmlFor="password">Create Password</label>
+                  <label className="sr-label" htmlFor="password">Create a Password</label>
                   <input
                     type="password"
                     id="password"

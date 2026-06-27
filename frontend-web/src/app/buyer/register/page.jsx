@@ -449,7 +449,7 @@ export default function BuyerRegister() {
                     </div>
 
                     <div className="br-field">
-                      <label className="br-label" htmlFor="password">Password</label>
+                      <label className="br-label" htmlFor="password">Create a Password</label>
                       <input
                         type="password"
                         id="password"

@@ -1510,7 +1510,7 @@ export default function DeliveryPortal() {
                     )}
 
                     <div className="form-group">
-                      <label className="form-label" htmlFor="password">Password</label>
+                      <label className="form-label" htmlFor="password">Create a Password</label>
                       <input
                         type="password"
                         id="password"
