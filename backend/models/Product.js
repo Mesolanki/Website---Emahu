@@ -100,6 +100,140 @@ const productSchema = new mongoose.Schema(
     colors: {
       type: [String],
       default: []
+    },
+    shortTitle: {
+      type: String,
+      trim: true
+    },
+    slug: {
+      type: String,
+      trim: true
+    },
+    bulletFeatures: {
+      type: [String],
+      default: []
+    },
+    highlights: {
+      type: String,
+      trim: true
+    },
+    packageContents: {
+      type: String,
+      trim: true
+    },
+    warrantyInfo: {
+      type: String,
+      trim: true
+    },
+    countryOfOrigin: {
+      type: String,
+      trim: true
+    },
+    manufacturer: {
+      type: String,
+      trim: true
+    },
+    modelNumber: {
+      type: String,
+      trim: true
+    },
+    barcode: {
+      type: String,
+      trim: true
+    },
+    mrp: {
+      type: Number
+    },
+    tax: {
+      type: Number
+    },
+    hsnCode: {
+      type: String,
+      trim: true
+    },
+    moq: {
+      type: Number,
+      default: 1
+    },
+    maxOrderQty: {
+      type: Number
+    },
+    stockStatus: {
+      type: String,
+      enum: ['in-stock', 'low-stock', 'out-of-stock', 'backorder'],
+      default: 'in-stock'
+    },
+    warehouse: {
+      type: String,
+      trim: true
+    },
+    lowStockAlert: {
+      type: Number,
+      default: 10
+    },
+    backorderAllowed: {
+      type: Boolean,
+      default: false
+    },
+    images360: {
+      type: [String],
+      default: []
+    },
+    thumbnail: {
+      type: String,
+      default: ''
+    },
+    weight: {
+      type: Number
+    },
+    length: {
+      type: Number
+    },
+    width: {
+      type: Number
+    },
+    height: {
+      type: Number
+    },
+    shippingCharges: {
+      type: Number,
+      default: 0
+    },
+    freeShipping: {
+      type: Boolean,
+      default: false
+    },
+    deliveryTime: {
+      type: String,
+      trim: true
+    },
+    dynamicAttributes: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    },
+    seoTitle: {
+      type: String,
+      trim: true
+    },
+    metaDescription: {
+      type: String,
+      trim: true
+    },
+    metaKeywords: {
+      type: [String],
+      default: []
+    },
+    canonicalUrl: {
+      type: String,
+      trim: true
+    },
+    altText: {
+      type: String,
+      trim: true
+    },
+    variants: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
     }
   },
   {
@@ -109,12 +243,21 @@ const productSchema = new mongoose.Schema(
 
 // Pre-save hook to calculate status from stock count
 productSchema.pre('save', function (next) {
+  const alertThreshold = this.lowStockAlert !== undefined ? this.lowStockAlert : 10;
   if (this.stock === 0) {
-    this.status = 'out-of-stock';
-  } else if (this.stock <= 10) {
+    if (this.backorderAllowed) {
+      this.status = 'low-stock';
+      this.stockStatus = 'backorder';
+    } else {
+      this.status = 'out-of-stock';
+      this.stockStatus = 'out-of-stock';
+    }
+  } else if (this.stock <= alertThreshold) {
     this.status = 'low-stock';
+    this.stockStatus = 'low-stock';
   } else {
     this.status = 'in-stock';
+    this.stockStatus = 'in-stock';
   }
   next();
 });

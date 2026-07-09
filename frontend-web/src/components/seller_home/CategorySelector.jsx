@@ -174,8 +174,12 @@ export default function CategorySelector({ value, onChange }) {
   };
 
   useEffect(() => {
-    fetchCategories();
-    const interval = setInterval(fetchCategories, 4000);
+    setTimeout(() => {
+      fetchCategories();
+    }, 0);
+    const interval = setInterval(() => {
+      fetchCategories();
+    }, 4000);
     return () => clearInterval(interval);
   }, []);
 
@@ -184,7 +188,9 @@ export default function CategorySelector({ value, onChange }) {
     if (categories.length > 0 && value) {
       const path = tracePath(categories, value);
       if (path) {
-        setSelectedPath(path);
+        setTimeout(() => {
+          setSelectedPath(path);
+        }, 0);
       }
     }
   }, [value, categories]);

@@ -34,6 +34,15 @@ exports.createProduct = async (req, res) => {
     // Auto-generate temporary SKU (Seller doesn't generate official SKU)
     const tempSku = `EM-TEMP-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
 
+    const {
+      shortTitle, slug, bulletFeatures, highlights, packageContents, warrantyInfo,
+      countryOfOrigin, manufacturer, modelNumber, barcode, mrp, tax, hsnCode,
+      moq, maxOrderQty, stockStatus, warehouse, lowStockAlert, backorderAllowed,
+      images360, thumbnail, weight, length, width, height, shippingCharges,
+      freeShipping, deliveryTime, dynamicAttributes, seoTitle, metaDescription,
+      metaKeywords, canonicalUrl, altText, variants
+    } = req.body;
+
     const product = await Product.create({
       name,
       brand,
@@ -50,7 +59,44 @@ exports.createProduct = async (req, res) => {
       seller: req.user.id,
       approvalStatus: 'pending',
       adminCode: undefined,
-      approvalAttempts: 0
+      approvalAttempts: 0,
+      
+      // Extended Form Parameters
+      shortTitle: shortTitle || '',
+      slug: slug || '',
+      bulletFeatures: Array.isArray(bulletFeatures) ? bulletFeatures : [],
+      highlights: highlights || '',
+      packageContents: packageContents || '',
+      warrantyInfo: warrantyInfo || '',
+      countryOfOrigin: countryOfOrigin || '',
+      manufacturer: manufacturer || '',
+      modelNumber: modelNumber || '',
+      barcode: barcode || '',
+      mrp: mrp ? parseFloat(mrp) : comparePrice,
+      tax: tax ? parseFloat(tax) : undefined,
+      hsnCode: hsnCode || '',
+      moq: moq ? parseInt(moq) : 1,
+      maxOrderQty: maxOrderQty ? parseInt(maxOrderQty) : undefined,
+      stockStatus: stockStatus || 'in-stock',
+      warehouse: warehouse || '',
+      lowStockAlert: lowStockAlert ? parseInt(lowStockAlert) : 10,
+      backorderAllowed: !!backorderAllowed,
+      images360: Array.isArray(images360) ? images360 : [],
+      thumbnail: thumbnail || '',
+      weight: weight ? parseFloat(weight) : undefined,
+      length: length ? parseFloat(length) : undefined,
+      width: width ? parseFloat(width) : undefined,
+      height: height ? parseFloat(height) : undefined,
+      shippingCharges: shippingCharges ? parseFloat(shippingCharges) : 0,
+      freeShipping: !!freeShipping,
+      deliveryTime: deliveryTime || '',
+      dynamicAttributes: dynamicAttributes || {},
+      seoTitle: seoTitle || '',
+      metaDescription: metaDescription || '',
+      metaKeywords: Array.isArray(metaKeywords) ? metaKeywords : [],
+      canonicalUrl: canonicalUrl || '',
+      altText: altText || '',
+      variants: Array.isArray(variants) ? variants : []
     });
 
     // Notify all admins
@@ -348,6 +394,15 @@ exports.resubmitProduct = async (req, res) => {
       });
     }
 
+    const {
+      shortTitle, slug, bulletFeatures, highlights, packageContents, warrantyInfo,
+      countryOfOrigin, manufacturer, modelNumber, barcode, mrp, tax, hsnCode,
+      moq, maxOrderQty, stockStatus, warehouse, lowStockAlert, backorderAllowed,
+      images360, thumbnail, weight, length, width, height, shippingCharges,
+      freeShipping, deliveryTime, dynamicAttributes, seoTitle, metaDescription,
+      metaKeywords, canonicalUrl, altText, variants
+    } = req.body;
+
     // Update values
     product.name = name.trim();
     product.brand = brand.trim();
@@ -361,6 +416,43 @@ exports.resubmitProduct = async (req, res) => {
     product.images = req.body.images || [];
     product.sizes = Array.isArray(req.body.sizes) ? req.body.sizes : product.sizes;
     product.colors = Array.isArray(req.body.colors) ? req.body.colors : product.colors;
+
+    // Update Extended Form Parameters
+    product.shortTitle = shortTitle !== undefined ? shortTitle : product.shortTitle;
+    product.slug = slug !== undefined ? slug : product.slug;
+    product.bulletFeatures = Array.isArray(bulletFeatures) ? bulletFeatures : product.bulletFeatures;
+    product.highlights = highlights !== undefined ? highlights : product.highlights;
+    product.packageContents = packageContents !== undefined ? packageContents : product.packageContents;
+    product.warrantyInfo = warrantyInfo !== undefined ? warrantyInfo : product.warrantyInfo;
+    product.countryOfOrigin = countryOfOrigin !== undefined ? countryOfOrigin : product.countryOfOrigin;
+    product.manufacturer = manufacturer !== undefined ? manufacturer : product.manufacturer;
+    product.modelNumber = modelNumber !== undefined ? modelNumber : product.modelNumber;
+    product.barcode = barcode !== undefined ? barcode : product.barcode;
+    product.mrp = mrp !== undefined ? parseFloat(mrp) : product.mrp;
+    product.tax = tax !== undefined ? parseFloat(tax) : product.tax;
+    product.hsnCode = hsnCode !== undefined ? hsnCode : product.hsnCode;
+    product.moq = moq !== undefined ? parseInt(moq) : product.moq;
+    product.maxOrderQty = maxOrderQty !== undefined ? parseInt(maxOrderQty) : product.maxOrderQty;
+    product.stockStatus = stockStatus !== undefined ? stockStatus : product.stockStatus;
+    product.warehouse = warehouse !== undefined ? warehouse : product.warehouse;
+    product.lowStockAlert = lowStockAlert !== undefined ? parseInt(lowStockAlert) : product.lowStockAlert;
+    product.backorderAllowed = backorderAllowed !== undefined ? !!backorderAllowed : product.backorderAllowed;
+    product.images360 = Array.isArray(images360) ? images360 : product.images360;
+    product.thumbnail = thumbnail !== undefined ? thumbnail : product.thumbnail;
+    product.weight = weight !== undefined ? parseFloat(weight) : product.weight;
+    product.length = length !== undefined ? parseFloat(length) : product.length;
+    product.width = width !== undefined ? parseFloat(width) : product.width;
+    product.height = height !== undefined ? parseFloat(height) : product.height;
+    product.shippingCharges = shippingCharges !== undefined ? parseFloat(shippingCharges) : product.shippingCharges;
+    product.freeShipping = freeShipping !== undefined ? !!freeShipping : product.freeShipping;
+    product.deliveryTime = deliveryTime !== undefined ? deliveryTime : product.deliveryTime;
+    product.dynamicAttributes = dynamicAttributes !== undefined ? dynamicAttributes : product.dynamicAttributes;
+    product.seoTitle = seoTitle !== undefined ? seoTitle : product.seoTitle;
+    product.metaDescription = metaDescription !== undefined ? metaDescription : product.metaDescription;
+    product.metaKeywords = Array.isArray(metaKeywords) ? metaKeywords : product.metaKeywords;
+    product.canonicalUrl = canonicalUrl !== undefined ? canonicalUrl : product.canonicalUrl;
+    product.altText = altText !== undefined ? altText : product.altText;
+    product.variants = Array.isArray(variants) ? variants : product.variants;
 
     // Reset verification to false / pending admin approval
     product.approvalStatus = 'pending';
