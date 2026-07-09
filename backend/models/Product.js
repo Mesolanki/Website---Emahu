@@ -25,6 +25,11 @@ const productSchema = new mongoose.Schema(
       required: [true, 'Please provide a merchandise category'],
       trim: true
     },
+    subcategory: {
+      type: String,
+      trim: true,
+      default: 'General'
+    },
     price: {
       type: Number,
       required: [true, 'Please provide a price'],
@@ -234,6 +239,10 @@ const productSchema = new mongoose.Schema(
     variants: {
       type: [mongoose.Schema.Types.Mixed],
       default: []
+    },
+    specifications: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
     }
   },
   {

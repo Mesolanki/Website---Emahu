@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
+import { changeUserRole, clearAuthSession, saveAuthSession } from '@/utils/auth';
 import './buyer_settings.css';
 
 export default function BuyerSettingsPage() {
@@ -31,6 +32,91 @@ export default function BuyerSettingsPage() {
     totalSpent: 0
   });
   const [ordersLoading, setOrdersLoading] = useState(true);
+
+  const [upgradeRole, setUpgradeRole] = useState(null); // null, 'seller', 'delivery'
+  const [storeForm, setStoreForm] = useState({
+    storeName: '',
+    category: '',
+    kycType: 'pan',
+    kycNumber: '',
+    bankHolder: '',
+    bankName: '',
+    accountNumber: '',
+    ifscCode: '',
+    gstNumber: ''
+  });
+  const [vehicleForm, setVehicleForm] = useState({
+    vehicleType: 'bike',
+    vehicleNumber: '',
+    currentCity: '',
+    currentArea: '',
+    pincode: '',
+    serviceRadius: '15',
+    perKmRate: '5',
+    deliveryScope: 'local'
+  });
+  const [upgradeError, setUpgradeError] = useState('');
+  const [upgradeSuccess, setUpgradeSuccess] = useState('');
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+
+  const CATEGORIES = [
+    'Electronics & Tech',
+    'Apparel & Fashion',
+    'Shoes & Footwear',
+    'Kitchen & Dining',
+    'Lifestyle & Home',
+    'Beauty & Cosmetics',
+    'Sports & Outdoors',
+    'Books & Stationery',
+    'Grocery & Essentials',
+    'Toys & Games',
+    'Health & Wellness',
+    'Pet Supplies',
+    'Baby Care',
+    'Automotive & Tools'
+  ];
+
+  const handleUpgradeSubmit = async (e) => {
+    e.preventDefault();
+    setUpgradeError('');
+    setUpgradeSuccess('');
+    setUpgradeLoading(true);
+
+    try {
+      if (upgradeRole === 'seller') {
+        if (!storeForm.storeName || !storeForm.category || !storeForm.kycNumber) {
+          throw new Error('Please fill in all mandatory store and identity details');
+        }
+        const data = await changeUserRole('seller', token, storeForm);
+        if (data.success) {
+          setUpgradeSuccess('Account upgrade request submitted successfully! Redirecting to seller dashboard...');
+          clearAuthSession('buyer');
+          saveAuthSession(data, 'seller');
+          setTimeout(() => {
+            window.location.href = '/seller/dashboard';
+          }, 2000);
+        }
+      } else if (upgradeRole === 'delivery') {
+        if (!vehicleForm.vehicleNumber || !vehicleForm.currentCity || !vehicleForm.currentArea) {
+          throw new Error('Please fill in vehicle details and operating location');
+        }
+        const data = await changeUserRole('delivery', token, vehicleForm);
+        if (data.success) {
+          setUpgradeSuccess('Account upgrade request submitted successfully! Redirecting to delivery portal...');
+          clearAuthSession('buyer');
+          saveAuthSession(data, 'delivery');
+          setTimeout(() => {
+            window.location.href = '/delivery';
+          }, 2000);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setUpgradeError(err.message || 'Upgrade request failed');
+    } finally {
+      setUpgradeLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -271,6 +357,289 @@ export default function BuyerSettingsPage() {
                 {loading ? 'Saving Profile Settings...' : 'Update Account Profile'}
               </button>
             </form>
+          </div>
+        </section>
+
+        {/* Upgrade / Change Account Role Section */}
+        <section className="upgrade-role-section" style={{ marginTop: '32px' }}>
+          <div className="glass-card settings-card">
+            <h2 className="section-title">Change Account Role</h2>
+            <p className="section-subtitle" style={{ marginBottom: '24px' }}>
+              Switch your account type to become a Seller or a Delivery Partner. Upgrades are subject to admin verification.
+            </p>
+
+            {upgradeSuccess && <div className="settings-alert-success">✓ {upgradeSuccess}</div>}
+            {upgradeError && <div className="settings-alert-error">⚠️ {upgradeError}</div>}
+
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+              <button
+                type="button"
+                className={`settings-submit-btn ${upgradeRole === 'seller' ? 'active-role' : ''}`}
+                style={{
+                  background: upgradeRole === 'seller' ? '#4f46e5' : '#e4e4e7',
+                  color: upgradeRole === 'seller' ? '#fff' : '#18181b',
+                  flex: 1
+                }}
+                onClick={() => { setUpgradeRole(upgradeRole === 'seller' ? null : 'seller'); setUpgradeError(''); setUpgradeSuccess(''); }}
+              >
+                Become Seller (Store Vendor)
+              </button>
+              <button
+                type="button"
+                className={`settings-submit-btn ${upgradeRole === 'delivery' ? 'active-role' : ''}`}
+                style={{
+                  background: upgradeRole === 'delivery' ? '#0d9488' : '#e4e4e7',
+                  color: upgradeRole === 'delivery' ? '#fff' : '#18181b',
+                  flex: 1
+                }}
+                onClick={() => { setUpgradeRole(upgradeRole === 'delivery' ? null : 'delivery'); setUpgradeError(''); setUpgradeSuccess(''); }}
+              >
+                Become Delivery Partner (Courier)
+              </button>
+            </div>
+
+            {upgradeRole === 'seller' && (
+              <form onSubmit={handleUpgradeSubmit} className="profile-form" style={{ borderTop: '1px solid #e4e4e7', paddingTop: '20px' }}>
+                <h3 className="section-title" style={{ fontSize: '1rem', marginBottom: '16px' }}>Store & Identity Profile Details</h3>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Store / Company Name *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={storeForm.storeName}
+                      onChange={(e) => setStoreForm({ ...storeForm, storeName: e.target.value })}
+                      required
+                      placeholder="e.g. Supreme Electro Traders"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Store Category *</label>
+                    <select
+                      className="form-input"
+                      value={storeForm.category}
+                      onChange={(e) => setStoreForm({ ...storeForm, category: e.target.value })}
+                      required
+                    >
+                      <option value="">Select category...</option>
+                      {CATEGORIES.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-grid" style={{ marginTop: '16px' }}>
+                  <div className="form-group">
+                    <label className="form-label">KYC Document Type *</label>
+                    <select
+                      className="form-input"
+                      value={storeForm.kycType}
+                      onChange={(e) => setStoreForm({ ...storeForm, kycType: e.target.value })}
+                      required
+                    >
+                      <option value="pan">PAN Card</option>
+                      <option value="aadhaar">Aadhaar Card</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">KYC Document Number *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={storeForm.kycNumber}
+                      onChange={(e) => setStoreForm({ ...storeForm, kycNumber: e.target.value })}
+                      required
+                      placeholder={storeForm.kycType === 'pan' ? 'ABCDE1234F' : '123456789012'}
+                    />
+                  </div>
+                </div>
+
+                <h3 className="section-title" style={{ fontSize: '1rem', marginTop: '24px', marginBottom: '16px' }}>Payout Bank Account</h3>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Account Holder Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={storeForm.bankHolder}
+                      onChange={(e) => setStoreForm({ ...storeForm, bankHolder: e.target.value })}
+                      placeholder="Owner or registered business name"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Bank Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={storeForm.bankName}
+                      onChange={(e) => setStoreForm({ ...storeForm, bankName: e.target.value })}
+                      placeholder="e.g. HDFC Bank"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-grid" style={{ marginTop: '16px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Bank Account Number</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={storeForm.accountNumber}
+                      onChange={(e) => setStoreForm({ ...storeForm, accountNumber: e.target.value })}
+                      placeholder="e.g. 5010023456789"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">IFSC Code</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={storeForm.ifscCode}
+                      onChange={(e) => setStoreForm({ ...storeForm, ifscCode: e.target.value })}
+                      placeholder="e.g. HDFC0000123"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginTop: '16px' }}>
+                  <label className="form-label">GST Number (GSTIN)</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={storeForm.gstNumber}
+                    onChange={(e) => setStoreForm({ ...storeForm, gstNumber: e.target.value })}
+                    placeholder="e.g. 22AAAAA0000A1Z5"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="settings-submit-btn"
+                  style={{ marginTop: '24px', background: '#4f46e5', color: '#fff' }}
+                  disabled={upgradeLoading}
+                >
+                  {upgradeLoading ? 'Submitting Upgrade Request...' : 'Submit Upgrade & Become Seller'}
+                </button>
+              </form>
+            )}
+
+            {upgradeRole === 'delivery' && (
+              <form onSubmit={handleUpgradeSubmit} className="profile-form" style={{ borderTop: '1px solid #e4e4e7', paddingTop: '20px' }}>
+                <h3 className="section-title" style={{ fontSize: '1rem', marginBottom: '16px' }}>Vehicle & Location Details</h3>
+                
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Vehicle Type *</label>
+                    <select
+                      className="form-input"
+                      value={vehicleForm.vehicleType}
+                      onChange={(e) => setVehicleForm({ ...vehicleForm, vehicleType: e.target.value })}
+                      required
+                    >
+                      <option value="bike">Bike</option>
+                      <option value="scooter">Scooter</option>
+                      <option value="car">Car</option>
+                      <option value="truck">Truck</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Vehicle Registration Number *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={vehicleForm.vehicleNumber}
+                      onChange={(e) => setVehicleForm({ ...vehicleForm, vehicleNumber: e.target.value })}
+                      required
+                      placeholder="e.g. DL-3C-AB-1234"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-grid" style={{ marginTop: '16px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Primary Service City *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={vehicleForm.currentCity}
+                      onChange={(e) => setVehicleForm({ ...vehicleForm, currentCity: e.target.value })}
+                      required
+                      placeholder="e.g. Ahmedabad"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Primary Service Area *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={vehicleForm.currentArea}
+                      onChange={(e) => setVehicleForm({ ...vehicleForm, currentArea: e.target.value })}
+                      required
+                      placeholder="e.g. Gota"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-grid" style={{ marginTop: '16px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Operating Pincode</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={vehicleForm.pincode}
+                      onChange={(e) => setVehicleForm({ ...vehicleForm, pincode: e.target.value })}
+                      placeholder="e.g. 382481"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Service Radius (KM)</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={vehicleForm.serviceRadius}
+                      onChange={(e) => setVehicleForm({ ...vehicleForm, serviceRadius: e.target.value })}
+                      placeholder="15"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-grid" style={{ marginTop: '16px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Payout Rate per KM (₹)</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={vehicleForm.perKmRate}
+                      onChange={(e) => setVehicleForm({ ...vehicleForm, perKmRate: e.target.value })}
+                      placeholder="5"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Delivery Scope</label>
+                    <select
+                      className="form-input"
+                      value={vehicleForm.deliveryScope}
+                      onChange={(e) => setVehicleForm({ ...vehicleForm, deliveryScope: e.target.value })}
+                    >
+                      <option value="local">Local Only</option>
+                      <option value="intercity">Intercity</option>
+                      <option value="interstate">Interstate</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="settings-submit-btn"
+                  style={{ marginTop: '24px', background: '#0d9488', color: '#fff' }}
+                  disabled={upgradeLoading}
+                >
+                  {upgradeLoading ? 'Submitting Upgrade Request...' : 'Submit Upgrade & Become Delivery Partner'}
+                </button>
+              </form>
+            )}
           </div>
         </section>
       </main>

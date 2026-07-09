@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
@@ -24,7 +24,7 @@ const CATEGORY_IMAGES = {
   'health & wellness': 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400&q=80',
   'pet supplies': 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?w=400&q=80',
   'baby care': 'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=400&q=80',
-  'automotive & tools': 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=400&q=80'
+  'automotive & tools': 'https://images.unsplash.com/photo-1530047139112-0494193b0148?w=400&q=80'
 };
 
 const FALLBACK_CATEGORY_TILES = [
@@ -81,6 +81,33 @@ function Stars({ rating }) {
   );
 }
 
+function getPaginationRange(currentPage, totalPages) {
+  const delta = 2;
+  const range = [];
+  const rangeWithDots = [];
+  let l;
+
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+      range.push(i);
+    }
+  }
+
+  for (let i of range) {
+    if (l) {
+      if (i - l === 2) {
+        rangeWithDots.push(l + 1);
+      } else if (i - l > 2) {
+        rangeWithDots.push('...');
+      }
+    }
+    rangeWithDots.push(i);
+    l = i;
+  }
+
+  return rangeWithDots;
+}
+
 export default function ProductsPage() {
   const router = useRouter();
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
@@ -100,21 +127,73 @@ export default function ProductsPage() {
     }
   }, []);
 
-  const [category, setCategory]         = useState('All');
-  const [sortBy, setSortBy]             = useState('popular');
-  const [maxPrice, setMaxPrice]         = useState(160000);
-  const [brands, setBrands]             = useState([]);
-  const [showVerified, setShowVerified] = useState(false);
-  const [showOnSale, setShowOnSale]     = useState(false);
-  const [showNew, setShowNew]           = useState(false);
-  const [viewMode, setViewMode]         = useState('grid');
-  const [wishlist, setWishlist]         = useState([]);
-  const [cartAdded, setCartAdded]       = useState([]);
-  const [searchQuery, setSearchQuery]   = useState('');
-  const [page, setPage]                 = useState(1);
-  const [dbProducts, setDbProducts]     = useState([]);
+  const [category, setCategory]           = useState('All');
+  const [activeSubcategory, setActiveSubcategory] = useState('All');
+  const [sortBy, setSortBy]               = useState('popular');
+  const [maxPrice, setMaxPrice]           = useState(160000);
+  const [maxPriceLimit, setMaxPriceLimit] = useState(160000);
+  const [brands, setBrands]               = useState([]);
+  const [showVerified, setShowVerified]   = useState(false);
+  const [showOnSale, setShowOnSale]       = useState(false);
+  const [showNew, setShowNew]             = useState(false);
+  const [viewMode, setViewMode]           = useState('grid');
+  const [wishlist, setWishlist]           = useState([]);
+  const [cartAdded, setCartAdded]         = useState([]);
+  const [searchQuery, setSearchQuery]     = useState('');
+  const [page, setPage]                   = useState(1);
+  const [dbProducts, setDbProducts]       = useState([]);
+  const [loading, setLoading]             = useState(true);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [categoryTiles, setCategoryTiles] = useState(FALLBACK_CATEGORY_TILES);
+  const [categoryParentMap, setCategoryParentMap] = useState({});
+
+  // Category Slider Scroll Hooks & Logic
+  const catRowRef = useRef(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(true);
+
+  const updateScrollButtons = () => {
+    if (catRowRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = catRowRef.current;
+      setShowLeftArrow(scrollLeft > 5);
+      setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 5);
+    }
+  };
+
+  const scrollCategories = (direction) => {
+    if (catRowRef.current) {
+      const scrollAmount = 360; // scroll by 2 tiles roughly
+      catRowRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  useEffect(() => {
+    const row = catRowRef.current;
+    if (row) {
+      updateScrollButtons();
+      row.addEventListener('scroll', updateScrollButtons);
+      window.addEventListener('resize', updateScrollButtons);
+      return () => {
+        row.removeEventListener('scroll', updateScrollButtons);
+        window.removeEventListener('resize', updateScrollButtons);
+      };
+    }
+  }, [categoryTiles]);
+
+  // Lock body scroll when mobile filter drawer is open
+  useEffect(() => {
+    if (showMobileFilters) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showMobileFilters]);
 
   // Fetch dynamic categories for buyer search page
   useEffect(() => {
@@ -123,6 +202,20 @@ export default function ProductsPage() {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories?status=approved`);
         const data = await res.json();
         if (data.success && data.data && data.data.length > 0) {
+          // Dynamic category-parent mapping traversal
+          const parentMap = {};
+          const traverse = (cats, rootName) => {
+            cats.forEach(cat => {
+              parentMap[cat.name.toLowerCase()] = rootName || cat.name;
+              if (cat.children && cat.children.length > 0) {
+                traverse(cat.children, rootName || cat.name);
+              }
+            });
+          };
+          traverse(data.data, null);
+          setCategoryParentMap(parentMap);
+
+          const seenValues = new Set();
           const mapped = data.data.map(cat => {
             const nameLC = cat.name.toLowerCase();
             let img = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80'; // default
@@ -132,11 +225,37 @@ export default function ProductsPage() {
                 break;
               }
             }
+            
+            // Normalize values so filtering is robust and aligns with products page categories
+            let mappedValue = cat.name;
+            const cleanCat = mappedValue.toLowerCase();
+            if (parentMap[cleanCat]) {
+              mappedValue = parentMap[cleanCat];
+            } else {
+              if (cleanCat === 'electronics' || cleanCat === 'tech' || cleanCat === 'tech & gadgets') {
+                mappedValue = 'Electronics & Tech';
+              } else if (cleanCat === 'apparel' || cleanCat === 'fashion') {
+                mappedValue = 'Apparel & Fashion';
+              } else if (cleanCat === 'shoes') {
+                mappedValue = 'Shoes & Footwear';
+              } else if (cleanCat === 'kitchen') {
+                mappedValue = 'Kitchen & Dining';
+              } else if (cleanCat === 'lifestyle' || cleanCat === 'fitness' || cleanCat === 'furniture') {
+                mappedValue = 'Lifestyle & Home';
+              } else if (cleanCat === 'grocery' || cleanCat === 'groceries') {
+                mappedValue = 'Grocery & Essentials';
+              }
+            }
+            const formattedLabel = mappedValue.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
             return {
-              label: cat.name,
-              value: cat.name,
+              label: formattedLabel,
+              value: mappedValue,
               img
             };
+          }).filter(tile => {
+            if (seenValues.has(tile.value)) return false;
+            seenValues.add(tile.value);
+            return true;
           });
           setCategoryTiles(mapped);
         } else {
@@ -154,6 +273,7 @@ export default function ProductsPage() {
   useEffect(() => {
     const fetchDbProducts = async () => {
       try {
+        setLoading(true);
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
         const data = await res.json();
         if (data.success) {
@@ -161,6 +281,8 @@ export default function ProductsPage() {
         }
       } catch (err) {
         console.error('Error fetching backend products:', err);
+      } finally {
+        setLoading(false);
       }
     };
     fetchDbProducts();
@@ -171,19 +293,24 @@ export default function ProductsPage() {
     return dbProducts.map(p => {
       // Smart category mapping to align dynamic categories
       let mappedCategory = p.category || 'Lifestyle & Home';
-      const catLC = mappedCategory.toLowerCase();
-      if (catLC === 'electronics' || catLC === 'tech' || catLC === 'tech & gadgets') {
-        mappedCategory = 'Electronics & Tech';
-      } else if (catLC === 'apparel' || catLC === 'fashion') {
-        mappedCategory = 'Apparel & Fashion';
-      } else if (catLC === 'shoes') {
-        mappedCategory = 'Shoes & Footwear';
-      } else if (catLC === 'kitchen') {
-        mappedCategory = 'Kitchen & Dining';
-      } else if (catLC === 'lifestyle' || catLC === 'fitness' || catLC === 'furniture') {
-        mappedCategory = 'Lifestyle & Home';
-      } else if (catLC === 'grocery' || catLC === 'groceries') {
-        mappedCategory = 'Grocery & Essentials';
+      const cleanCat = mappedCategory.toLowerCase();
+      if (categoryParentMap[cleanCat]) {
+        mappedCategory = categoryParentMap[cleanCat];
+      } else {
+        const catLC = mappedCategory.toLowerCase();
+        if (catLC === 'electronics' || catLC === 'tech' || catLC === 'tech & gadgets') {
+          mappedCategory = 'Electronics & Tech';
+        } else if (catLC === 'apparel' || catLC === 'fashion') {
+          mappedCategory = 'Apparel & Fashion';
+        } else if (catLC === 'shoes') {
+          mappedCategory = 'Shoes & Footwear';
+        } else if (catLC === 'kitchen') {
+          mappedCategory = 'Kitchen & Dining';
+        } else if (catLC === 'lifestyle' || catLC === 'fitness' || catLC === 'furniture') {
+          mappedCategory = 'Lifestyle & Home';
+        } else if (catLC === 'grocery' || catLC === 'groceries') {
+          mappedCategory = 'Grocery & Essentials';
+        }
       }
 
       const cleanedImg = cleanImageUrl(p.image);
@@ -194,6 +321,7 @@ export default function ProductsPage() {
         name: p.name,
         brand: p.brand || p.seller?.name || 'Emahu Seller',
         category: mappedCategory,
+        subcategory: p.subcategory || 'General',
         price: p.price,
         original: p.comparePrice || p.price,
         discount: p.comparePrice ? Math.round(((p.comparePrice - p.price) / p.comparePrice) * 100) : 0,
@@ -206,10 +334,12 @@ export default function ProductsPage() {
         isNew: true,
         isHot: false,
         onSale: p.comparePrice ? (p.price < p.comparePrice) : false,
-        seller: p.seller
+        seller: p.seller,
+        sellerStore: p.seller?.storeName || 'Emahu Store',
+        sellerName: p.seller?.name || 'Emahu Merchant'
       };
     });
-  }, [dbProducts]);
+  }, [dbProducts, categoryParentMap]);
 
   // Combine database products (shown at top) with default static ones
   const allProductsCombined = useMemo(() => {
@@ -231,11 +361,31 @@ export default function ProductsPage() {
       }
       return {
         ...p,
-        category: mappedCategory
+        category: mappedCategory,
+        sellerStore: p.seller || 'Emahu Store',
+        sellerName: p.brand
       };
     });
     return [...formattedDbProducts, ...formattedStatic];
   }, [formattedDbProducts]);
+
+  // Dynamically update maxPriceLimit based on all products in database and static catalog
+  useEffect(() => {
+    if (allProductsCombined.length > 0) {
+      const highestPrice = Math.max(...allProductsCombined.map(p => p.price || 0));
+      // Round up to nearest 10,000 for clean steps
+      const roundedMax = Math.ceil(highestPrice / 10000) * 10000;
+      const finalMaxLimit = roundedMax || 160000;
+      
+      setMaxPriceLimit(finalMaxLimit);
+      setMaxPrice(prev => {
+        if (prev === 160000 || prev > finalMaxLimit) {
+          return finalMaxLimit;
+        }
+        return prev;
+      });
+    }
+  }, [allProductsCombined]);
 
   // Sync state on mount
   useEffect(() => {
@@ -276,7 +426,7 @@ export default function ProductsPage() {
         window.dispatchEvent(new Event('storage'));
 
         // Log analytics event
-        const prod = dbProducts.find(p => p.id === id || p._id === id);
+        const prod = allProductsCombined.find(p => p.id === id || p._id === id);
         if (prod) {
           logAnalyticsEvent({
             type: 'add_to_cart',
@@ -311,7 +461,7 @@ export default function ProductsPage() {
   };
 
   const clearAll = () => {
-    setCategory('All'); setMaxPrice(160000); setBrands([]);
+    setCategory('All'); setActiveSubcategory('All'); setMaxPrice(maxPriceLimit); setBrands([]);
     setShowVerified(false); setShowOnSale(false); setShowNew(false);
     setSearchQuery(''); setPage(1);
   };
@@ -325,9 +475,16 @@ export default function ProductsPage() {
     if (showOnSale)          tags.push({ label: 'On Sale',  clear: () => setShowOnSale(false) });
     if (showNew)             tags.push({ label: 'New In',   clear: () => setShowNew(false) });
     brands.forEach(b => tags.push({ label: b, clear: () => toggleBrand(b) }));
-    if (maxPrice < 160000)   tags.push({ label: `Under ₹${maxPrice.toLocaleString('en-IN')}`, clear: () => setMaxPrice(160000) });
+    if (maxPrice < maxPriceLimit)   tags.push({ label: `Under ₹${maxPrice.toLocaleString('en-IN')}`, clear: () => setMaxPrice(maxPriceLimit) });
     return tags;
-  }, [category, showVerified, showOnSale, showNew, brands, maxPrice, searchQuery]);
+  }, [category, showVerified, showOnSale, showNew, brands, maxPrice, maxPriceLimit, searchQuery]);
+
+  // Collect unique subcategories for the active category
+  const availableSubcategories = useMemo(() => {
+    const base = category === 'All' ? allProductsCombined : allProductsCombined.filter(p => p.category === category);
+    const subs = Array.from(new Set(base.map(p => p.subcategory).filter(s => s && s !== 'General')));
+    return subs;
+  }, [allProductsCombined, category]);
 
   const filtered = useMemo(() => {
     let items = [...allProductsCombined];
@@ -336,22 +493,24 @@ export default function ProductsPage() {
       items = items.filter(p =>
         p.name.toLowerCase().includes(q) ||
         p.brand.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
+        p.category.toLowerCase().includes(q) ||
+        (p.subcategory && p.subcategory.toLowerCase().includes(q))
       );
     }
-    if (category !== 'All')  items = items.filter(p => p.category === category);
-    if (showVerified)        items = items.filter(p => p.verified);
-    if (showOnSale)          items = items.filter(p => p.onSale);
-    if (showNew)             items = items.filter(p => p.isNew);
-    if (brands.length)       items = items.filter(p => brands.includes(p.brand));
+    if (category !== 'All')            items = items.filter(p => p.category === category);
+    if (activeSubcategory !== 'All')   items = items.filter(p => p.subcategory === activeSubcategory);
+    if (showVerified)                  items = items.filter(p => p.verified);
+    if (showOnSale)                    items = items.filter(p => p.onSale);
+    if (showNew)                       items = items.filter(p => p.isNew);
+    if (brands.length)                 items = items.filter(p => brands.includes(p.brand));
     items = items.filter(p => p.price <= maxPrice);
     if (sortBy === 'price-asc')  items.sort((a,b) => a.price - b.price);
     if (sortBy === 'price-desc') items.sort((a,b) => b.price - a.price);
     if (sortBy === 'rating')     items.sort((a,b) => b.rating - a.rating);
     if (sortBy === 'discount')   items.sort((a,b) => b.discount - a.discount);
-    if (sortBy === 'newest')     items.sort((a,b) => b.isNew - a.isNew);
+    if (sortBy === 'newest')     items.sort((a,b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
     return items;
-  }, [allProductsCombined, category, showVerified, showOnSale, showNew, brands, maxPrice, sortBy, searchQuery]);
+  }, [allProductsCombined, category, activeSubcategory, showVerified, showOnSale, showNew, brands, maxPrice, sortBy, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const paged      = filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
@@ -376,20 +535,44 @@ export default function ProductsPage() {
           {category === 'All' ? 'All Products' : (categoryTiles.find(c => c.value === category)?.label || category)}
         </h1>
 
-        {/* Category image row */}
-        <div className="bp-cat-row">
-          {categoryTiles.map(tile => (
-            <button
-              key={tile.value}
-              className={`bp-cat-tile ${category === tile.value ? 'bp-cat-tile--active' : ''}`}
-              onClick={() => { setCategory(tile.value); setPage(1); }}
-            >
-              <div className="bp-cat-tile__img-wrap">
-                <img src={tile.img} alt={tile.label} className="bp-cat-tile__img" loading="lazy" />
-              </div>
-              <span className="bp-cat-tile__label">{tile.label}</span>
-            </button>
-          ))}
+        {/* Category slider with left & right navigation arrows */}
+        <div className="bp-cat-slider-container">
+          <button
+            className="bp-cat-nav-btn bp-cat-nav-btn--prev"
+            onClick={() => scrollCategories('left')}
+            aria-label="Previous Categories"
+            disabled={!showLeftArrow}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
+          <div className="bp-cat-row" ref={catRowRef}>
+            {categoryTiles.map(tile => (
+              <button
+                key={tile.value}
+                className={`bp-cat-tile ${category === tile.value ? 'bp-cat-tile--active' : ''}`}
+                onClick={() => { setCategory(tile.value); setActiveSubcategory('All'); setPage(1); }}
+              >
+                <div className="bp-cat-tile__img-wrap">
+                  <img src={tile.img} alt={tile.label} className="bp-cat-tile__img" loading="lazy" />
+                </div>
+                <span className="bp-cat-tile__label">{tile.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <button
+            className="bp-cat-nav-btn bp-cat-nav-btn--next"
+            onClick={() => scrollCategories('right')}
+            aria-label="Next Categories"
+            disabled={!showRightArrow}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -508,13 +691,20 @@ export default function ProductsPage() {
               <span className="bp-filter-group__title">Category</span>
               <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
             </div>
-            {[{ label: 'All Products', value: 'All' }, ...categoryTiles].map(item => (
-              <label key={item.value} className="bp-check-item" style={{ cursor:'pointer' }} onClick={(e) => { e.preventDefault(); setCategory(item.value); setPage(1); }}>
-                <input type="checkbox" readOnly checked={category === item.value} style={{ accentColor:'#0d0d0d' }} />
-                {item.label}
-                <span className="bp-check-item__count">{catCount(item.value)}</span>
-              </label>
-            ))}
+            <div className="bp-filter-scroll-container">
+              {[{ label: 'All Products', value: 'All' }, ...categoryTiles].map(item => (
+                <label key={item.value} className="bp-check-item" style={{ cursor:'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={category === item.value} 
+                    onChange={() => { setCategory(item.value); setActiveSubcategory('All'); setPage(1); }} 
+                    style={{ accentColor:'#0d0d0d', cursor: 'pointer' }} 
+                  />
+                  {item.label}
+                  <span className="bp-check-item__count">{catCount(item.value)}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
           {/* Price */}
@@ -528,10 +718,48 @@ export default function ProductsPage() {
               <span>₹{maxPrice.toLocaleString('en-IN')}</span>
             </div>
             <input type="range" className="bp-price-slider"
-              min={0} max={160000} step={1000} value={maxPrice}
+              min={0} max={maxPriceLimit} step={1000} value={maxPrice}
               onChange={e => { setMaxPrice(+e.target.value); setPage(1); }}
             />
           </div>
+
+          {/* Subcategory — only show when a category is active and subcategories exist */}
+          {availableSubcategories.length > 0 && (
+            <div className="bp-filter-group">
+              <div className="bp-filter-group__head">
+                <span className="bp-filter-group__title">Subcategory</span>
+                <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+              <div className="bp-filter-scroll-container">
+                <label className="bp-check-item" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={activeSubcategory === 'All'}
+                    onChange={() => { setActiveSubcategory('All'); setPage(1); }}
+                    style={{ accentColor: '#0d0d0d', cursor: 'pointer' }}
+                  />
+                  All Subcategories
+                  <span className="bp-check-item__count">
+                    {category === 'All' ? allProductsCombined.length : allProductsCombined.filter(p => p.category === category).length}
+                  </span>
+                </label>
+                {availableSubcategories.map(sub => (
+                  <label key={sub} className="bp-check-item" style={{ cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={activeSubcategory === sub}
+                      onChange={() => { setActiveSubcategory(activeSubcategory === sub ? 'All' : sub); setPage(1); }}
+                      style={{ accentColor: '#0d0d0d', cursor: 'pointer' }}
+                    />
+                    {sub}
+                    <span className="bp-check-item__count">
+                      {allProductsCombined.filter(p => p.subcategory === sub && (category === 'All' || p.category === category)).length}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Brands */}
           <div className="bp-filter-group">
@@ -539,13 +767,15 @@ export default function ProductsPage() {
               <span className="bp-filter-group__title">Brand</span>
               <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
             </div>
-            {Array.from(new Set(allProductsCombined.map(p => p.brand).filter(Boolean))).slice(0, 10).map(b => (
-              <label key={b} className="bp-check-item">
-                <input type="checkbox" checked={brands.includes(b)} onChange={() => { toggleBrand(b); setPage(1); }} />
-                {b}
-                <span className="bp-check-item__count">{allProductsCombined.filter(p=>p.brand===b).length}</span>
-              </label>
-            ))}
+            <div className="bp-filter-scroll-container">
+              {Array.from(new Set(allProductsCombined.map(p => p.brand).filter(Boolean))).slice(0, 30).map(b => (
+                <label key={b} className="bp-check-item">
+                  <input type="checkbox" checked={brands.includes(b)} onChange={() => { toggleBrand(b); setPage(1); }} />
+                  {b}
+                  <span className="bp-check-item__count">{allProductsCombined.filter(p=>p.brand===b).length}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </aside>
 
@@ -574,7 +804,7 @@ export default function ProductsPage() {
 
           {/* Grid */}
           <div className={`bp-grid ${viewMode==='list' ? 'bp-grid--list' : ''}`}>
-            {isOffline ? (
+            {loading ? (
               <>
                 <style>{`
                   @keyframes skeleton-pulse {
@@ -584,7 +814,7 @@ export default function ProductsPage() {
                   }
                   .sk-pulse {
                     animation: skeleton-pulse 1.5s infinite ease-in-out;
-                    background-color: rgba(255, 255, 255, 0.08);
+                    background-color: rgba(0, 0, 0, 0.06);
                     border-radius: 8px;
                   }
                   .sk-card {
@@ -592,13 +822,13 @@ export default function ProductsPage() {
                     flex-direction: column;
                     gap: 12px;
                     padding: 16px;
-                    background: rgba(255, 255, 255, 0.02);
-                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    background: #ffffff;
+                    border: 1px solid #ebebeb;
                     border-radius: 12px;
                   }
                   .sk-thumb {
                     width: 100%;
-                    aspect-ratio: 16/10;
+                    aspect-ratio: 4/3;
                   }
                   .sk-row {
                     display: flex;
@@ -684,8 +914,34 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="bp-card__body">
-                  <p className="bp-card__brand">{p.brand}</p>
+                  <p className="bp-card__brand">
+                    {p.brand}
+                    {p.sellerStore && (
+                      <>
+                        <span style={{ margin: '0 5px', color: '#d1d5db' }}>•</span>
+                        <span style={{ textTransform: 'none', color: '#4b5563', letterSpacing: '0.2px', fontWeight: '600' }}>
+                          Store: {p.sellerStore}
+                        </span>
+                      </>
+                    )}
+                  </p>
                   <p className="bp-card__name">{p.name}</p>
+                  {p.subcategory && p.subcategory !== 'General' && (
+                    <span style={{
+                      display: 'inline-block',
+                      fontSize: '0.68rem',
+                      fontWeight: '600',
+                      color: '#4b5563',
+                      background: '#f3f4f6',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '10px',
+                      padding: '2px 8px',
+                      marginBottom: '4px',
+                      letterSpacing: '0.2px'
+                    }}>
+                      {p.subcategory}
+                    </span>
+                  )}
                   <div className="bp-card__rating">
                     <Stars rating={p.rating} />
                     <span className="bp-card__rc">({p.reviews.toLocaleString()})</span>
@@ -734,9 +990,24 @@ export default function ProductsPage() {
               <button className="bp-page-btn" onClick={() => setPage(p=>p-1)} disabled={page===1}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
               </button>
-              {Array.from({length: totalPages}, (_,i) => i+1).map(n => (
-                <button key={n} className={`bp-page-btn ${page===n?'bp-page-btn--active':''}`} onClick={() => setPage(n)}>{n}</button>
-              ))}
+              {getPaginationRange(page, totalPages).map((n, idx) => {
+                if (n === '...') {
+                  return (
+                    <span key={`dots-${idx}`} className="bp-page-dots">
+                      ...
+                    </span>
+                  );
+                }
+                return (
+                  <button
+                    key={`page-${n}`}
+                    className={`bp-page-btn ${page===n?'bp-page-btn--active':''}`}
+                    onClick={() => setPage(n)}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
               <button className="bp-page-btn" onClick={() => setPage(p=>p+1)} disabled={page===totalPages}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
               </button>

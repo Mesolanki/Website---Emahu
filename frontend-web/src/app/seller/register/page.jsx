@@ -20,6 +20,7 @@ export default function SellerRegister() {
   const [loading, setLoading] = useState(false);
   const [regSuccessData, setRegSuccessData] = useState(null);
   const [dbCategories, setDbCategories] = useState([]);
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
   // Fallback category names (Amazon-like comprehensive list)
   const FALLBACK_CATEGORIES = [
@@ -291,11 +292,16 @@ export default function SellerRegister() {
     const newErrors = {};
     if (!formData.storeName.trim()) newErrors.storeName = 'Store name is required';
     if (!formData.ownerName.trim()) newErrors.ownerName = 'Owner name is required';
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email address is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Enter a valid email address';
+    
+    const isGoogleReg = formData.password && formData.password.startsWith('GoogleAuthPass_');
+    if (isGoogleReg) {
+      if (!formData.email.trim()) {
+        newErrors.email = 'Email address is required';
+      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+        newErrors.email = 'Enter a valid email address';
+      }
     }
+
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required';
     } else if (!/^\d{10}$/.test(formData.phone.trim())) {
@@ -580,19 +586,17 @@ export default function SellerRegister() {
                   {errors.ownerName && <span className="sr-error-text">{errors.ownerName}</span>}
                 </div>
 
-                <div className="sr-input-group">
-                  <label className="sr-label" htmlFor="email">Email Address</label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    className={`sr-input ${errors.email ? 'sr-input--error' : ''}`}
-                    placeholder="rajesh@company.com"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                  />
-                  {errors.email && <span className="sr-error-text">{errors.email}</span>}
-                </div>
+                {formData.password && formData.password.startsWith('GoogleAuthPass_') && (
+                  <div className="sr-input-group">
+                    <label className="sr-label">Connected Google Email</label>
+                    <input
+                      type="text"
+                      className="sr-input"
+                      value={formData.email}
+                      disabled
+                    />
+                  </div>
+                )}
 
                 <div className="sr-input-group">
                   <label className="sr-label" htmlFor="phone">Phone Number (10-Digit)</label>
@@ -643,14 +647,34 @@ export default function SellerRegister() {
                 </div>
               </div>
 
-              <div className="sr-form-actions">
-                <button type="button" className="sr-btn sr-btn--primary" onClick={handleNext}>
-                  <span>Continue</span>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </div>
+                  {/* Terms & Conditions Checkbox */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '20px 0 12px 0', padding: '0 4px' }}>
+                    <input 
+                      id="agree-portal-terms"
+                      type="checkbox" 
+                      checked={agreeTerms}
+                      onChange={(e) => setAgreeTerms(e.target.checked)}
+                      style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="agree-portal-terms" style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
+                      I agree to the <a href="#" onClick={(e) => { e.preventDefault(); alert("EMAHU Seller Terms & Partner Conditions: By signing up as a merchant, you agree to list genuine verified products, fulfill shipments within standard delivery periods, and process returns in compliance with our safety protocol."); }} style={{ color: '#60a5fa', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+                    </label>
+                  </div>
+
+                  <div className="sr-form-actions">
+                    <button 
+                      type="button" 
+                      className="sr-btn sr-btn--primary" 
+                      onClick={handleNext}
+                      disabled={!agreeTerms}
+                      style={!agreeTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#4b5563' } : {}}
+                    >
+                      <span>Continue</span>
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
 
 
 
@@ -940,6 +964,29 @@ export default function SellerRegister() {
               }
             </p>
 
+            {mockOtpCode && (
+              <div style={{
+                background: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.2)',
+                color: '#38bdf8',
+                padding: '12px',
+                borderRadius: '8px',
+                textAlign: 'center',
+                marginTop: '8px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>🔑 simulated code (check console too):</div>
+                <div
+                  style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#38bdf8', background: 'rgba(0,0,0,0.25)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
+                  onClick={() => setOtpInput(mockOtpCode)}
+                  title="Click to auto-fill"
+                >
+                  {mockOtpCode}
+                </div>
+                <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
+              </div>
+            )}
+
 
             {otpError && (
               <div style={{
@@ -956,38 +1003,7 @@ export default function SellerRegister() {
               </div>
             )}
 
-            {isMockOtpActive && mockOtpCode && (
-              <div style={{
-                backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                border: '1px solid rgba(16, 185, 129, 0.35)',
-                color: '#10b981',
-                padding: '14px 18px',
-                borderRadius: '10px',
-                fontSize: '0.88rem',
-                marginBottom: '16px',
-                textAlign: 'center'
-              }}>
-                <div style={{ marginBottom: '6px', opacity: 0.85 }}>📱 Simulated Mobile Verification Code (Dev Mode):</div>
-                <div style={{
-                  letterSpacing: '6px',
-                  fontSize: '1.6rem',
-                  fontWeight: '800',
-                  color: '#ffffff',
-                  background: 'rgba(0,0,0,0.3)',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  display: 'inline-block',
-                  cursor: 'pointer',
-                  userSelect: 'all'
-                }}
-                  onClick={() => setOtpInput(mockOtpCode)}
-                  title="Click to auto-fill"
-                >
-                  {mockOtpCode}
-                </div>
-                <div style={{ marginTop: '6px', fontSize: '0.75rem', opacity: 0.7 }}>👆 Click the code above to auto-fill</div>
-              </div>
-            )}
+
 
 
 

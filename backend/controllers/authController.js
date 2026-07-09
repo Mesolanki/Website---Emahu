@@ -142,11 +142,16 @@ exports.register = async (req, res) => {
     } = req.body;
 
     // Simple validation
-    if (!name || !email || !password) {
+    if (!name || (!email && !phone) || !password) {
       return res.status(400).json({
         success: false,
-        error: 'Please enter name, email, and password'
+        error: 'Please enter name, phone number, and password'
       });
+    }
+
+    let finalEmail = email ? email.trim().toLowerCase() : '';
+    if (!finalEmail && phone) {
+      finalEmail = `${phone.trim()}@emahu.com`;
     }
 
     // Admin role authorization verification passcode check
@@ -160,28 +165,39 @@ exports.register = async (req, res) => {
       }
     }
 
-    // Check if email OTP verification was completed (bypass for Google and Buyer registrations)
+    // Check if phone or email OTP verification was completed (bypass only for Google registrations)
     const isGoogleReg = password && password.startsWith('GoogleAuthPass_');
-    const isBuyerReg = !role || role === 'buyer';
-    if (!isGoogleReg && !isBuyerReg) {
+    if (!isGoogleReg) {
       const Otp = require('../models/Otp');
-      const otpRecord = await Otp.findOne({ email: email.trim().toLowerCase(), isVerified: true });
+      const queryPhone = phone ? phone.trim() : 'non_existent_phone_123';
+      const otpRecord = await Otp.findOne({
+        $or: [
+          { phone: queryPhone },
+          { email: finalEmail }
+        ],
+        isVerified: true
+      });
       if (!otpRecord) {
         return res.status(400).json({
           success: false,
-          error: 'Please verify your email address via OTP first before registering'
+          error: 'Please verify your phone number via OTP first before registering'
         });
       }
       // Delete the verified OTP record so it can't be reused
-      await Otp.deleteMany({ email: email.trim().toLowerCase() });
+      await Otp.deleteMany({
+        $or: [
+          { phone: queryPhone },
+          { email: finalEmail }
+        ]
+      });
     }
 
     // Check if user already exists
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ email: finalEmail });
     if (userExists) {
       return res.status(400).json({
         success: false,
-        error: 'A user with this email already exists'
+        error: 'A user with this email/phone already exists'
       });
     }
 
@@ -211,7 +227,7 @@ exports.register = async (req, res) => {
     // Create user
     const user = await User.create({
       name,
-      email,
+      email: finalEmail,
       password,
       role: role || 'buyer',
       phone,
@@ -315,12 +331,24 @@ exports.login = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        error: 'Please provide email and password'
+        error: 'Please provide your phone number/email and password'
       });
     }
 
     // Check if user exists (include password and 2fa secret)
-    const user = await User.findOne({ email }).select('+password +twoFactorSecret');
+    let query = {};
+    if (email.includes('@')) {
+      query = { email: email.toLowerCase() };
+    } else {
+      const cleanPhone = email.trim();
+      query = {
+        $or: [
+          { phone: cleanPhone },
+          { email: `${cleanPhone}@emahu.com` }
+        ]
+      };
+    }
+    const user = await User.findOne(query).select('+password +twoFactorSecret');
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -507,7 +535,7 @@ exports.googleLogin = async (req, res) => {
     }
 
     // Check if the existing user's role matches the requested role
-    if (role && user.role !== role) {
+    if (role && user.role !== role && user.role !== 'admin') {
       console.warn(`Role mismatch: existing user has role '${user.role}' but requested role is '${role}'`);
       if (role === 'buyer') {
         return res.status(400).json({
@@ -1563,12 +1591,12 @@ exports.sendPhoneOtp = async (req, res) => {
       return res.status(400).json({ success: false, error: 'A user with this phone number already exists' });
     }
 
-    // If Twilio Verify Service is configured, use it!
-    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID ? process.env.TWILIO_VERIFY_SERVICE_SID.trim() : '';
+    const accountSid = process.env.TWILIO_ACCOUNT_SID ? process.env.TWILIO_ACCOUNT_SID.trim() : '';
+    const authToken = process.env.TWILIO_AUTH_TOKEN ? process.env.TWILIO_AUTH_TOKEN.trim() : '';
 
-    if (verifyServiceSid && verifyServiceSid !== 'your-twilio-verify-service-sid' && accountSid && authToken) {
+    const has2Factor = process.env.TWOFACTOR_API_KEY && process.env.TWOFACTOR_API_KEY.trim() !== '' && process.env.TWOFACTOR_API_KEY.trim() !== 'your-2factor-api-key';
+    if (!has2Factor && verifyServiceSid && verifyServiceSid !== 'your-twilio-verify-service-sid' && accountSid && authToken) {
       try {
         const twilio = require('twilio');
         const client = twilio(accountSid, authToken);
@@ -1652,12 +1680,12 @@ exports.verifyPhoneOtp = async (req, res) => {
     const cleanPhone = phone.trim();
     const otpCode = otp.trim();
 
-    // Check if Twilio Verify Service is configured
-    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID ? process.env.TWILIO_VERIFY_SERVICE_SID.trim() : '';
+    const accountSid = process.env.TWILIO_ACCOUNT_SID ? process.env.TWILIO_ACCOUNT_SID.trim() : '';
+    const authToken = process.env.TWILIO_AUTH_TOKEN ? process.env.TWILIO_AUTH_TOKEN.trim() : '';
 
-    if (verifyServiceSid && verifyServiceSid !== 'your-twilio-verify-service-sid' && accountSid && authToken) {
+    const has2Factor = process.env.TWOFACTOR_API_KEY && process.env.TWOFACTOR_API_KEY.trim() !== '' && process.env.TWOFACTOR_API_KEY.trim() !== 'your-2factor-api-key';
+    if (!has2Factor && verifyServiceSid && verifyServiceSid !== 'your-twilio-verify-service-sid' && accountSid && authToken) {
       try {
         const twilio = require('twilio');
         const client = twilio(accountSid, authToken);
@@ -1686,16 +1714,14 @@ exports.verifyPhoneOtp = async (req, res) => {
         }
 
         // Sync verification in MongoDB for registration check
-        if (email) {
-          const cleanEmail = email.trim().toLowerCase();
-          await Otp.deleteMany({ email: cleanEmail });
-          await Otp.create({
-            email: cleanEmail,
-            otp: 'TWILIO_VERIFY_API',
-            isVerified: true,
-            expiresAt: new Date(Date.now() + 15 * 60 * 1000)
-          });
-        }
+        const OtpModel = require('../models/Otp');
+        await OtpModel.deleteMany({ phone: cleanPhone });
+        await OtpModel.create({
+          phone: cleanPhone,
+          otp: 'TWILIO_VERIFY_API',
+          isVerified: true,
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000)
+        });
 
         return res.status(200).json({
           success: true,
@@ -1714,16 +1740,13 @@ exports.verifyPhoneOtp = async (req, res) => {
           
           await Otp.deleteOne({ _id: localOtp._id });
           
-          if (email) {
-            const cleanEmail = email.trim().toLowerCase();
-            await Otp.deleteMany({ email: cleanEmail });
-            await Otp.create({
-              email: cleanEmail,
-              otp: 'TWILIO_VERIFY_SIMULATED',
-              isVerified: true,
-              expiresAt: new Date(Date.now() + 15 * 60 * 1000)
-            });
-          }
+          await Otp.deleteMany({ phone: cleanPhone });
+          await Otp.create({
+            phone: cleanPhone,
+            otp: 'TWILIO_VERIFY_SIMULATED',
+            isVerified: true,
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000)
+          });
 
           return res.status(200).json({
             success: true,
@@ -1750,18 +1773,10 @@ exports.verifyPhoneOtp = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid OTP code. Please try again.' });
     }
 
-    await Otp.deleteOne({ _id: otpRecord._id });
-
-    if (email) {
-      const cleanEmail = email.trim().toLowerCase();
-      await Otp.deleteMany({ email: cleanEmail });
-      await Otp.create({
-        email: cleanEmail,
-        otp: 'TWILIO_VERIFIED',
-        isVerified: true,
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000)
-      });
-    }
+    // Mark current OTP record as verified instead of deleting it, so register checks can locate it
+    otpRecord.isVerified = true;
+    otpRecord.expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    await otpRecord.save();
 
     res.status(200).json({
       success: true,
@@ -1805,70 +1820,21 @@ exports.forgotPassword = async (req, res) => {
     
     await user.save();
 
-    // Send email using Nodemailer utility
-    const sendEmail = require('../utils/sendEmail');
-    const htmlContent = `
-      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-        <div style="background: linear-gradient(135deg, #ef4444, #f97316); padding: 40px 32px; text-align: center; color: #ffffff;">
-          <div style="font-size: 24px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px;">EMAHU</div>
-          <h1 style="color: #ffffff; margin: 0; font-size: 1.8rem; font-weight: 700;">Password Reset Code</h1>
-          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 0.95rem;">Request for account recovery</p>
-        </div>
-        <div style="padding: 36px 32px; background: #ffffff;">
-          <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 24px 0;">Hello,</p>
-          <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">We received a request to reset your password. Please use the 6-digit verification code below to authorize this password reset. This code is valid for <strong>10 minutes</strong>.</p>
-          
-          <div style="text-align: center; margin: 32px 0;">
-            <div style="display: inline-block; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 12px; padding: 16px 36px; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #991b1b; font-family: monospace;">
-              ${otpCode}
-            </div>
-          </div>
-
-          <p style="color: #64748b; font-size: 0.88rem; line-height: 1.6; margin: 28px 0 0 0;">If you did not request a password reset, please change your password immediately or contact support to secure your account.</p>
-        </div>
-        <div style="background: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 0.8rem;">
-          <p style="margin: 0 0 4px 0;">Emahu Marketplace Inc.</p>
-          <p style="margin: 0;">Securing premium local trade.</p>
-        </div>
-      </div>
-    `;
-
-    // ✅ Send email using Resend (HTTPS, fast — safe to await)
-    const emailResult = await sendEmail({
-      to: cleanEmail,
-      subject: 'Password Reset OTP',
-      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`,
-      html: htmlContent
+    // Send SMS using twilio/fast2sms utility
+    const sendSms = require('../utils/sendSms');
+    const smsResult = await sendSms({
+      to: user.phone,
+      body: `Your Emahu password reset OTP is ${otpCode}. Valid for 10 minutes. Do not share this code.`
     });
 
-    const emailOk = emailResult.success || emailResult.simulated;
-    if (!emailOk) {
-      console.warn(`⚠️  Forgot-password email failed for ${cleanEmail}: ${emailResult.error}`);
-      if (emailResult.sandboxRestricted) {
-        console.log(`ℹ️ Resend Sandbox restriction detected for ${cleanEmail}. Falling back to on-screen OTP for recovery testing.`);
-        return res.status(200).json({
-          success: true,
-          message: `Reset code generated. Resend Sandbox restriction: please check backend console or use the backup code shown below.`,
-          otpCode,
-          devOtp: otpCode,
-          emailSent: false,
-          isSandboxRestricted: true
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        error: emailResult.error || 'Failed to send password reset OTP email via Resend'
-      });
-    }
-
-    console.log(`✔️  Password reset OTP email delivered to ${cleanEmail}`);
+    console.log(`✔️  Password reset OTP SMS sent to ${user.phone}`);
 
     res.status(200).json({
       success: true,
-      message: `Reset code sent to ${cleanEmail}. Check your inbox (or spam folder).`,
+      message: `Reset code sent via SMS to your registered mobile number ending in ${user.phone.slice(-4)}.`,
       otpCode,
       devOtp: otpCode,
-      emailSent: true,
+      emailSent: false,
       isSandboxRestricted: false
     });
   } catch (error) {
@@ -1919,70 +1885,21 @@ exports.resendOtp = async (req, res) => {
     
     await user.save();
 
-    // Send email
-    const sendEmail = require('../utils/sendEmail');
-    const htmlContent = `
-      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-        <div style="background: linear-gradient(135deg, #ef4444, #f97316); padding: 40px 32px; text-align: center; color: #ffffff;">
-          <div style="font-size: 24px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px;">EMAHU</div>
-          <h1 style="color: #ffffff; margin: 0; font-size: 1.8rem; font-weight: 700;">Password Reset Code</h1>
-          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 0.95rem;">Request for account recovery</p>
-        </div>
-        <div style="padding: 36px 32px; background: #ffffff;">
-          <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 24px 0;">Hello,</p>
-          <p style="color: #334155; font-size: 1rem; line-height: 1.6; margin: 0 0 28px 0;">We received a request to reset your password. Please use the 6-digit verification code below to authorize this password reset. This code is valid for <strong>10 minutes</strong>.</p>
-          
-          <div style="text-align: center; margin: 32px 0;">
-            <div style="display: inline-block; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 12px; padding: 16px 36px; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #991b1b; font-family: monospace;">
-              ${otpCode}
-            </div>
-          </div>
-
-          <p style="color: #64748b; font-size: 0.88rem; line-height: 1.6; margin: 28px 0 0 0;">If you did not request a password reset, please change your password immediately or contact support to secure your account.</p>
-        </div>
-        <div style="background: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 0.8rem;">
-          <p style="margin: 0 0 4px 0;">Emahu Marketplace Inc.</p>
-          <p style="margin: 0;">Securing premium local trade.</p>
-        </div>
-      </div>
-    `;
-
-    // ✅ Send email using Resend (HTTPS, fast — safe to await)
-    const emailResult = await sendEmail({
-      to: cleanEmail,
-      subject: 'Password Reset OTP',
-      text: `Hello,\n\nYour password reset OTP is: ${otpCode}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nRegards,\nTeam Emahu`,
-      html: htmlContent
+    // Send SMS
+    const sendSms = require('../utils/sendSms');
+    const smsResult = await sendSms({
+      to: user.phone,
+      body: `Your Emahu password reset OTP is ${otpCode}. Valid for 10 minutes. Do not share this code.`
     });
 
-    const emailOk = emailResult.success || emailResult.simulated;
-    if (!emailOk) {
-      console.warn(`⚠️  Resend-OTP email failed for ${cleanEmail}: ${emailResult.error}`);
-      if (emailResult.sandboxRestricted) {
-        console.log(`ℹ️ Resend Sandbox restriction detected for ${cleanEmail}. Falling back to on-screen OTP for recovery resend testing.`);
-        return res.status(200).json({
-          success: true,
-          message: `Reset code generated. Resend Sandbox restriction: please check backend console or use the backup code shown below.`,
-          otpCode,
-          devOtp: otpCode,
-          emailSent: false,
-          isSandboxRestricted: true
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        error: emailResult.error || 'Failed to resend password reset OTP email via Resend'
-      });
-    }
-
-    console.log(`✔️  Resend OTP email delivered to ${cleanEmail}`);
+    console.log(`✔️  Password reset OTP SMS re-sent to ${user.phone}`);
 
     res.status(200).json({
       success: true,
-      message: `Reset code resent to ${cleanEmail}. Check your inbox (or spam folder).`,
+      message: `Reset code re-sent via SMS to your registered mobile number ending in ${user.phone.slice(-4)}.`,
       otpCode,
       devOtp: otpCode,
-      emailSent: true,
+      emailSent: false,
       isSandboxRestricted: false
     });
   } catch (error) {
@@ -2085,5 +2002,150 @@ exports.getKycDocumentStub = (req, res) => {
   `.trim();
   res.setHeader('Content-Type', 'image/svg+xml');
   res.send(svgContent);
+};
+
+// @desc    Change user role (buyer <-> seller/delivery)
+// @route   PUT /api/auth/change-role
+// @access  Private
+exports.changeRole = async (req, res) => {
+  try {
+    const { role: newRole, storeDetails, vehicleDetails } = req.body;
+    const allowedRoles = ['buyer', 'seller', 'delivery'];
+    if (!newRole || !allowedRoles.includes(newRole)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid role specified. Allowed roles are: buyer, seller, delivery'
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    if (user.role === newRole) {
+      return res.status(400).json({
+        success: false,
+        error: `User is already a ${newRole}`
+      });
+    }
+
+    if (newRole === 'buyer') {
+      // Seller/delivery to buyer: allowed directly with instant approval
+      user.role = 'buyer';
+      user.status = 'approved';
+      await user.save();
+
+      // Regenerate tokens and respond
+      return await sendTokenResponse(user, 200, req, res);
+    }
+
+    // Changing to seller or delivery requires admin verification
+    if (newRole === 'seller') {
+      if (!storeDetails || !storeDetails.storeName || !storeDetails.category) {
+        return res.status(400).json({
+          success: false,
+          error: 'Please provide store name and store category to request seller role'
+        });
+      }
+
+      user.role = 'seller';
+      user.status = 'pending';
+      user.storeName = storeDetails.storeName;
+      user.category = storeDetails.category;
+      user.isPhoneVerified = true;
+
+      // Optional details
+      if (storeDetails.bankHolder) user.bankHolder = storeDetails.bankHolder;
+      if (storeDetails.accountNumber) user.accountNumber = storeDetails.accountNumber;
+      if (storeDetails.ifscCode) user.ifscCode = storeDetails.ifscCode;
+      if (storeDetails.bankName) user.bankName = storeDetails.bankName;
+      if (storeDetails.gstNumber) user.gstNumber = storeDetails.gstNumber;
+      if (storeDetails.kycType) user.kycType = storeDetails.kycType;
+      if (storeDetails.kycNumber) user.kycNumber = storeDetails.kycNumber;
+
+      await user.save();
+
+      // Submit placeholder documents for compliance reviews
+      const SellerDocument = require('../models/SellerDocument');
+      await SellerDocument.deleteMany({ seller: user._id });
+      
+      const docUrl = `${req.protocol}://${req.get('host')}/api/auth/kyc_document.jpg`;
+      await SellerDocument.create({
+        seller: user._id,
+        documentType: 'id_proof',
+        fileUrl: docUrl,
+        status: 'pending'
+      });
+
+      await SellerDocument.create({
+        seller: user._id,
+        documentType: 'business_registration',
+        fileUrl: `${req.protocol}://${req.get('host')}/api/auth/gst_certificate_stub.pdf`,
+        status: 'pending'
+      });
+
+      // Notify admins
+      const admins = await User.find({ role: 'admin' });
+      const Notification = require('../models/Notification');
+      for (const admin of admins) {
+        await Notification.create({
+          recipient: admin._id,
+          title: 'Role Upgrade Request: Seller',
+          message: `User "${user.name}" has requested to switch role to Seller for store "${user.storeName}" and is pending approval.`,
+          type: 'info'
+        });
+      }
+
+      return await sendTokenResponse(user, 200, req, res);
+    }
+
+    if (newRole === 'delivery') {
+      if (!vehicleDetails || !vehicleDetails.vehicleType || !vehicleDetails.vehicleNumber) {
+        return res.status(400).json({
+          success: false,
+          error: 'Please provide vehicle type and vehicle number to request delivery role'
+        });
+      }
+
+      user.role = 'delivery';
+      user.status = 'pending';
+      user.vehicleType = vehicleDetails.vehicleType;
+      user.vehicleNumber = vehicleDetails.vehicleNumber;
+      user.currentCity = vehicleDetails.currentCity || user.city || 'Ahmedabad';
+      user.currentArea = vehicleDetails.currentArea || user.address || 'Gota';
+      user.pincode = vehicleDetails.pincode || '382481';
+      user.serviceRadius = vehicleDetails.serviceRadius ? parseFloat(vehicleDetails.serviceRadius) : 15;
+      user.perItemCharge = vehicleDetails.perKmRate ? parseFloat(vehicleDetails.perKmRate) : 10;
+      user.perKmRate = vehicleDetails.perKmRate ? parseFloat(vehicleDetails.perKmRate) : 5;
+      user.coveredCities = vehicleDetails.coveredCities || [user.city || 'Ahmedabad'];
+      user.deliveryScope = vehicleDetails.deliveryScope || 'local';
+      user.operatingLocation = `${user.currentArea}, ${user.currentCity}`;
+      user.isPhoneVerified = true;
+
+      await user.save();
+
+      // Notify admins
+      const admins = await User.find({ role: 'admin' });
+      const Notification = require('../models/Notification');
+      for (const admin of admins) {
+        await Notification.create({
+          recipient: admin._id,
+          title: 'Role Upgrade Request: Delivery Partner',
+          message: `User "${user.name}" has requested to switch role to Delivery Partner and is pending approval.`,
+          type: 'info'
+        });
+      }
+
+      return await sendTokenResponse(user, 200, req, res);
+    }
+
+  } catch (error) {
+    console.error('Change Role Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Server error during role transition'
+    });
+  }
 };
 

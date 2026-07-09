@@ -62,7 +62,7 @@ exports.getCategories = async (req, res) => {
       query.status = statusFilter;
     }
 
-    const categories = await Category.find(query).sort({ name: 1 });
+    const categories = await Category.find(query).sort({ order: 1, name: 1 });
     const categoryTree = buildCategoryTree(categories, null);
 
     res.status(200).json({
@@ -258,6 +258,172 @@ exports.seedDefaultCategories = async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Server Error while seeding categories: ' + err.message
+    });
+  }
+};
+
+/**
+ * @desc    Get category by ID (including attributes/specification details)
+ * @route   GET /api/categories/:id
+ * @access  Public
+ */
+exports.getCategoryById = async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        error: 'Category not found'
+      });
+    }
+    res.status(200).json({
+      success: true,
+      data: category
+    });
+  } catch (err) {
+    console.error('Error in getCategoryById:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server Error'
+    });
+  }
+};
+
+/**
+ * @desc    Create a category (Admin only)
+ * @route   POST /api/categories
+ * @access  Private (Admin)
+ */
+exports.createCategory = async (req, res) => {
+  try {
+    const {
+      name, parentId, brands, attributes, specifications,
+      validationRules, shippingTemplate, seoTemplate, icon, image, order, isEnabled
+    } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide a category name'
+      });
+    }
+
+    const category = await Category.create({
+      name,
+      slug: slugify(name),
+      parentId: parentId || null,
+      brands: brands || [],
+      attributes: attributes || [],
+      specifications: specifications || [],
+      validationRules: validationRules || {},
+      shippingTemplate: shippingTemplate || {},
+      seoTemplate: seoTemplate || {},
+      icon: icon || '',
+      image: image || '',
+      order: order || 0,
+      isEnabled: isEnabled !== undefined ? isEnabled : true,
+      status: 'approved',
+      createdBy: req.user ? req.user.id : null
+    });
+
+    res.status(201).json({
+      success: true,
+      data: category
+    });
+  } catch (err) {
+    console.error('Error in createCategory:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server Error'
+    });
+  }
+};
+
+/**
+ * @desc    Update category configurations (Admin only)
+ * @route   PUT /api/categories/:id
+ * @access  Private (Admin)
+ */
+exports.updateCategory = async (req, res) => {
+  try {
+    const {
+      name, parentId, brands, attributes, specifications,
+      validationRules, shippingTemplate, seoTemplate, icon, image, order, isEnabled
+    } = req.body;
+
+    let category = await Category.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        error: 'Category not found'
+      });
+    }
+
+    const updates = {
+      parentId: parentId || null,
+      brands: brands || [],
+      attributes: attributes || [],
+      specifications: specifications || [],
+      validationRules: validationRules || {},
+      shippingTemplate: shippingTemplate || {},
+      seoTemplate: seoTemplate || {},
+      icon: icon || '',
+      image: image || '',
+      order: order || 0,
+      isEnabled: isEnabled !== undefined ? isEnabled : true
+    };
+
+    if (name) {
+      updates.name = name;
+      updates.slug = slugify(name);
+    }
+
+    category = await Category.findByIdAndUpdate(req.params.id, updates, {
+      new: true,
+      runValidators: true
+    });
+
+    res.status(200).json({
+      success: true,
+      data: category
+    });
+  } catch (err) {
+    console.error('Error in updateCategory:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server Error'
+    });
+  }
+};
+
+/**
+ * @desc    Delete category and un-nest child nodes (Admin only)
+ * @route   DELETE /api/categories/:id
+ * @access  Private (Admin)
+ */
+exports.deleteCategory = async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        error: 'Category not found'
+      });
+    }
+
+    // Set subcategories parentId to null so they don't break
+    await Category.updateMany({ parentId: req.params.id }, { parentId: null });
+    await category.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: 'Category removed successfully'
+    });
+  } catch (err) {
+    console.error('Error in deleteCategory:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Server Error'
     });
   }
 };

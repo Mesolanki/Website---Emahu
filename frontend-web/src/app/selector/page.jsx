@@ -129,6 +129,7 @@ const DYNAMIC_CATEGORY_ICONS = {
 const DYNAMIC_ACCENTS = ['#0ea5e9', '#d946ef', '#14b8a6', '#f97316', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16', '#e11d48', '#7c3aed'];
 
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
+import API_BASE from '@/utils/config';
 
 function Stars({ rating, reviews }) {
   const rounded = Math.round(rating);
@@ -168,6 +169,7 @@ export default function RoleSelector() {
   const [dbProducts, setDbProducts] = useState([]);
   const [dbCategories, setDbCategories] = useState([]);
   const [showAllCategories, setShowAllCategories] = useState(false);
+  const [selectedSeller, setSelectedSeller] = useState('All');
   
   // Portal & Dropdown States
   const [deliveryDropdownOpen, setDeliveryDropdownOpen] = useState(false);
@@ -204,7 +206,7 @@ export default function RoleSelector() {
   useEffect(() => {
     const fetchDbProducts = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
+        const res = await fetch(`${API_BASE}/api/products`);
         const data = await res.json();
         if (data.success && data.products) {
           setDbProducts(data.products);
@@ -222,7 +224,7 @@ export default function RoleSelector() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories?status=approved`);
+        const res = await fetch(`${API_BASE}/api/categories?status=approved`);
         const data = await res.json();
         if (data.success && data.data) {
           setDbCategories(data.data);
@@ -278,8 +280,17 @@ export default function RoleSelector() {
         dbCat.children.forEach(child => subcats.push(child.name));
       }
       
+      let resolvedId = slug;
+      for (const hc of CATEGORIES) {
+        const hcNameLC = hc.name.toLowerCase();
+        if (hcNameLC.includes(nameLC) || nameLC.includes(hcNameLC)) {
+          resolvedId = hc.id;
+          break;
+        }
+      }
+
       dynamicCats.push({
-        id: slug,
+        id: resolvedId,
         name: dbCat.name,
         icon,
         desc: `Browse ${dbCat.name} products from verified sellers on EMAHU.`,
@@ -357,14 +368,15 @@ export default function RoleSelector() {
       return {
         id: p.id || p._id,
         name: p.name,
-        brand: p.brand || p.seller?.name || 'Emahu Seller',
+        brand: p.brand || 'Emahu Brand',
         category: cat,
         subcategory: p.subcategory || 'General',
         price: p.price,
         originalPrice: p.comparePrice || p.price,
         rating: p.rating || 4.7,
         reviews: p.reviews || 84,
-        seller: p.seller?.name || p.brand || 'Emahu Seller',
+        sellerName: p.seller?.name || 'Emahu Merchant',
+        sellerStore: p.seller?.storeName || 'Emahu Store',
         image: isRealImage(p.image) ? cleanedImg : (p.image || '📦'),
         stock: p.stock
       };
@@ -372,50 +384,100 @@ export default function RoleSelector() {
     
     // De-duplicate items with same ID or name for smooth UI experience
     const seen = new Set();
-    return [...mappedDb, ...STATIC_PRODUCTS].filter(p => {
+    const formattedStatic = STATIC_PRODUCTS.map(p => ({
+      id: p.id,
+      name: p.name,
+      brand: p.brand,
+      category: p.category,
+      subcategory: p.subcategory || 'General',
+      price: p.price,
+      originalPrice: p.originalPrice || p.price,
+      rating: p.rating || 4.7,
+      reviews: p.reviews || 84,
+      sellerName: p.brand,
+      sellerStore: p.seller || 'Emahu Store',
+      image: p.image,
+      stock: 10
+    }));
+
+    return [...mappedDb, ...formattedStatic].filter(p => {
       if (seen.has(p.id)) return false;
       seen.add(p.id);
       return true;
     });
   }, [dbProducts, categoryNameToId]);
 
-  // Filtered products based on active categories and search
+  // Get unique sellers for the currently selected category
+  const uniqueSellers = useMemo(() => {
+    if (!selectedCategory) return [];
+    
+    // Filter all products that belong to the active category
+    const catProducts = allProducts.filter(p => p.category === selectedCategory.id);
+    
+    const sellersMap = new Map();
+    catProducts.forEach(p => {
+      if (p.sellerStore) {
+        sellersMap.set(p.sellerStore, p.sellerName || p.sellerStore);
+      }
+    });
+    
+    return Array.from(sellersMap.entries()).map(([store, name]) => ({
+      storeName: store,
+      merchantName: name
+    }));
+  }, [allProducts, selectedCategory]);
+
+  // Filtered products based on active categories, search, and seller filter
   const filteredProducts = useMemo(() => {
     if (!selectedCategory) return [];
 
-    return allProducts.filter(p => {
-      // Category check
-      if (p.category !== selectedCategory.id) return false;
-      
-      // Subcategory check
-      if (activeSubcategory !== 'All' && !activeSubcategory.startsWith('All')) {
-        if (p.subcategory.toLowerCase() !== activeSubcategory.toLowerCase()) return false;
-      }
+    // First filter by parent category
+    let base = allProducts.filter(p => p.category === selectedCategory.id);
 
-      // Search query check
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        return (
-          p.name.toLowerCase().includes(query) ||
-          p.brand.toLowerCase().includes(query) ||
-          p.seller.toLowerCase().includes(query) ||
-          p.subcategory.toLowerCase().includes(query)
-        );
+    // Subcategory filter: try exact match first;
+    // if the chosen subcategory returns 0 products (e.g. a DB-only sub like "Women's Clothing"
+    // that no seeded/mock product has), fall back to showing ALL products in the parent category.
+    if (activeSubcategory !== 'All' && !activeSubcategory.startsWith('All')) {
+      const exactMatches = base.filter(
+        p => p.subcategory && p.subcategory.toLowerCase() === activeSubcategory.toLowerCase()
+      );
+      if (exactMatches.length > 0) {
+        base = exactMatches;
       }
+      // else: no exact matches — keep all category products so the grid never shows 0 items
+    }
 
-      return true;
-    });
-  }, [selectedCategory, activeSubcategory, searchQuery, allProducts]);
+    // Seller filter
+    if (selectedSeller !== 'All') {
+      base = base.filter(p => p.sellerStore === selectedSeller);
+    }
+
+    // Search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      base = base.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        p.brand.toLowerCase().includes(query) ||
+        (p.sellerName && p.sellerName.toLowerCase().includes(query)) ||
+        (p.sellerStore && p.sellerStore.toLowerCase().includes(query)) ||
+        (p.subcategory && p.subcategory.toLowerCase().includes(query))
+      );
+    }
+
+    return base;
+  }, [selectedCategory, activeSubcategory, selectedSeller, searchQuery, allProducts]);
 
   const handleCategorySelect = (cat) => {
     setSelectedCategory(cat);
     setActiveSubcategory('All');
+    setSelectedSeller('All');
     setSearchQuery('');
   };
 
   const handleBackToCategories = () => {
     setSelectedCategory(null);
     setActiveSubcategory('All');
+    setSelectedSeller('All');
     setSearchQuery('');
   };
 
@@ -616,8 +678,8 @@ export default function RoleSelector() {
                 </div>
               </div>
 
-              {/* Central Searchbar */}
-              <div className="sel-searchbar-container">
+              {/* Central Searchbar & Seller Filter Controls */}
+              <div className="sel-controls-row">
                 <div className="sel-searchbar-wrapper">
                   <svg className="sel-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <circle cx="11" cy="11" r="8"/>
@@ -638,6 +700,21 @@ export default function RoleSelector() {
                       </svg>
                     </button>
                   )}
+                </div>
+
+                <div className="sel-seller-filter-wrapper">
+                  <select
+                    className="sel-seller-select"
+                    value={selectedSeller}
+                    onChange={(e) => setSelectedSeller(e.target.value)}
+                  >
+                    <option value="All">All Sellers / Shops</option>
+                    {uniqueSellers.map(s => (
+                      <option key={s.storeName} value={s.storeName}>
+                        {s.storeName} ({s.merchantName})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -666,18 +743,29 @@ export default function RoleSelector() {
                         </div>
 
                         <div className="sel-prod-card__body">
-                          <span className="sel-prod-card__brand">{p.brand}</span>
+                          {/* Company Brand and Subcategory Row */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span className="sel-prod-card__brand">{p.brand}</span>
+                            <span style={{ fontSize: '0.72rem', color: '#475569', background: '#e2e8f0', padding: '2px 8px', borderRadius: '12px', fontWeight: '600' }}>
+                              {p.subcategory}
+                            </span>
+                          </div>
+
                           <h4 className="sel-prod-card__title">{p.name}</h4>
                           
-                          {/* Rating and Seller details */}
+                          {/* Rating details */}
                           <Stars rating={p.rating} reviews={p.reviews} />
                           
-                          <div className="sel-prod-card__seller-info">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          {/* Seller & Shop details */}
+                          <div className="sel-prod-card__seller-info" style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: '8px' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginTop: '2px' }}>
                               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                               <circle cx="12" cy="7" r="4" />
                             </svg>
-                            <span>Seller: <strong>{p.seller}</strong></span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                              <span>Shop: <strong>{p.sellerStore}</strong></span>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Company: {p.sellerName}</span>
+                            </div>
                           </div>
 
                           <div className="sel-prod-card__price-row">
@@ -724,9 +812,9 @@ export default function RoleSelector() {
             {/* Option 1: Merchant / Seller */}
             <div className="sel-portal-box sel-portal-box--seller">
               <div className="sel-portal-box__icon">🏪</div>
-              <h3 className="sel-portal-box__title">Merchant Seller Portal</h3>
+              <h3 className="sel-portal-box__title">Shop Seller Portal</h3>
               <p className="sel-portal-box__desc">
-                Onboard as a vendor, list inventory, configure delivery fee rates, and grow your retail storefront.
+                Whether you sell from home or run a large business list your products, manage stock, set delivery charges, and start growing your sales on EMAHU today.
               </p>
               <Link href="/seller" className="sel-portal-btn sel-portal-btn--seller">
                 <span>Enter Seller Hub</span>
@@ -739,7 +827,7 @@ export default function RoleSelector() {
             {/* Option 2: Delivery Partner Options */}
             <div className="sel-portal-box sel-portal-box--delivery" ref={deliveryDropdownRef}>
               <div className="sel-portal-box__icon">🚚</div>
-              <h3 className="sel-portal-box__title">Logistics Partner Portal</h3>
+              <h3 className="sel-portal-box__title">Dehlivery Partner Portal</h3>
               <p className="sel-portal-box__desc">
                 Register dispatch assets, coordinate local city orders, and manage last-mile transport logistics.
               </p>

@@ -8,7 +8,7 @@
  * 5. Rejection limit validation (3 rejections delete the product)
  */
 
-const BASE_URL = 'http://localhost:5000';
+const BASE_URL = 'http://127.0.0.1:5000';
 
 async function requestAndVerifyOtp(email) {
   // 1. Send OTP

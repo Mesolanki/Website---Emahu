@@ -30,7 +30,8 @@ const {
   resendOtp,
   resetPassword,
   getGstCertificateStub,
-  getKycDocumentStub
+  getKycDocumentStub,
+  changeRole
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -59,6 +60,7 @@ router.get('/:filename.pdf', getGstCertificateStub);
 router.get('/me', protect, getMe);
 router.put('/update-details', protect, updateDetails);
 router.put('/update-password', protect, updatePassword);
+router.put('/change-role', protect, changeRole);
 
 // Delivery partner endpoints for sellers/buyers
 router.get('/delivery-partners', protect, getApprovedDeliveryPartners);

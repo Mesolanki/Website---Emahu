@@ -19,6 +19,7 @@ export default function SellerLogin() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
   // If already logged in, redirect directly to the seller dashboard (unless expired)
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function SellerLogin() {
         router.push(`/seller/register?email=${encodeURIComponent(data.email)}&name=${encodeURIComponent(data.name)}`);
         return;
       }
-      if (data.user && data.user.role !== 'seller') {
+      if (data.user && data.user.role !== 'seller' && data.user.role !== 'admin') {
         throw new Error('Access denied. Please log in using the correct portal.');
       }
       saveAuthSession(data, 'seller');
@@ -83,7 +84,7 @@ export default function SellerLogin() {
       const data = await loginUser(email, password);
 
       // Verify the user is a seller
-      if (data.user.role !== 'seller') {
+      if (data.user.role !== 'seller' && data.user.role !== 'admin') {
         throw new Error('Access denied. Please log in using the correct portal.');
       }
 
@@ -167,9 +168,9 @@ export default function SellerLogin() {
 
           <form className="sl-form" onSubmit={handleSubmit}>
             
-            {/* Input Group: Email */}
+            {/* Input Group: Phone/Email */}
             <div className="sl-input-group">
-              <label className="sl-label" htmlFor="sl-email">Email Address</label>
+              <label className="sl-label" htmlFor="sl-email">Phone Number or Email</label>
               <div className="sl-input-wrapper">
                 <svg className="sl-input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">
                   <path d="M2.5 5h15c.8 0 1.5.7 1.5 1.5v7c0 .8-.7 1.5-1.5 1.5h-15C1.7 15 1 14.3 1 13.5v-7C1 5.7 1.7 5 2.5 5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -177,9 +178,9 @@ export default function SellerLogin() {
                 </svg>
                 <input
                   id="sl-email"
-                  type="email"
+                  type="text"
                   className="sl-input"
-                  placeholder="name@company.com"
+                  placeholder="e.g. 9876543210 or name@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -224,11 +225,26 @@ export default function SellerLogin() {
               </label>
             </div>
 
+            {/* Terms & Conditions Checkbox */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '12px 0 8px 0', padding: '0 2px' }}>
+              <input 
+                id="agree-portal-terms"
+                type="checkbox" 
+                checked={agreeTerms}
+                onChange={(e) => setAgreeTerms(e.target.checked)}
+                style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
+              />
+              <label htmlFor="agree-portal-terms" style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
+                I agree to the <a href="#" onClick={(e) => { e.preventDefault(); alert("EMAHU Seller Terms & Partner Conditions: By signing in, you agree to list genuine verified products, fulfill shipments within standard delivery periods, and process returns in compliance with our safety protocol."); }} style={{ color: '#60a5fa', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+              </label>
+            </div>
+
             {/* Main Submit button with dynamic loading state */}
             <button
               type="submit"
               className={`sl-btn sl-btn--primary ${loading ? 'sl-btn--loading' : ''}`}
-              disabled={loading}
+              disabled={loading || !agreeTerms}
+              style={!agreeTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#4b5563' } : {}}
             >
               {loading ? (
                 <>

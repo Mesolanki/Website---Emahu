@@ -4,9 +4,10 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './dashboard.css';
-import { logoutUser, clearAuthSession, getProfile } from '@/utils/auth';
+import { logoutUser, clearAuthSession, getProfile, changeUserRole, saveAuthSession } from '@/utils/auth';
 import CategorySelector from '@/components/seller_home/CategorySelector';
 import DynamicProductForm from '@/components/seller_home/DynamicProductForm';
+import API_BASE from '@/utils/config';
 
 if (typeof window !== 'undefined') {
   let url = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
@@ -1211,6 +1212,22 @@ export default function EmahuProDashboard() {
     router.push('/seller/login');
   };
 
+  const handleSwitchToBuyer = async () => {
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      if (!token) return;
+      const data = await changeUserRole('buyer', token);
+      if (data.success) {
+        clearAuthSession('seller');
+        saveAuthSession(data, 'buyer');
+        router.push('/buyer/products');
+      }
+    } catch (err) {
+      console.error('Error switching to buyer:', err);
+      triggerToast('Switch Failed', err.message || 'Could not change account role to buyer', 'danger');
+    }
+  };
+
   // Ref for GSTIN text selection to match user screenshot
   const gstinRef = useRef(null);
 
@@ -1543,6 +1560,69 @@ export default function EmahuProDashboard() {
   const [selectedPartnerId, setSelectedPartnerId] = useState('');
   const [isConfirmChecked, setIsConfirmChecked] = useState(false);
   const [hasContactedPartner, setHasContactedPartner] = useState(false);
+
+  // Self-Delivery OTP states
+  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+  const [otpCodeEntered, setOtpCodeEntered] = useState('');
+  const [otpVerifyError, setOtpVerifyError] = useState('');
+  const [otpVerifyingOrderId, setOtpVerifyingOrderId] = useState('');
+  const [isOtpSubmitting, setIsOtpSubmitting] = useState(false);
+
+  const isSelfDeliveryOrder = (o) => {
+    if (!o) return false;
+    const rawOrder = o.raw || o;
+    return rawOrder.deliveryPartnerId === 'sd' || rawOrder.carrier === 'Self-Delivery (sd)' || rawOrder.carrier === 'sd';
+  };
+
+  const handleTriggerDeliveryOtpVerification = (orderId) => {
+    setOtpVerifyingOrderId(orderId);
+    setOtpCodeEntered('');
+    setOtpVerifyError('');
+    setIsOtpModalOpen(true);
+  };
+
+  const handleVerifyDeliveryOtpSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!otpCodeEntered || otpCodeEntered.trim().length !== 6) {
+      setOtpVerifyError('Please enter a valid 6-digit OTP code.');
+      return;
+    }
+    setIsOtpSubmitting(true);
+    setOtpVerifyError('');
+    try {
+      const storedOrders = localStorage.getItem('emahu_orders');
+      if (storedOrders) {
+        const parsed = JSON.parse(storedOrders);
+        const order = parsed.find(o => o.orderId === otpVerifyingOrderId);
+        if (!order) {
+          throw new Error('Order details not found.');
+        }
+
+        const expectedOtp = order.deliveryOtp;
+        if (!expectedOtp) {
+          throw new Error('No delivery verification code found for this order.');
+        }
+
+        if (expectedOtp.trim() !== otpCodeEntered.trim()) {
+          throw new Error('Incorrect delivery verification code. Please ask the customer for the correct code.');
+        }
+
+        // OTP verified successfully
+        await handleAdvanceOrderStatus(otpVerifyingOrderId, 'DELIVERED', '✅ Order delivered successfully. Verified via secure OTP.');
+        
+        // Trigger auto payment release
+        await handleReleasePayment(otpVerifyingOrderId);
+
+        setIsOtpModalOpen(false);
+        triggerToast('Delivery Confirmed', `Order #${otpVerifyingOrderId} verified and delivered successfully!`, 'success');
+      }
+    } catch (err) {
+      console.error('OTP Verification Error:', err);
+      setOtpVerifyError(err.message || 'Verification failed.');
+    } finally {
+      setIsOtpSubmitting(false);
+    }
+  };
 
   const selectedDetailedOrder = useMemo(() => {
     if (!selectedDetailedOrderId) return null;
@@ -2030,7 +2110,7 @@ export default function EmahuProDashboard() {
               timeline: filteredTimeline,
               carrier: partnerName,
               deliveryCost: cost,
-              deliveryPartnerId: partnerId,
+              deliveryPartnerId: partnerId === 'sd' ? null : partnerId,
               deliveryStatus: 'assigned'
             };
           }
@@ -3285,6 +3365,12 @@ export default function EmahuProDashboard() {
             <span className="sidebar-username">{sellerUser ? sellerUser.name : 'Pro Seller Inc.'}</span>
             <span className="sidebar-usertag">{sellerUser ? sellerUser.email : 'Premium Account'}</span>
           </div>
+          <button className="logout-btn" onClick={handleSwitchToBuyer} title="Switch to Buyer Portal" style={{ marginRight: '8px', color: '#6366f1' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
           <button className="logout-btn" onClick={handleSignOut} title="Log Out">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
@@ -4129,14 +4215,15 @@ export default function EmahuProDashboard() {
                                         height: '28px',
                                         fontSize: '0.75rem',
                                         padding: '2px 6px',
-                                        width: '90px',
-                                        background: 'rgba(255,255,255,0.08)',
-                                        borderColor: 'var(--color-success)',
-                                        color: '#10b981',
-                                        borderRadius: '4px',
-                                        fontWeight: 'bold',
+                                        width: '100px',
+                                        background: '#f0fdf4',
+                                        borderColor: '#10b981',
+                                        color: '#059669',
+                                        borderRadius: '6px',
+                                        fontWeight: '700',
                                         textAlign: 'center',
-                                        cursor: 'not-allowed'
+                                        cursor: 'not-allowed',
+                                        letterSpacing: '0.05em'
                                       }}
                                       value={product.adminCode || ''}
                                       readOnly={true}
@@ -4233,7 +4320,7 @@ export default function EmahuProDashboard() {
                 <div className="requests-grid-container" style={{ marginTop: '24px' }}>
 
                   {/* LEFT COLUMN: CREATE REQUEST FORM */}
-                  <div className="card" style={{ padding: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px' }}>
+                  <div className="card requests-form-card" style={{ padding: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px' }}>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
                       <span>📝</span> Submit New Request
                     </h3>
@@ -4326,12 +4413,12 @@ export default function EmahuProDashboard() {
 
 
                         {/* Variations & Options */}
-                        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px', marginTop: '4px', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-primary)', display: 'block', marginBottom: '8px' }}>🎨 Variations &amp; Options</span>
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginTop: '4px', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e293b', display: 'block', marginBottom: '12px', letterSpacing: '-0.01em' }}>🎨 Variations &amp; Options</span>
                           
                           {/* Sizes Option */}
-                          <div style={{ marginBottom: '12px' }}>
-                            <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px', display: 'block' }}>
+                          <div style={{ marginBottom: '14px' }}>
+                            <label className="form-label" style={{ fontSize: '0.75rem', color: '#475569', fontWeight: '600', marginBottom: '8px', display: 'block' }}>
                               {['Apparel & Fashion','Fashion & Apparel'].includes(newProductCategory) ? '👕 Clothing Sizes' :
                                newProductCategory === 'Electronics & Tech' ? '💾 Storage / Variant' :
                                ['Kitchen & Dining','Lifestyle & Home','Home & Kitchen'].includes(newProductCategory) ? '📐 Size / Dimensions' :
@@ -4368,7 +4455,7 @@ export default function EmahuProDashboard() {
                                   return (
                                     <button key={sz} type="button"
                                       onClick={() => setNewProductSizes(sel ? newProductSizes.filter(s => s !== sz) : [...newProductSizes, sz])}
-                                      style={{ padding: '4px 8px', fontSize: '0.72rem', borderRadius: '4px', cursor: 'pointer', border: sel ? '1px solid #2dd4bf' : '1px solid rgba(255,255,255,0.12)', background: sel ? 'rgba(45,212,191,0.12)' : 'rgba(255,255,255,0.03)', color: sel ? '#2dd4bf' : 'var(--text-secondary)', fontWeight: sel ? '700' : '400', transition: 'all 0.15s ease' }}>
+                                      style={{ padding: '5px 10px', fontSize: '0.73rem', borderRadius: '6px', cursor: 'pointer', border: sel ? '1.5px solid #6366f1' : '1px solid #e2e8f0', background: sel ? 'rgba(99,102,241,0.08)' : '#ffffff', color: sel ? '#4f46e5' : '#52525b', fontWeight: sel ? '700' : '500', transition: 'all 0.15s ease', boxShadow: sel ? '0 0 0 2px rgba(99,102,241,0.12)' : 'none' }}>
                                       {sel ? '✓ ' : ''}{sz}
                                     </button>
                                   );
@@ -4393,7 +4480,7 @@ export default function EmahuProDashboard() {
                                   }
                                 }}
                               />
-                              <select id="req-sz-scale-select" className="form-input" style={{ margin: 0, height: '28px', fontSize: '0.72rem', flex: 1.5, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', padding: '0 2px' }}>
+                              <select id="req-sz-scale-select" className="form-input" style={{ margin: 0, height: '28px', fontSize: '0.72rem', flex: 1.5, background: '#ffffff', color: '#18181b', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0 4px' }}>
                                 {(() => {
                                   if (['Apparel & Fashion', 'Fashion & Apparel'].includes(newProductCategory)) {
                                     return (
@@ -4482,14 +4569,14 @@ export default function EmahuProDashboard() {
                                   }
                                 }
                               }}
-                                style={{ height: '28px', padding: '0 8px', fontSize: '0.72rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Add</button>
+                                style={{ height: '28px', padding: '0 10px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#ffffff', color: '#18181b', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '600' }}>+ Add</button>
                             </div>
                             {newProductSizes.length > 0 && (
                               <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                 {newProductSizes.map(sz => (
-                                  <span key={sz} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.3)', color: '#2dd4bf', borderRadius: '20px', padding: '1px 8px', fontSize: '0.7rem', fontWeight: '600' }}>
+                                  <span key={sz} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#4f46e5', borderRadius: '20px', padding: '2px 10px', fontSize: '0.7rem', fontWeight: '600' }}>
                                     {sz}
-                                    <button type="button" onClick={() => setNewProductSizes(newProductSizes.filter(s => s !== sz))} style={{ background: 'none', border: 'none', color: '#2dd4bf', cursor: 'pointer', padding: '0', fontSize: '0.8rem', lineHeight: 1 }}>×</button>
+                                    <button type="button" onClick={() => setNewProductSizes(newProductSizes.filter(s => s !== sz))} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer', padding: '0', fontSize: '0.8rem', lineHeight: 1 }}>×</button>
                                   </span>
                                 ))}
                               </div>
@@ -4497,8 +4584,8 @@ export default function EmahuProDashboard() {
                           </div>
 
                           {/* Colors Option */}
-                          <div>
-                            <label className="form-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px', display: 'block' }}>🎨 Available Colors</label>
+                          <div style={{ marginTop: '14px' }}>
+                            <label className="form-label" style={{ fontSize: '0.75rem', color: '#475569', fontWeight: '600', marginBottom: '8px', display: 'block' }}>🎨 Available Colors</label>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                               {[
                                 {name:'Red',hex:'#ef4444'},{name:'Blue',hex:'#3b82f6'},{name:'Black',hex:'#1a1a1a'},
@@ -4511,8 +4598,8 @@ export default function EmahuProDashboard() {
                                 return (
                                   <button key={col.name} type="button"
                                     onClick={() => setNewProductColors(sel ? newProductColors.filter(c => c !== col.name) : [...newProductColors, col.name])}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', fontSize: '0.72rem', borderRadius: '4px', cursor: 'pointer', border: sel ? '1.5px solid #2dd4bf' : '1px solid rgba(255,255,255,0.12)', background: sel ? 'rgba(45,212,191,0.12)' : 'rgba(255,255,255,0.03)', color: sel ? '#2dd4bf' : 'var(--text-secondary)', fontWeight: sel ? '700' : '400', transition: 'all 0.15s ease' }}>
-                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: col.hex, display: 'inline-block', flexShrink: 0, border: '1px solid rgba(255,255,255,0.2)' }} />
+                                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', fontSize: '0.73rem', borderRadius: '6px', cursor: 'pointer', border: sel ? '1.5px solid #6366f1' : '1px solid #e2e8f0', background: sel ? 'rgba(99,102,241,0.08)' : '#ffffff', color: sel ? '#4f46e5' : '#52525b', fontWeight: sel ? '700' : '500', transition: 'all 0.15s ease' }}>
+                                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: col.hex, display: 'inline-block', flexShrink: 0, border: '1px solid #d1d5db', boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }} />
                                     {col.name}
                                   </button>
                                 );
@@ -4540,7 +4627,7 @@ export default function EmahuProDashboard() {
                                   }
                                 }}
                               />
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '4px', padding: '2px 4px', height: '28px', boxSizing: 'border-box' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '2px 6px', height: '28px', boxSizing: 'border-box' }}>
                                 <input id="req-col-picker-inp" type="color" defaultValue="#319795" style={{ border: 'none', background: 'none', width: '20px', height: '20px', cursor: 'pointer', padding: 0 }} />
                               </div>
                               <button type="button" onClick={() => {
@@ -4560,14 +4647,14 @@ export default function EmahuProDashboard() {
                                   }
                                 }
                               }}
-                                style={{ height: '28px', padding: '0 8px', fontSize: '0.72rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Add</button>
+                                style={{ height: '28px', padding: '0 10px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#ffffff', color: '#18181b', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '600' }}>+ Add</button>
                             </div>
                             {newProductColors.length > 0 && (
                               <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                 {newProductColors.map(c => (
-                                  <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.3)', color: '#2dd4bf', borderRadius: '20px', padding: '1px 8px', fontSize: '0.7rem', fontWeight: '600' }}>
+                                  <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#4f46e5', borderRadius: '20px', padding: '2px 10px', fontSize: '0.7rem', fontWeight: '600' }}>
                                     {c}
-                                    <button type="button" onClick={() => setNewProductColors(newProductColors.filter(x => x !== c))} style={{ background: 'none', border: 'none', color: '#2dd4bf', cursor: 'pointer', padding: '0', fontSize: '0.8rem', lineHeight: 1 }}>×</button>
+                                    <button type="button" onClick={() => setNewProductColors(newProductColors.filter(x => x !== c))} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer', padding: '0', fontSize: '0.8rem', lineHeight: 1 }}>×</button>
                                   </span>
                                 ))}
                               </div>
@@ -4589,11 +4676,23 @@ export default function EmahuProDashboard() {
 
                         <button
                           type="submit"
-                          className="company-portal-btn"
-                          style={{ height: '40px', width: '100%', marginTop: '8px', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                          className="req-submit-btn"
                           disabled={isSubmittingProduct}
                         >
-                          {isSubmittingProduct ? 'Submitting...' : 'Submit Request'}
+                          {isSubmittingProduct ? (
+                            <>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: 'spin 1s linear infinite' }}>
+                                <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" strokeOpacity="0.3"/>
+                                <path d="M21 12a9 9 0 0 0-9-9" />
+                              </svg>
+                              Submitting...
+                            </>
+                          ) : (
+                            <>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z"/></svg>
+                              Submit for Admin Review
+                            </>
+                          )}
                         </button>
                       </div>
                     </form>
@@ -4976,7 +5075,7 @@ export default function EmahuProDashboard() {
                                 </>
                               )}
 
-                              {order.status === 'READY_FOR_PICKUP' && (
+                              {order.status === 'READY_FOR_PICKUP' && isSelfDeliveryOrder(order) && (
                                 <button
                                   className="order-action-btn carrier"
                                   onClick={() => handleAdvanceOrderStatus(order.id, 'PICKED_UP', `🚀 Package picked up by ${order.raw?.carrier ? 'courier partner ' + order.raw.carrier : 'Seller (Self-Delivery)'}.`)}
@@ -4986,7 +5085,7 @@ export default function EmahuProDashboard() {
                                 </button>
                               )}
 
-                              {order.status === 'PICKED_UP' && (
+                              {order.status === 'PICKED_UP' && isSelfDeliveryOrder(order) && (
                                 <button
                                   className="order-action-btn carrier"
                                   onClick={() => handleAdvanceOrderStatus(order.id, 'IN_TRANSIT', '🚚 Order package is in transit.')}
@@ -4996,7 +5095,7 @@ export default function EmahuProDashboard() {
                                 </button>
                               )}
 
-                              {order.status === 'IN_TRANSIT' && (
+                              {order.status === 'IN_TRANSIT' && isSelfDeliveryOrder(order) && (
                                 <button
                                   className="order-action-btn carrier"
                                   onClick={() => handleAdvanceOrderStatus(order.id, 'OUT_FOR_DELIVERY', '🛵 Package is out for delivery.')}
@@ -5006,10 +5105,10 @@ export default function EmahuProDashboard() {
                                 </button>
                               )}
 
-                              {order.status === 'OUT_FOR_DELIVERY' && (
+                              {order.status === 'OUT_FOR_DELIVERY' && isSelfDeliveryOrder(order) && (
                                 <button
                                   className="order-action-btn approve"
-                                  onClick={() => handleAdvanceOrderStatus(order.id, 'DELIVERED', '✅ Order delivered successfully.')}
+                                  onClick={() => handleTriggerDeliveryOtpVerification(order.id)}
                                   disabled={orderLoading[order.id]}
                                 >
                                   {orderLoading[order.id] ? 'Processing...' : '✅ Delivered'}
@@ -6624,6 +6723,108 @@ export default function EmahuProDashboard() {
         );
       })()}
       
+      {/* --- SELF-DELIVERED OTP VERIFICATION MODAL (LIGHT MODE) --- */}
+      {isOtpModalOpen && (
+        <div className="modal-overlay" style={{ zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '440px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            
+            {/* Header */}
+            <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>🔑 Verify Delivery OTP</h3>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>Secure Handover · Order #{otpVerifyingOrderId}</p>
+              </div>
+              <button onClick={() => setIsOtpModalOpen(false)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#64748b', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleVerifyDeliveryOtpSubmit} style={{ padding: '22px' }}>
+              <p style={{ margin: '0 0 20px 0', fontSize: '0.84rem', color: '#475569', lineHeight: '1.5' }}>
+                Ask the customer for the 6-digit delivery security code (OTP) sent to their email/SMS. Enter it below to confirm successful package receipt.
+              </p>
+
+              {otpVerifyError && (
+                <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', fontSize: '0.8rem', marginBottom: '16px', fontWeight: '600' }}>
+                  ⚠️ {otpVerifyError}
+                </div>
+              )}
+
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '8px' }}>
+                  Enter 6-Digit Code *
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="e.g. 123456"
+                  required
+                  value={otpCodeEntered}
+                  onChange={(e) => setOtpCodeEntered(e.target.value.replace(/[^0-9]/g, ''))}
+                  style={{
+                    height: '46px',
+                    width: '100%',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '0 16px',
+                    fontSize: '1.2rem',
+                    fontWeight: '700',
+                    textAlign: 'center',
+                    letterSpacing: '0.3em',
+                    color: '#18181b',
+                    background: '#f8fafc',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsOtpModalOpen(false)}
+                  style={{
+                    flex: 1,
+                    height: '42px',
+                    background: '#f1f5f9',
+                    color: '#475569',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Cancel
+                </button>
+                
+                <button
+                  type="submit"
+                  disabled={isOtpSubmitting || otpCodeEntered.length !== 6}
+                  style={{
+                    flex: 1,
+                    height: '42px',
+                    background: '#10b981',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    fontSize: '0.85rem',
+                    cursor: (isOtpSubmitting || otpCodeEntered.length !== 6) ? 'not-allowed' : 'pointer',
+                    opacity: (isOtpSubmitting || otpCodeEntered.length !== 6) ? 0.7 : 1,
+                    boxShadow: '0 4px 12px rgba(16,185,129,0.2)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {isOtpSubmitting ? 'Verifying...' : '🔑 Confirm Delivery'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      
       {/* --- REJECTION REASON MODAL --- */}
       {isRejectModalOpen && (
         <div className="modal-overlay" style={{ zIndex: 9999 }}>
@@ -7345,7 +7546,7 @@ export default function EmahuProDashboard() {
                               </div>
                             )}
 
-                            {selectedDetailedOrder.status === 'READY_FOR_PICKUP' && (
+                            {selectedDetailedOrder.status === 'READY_FOR_PICKUP' && isSelfDeliveryOrder(selectedDetailedOrder) && (
                               <button
                                 className="btn-primary"
                                 style={{ height: '40px', fontSize: '0.88rem', width: '100%' }}
@@ -7356,18 +7557,18 @@ export default function EmahuProDashboard() {
                               </button>
                             )}
 
-                            {selectedDetailedOrder.status === 'PICKED_UP' && (
+                            {selectedDetailedOrder.status === 'PICKED_UP' && isSelfDeliveryOrder(selectedDetailedOrder) && (
                               <button
                                 className="btn-primary"
                                 style={{ height: '40px', fontSize: '0.88rem', width: '100%' }}
                                 onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'IN_TRANSIT', '🚚 Order package is in transit via EV corridor.')}
                                 disabled={orderLoading[selectedDetailedOrder.orderId]}
                               >
-                                🚛 Move into Transit Route
+                                🚚 Move into Transit Route
                               </button>
                             )}
 
-                            {selectedDetailedOrder.status === 'IN_TRANSIT' && (
+                            {selectedDetailedOrder.status === 'IN_TRANSIT' && isSelfDeliveryOrder(selectedDetailedOrder) && (
                               <button
                                 className="btn-primary"
                                 style={{ height: '40px', fontSize: '0.88rem', width: '100%' }}
@@ -7378,7 +7579,7 @@ export default function EmahuProDashboard() {
                               </button>
                             )}
 
-                            {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && (
+                            {selectedDetailedOrder.status === 'OUT_FOR_DELIVERY' && isSelfDeliveryOrder(selectedDetailedOrder) && (
                               <button
                                 className="btn-primary"
                                 style={{
@@ -7398,7 +7599,7 @@ export default function EmahuProDashboard() {
                                   fontWeight: '700',
                                   cursor: 'pointer'
                                 }}
-                                onClick={() => handleAdvanceOrderStatus(selectedDetailedOrder.orderId, 'DELIVERED', '✅ Order delivered successfully.')}
+                                onClick={() => handleTriggerDeliveryOtpVerification(selectedDetailedOrder.orderId)}
                                 disabled={orderLoading[selectedDetailedOrder.orderId]}
                               >
                                 🎉 Mark Order Delivered

@@ -165,3 +165,32 @@ export function checkIsLoggedIn(role) {
   const keyPrefix = role === 'seller' ? 'emahu_seller' : role === 'delivery' ? 'emahu_delivery' : role === 'admin' ? 'emahu_admin' : 'emahu_buyer';
   return localStorage.getItem(`${keyPrefix}_logged_in`) === 'true';
 }
+
+/**
+ * Request a backend role switch and update user details
+ */
+export async function changeUserRole(newRole, token, details = {}) {
+  try {
+    const payload = { role: newRole };
+    if (newRole === 'seller') {
+      payload.storeDetails = details;
+    } else if (newRole === 'delivery') {
+      payload.vehicleDetails = details;
+    }
+
+    const response = await fetch(`${API_BASE}/api/auth/change-role`, {
+      method: 'PUT',
+      headers: getHeaders(token),
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to change role');
+    }
+    return data;
+  } catch (error) {
+    console.error('API Change Role Error:', error.message);
+    throw error;
+  }
+}

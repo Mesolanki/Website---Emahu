@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { io } from 'socket.io-client';
-import { registerUser, loginUser, saveAuthSession, clearAuthSession, checkIsLoggedIn } from '@/utils/auth';
+import { registerUser, loginUser, saveAuthSession, clearAuthSession, checkIsLoggedIn, changeUserRole } from '@/utils/auth';
 import { indiaStatesCities } from '@/utils/indiaStatesCities';
 import './delivery.css';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
@@ -30,6 +30,7 @@ export default function DeliveryPortal() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [portalMode, setPortalMode] = useState('register'); // 'register', 'dashboard'
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
   // --- Registration / Onboarding States ---
   const [regCategory, setRegCategory] = useState('single_two_boy'); // 'single_two_boy', 'agency', 'partner'
@@ -355,7 +356,7 @@ export default function DeliveryPortal() {
     setLoginLoading(true);
     try {
       const data = await loginUser(loginEmail.trim(), loginPassword);
-      if (data.user.role !== 'delivery') {
+      if (data.user.role !== 'delivery' && data.user.role !== 'admin') {
         throw new Error('This login portal is restricted to Delivery Partners only.');
       }
       saveAuthSession(data, 'delivery');
@@ -376,6 +377,25 @@ export default function DeliveryPortal() {
     setUser(null);
     setToken(null);
     setPortalMode('login');
+  };
+
+  const handleSwitchToBuyer = async () => {
+    try {
+      const storedToken = localStorage.getItem('emahu_delivery_token') || token;
+      if (!storedToken) return;
+      const data = await changeUserRole('buyer', storedToken);
+      if (data.success) {
+        clearAuthSession('delivery');
+        saveAuthSession(data, 'buyer');
+        setIsLoggedIn(false);
+        setUser(null);
+        setToken(null);
+        window.location.href = '/buyer/products';
+      }
+    } catch (err) {
+      console.error('Error switching to buyer:', err);
+      alert(err.message || 'Could not change account role to buyer');
+    }
   };
 
   const handleSendEmailOtp = async () => {
@@ -493,10 +513,10 @@ export default function DeliveryPortal() {
       if (!gstNumber.trim()) newErrors.gstNumber = 'GSTIN is required';
     }
 
-    if (!email.trim()) {
-      newErrors.email = 'Email is required';
+    if (!phoneNumber.trim()) {
+      newErrors.phoneNumber = 'Contact number is required';
     } else if (!isEmailVerified) {
-      newErrors.email = 'Please verify your email address via OTP first';
+      newErrors.phoneNumber = 'Please verify your mobile number via OTP first';
     }
     if (!password || password.length < 6) newErrors.password = 'Password must be >= 6 chars';
     if (!phoneNumber.trim()) newErrors.phoneNumber = 'Contact number is required';
@@ -537,7 +557,7 @@ export default function DeliveryPortal() {
     try {
       const payload = {
         name: deliveryName,
-        email: email.trim(),
+        email: email.trim() || `${phoneNumber.trim()}@emahu.com`,
         password,
         role: 'delivery',
         phone: phoneNumber.trim(),
@@ -699,7 +719,7 @@ export default function DeliveryPortal() {
     try {
       const payload = {
         name: deliveryName,
-        email: email.trim(),
+        email: email.trim() || `${phoneNumber.trim()}@emahu.com`,
         password,
         role: 'delivery',
         phone: phoneNumber.trim(),
@@ -1227,6 +1247,9 @@ export default function DeliveryPortal() {
             {isLoggedIn ? (
               <>
                 <span className="lp-nav-user">👋 {user?.name} ({user?.currentCity})</span>
+                <button onClick={handleSwitchToBuyer} className="lp-nav-link-btn" style={{ background: '#3182ce', color: '#fff', border: 'none', marginRight: '8px' }}>
+                  Become Buyer
+                </button>
                 <button onClick={() => setEditProfileMode(!editProfileMode)} className="lp-nav-link-btn">
                   Edit Fleet Profile
                 </button>
@@ -1403,19 +1426,6 @@ export default function DeliveryPortal() {
                     )}
 
                     <div className="form-group">
-                      <label className="form-label" htmlFor="email">Email Address</label>
-                      <input
-                        type="email"
-                        id="email"
-                        className={`form-input ${errors.email ? 'form-input--error' : ''}`}
-                        placeholder="e.g. partner@emahu.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                      {errors.email && <span className="form-error">{errors.email}</span>}
-                    </div>
-
-                    <div className="form-group">
                       <label className="form-label" htmlFor="phoneNumber">
                         {regCategory === 'single_two_boy' ? 'Mobile Number' :
                           regCategory === 'agency' ? 'Contact Mobile Number' : 'Corporate Mobile Number'}
@@ -1430,6 +1440,7 @@ export default function DeliveryPortal() {
                           onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
                           readOnly={isEmailVerified}
                           style={{ flex: 1 }}
+                          required
                         />
                         {!isEmailVerified && (
                           <button
@@ -1469,20 +1480,6 @@ export default function DeliveryPortal() {
                             </button>
                           </div>
                           {errors.otp && <span className="form-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
-
-                          {devOtp && (
-                            <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '8px' }}>
-                              <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>📧 Code also shown here (check spam too):</div>
-                              <div
-                                style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#fff', background: 'rgba(0,0,0,0.25)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
-                                onClick={() => setEmailOtp(devOtp)}
-                                title="Click to auto-fill"
-                              >
-                                {devOtp}
-                              </div>
-                              <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
-                            </div>
-                          )}
                         </div>
                       )}
 
@@ -1762,7 +1759,7 @@ export default function DeliveryPortal() {
                         className="form-textarea"
                         placeholder={
                           regCategory === 'single_two_boy' ? 'e.g. Available for night deliveries, personal bike...' :
-                            regCategory === 'agency' ? 'e.g. Fleet of 10 bikes and 5 vans, standard billing...' :
+                          regCategory === 'agency' ? 'e.g. Fleet of 10 bikes and 5 vans, standard billing...' :
                               'e.g. SLA guaranteed within 4 hours, regional cargo trucks available...'
                         }
                         value={dispatchNotes}
@@ -1772,7 +1769,26 @@ export default function DeliveryPortal() {
                     </div>
                   </div>
 
-                  <button type="submit" className="form-btn" disabled={loading}>
+                  {/* Terms & Conditions Checkbox */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '20px 0 16px 0', padding: '0 4px' }}>
+                    <input 
+                      id="agree-portal-terms-register"
+                      type="checkbox" 
+                      checked={agreeTerms}
+                      onChange={(e) => setAgreeTerms(e.target.checked)}
+                      style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="agree-portal-terms-register" style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
+                      I agree to the <a href="#" onClick={(e) => { e.preventDefault(); alert("EMAHU Delivery Partner Terms & Conditions: By onboarding as a delivery agent, you agree to coordinate local city transport orders, handle client parcels with due diligence, maintain prompt ETA schedules, and follow compliance parameters."); }} style={{ color: '#319795', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+                    </label>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="form-btn" 
+                    disabled={loading || !agreeTerms}
+                    style={!agreeTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#4a5568' } : {}}
+                  >
                     {loading ? 'Submitting Registration...' : 'Register Dispatch Partner'}
                   </button>
                 </form>
@@ -1833,7 +1849,26 @@ export default function DeliveryPortal() {
                   />
                 </div>
                 
-                <button type="submit" className="form-btn" disabled={loginLoading} style={{ width: '100%', background: '#319795', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                {/* Terms & Conditions Checkbox */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '12px 0 16px 0', padding: '0 2px' }}>
+                  <input 
+                    id="agree-portal-terms-login"
+                    type="checkbox" 
+                    checked={agreeTerms}
+                    onChange={(e) => setAgreeTerms(e.target.checked)}
+                    style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="agree-portal-terms-login" style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
+                    I agree to the <a href="#" onClick={(e) => { e.preventDefault(); alert("EMAHU Delivery Partner Terms & Conditions: By onboarding as a delivery agent, you agree to coordinate local city transport orders, handle client parcels with due diligence, maintain prompt ETA schedules, and follow compliance parameters."); }} style={{ color: '#319795', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+                  </label>
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="form-btn" 
+                  disabled={loginLoading || !agreeTerms} 
+                  style={{ width: '100%', background: '#319795', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', ...(!agreeTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8' } : {}) }}
+                >
                   {loginLoading ? 'Logging in...' : 'Sign In to Dashboard'}
                 </button>
                 

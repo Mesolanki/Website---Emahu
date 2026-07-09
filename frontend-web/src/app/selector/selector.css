@@ -487,16 +487,61 @@
   color: #ffffff;
 }
 
-/* Central Searchbar inside explorer */
-.sel-searchbar-container {
-  margin-bottom: 40px;
+/* Central Controls Row (Search & Seller Dropdown) */
+.sel-controls-row {
+  display: flex;
+  gap: 16px;
+  max-width: 900px;
+  margin: 0 auto 36px auto;
+  align-items: center;
+  justify-content: center;
 }
 
 .sel-searchbar-wrapper {
   position: relative;
+  flex-grow: 1;
   width: 100%;
-  max-width: 650px;
-  margin: 0 auto;
+}
+
+.sel-seller-filter-wrapper {
+  flex-shrink: 0;
+  width: 300px;
+}
+
+.sel-seller-select {
+  width: 100%;
+  height: 52px;
+  padding: 0 40px 0 16px;
+  border-radius: 16px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 16px center;
+  background-size: 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.015);
+  appearance: none;
+  -webkit-appearance: none;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.sel-seller-select:focus,
+.sel-seller-select:hover {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12), 0 6px 16px rgba(15, 23, 42, 0.03);
+  outline: none;
+}
+
+@media (max-width: 768px) {
+  .sel-controls-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sel-seller-filter-wrapper {
+    width: 100%;
+  }
 }
 
 .sel-search-icon {

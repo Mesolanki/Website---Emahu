@@ -309,15 +309,19 @@ export default function ProductDetailPage() {
             status: p.status,
             specs: [
               ['Category', p.category],
+              ['Subcategory', p.subcategory || 'General'],
               ['Available Inventory', `${p.stock} units`],
               ['Status', p.status === 'in-stock' ? 'In Stock' : p.status === 'low-stock' ? 'Low Stock' : 'Out of Stock'],
               ['SKU Identifier', p.sku],
-              ['Seller Name', p.seller?.name || 'Authorized Merchant']
+              ['Seller Name', p.seller?.name || 'Authorized Merchant'],
+              ['Seller Shop', p.seller?.storeName || 'Authorized Store']
             ],
             verified: true,
             isHot: false,
             onSale: p.comparePrice ? (p.price < p.comparePrice) : false,
-            seller: p.seller
+            seller: p.seller,
+            sellerStore: p.seller?.storeName || 'Emahu Store',
+            sellerName: p.seller?.name || 'Emahu Merchant'
           });
 
           // Log analytics event for product view
@@ -359,14 +363,18 @@ export default function ProductDetailPage() {
             status: 'in-stock',
             specs: [
               ['Category', staticProd.category],
+              ['Subcategory', staticProd.subcategory || 'General'],
               ['Available Inventory', '10 units'],
               ['Status', 'In Stock'],
-              ['Seller Name', typeof staticProd.seller === 'string' ? staticProd.seller : 'Authorized Merchant']
+              ['Seller Name', typeof staticProd.seller === 'string' ? staticProd.seller : 'Authorized Merchant'],
+              ['Seller Shop', typeof staticProd.seller === 'string' ? staticProd.seller : 'Authorized Store']
             ],
             verified: true,
             isHot: false,
             onSale: staticProd.originalPrice ? (staticProd.price < staticProd.originalPrice) : false,
-            seller: typeof staticProd.seller === 'string' ? { name: staticProd.seller, id: 'static-seller-' + staticProd.id } : staticProd.seller
+            seller: typeof staticProd.seller === 'string' ? { name: staticProd.seller, id: 'static-seller-' + staticProd.id } : staticProd.seller,
+            sellerStore: typeof staticProd.seller === 'string' ? staticProd.seller : 'Emahu Store',
+            sellerName: staticProd.brand
           });
         }
       }
@@ -433,6 +441,42 @@ export default function ProductDetailPage() {
         });
       }
       router.push('/buyer/checkout');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleQuickAddRelatedProduct = (e, relatedProd) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isUserLoggedIn) {
+      router.push('/buyer/login');
+      return;
+    }
+    try {
+      const storedCartStr = localStorage.getItem('emahu_cart') || '[]';
+      const storedCart = JSON.parse(storedCartStr);
+      const prodId = relatedProd.id || relatedProd._id;
+      if (!storedCart.some(x => (typeof x === 'object' ? x.id : x).toString() === prodId.toString())) {
+        storedCart.push({
+          id: prodId,
+          quantity: 1,
+          color: relatedProd.colors?.[0] || 'Default',
+          size: relatedProd.sizes?.[0] || 'Default'
+        });
+        localStorage.setItem('emahu_cart', JSON.stringify(storedCart));
+        window.dispatchEvent(new Event('storage'));
+        
+        logAnalyticsEvent({
+          type: 'add_to_cart',
+          productId: prodId,
+          sellerId: relatedProd.seller?._id || relatedProd.seller?.id || relatedProd.seller
+        });
+        
+        alert(`🛒 Added "${relatedProd.name}" to your cart!`);
+      } else {
+        alert(`🛒 "${relatedProd.name}" is already in your cart!`);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -537,7 +581,17 @@ export default function ProductDetailPage() {
               <span>to purchase or save items.</span>
             </div>
           )}
-          <p className="pd-info__brand">{product.brand}</p>
+          <p className="pd-info__brand">
+            {product.brand}
+            {product.sellerStore && (
+              <>
+                <span style={{ margin: '0 6px', color: '#cbd5e1' }}>•</span>
+                <span style={{ textTransform: 'none', color: '#475569', fontWeight: '500' }}>
+                  Sold by: <strong>{product.sellerStore}</strong>
+                </span>
+              </>
+            )}
+          </p>
           <h1 className="pd-info__name">{product.name}</h1>
 
           {/* Rating */}
@@ -635,6 +689,140 @@ export default function ProductDetailPage() {
               </svg>
             </button>
           </div>
+
+
+          {/* Frequently Bought Together Bundle Card */}
+          {relatedProducts.length > 0 && (
+            <div style={{
+              marginTop: '32px',
+              marginBottom: '20px',
+              padding: '20px',
+              background: '#ffffff',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '16px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s'
+            }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '0.88rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                🤝 Frequently Bought Together
+              </h3>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px', flexWrap: 'wrap' }}>
+                {/* Main Product Thumbnail */}
+                <div style={{ width: '70px', height: '70px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', position: 'relative', flexShrink: 0 }}>
+                  {isRealImage(product.image) ? (
+                    <img src={cleanImageUrl(product.image)} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: '2rem' }}>{product.image || '📦'}</span>
+                  )}
+                  <span style={{ position: 'absolute', bottom: '2px', right: '2px', background: '#0f172a', color: '#fff', fontSize: '0.62rem', fontWeight: '800', padding: '1px 4px', borderRadius: '4px' }}>This</span>
+                </div>
+                
+                <span style={{ fontSize: '1.4rem', fontWeight: '300', color: '#94a3b8' }}>+</span>
+                
+                {/* Related Product Thumbnail */}
+                {(() => {
+                  const s = relatedProducts[0];
+                  return (
+                    <div style={{ width: '70px', height: '70px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', position: 'relative', flexShrink: 0 }}>
+                      {isRealImage(s.img) ? (
+                        <img src={s.img} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <span style={{ fontSize: '2rem' }}>{s.img || '📦'}</span>
+                      )}
+                      <span style={{ position: 'absolute', bottom: '2px', right: '2px', background: '#4169e1', color: '#fff', fontSize: '0.62rem', fontWeight: '800', padding: '1px 4px', borderRadius: '4px' }}>Add-on</span>
+                    </div>
+                  );
+                })()}
+
+                {/* Bundle pricing summary */}
+                {(() => {
+                  const s = relatedProducts[0];
+                  const totalBundlePrice = product.price + s.price;
+                  return (
+                    <div style={{ flex: 1, minWidth: '150px' }}>
+                      <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: '700', color: '#334155' }}>
+                        Bundle Accessory
+                      </p>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
+                        {s.name}
+                      </p>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', fontWeight: '800', color: '#16a34a' }}>
+                        Total: ₹{totalBundlePrice.toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Add Bundle Button */}
+              {(() => {
+                const s = relatedProducts[0];
+                return (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isUserLoggedIn) {
+                        router.push('/buyer/login');
+                        return;
+                      }
+                      try {
+                        const storedCartStr = localStorage.getItem('emahu_cart') || '[]';
+                        const storedCart = JSON.parse(storedCartStr);
+                        
+                        // Add main product
+                        if (!storedCart.some(x => (typeof x === 'object' ? x.id : x).toString() === product.id.toString())) {
+                          storedCart.push({
+                            id: product.id,
+                            quantity: qty,
+                            color: product.colors[activeColor] || 'Default',
+                            size: activeSize || 'Default'
+                          });
+                        }
+                        
+                        // Add suggestion product
+                        const sId = s.id || s._id;
+                        if (!storedCart.some(x => (typeof x === 'object' ? x.id : x).toString() === sId.toString())) {
+                          storedCart.push({
+                            id: sId,
+                            quantity: 1,
+                            color: s.colors?.[0] || 'Default',
+                            size: s.sizes?.[0] || 'Default'
+                          });
+                        }
+                        
+                        localStorage.setItem('emahu_cart', JSON.stringify(storedCart));
+                        window.dispatchEvent(new Event('storage'));
+                        
+                        alert(`🛒 Added Both items to your cart!`);
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '11px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #4169e1, #2b4594)',
+                      color: '#fff',
+                      fontWeight: '700',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(65,105,225,0.2)',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    ⚡ Buy Both Together (Add Bundle to Cart)
+                  </button>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Delivery info */}
           <div className="pd-delivery-cards">
@@ -880,7 +1068,7 @@ export default function ProductDetailPage() {
         <h2 className="pd-related__title">You Might Also Like</h2>
         <div className="pd-related-grid">
           {relatedProducts.map(r => (
-            <Link key={r.id} href={`/buyer/products/${r.id}`} className="pd-related-card">
+            <div key={r.id} className="pd-related-card" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => router.push(`/buyer/products/${r.id}`)}>
               <div className="pd-related-img-wrap" style={r.isEmoji ? { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' } : {}}>
                 {r.isEmoji ? (
                   <span>{r.img}</span>
@@ -890,8 +1078,28 @@ export default function ProductDetailPage() {
               </div>
               <p className="pd-related-brand">{r.brand}</p>
               <p className="pd-related-name">{r.name}</p>
-              <p className="pd-related-price">₹{r.price.toLocaleString('en-IN')}</p>
-            </Link>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                <p className="pd-related-price" style={{ margin: 0 }}>₹{r.price.toLocaleString('en-IN')}</p>
+                <button
+                  type="button"
+                  onClick={(e) => handleQuickAddRelatedProduct(e, r)}
+                  style={{
+                    background: '#eff6ff',
+                    color: '#2563eb',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    fontSize: '0.72rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  + Add
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       </section>

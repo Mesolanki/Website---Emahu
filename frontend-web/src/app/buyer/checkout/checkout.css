@@ -779,3 +779,20 @@
     box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
   }
 }
+
+/* Responsive Terms Checkbox Layout Wrappers */
+.co-terms-wrap-desktop {
+  display: flex !important;
+}
+.co-terms-wrap-mobile {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .co-terms-wrap-desktop {
+    display: none !important;
+  }
+  .co-terms-wrap-mobile {
+    display: flex !important;
+  }
+}

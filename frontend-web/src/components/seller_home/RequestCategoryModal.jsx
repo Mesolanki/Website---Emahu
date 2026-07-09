@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import API_BASE from '@/utils/config';
 
 export default function RequestCategoryModal({
   isOpen,
@@ -31,7 +32,7 @@ export default function RequestCategoryModal({
 
     try {
       const token = localStorage.getItem('emahu_seller_token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories/request`, {
+      const res = await fetch(`${API_BASE}/api/categories/request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

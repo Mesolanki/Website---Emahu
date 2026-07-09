@@ -245,6 +245,26 @@ export default function AdminDashboard() {
   // Sub-tab state for unified Products Hub tab
   const [productsHubSubTab, setProductsHubSubTab] = useState('queue'); // 'queue' | 'live' | 'rejected'
 
+  // Category Hub states
+  const [adminCategories, setAdminCategories] = useState([]);
+  const [loadingAdminCategories, setLoadingAdminCategories] = useState(false);
+  const [adminCategoriesError, setAdminCategoriesError] = useState(false);
+  const [selectedAdminCategory, setSelectedAdminCategory] = useState(null);
+  const [isCategoryFormSaving, setIsCategoryFormSaving] = useState(false);
+  const [categoryHubSearchQuery, setCategoryHubSearchQuery] = useState('');
+  
+  // Category form fields state
+  const [catFormName, setCatFormName] = useState('');
+  const [catFormParentId, setCatFormParentId] = useState('');
+  const [catFormBrands, setCatFormBrands] = useState('');
+  const [catFormAttributes, setCatFormAttributes] = useState([]);
+  const [catFormSpecifications, setCatFormSpecifications] = useState([]);
+  const [catFormValidationRules, setCatFormValidationRules] = useState({ minImages: 1, brandRequired: false, variantRequired: false });
+  const [catFormIcon, setCatFormIcon] = useState('');
+  const [catFormImage, setCatFormImage] = useState('');
+  const [catFormOrder, setCatFormOrder] = useState(0);
+  const [catFormIsEnabled, setCatFormIsEnabled] = useState(true);
+
   // Orders states
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -486,6 +506,163 @@ export default function AdminDashboard() {
       triggerToast('Error', 'Network error fetching products.', 'danger');
     } finally {
       setLoadingProducts(false);
+    }
+  };
+
+  // Fetch Categories Tree
+  const fetchCategories = async () => {
+    setLoadingAdminCategories(true);
+    setAdminCategoriesError(false);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories?status=all`);
+      const data = await res.json();
+      if (data.success) {
+        setAdminCategories(data.data || []);
+      } else {
+        setAdminCategoriesError(true);
+        triggerToast('Error', data.error || 'Failed to fetch categories.', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      setAdminCategoriesError(true);
+      triggerToast('Error', 'Network error fetching categories.', 'danger');
+    } finally {
+      setLoadingAdminCategories(false);
+    }
+  };
+
+  const handleSelectCategory = (cat) => {
+    setSelectedAdminCategory(cat);
+    if (!cat) return;
+    setCatFormName(cat.name || '');
+    setCatFormParentId(cat.parentId || '');
+    setCatFormBrands(cat.brands ? cat.brands.join(', ') : '');
+    setCatFormAttributes(cat.attributes || []);
+    setCatFormSpecifications(cat.specifications || []);
+    setCatFormValidationRules(cat.validationRules || { minImages: 1, brandRequired: false, variantRequired: false });
+    setCatFormIcon(cat.icon || '');
+    setCatFormImage(cat.image || '');
+    setCatFormOrder(cat.order || 0);
+    setCatFormIsEnabled(cat.isEnabled !== undefined ? cat.isEnabled : true);
+  };
+
+  const handleCreateCategoryInit = (defaultParentId = '') => {
+    setSelectedAdminCategory({ id: 'new' });
+    setCatFormName('');
+    setCatFormParentId(defaultParentId);
+    setCatFormBrands('');
+    setCatFormAttributes([]);
+    setCatFormSpecifications([]);
+    setCatFormValidationRules({ minImages: 1, brandRequired: false, variantRequired: false });
+    setCatFormIcon('');
+    setCatFormImage('');
+    setCatFormOrder(0);
+    setCatFormIsEnabled(true);
+  };
+  const addAttributeField = () => {
+    setCatFormAttributes([...catFormAttributes, { name: '', type: 'text', options: '', isRequired: false, isVariant: false }]);
+  };
+  const updateAttributeField = (index, key, val) => {
+    const updated = [...catFormAttributes];
+    updated[index][key] = val;
+    setCatFormAttributes(updated);
+  };
+  const removeAttributeField = (index) => {
+    setCatFormAttributes(catFormAttributes.filter((_, i) => i !== index));
+  };
+
+  const addSpecificationField = () => {
+    setCatFormSpecifications([...catFormSpecifications, { name: '', isRequired: false }]);
+  };
+  const updateSpecificationField = (index, key, val) => {
+    const updated = [...catFormSpecifications];
+    updated[index][key] = val;
+    setCatFormSpecifications(updated);
+  };
+  const removeSpecificationField = (index) => {
+    setCatFormSpecifications(catFormSpecifications.filter((_, i) => i !== index));
+  };
+
+  const handleSaveCategory = async (e) => {
+    if (e) e.preventDefault();
+    if (!catFormName.trim()) {
+      triggerToast('Validation Error', 'Category name is required', 'warning');
+      return;
+    }
+    setIsCategoryFormSaving(true);
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      const isNew = !selectedAdminCategory || selectedAdminCategory.id === 'new';
+      
+      const payload = {
+        name: catFormName.trim(),
+        parentId: catFormParentId || null,
+        brands: catFormBrands.split(',').map(b => b.trim()).filter(Boolean),
+        attributes: catFormAttributes,
+        specifications: catFormSpecifications,
+        validationRules: catFormValidationRules,
+        icon: catFormIcon.trim(),
+        image: catFormImage.trim(),
+        order: Number(catFormOrder || 0),
+        isEnabled: catFormIsEnabled
+      };
+
+      const url = isNew
+        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories`
+        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories/${selectedAdminCategory.id || selectedAdminCategory._id}`;
+
+      const method = isNew ? 'POST' : 'PUT';
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        triggerToast('Success', isNew ? 'Category created successfully!' : 'Category updated successfully!', 'success');
+        fetchCategories();
+        if (isNew) {
+          handleSelectCategory(data.data);
+        } else {
+          // Refresh local state object
+          setSelectedAdminCategory(data.data);
+        }
+      } else {
+        triggerToast('Error', data.error || 'Failed to save category configuration.', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error saving category configuration.', 'danger');
+    } finally {
+      setIsCategoryFormSaving(false);
+    }
+  };
+
+  const handleDeleteCategory = async (catId) => {
+    if (!window.confirm('Are you sure you want to permanently delete this category? Any children subcategories will be unnested.')) return;
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories/${catId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        triggerToast('Success', 'Category removed successfully.', 'success');
+        setSelectedAdminCategory(null);
+        fetchCategories();
+      } else {
+        triggerToast('Error', data.error || 'Failed to delete category.', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error deleting category.', 'danger');
     }
   };
 
@@ -1197,6 +1374,8 @@ export default function AdminDashboard() {
       setTimeout(() => fetchPlatformSettings(), 0);
     } else if (activeTab === 'notifications') {
       setTimeout(() => fetchNotifications(), 0);
+    } else if (activeTab === 'categories-hub') {
+      setTimeout(() => fetchCategories(), 0);
     }
   }, [isAuthorized, activeTab]);
 
@@ -4049,6 +4228,11 @@ export default function AdminDashboard() {
             </button>
           </li>
           <li>
+            <button className={`ad-sidebar-btn ${activeTab === 'categories-hub' ? 'active' : ''}`} onClick={() => { setActiveTab('categories-hub'); setMobileSidebarOpen(false); }}>
+              📂 Category Hub
+            </button>
+          </li>
+          <li>
             <button className={`ad-sidebar-btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => { setActiveTab('orders'); setMobileSidebarOpen(false); }}>
               🚚 Fulfillment Hub {orders.filter(o => o.status !== 'DELIVERED' && o.status !== 'COMPLETED' && o.status !== 'REJECTED' && o.status !== '❌ Order Rejected by Seller').length > 0 && (
                 <span style={{ background: '#6366f1', color: '#fff', borderRadius: '50%', padding: '2px 8px', fontSize: '0.7rem', marginLeft: '6px', fontWeight: 'bold' }}>
@@ -5077,6 +5261,480 @@ export default function AdminDashboard() {
                   {notifications.length === 0 && (
                     <div className="ad-empty" style={{ textAlign: 'center', padding: '40px', color: '#71717a' }}>No alerts or notifications.</div>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: CATEGORY & ATTRIBUTE HUB */}
+          {activeTab === 'categories-hub' && (
+            <div>
+              <div className="ad-view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3>Category &amp; Attribute Hub</h3>
+                  <p>Define product categories structure, allowed brands, specifications templates, and dynamic seller attributes.</p>
+                </div>
+                <button 
+                  className="ad-btn-action approve"
+                  style={{ margin: 0, height: '40px', padding: '0 20px', fontWeight: '600' }}
+                  onClick={() => handleCreateCategoryInit('')}
+                >
+                  ➕ Create Root Category
+                </button>
+              </div>
+
+              {adminCategoriesError ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Connection Timeout</div>
+                  <div className="ad-error-message">Failed to load categories. Please check database connection.</div>
+                  <button className="ad-btn-sec" onClick={fetchCategories}>🔄 Retry</button>
+                </div>
+              ) : loadingAdminCategories ? (
+                <div className="ad-loading">Loading categories tree...</div>
+              ) : (
+                <div style={{ display: 'flex', gap: '24px', marginTop: '24px', alignItems: 'flex-start' }}>
+                  {/* Left Panel: Category Tree View */}
+                  <div style={{
+                    width: '35%',
+                    background: '#18181b',
+                    border: '1.5px solid #27272a',
+                    borderRadius: '16px',
+                    padding: '20px',
+                    maxHeight: '75vh',
+                    overflowY: 'auto'
+                  }}>
+                    <div style={{ marginBottom: '16px' }}>
+                      <input
+                        type="text"
+                        placeholder="Search categories..."
+                        className="ad-modal-input"
+                        style={{ margin: 0, width: '100%', height: '38px' }}
+                        value={categoryHubSearchQuery}
+                        onChange={(e) => setCategoryHubSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {adminCategories.length > 0 ? (
+                        (() => {
+                          const renderCategoryTreeNodes = (nodes, depth = 0) => {
+                            return nodes.map((node) => {
+                              const isSelected = selectedAdminCategory && (selectedAdminCategory._id === node._id || selectedAdminCategory.id === node._id);
+                              const hasChildren = node.children && node.children.length > 0;
+                              
+                              const matchesSearch = node.name.toLowerCase().includes(categoryHubSearchQuery.toLowerCase()) ||
+                                (node.children && node.children.some(child => child.name.toLowerCase().includes(categoryHubSearchQuery.toLowerCase())));
+                                
+                              if (categoryHubSearchQuery && !matchesSearch) return null;
+
+                              return (
+                                <div key={node._id} style={{ marginLeft: `${depth * 16}px`, marginBottom: '4px' }}>
+                                  <div 
+                                    onClick={() => handleSelectCategory(node)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '8px 12px',
+                                      borderRadius: '8px',
+                                      backgroundColor: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                                      border: `1.5px solid ${isSelected ? 'var(--color-admin-primary)' : 'transparent'}`,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s',
+                                      color: isSelected ? '#fff' : '#e4e4e7',
+                                      gap: '8px'
+                                    }}
+                                    onMouseEnter={(e) => { if(!isSelected) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)' }}
+                                    onMouseLeave={(e) => { if(!isSelected) e.currentTarget.style.backgroundColor = 'transparent' }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                      <span style={{ fontSize: '1rem' }}>{node.icon || (depth === 0 ? '📁' : depth === 1 ? '📂' : '📄')}</span>
+                                      <span style={{ fontSize: '0.88rem', fontWeight: isSelected ? '600' : '400', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                        {node.name}
+                                      </span>
+                                      {!node.isEnabled && (
+                                        <span style={{ fontSize: '0.7rem', color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                          Disabled
+                                        </span>
+                                      )}
+                                    </div>
+                                    
+                                    <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
+                                      <button 
+                                        title="Add Subcategory under this"
+                                        onClick={() => handleCreateCategoryInit(node._id)}
+                                        style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', fontSize: '0.9rem', padding: '2px' }}
+                                      >
+                                        ➕
+                                      </button>
+                                      <button 
+                                        title="Delete Category"
+                                        onClick={() => handleDeleteCategory(node._id)}
+                                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.9rem', padding: '2px' }}
+                                      >
+                                        🗑️
+                                      </button>
+                                    </div>
+                                  </div>
+                                  
+                                  {hasChildren && (
+                                    <div style={{ marginTop: '4px' }}>
+                                      {renderCategoryTreeNodes(node.children, depth + 1)}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            });
+                          };
+                          return renderCategoryTreeNodes(adminCategories);
+                        })()
+                      ) : (
+                        <div className="ad-empty" style={{ textAlign: 'center', padding: '20px' }}>No categories found. Click &apos;Create Root Category&apos; to start.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Panel: Category Config Details Editor */}
+                  <div style={{ width: '65%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    {selectedAdminCategory ? (
+                      <form onSubmit={handleSaveCategory} style={{
+                        background: '#18181b',
+                        border: '1.5px solid #27272a',
+                        borderRadius: '16px',
+                        padding: '32px'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #27272a', paddingBottom: '16px' }}>
+                          <h4 style={{ color: '#fff', fontSize: '1.25rem', fontWeight: '700', margin: 0 }}>
+                            {(!selectedAdminCategory.id || selectedAdminCategory.id === 'new') ? '✨ Create New Category' : `⚙️ Edit Category: ${selectedAdminCategory.name}`}
+                          </h4>
+                          {(selectedAdminCategory.id && selectedAdminCategory.id !== 'new') && (
+                            <button
+                              type="button"
+                              className="ad-btn-danger"
+                              style={{ height: '32px', padding: '0 12px', fontSize: '0.8rem' }}
+                              onClick={() => handleDeleteCategory(selectedAdminCategory._id || selectedAdminCategory.id)}
+                            >
+                              Delete Category
+                            </button>
+                          )}
+                        </div>
+
+                        {/* General details grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                          <div>
+                            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.82rem', fontWeight: '600', marginBottom: '6px' }}>Category Name *</label>
+                            <input
+                              type="text"
+                              required
+                              className="ad-modal-input"
+                              style={{ margin: 0, width: '100%', height: '40px' }}
+                              placeholder="e.g. Smartphones"
+                              value={catFormName}
+                              onChange={(e) => setCatFormName(e.target.value)}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.82rem', fontWeight: '600', marginBottom: '6px' }}>Parent Category</label>
+                            <select
+                              className="ad-modal-input"
+                              style={{ margin: 0, width: '100%', height: '40px', background: '#09090b', border: '1.5px solid #27272a', borderRadius: '8px', color: '#fff' }}
+                              value={catFormParentId}
+                              onChange={(e) => setCatFormParentId(e.target.value)}
+                            >
+                              <option value="">None (Root Category)</option>
+                              {(() => {
+                                const getFlatCategories = (tree, excludeId = null) => {
+                                  let flat = [];
+                                  const recurse = (nodes) => {
+                                    for (let n of nodes) {
+                                      if (excludeId && (n._id === excludeId || n.id === excludeId)) continue;
+                                      flat.push({ _id: n._id, name: n.name });
+                                      if (n.children && n.children.length > 0) recurse(n.children);
+                                    }
+                                  };
+                                  recurse(tree);
+                                  return flat;
+                                };
+                                return getFlatCategories(adminCategories, selectedAdminCategory._id || selectedAdminCategory.id).map(c => (
+                                  <option key={c._id} value={c._id}>{c.name}</option>
+                                ));
+                              })()}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.82rem', fontWeight: '600', marginBottom: '6px' }}>Icon (Emoji / unicode)</label>
+                            <input
+                              type="text"
+                              className="ad-modal-input"
+                              style={{ margin: 0, width: '100%', height: '40px' }}
+                              placeholder="e.g. 📱"
+                              value={catFormIcon}
+                              onChange={(e) => setCatFormIcon(e.target.value)}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.82rem', fontWeight: '600', marginBottom: '6px' }}>Order (Priority sorting)</label>
+                            <input
+                              type="number"
+                              className="ad-modal-input"
+                              style={{ margin: 0, width: '100%', height: '40px' }}
+                              placeholder="e.g. 0"
+                              value={catFormOrder}
+                              onChange={(e) => setCatFormOrder(e.target.value)}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.82rem', fontWeight: '600', marginBottom: '6px' }}>Category Status</label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', height: '40px' }}>
+                              <input
+                                type="checkbox"
+                                checked={catFormIsEnabled}
+                                onChange={(e) => setCatFormIsEnabled(e.target.checked)}
+                              />
+                              <span style={{ fontSize: '0.88rem', color: '#cbd5e1' }}>Enable this Category</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Brands configuration */}
+                        <div style={{ marginBottom: '24px' }}>
+                          <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.82rem', fontWeight: '600', marginBottom: '6px' }}>Allowed Brands (Comma-separated)</label>
+                          <input
+                            type="text"
+                            className="ad-modal-input"
+                            style={{ margin: 0, width: '100%', height: '40px' }}
+                            placeholder="e.g. Apple, Samsung, OnePlus, Google"
+                            value={catFormBrands}
+                            onChange={(e) => setCatFormBrands(e.target.value)}
+                          />
+                          <span style={{ fontSize: '0.72rem', color: '#a1a1aa' }}>Only these brands will be selectable by sellers under this category. Leave blank for any.</span>
+                        </div>
+
+                        {/* Dynamic attributes list */}
+                        <div style={{ marginBottom: '24px', borderTop: '1.5px solid #27272a', paddingTop: '20px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h5 style={{ color: '#fff', fontSize: '1rem', fontWeight: '600', margin: 0 }}>📊 Dynamic Seller Attributes</h5>
+                            <button
+                              type="button"
+                              className="ad-btn-sec"
+                              style={{ height: '30px', padding: '0 12px', fontSize: '0.8rem', fontWeight: '600', margin: 0 }}
+                              onClick={addAttributeField}
+                            >
+                              ➕ Add Attribute
+                            </button>
+                          </div>
+                          
+                          {catFormAttributes.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {catFormAttributes.map((attr, index) => (
+                                <div key={index} style={{
+                                  background: '#09090b',
+                                  border: '1px solid #27272a',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  display: 'grid',
+                                  gridTemplateColumns: '2fr 1.5fr 3fr 1fr 1fr auto',
+                                  gap: '10px',
+                                  alignItems: 'center'
+                                }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Name (e.g. Size)"
+                                    className="ad-modal-input"
+                                    style={{ margin: 0, height: '34px', fontSize: '0.8rem' }}
+                                    value={attr.name}
+                                    onChange={(e) => updateAttributeField(index, 'name', e.target.value)}
+                                    required
+                                  />
+                                  <select
+                                    className="ad-modal-input"
+                                    style={{ margin: 0, height: '34px', fontSize: '0.8rem', background: '#000', color: '#fff', border: '1px solid #27272a' }}
+                                    value={attr.type}
+                                    onChange={(e) => updateAttributeField(index, 'type', e.target.value)}
+                                  >
+                                    <option value="text">Text Field</option>
+                                    <option value="number">Number Field</option>
+                                    <option value="select">Dropdown Select</option>
+                                  </select>
+                                  <input
+                                    type="text"
+                                    placeholder="Options (comma-separated)"
+                                    className="ad-modal-input"
+                                    style={{ margin: 0, height: '34px', fontSize: '0.8rem' }}
+                                    value={attr.options || ''}
+                                    onChange={(e) => updateAttributeField(index, 'options', e.target.value)}
+                                    disabled={attr.type !== 'select'}
+                                  />
+                                  <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                                    <span style={{ fontSize: '0.65rem', color: '#cbd5e1' }}>Required</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={!!attr.isRequired}
+                                      onChange={(e) => updateAttributeField(index, 'isRequired', e.target.checked)}
+                                    />
+                                  </label>
+                                  <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                                    <span style={{ fontSize: '0.65rem', color: '#cbd5e1' }}>Variant</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={!!attr.isVariant}
+                                      onChange={(e) => updateAttributeField(index, 'isVariant', e.target.checked)}
+                                    />
+                                  </label>
+                                  <button
+                                    type="button"
+                                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.1rem' }}
+                                    onClick={() => removeAttributeField(index)}
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p style={{ fontStyle: 'italic', color: '#71717a', fontSize: '0.8rem', margin: '4px 0 0 0' }}>No dynamic attributes configured. Sellers will enter basic fields only.</p>
+                          )}
+                        </div>
+
+                        {/* Custom Specifications templates */}
+                        <div style={{ marginBottom: '24px', borderTop: '1.5px solid #27272a', paddingTop: '20px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h5 style={{ color: '#fff', fontSize: '1rem', fontWeight: '600', margin: 0 }}>📐 Specification Sheet Fields</h5>
+                            <button
+                              type="button"
+                              className="ad-btn-sec"
+                              style={{ height: '30px', padding: '0 12px', fontSize: '0.8rem', fontWeight: '600', margin: 0 }}
+                              onClick={addSpecificationField}
+                            >
+                              ➕ Add Spec Field
+                            </button>
+                          </div>
+                          
+                          {catFormSpecifications.length > 0 ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                              {catFormSpecifications.map((spec, index) => (
+                                <div key={index} style={{
+                                  background: '#09090b',
+                                  border: '1px solid #27272a',
+                                  borderRadius: '8px',
+                                  padding: '10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '10px'
+                                }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Spec Key (e.g. RAM, Weight)"
+                                    className="ad-modal-input"
+                                    style={{ margin: 0, height: '34px', fontSize: '0.8rem', flex: 1 }}
+                                    value={spec.name}
+                                    onChange={(e) => updateSpecificationField(index, 'name', e.target.value)}
+                                    required
+                                  />
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={!!spec.isRequired}
+                                      onChange={(e) => updateSpecificationField(index, 'isRequired', e.target.checked)}
+                                    />
+                                    <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>Required</span>
+                                  </label>
+                                  <button
+                                    type="button"
+                                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem' }}
+                                    onClick={() => removeSpecificationField(index)}
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p style={{ fontStyle: 'italic', color: '#71717a', fontSize: '0.8rem', margin: '4px 0 0 0' }}>No specification fields configured.</p>
+                          )}
+                        </div>
+
+                        {/* Validation Rules */}
+                        <div style={{ marginBottom: '24px', borderTop: '1.5px solid #27272a', paddingTop: '20px' }}>
+                          <h5 style={{ color: '#fff', fontSize: '1rem', fontWeight: '600', marginBottom: '12px' }}>🔒 Category Validation Rules</h5>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                            <div>
+                              <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.82rem', fontWeight: '600', marginBottom: '6px' }}>Min Images Required</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="10"
+                                className="ad-modal-input"
+                                style={{ margin: 0, width: '100%', height: '36px' }}
+                                value={catFormValidationRules.minImages || 1}
+                                onChange={(e) => setCatFormValidationRules({ ...catFormValidationRules, minImages: Number(e.target.value) })}
+                              />
+                            </div>
+                            
+                            <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', paddingBottom: '10px' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!catFormValidationRules.brandRequired}
+                                  onChange={(e) => setCatFormValidationRules({ ...catFormValidationRules, brandRequired: e.target.checked })}
+                                />
+                                <span style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>Brand Selection Mandatory</span>
+                              </label>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', paddingBottom: '10px' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!catFormValidationRules.variantRequired}
+                                  onChange={(e) => setCatFormValidationRules({ ...catFormValidationRules, variantRequired: e.target.checked })}
+                                />
+                                <span style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>Variants Config Mandatory</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Save Action */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1.5px solid #27272a', paddingTop: '20px', marginTop: '20px' }}>
+                          <button
+                            type="button"
+                            className="ad-btn-sec"
+                            style={{ height: '40px', padding: '0 24px', fontWeight: '600', margin: 0 }}
+                            onClick={() => handleSelectCategory(null)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="ad-btn-action approve"
+                            style={{ height: '40px', padding: '0 32px', fontWeight: '600', margin: 0 }}
+                            disabled={isCategoryFormSaving}
+                          >
+                            {isCategoryFormSaving ? 'Saving...' : '💾 Save Configurations'}
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div style={{
+                        background: '#18181b',
+                        border: '1.5px solid #27272a',
+                        borderRadius: '16px',
+                        padding: '40px',
+                        textAlign: 'center',
+                        color: '#71717a'
+                      }}>
+                        <span style={{ fontSize: '3rem', display: 'block', marginBottom: '16px' }}>📂</span>
+                        <h4 style={{ color: '#fff', fontSize: '1.1rem', fontWeight: '600', marginBottom: '8px' }}>No Category Selected</h4>
+                        <p style={{ fontSize: '0.88rem', maxWidth: '360px', margin: '0 auto' }}>Select a category from the left tree pane to modify its configurations, attributes, specifications, and validation rules, or click &quot;Create Root Category&quot;.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

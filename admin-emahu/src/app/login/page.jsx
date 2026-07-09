@@ -125,13 +125,13 @@ export default function AdminLogin() {
             {!requires2FA ? (
               <>
                 <div className="al-input-group">
-                  <label className="al-label" htmlFor="al-email">Email Address</label>
+                  <label className="al-label" htmlFor="al-email">Phone Number or Email</label>
                   <div className="al-input-wrapper">
                     <input
                       id="al-email"
-                      type="email"
+                      type="text"
                       className="al-input"
-                      placeholder="admin@emahu.com"
+                      placeholder="e.g. 9876543210 or admin@emahu.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required

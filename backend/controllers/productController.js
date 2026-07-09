@@ -48,6 +48,7 @@ exports.createProduct = async (req, res) => {
       brand,
       sku: tempSku,
       category,
+      subcategory: req.body.subcategory || 'General',
       price,
       comparePrice,
       stock,
@@ -95,8 +96,8 @@ exports.createProduct = async (req, res) => {
       metaDescription: metaDescription || '',
       metaKeywords: Array.isArray(metaKeywords) ? metaKeywords : [],
       canonicalUrl: canonicalUrl || '',
-      altText: altText || '',
-      variants: Array.isArray(variants) ? variants : []
+      variants: Array.isArray(variants) ? variants : [],
+      specifications: req.body.specifications || {}
     });
 
     // Notify all admins
@@ -408,6 +409,7 @@ exports.resubmitProduct = async (req, res) => {
     product.brand = brand.trim();
     product.sku = sku.trim().toUpperCase();
     product.category = category;
+    product.subcategory = req.body.subcategory !== undefined ? req.body.subcategory : product.subcategory;
     product.price = parseFloat(price);
     product.comparePrice = parseFloat(comparePrice);
     product.stock = parseInt(stock);
@@ -453,6 +455,7 @@ exports.resubmitProduct = async (req, res) => {
     product.canonicalUrl = canonicalUrl !== undefined ? canonicalUrl : product.canonicalUrl;
     product.altText = altText !== undefined ? altText : product.altText;
     product.variants = Array.isArray(variants) ? variants : product.variants;
+    product.specifications = req.body.specifications !== undefined ? req.body.specifications : product.specifications;
 
     // Reset verification to false / pending admin approval
     product.approvalStatus = 'pending';

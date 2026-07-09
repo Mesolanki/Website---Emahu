@@ -13,7 +13,7 @@
  */
 
 const PORT = process.env.TEST_PORT || '5000';
-const BASE_URL = `http://localhost:${PORT}`;
+const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 async function requestAndVerifyOtp(email) {
   const sendRes = await fetch(`${BASE_URL}/api/auth/send-otp`, {
@@ -527,7 +527,7 @@ async function runTests() {
     }
 
     // Reset attempts in database to test successful validation
-    await Otp.updateOne({ email: buyerEmail }, { $set: { attempts: 0 } });
+    await Otp.updateOne({ email: buyerEmail, otp: activeOtp }, { $set: { attempts: 0 } });
     console.log('👉 Resetting failures in MongoDB to verify successful OTP handover...');
 
     // Proximity Verify: Try to verify OTP from distant location (Mumbai coords)

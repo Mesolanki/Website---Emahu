@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import RequestCategoryModal from './RequestCategoryModal';
+import API_BASE from '@/utils/config';
 
 // Fallback categories used when the backend API is unreachable (Vercel cold start, DB empty, etc.)
 const FALLBACK_CATEGORIES = [
@@ -156,7 +157,7 @@ export default function CategorySelector({ value, onChange }) {
   // Fetch categories from Backend API, fall back to hardcoded list if API fails
   const fetchCategories = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories?status=approved`);
+      const res = await fetch(`${API_BASE}/api/categories?status=approved`);
       const data = await res.json();
       if (data.success && data.data && data.data.length > 0) {
         setCategories(data.data);

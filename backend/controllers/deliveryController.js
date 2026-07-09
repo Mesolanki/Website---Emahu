@@ -189,10 +189,6 @@ exports.updateDeliverySettings = async (req, res) => {
 
 // Helper function to resolve delivery charge based on settings and distance/amount
 function resolveCharge(distance, productTotal, settings) {
-  const maxDist = settings?.maxDeliveryDistance || 100;
-  if (distance > maxDist) {
-    return { error: `Distance (${distance.toFixed(1)} KM) exceeds maximum allowed delivery distance (${maxDist} KM)` };
-  }
   const charge = parseFloat((distance * 2).toFixed(2));
   return { charge, free: false };
 }
@@ -361,10 +357,19 @@ exports.assignOrderToPartner = async (req, res) => {
     if (isManualCarrier) {
       // Manual/3rd party carrier assignment (Delhivery, Blue Dart, EmahuXpress, FedEx, etc.)
       const manualPhone = deliveryPartnerId === 'Blue Dart' ? '+91 1860 233 1234' : (deliveryPartnerId === 'Delhivery' ? '+91 80698 56101' : '+91 99999 99999');
-      order.carrier = deliveryPartnerId;
-      order.carrierPhone = manualPhone;
-      order.deliveryStatus = 'accepted';
-      order.status = 'LABEL_GENERATED';
+      if (deliveryPartnerId === 'sd') {
+        order.carrier = 'Self-Delivery (sd)';
+        order.carrierPhone = '+91 99999 99999';
+        order.deliveryPartnerId = undefined;
+        order.deliveryStatus = 'accepted';
+        order.status = 'LABEL_GENERATED';
+        await generateAndSaveDeliveryOtp(order);
+      } else {
+        order.carrier = deliveryPartnerId;
+        order.carrierPhone = manualPhone;
+        order.deliveryStatus = 'accepted';
+        order.status = 'LABEL_GENERATED';
+      }
 
       // Default tracking details if not set
       if (!order.trackingId) {

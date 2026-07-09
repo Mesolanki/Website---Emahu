@@ -118,15 +118,17 @@ exports.createOrder = async (req, res) => {
       const Product = require('../models/Product');
       const mongoose = require('mongoose');
       for (const item of orderData.items) {
+        const qty = Math.max(1, Math.floor(Number(item.quantity || 1)));
+        item.quantity = qty;
         if (mongoose.Types.ObjectId.isValid(item.productId)) {
           const product = await Product.findById(item.productId);
           if (product) {
-            productAmount += product.price * (item.quantity || 1);
+            productAmount += product.price * qty;
             continue;
           }
         }
         // Fallback if product not found in DB or not a valid ObjectId
-        productAmount += (item.price || 0) * (item.quantity || 1);
+        productAmount += (item.price || 0) * qty;
       }
     }
 
@@ -170,7 +172,7 @@ exports.createOrder = async (req, res) => {
     let bLon = orderData.buyerLocation?.longitude;
 
     // If coordinates are missing, fallback to seller location to avoid crashes and give 0 distance
-    if (bLat === undefined || bLat === null || bLon === undefined || bLon === null) {
+    if (bLat === undefined || bLat === null || isNaN(bLat) || bLon === undefined || bLon === null || isNaN(bLon)) {
       bLat = sLat;
       bLon = sLon;
     }
@@ -182,13 +184,8 @@ exports.createOrder = async (req, res) => {
       distanceKm = getHaversineDistance(bLat, bLon, sLat, sLon);
     }
     
-    // Validate Max Distance
-    if (distanceKm > settings.maxDeliveryDistance) {
-      return res.status(400).json({
-        success: false,
-        error: `Delivery distance (${distanceKm.toFixed(1)} KM) exceeds the maximum allowed distance of ${settings.maxDeliveryDistance} KM`
-      });
-    }
+
+
 
     const chargeResult = resolveCharge(distanceKm, productAmount, settings);
     if (chargeResult.error) {

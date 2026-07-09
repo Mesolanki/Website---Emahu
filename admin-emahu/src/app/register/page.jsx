@@ -29,24 +29,25 @@ export default function AdminRegister() {
   }, [router]);
 
   const handleSendEmailOtp = async () => {
-    if (!email.trim()) {
-      setError('Email address is required to send OTP');
+    if (!phone.trim()) {
+      setError('Phone number is required to send OTP');
       return;
     }
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      setError('Enter a valid email address');
+    if (!/^\d{10}$/.test(phone.trim())) {
+      setError('Enter a valid 10-digit mobile number');
       return;
     }
     setOtpLoading(true);
     setError('');
     setDevOtp('');
     try {
-      const res = await fetch(`${API_BASE}/api/auth/send-otp`, {
+      let cleanPhone = phone.trim();
+      const res = await fetch(`${API_BASE}/api/auth/send-phone-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ email: email })
+        body: JSON.stringify({ phone: cleanPhone })
       });
       const data = await res.json();
       if (data.success) {
@@ -73,12 +74,13 @@ export default function AdminRegister() {
     setOtpLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
+      let cleanPhone = phone.trim();
+      const res = await fetch(`${API_BASE}/api/auth/verify-phone-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ email: email, otp: emailOtp })
+        body: JSON.stringify({ phone: cleanPhone, otp: emailOtp })
       });
       const data = await res.json();
       if (data.success) {
@@ -96,12 +98,12 @@ export default function AdminRegister() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !email || !password || !phone || !adminSecret) {
+    if (!name || !password || !phone || !adminSecret) {
       setError('Please fill in all fields.');
       return;
     }
     if (!isEmailVerified) {
-      setError('Please verify your email address via OTP first.');
+      setError('Please verify your phone number via OTP first.');
       return;
     }
     setError('');
@@ -110,7 +112,7 @@ export default function AdminRegister() {
     try {
       const data = await registerUser({
         name,
-        email,
+        email: `${phone.trim()}@emahu.com`,
         password,
         phone,
         role: 'admin',
@@ -196,16 +198,16 @@ export default function AdminRegister() {
             </div>
 
             <div className="ar-input-group">
-              <label className="ar-label" htmlFor="ar-email">Email Address</label>
+              <label className="ar-label" htmlFor="ar-phone">Phone Number</label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
-                  id="ar-email"
-                  type="email"
+                  id="ar-phone"
+                  type="tel"
                   className="ar-input"
-                  placeholder="e.g. admin@company.com"
-                  value={email}
+                  placeholder="e.g. 9876543210"
+                  value={phone}
                   onChange={(e) => {
-                    setEmail(e.target.value);
+                    setPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
                     if (isEmailVerified) setIsEmailVerified(false);
                     if (isEmailOtpSent) setIsEmailOtpSent(false);
                   }}
@@ -230,6 +232,30 @@ export default function AdminRegister() {
               {isEmailOtpSent && !isEmailVerified && (
                 <div style={{ marginTop: '8px', background: 'rgba(99,102,241,0.03)', border: '1px solid rgba(99,102,241,0.15)', padding: '10px', borderRadius: '6px' }}>
                   <label className="ar-label" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>Verification Code</label>
+                  
+                  {devOtp && (
+                    <div style={{
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      border: '1px solid rgba(99, 102, 241, 0.2)',
+                      color: 'var(--color-admin-primary, #6366f1)',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      textAlign: 'center',
+                      marginTop: '8px',
+                      marginBottom: '16px'
+                    }}>
+                      <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>🔑 simulated code (check console too):</div>
+                      <div
+                        style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: 'var(--color-admin-primary, #6366f1)', background: 'rgba(0,0,0,0.05)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
+                        onClick={() => setEmailOtp(devOtp)}
+                        title="Click to auto-fill"
+                      >
+                        {devOtp}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input
                       type="text"
@@ -249,39 +275,15 @@ export default function AdminRegister() {
                       Verify
                     </button>
                   </div>
-                  {typeof window !== 'undefined' && 
-                   (window.location.hostname === 'localhost' || 
-                    window.location.hostname === '127.0.0.1' || 
-                    window.location.hostname.startsWith('192.168.') || 
-                    window.location.hostname.startsWith('172.') || 
-                    window.location.hostname.startsWith('10.') || 
-                    window.location.hostname.endsWith('.local')) && 
-                   devOtp && (
-                    <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#6366f1', fontWeight: '600' }}>
-                      🔑 Dev Mode OTP Code: <code style={{ background: 'rgba(99,102,241,0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.85rem' }}>{devOtp}</code>
-                    </div>
-                  )}
+
                 </div>
               )}
 
               {isEmailVerified && (
                 <div style={{ color: '#10b981', fontSize: '0.75rem', marginTop: '6px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  ✓ Email Address Verified Successfully
+                  ✓ Phone Number Verified Successfully
                 </div>
               )}
-            </div>
-
-            <div className="ar-input-group">
-              <label className="ar-label" htmlFor="ar-phone">Phone Number</label>
-              <input
-                id="ar-phone"
-                type="tel"
-                className="ar-input"
-                placeholder="e.g. 9876543210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
             </div>
 
             <div className="ar-input-group">

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './forgot-password.css';
+import API_BASE from '@/utils/config';
 
 export default function ForgotPassword() {
   const router = useRouter();
@@ -106,7 +107,7 @@ export default function ForgotPassword() {
     setDevOtp('');
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/forgot-password`, {
+      const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase() })
@@ -178,7 +179,7 @@ export default function ForgotPassword() {
     setError('');
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/verify-otp`, {
+      const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -216,7 +217,7 @@ export default function ForgotPassword() {
     setDevOtp('');
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/resend-otp`, {
+      const res = await fetch(`${API_BASE}/api/auth/resend-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase() })
@@ -263,7 +264,7 @@ export default function ForgotPassword() {
     setSuccessMsg('');
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/reset-password`, {
+      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -313,8 +314,8 @@ export default function ForgotPassword() {
             {step === 'success' && 'Reset Successful'}
           </h1>
           <p className="fp-subtitle">
-            {step === 'email' && 'Enter your registered email address to receive a secure password reset OTP code.'}
-            {step === 'otp' && `We have sent a verification code to ${email}.`}
+            {step === 'email' && 'Enter your registered email address to receive a secure password reset OTP code on your mobile number.'}
+            {step === 'otp' && 'We have sent a verification code to your registered mobile number.'}
             {step === 'reset' && 'Choose a strong password containing uppercase, lowercase, numbers, and special characters.'}
             {step === 'success' && 'Your password has been updated. You will be redirected to the login page shortly.'}
           </p>

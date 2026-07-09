@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import './cart.css';
@@ -36,6 +36,7 @@ const isRealImage = (img) => {
 
 export default function CartPage() {
   const [cartItems, setCartItems] = useState([]);
+  const [availableProducts, setAvailableProducts] = useState([]);
   const [checkoutStep, setCheckoutStep] = useState('idle'); // idle | securing | success
   const [removingId, setRemovingId] = useState(null);
   const [isClearingAll, setIsClearingAll] = useState(false);
@@ -130,100 +131,102 @@ export default function CartPage() {
   }, []);
 
   // ── Load Cart items on mount ──
-  useEffect(() => {
-    const loadCartAndProducts = async () => {
-      let formattedList = [];
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
-        const data = await res.json();
-        if (data.success && data.products) {
-          formattedList = data.products.map(p => {
-            let mappedCategory = p.category;
-            if (p.category === 'Electronics') mappedCategory = 'Tech';
-            else if (p.category === 'Fitness' || p.category === 'Furniture') mappedCategory = 'Lifestyle';
+  const loadCartAndProducts = useCallback(async () => {
+    let formattedList = [];
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
+      const data = await res.json();
+      if (data.success && data.products) {
+        formattedList = data.products.map(p => {
+          let mappedCategory = p.category;
+          if (p.category === 'Electronics') mappedCategory = 'Tech';
+          else if (p.category === 'Fitness' || p.category === 'Furniture') mappedCategory = 'Lifestyle';
 
-            const cleanedImg = cleanImageUrl(p.image);
-            const imageToShow = isRealImage(p.image) ? cleanedImg : (p.image || '📦');
+          const cleanedImg = cleanImageUrl(p.image);
+          const imageToShow = isRealImage(p.image) ? cleanedImg : (p.image || '📦');
 
-            return {
-              id: p.id || p._id,
-              name: p.name,
-              brand: p.brand || p.seller?.name || 'Emahu Seller',
-              category: mappedCategory,
-              price: p.price,
-              original: p.comparePrice || p.price,
-              discount: p.comparePrice ? Math.round(((p.comparePrice - p.price) / p.comparePrice) * 100) : 0,
-              rating: p.rating || 4.7,
-              reviews: p.reviews || 84,
-              img: imageToShow,
-              stock: typeof p.stock === 'number' ? p.stock : 99, // ← STOCK FIELD
-              verified: true,
-              isNew: true,
-              isHot: false,
-              onSale: p.comparePrice ? (p.price < p.comparePrice) : false,
-              seller: p.seller
-            };
-          });
-        }
-      } catch (err) {
-        console.warn('Failed to fetch DB products for cart, falling back to static:', err);
+          return {
+            id: p.id || p._id,
+            name: p.name,
+            brand: p.brand || p.seller?.name || 'Emahu Seller',
+            category: mappedCategory,
+            price: p.price,
+            original: p.comparePrice || p.price,
+            discount: p.comparePrice ? Math.round(((p.comparePrice - p.price) / p.comparePrice) * 100) : 0,
+            rating: p.rating || 4.7,
+            reviews: p.reviews || 84,
+            img: imageToShow,
+            stock: typeof p.stock === 'number' ? p.stock : 99, // ← STOCK FIELD
+            verified: true,
+            isNew: true,
+            isHot: false,
+            onSale: p.comparePrice ? (p.price < p.comparePrice) : false,
+            seller: p.seller
+          };
+        });
       }
+    } catch (err) {
+      console.warn('Failed to fetch DB products for cart, falling back to static:', err);
+    }
 
-      try {
-        // Combine DB products with static mock products (static get default stock of 99)
-        const allProducts = [...formattedList, ...STATIC_PRODUCTS.map(p => ({ ...p, stock: p.stock ?? 99 }))];
-        const seen = new Set();
-        const uniqueProducts = allProducts.filter(p => {
-          if (!p || !p.id) return false;
-          const pid = p.id.toString();
-          if (seen.has(pid)) return false;
-          seen.add(pid);
-          return true;
+    try {
+      // Combine DB products with static mock products (static get default stock of 99)
+      const allProducts = [...formattedList, ...STATIC_PRODUCTS.map(p => ({ ...p, stock: p.stock ?? 99 }))];
+      const seen = new Set();
+      const uniqueProducts = allProducts.filter(p => {
+        if (!p || !p.id) return false;
+        const pid = p.id.toString();
+        if (seen.has(pid)) return false;
+        seen.add(pid);
+        return true;
+      });
+
+      setAvailableProducts(uniqueProducts);
+
+      const storedCart = localStorage.getItem('emahu_cart');
+      if (storedCart) {
+        const parsed = JSON.parse(storedCart);
+        const matched = [];
+        let hasStale = false;
+
+        parsed.forEach(cItem => {
+          const cItemId = typeof cItem === 'object' ? cItem.id : cItem;
+          if (!cItemId) return;
+          const prod = uniqueProducts.find(p => p.id.toString() === cItemId.toString());
+          if (prod) {
+            // Clamp quantity to available stock
+            const clampedQty = Math.min(cItem.quantity || 1, prod.stock > 0 ? prod.stock : 1);
+            matched.push({
+              ...prod,
+              quantity: clampedQty,
+              selectedColor: cItem.color || 'Premium Black',
+              selectedSize: cItem.size || 'Regular'
+            });
+          } else {
+            hasStale = true;
+          }
         });
 
-        const storedCart = localStorage.getItem('emahu_cart');
-        if (storedCart) {
-          const parsed = JSON.parse(storedCart);
-          const matched = [];
-          let hasStale = false;
+        setCartItems(matched);
 
-          parsed.forEach(cItem => {
-            const cItemId = typeof cItem === 'object' ? cItem.id : cItem;
-            if (!cItemId) return;
-            const prod = uniqueProducts.find(p => p.id.toString() === cItemId.toString());
-            if (prod) {
-              // Clamp quantity to available stock
-              const clampedQty = Math.min(cItem.quantity || 1, prod.stock > 0 ? prod.stock : 1);
-              matched.push({
-                ...prod,
-                quantity: clampedQty,
-                selectedColor: cItem.color || 'Premium Black',
-                selectedSize: cItem.size || 'Regular'
-              });
-            } else {
-              hasStale = true;
-            }
-          });
-
-          setCartItems(matched);
-
-          // Persist clamped quantities back
-          const saveList = matched.map(p => ({
-            id: p.id,
-            quantity: p.quantity,
-            color: p.selectedColor,
-            size: p.selectedSize
-          }));
-          localStorage.setItem('emahu_cart', JSON.stringify(saveList));
-          if (hasStale) window.dispatchEvent(new Event('storage'));
-        }
-      } catch (err) {
-        console.error('Error combining/processing products in cart:', err);
+        // Persist clamped quantities back
+        const saveList = matched.map(p => ({
+          id: p.id,
+          quantity: p.quantity,
+          color: p.selectedColor,
+          size: p.selectedSize
+        }));
+        localStorage.setItem('emahu_cart', JSON.stringify(saveList));
+        if (hasStale) window.dispatchEvent(new Event('storage'));
       }
-    };
-
-    loadCartAndProducts();
+    } catch (err) {
+      console.error('Error combining/processing products in cart:', err);
+    }
   }, []);
+
+  useEffect(() => {
+    loadCartAndProducts();
+  }, [loadCartAndProducts]);
 
   // ── Save changes to localStorage helper ──
   const saveCartToStorage = (items) => {
@@ -238,6 +241,49 @@ export default function CartPage() {
       window.dispatchEvent(new Event('storage'));
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // Suggestions for cross-selling when there is exactly 1 item in cart
+  const cartSuggestions = useMemo(() => {
+    if (cartItems.length !== 1 || !availableProducts.length) return [];
+    const cartItem = cartItems[0];
+    const cartItemId = cartItem.id.toString();
+
+    const cleanAvailable = availableProducts.filter(p => p.id.toString() !== cartItemId);
+    const sameCat = cleanAvailable.filter(p => p.category === cartItem.category);
+    const otherCat = cleanAvailable.filter(p => p.category !== cartItem.category);
+
+    const shuffle = (array) => [...array].sort(() => Math.random() - 0.5);
+
+    const combined = [...shuffle(sameCat), ...shuffle(otherCat)];
+    return combined.slice(0, 3);
+  }, [cartItems, availableProducts]);
+
+  const handleAddSuggestionToCart = (suggestedProduct) => {
+    try {
+      const currentCartStr = localStorage.getItem('emahu_cart') || '[]';
+      const currentCart = JSON.parse(currentCartStr);
+
+      const exists = currentCart.some(cItem => {
+        const cItemId = typeof cItem === 'object' ? cItem.id : cItem;
+        return cItemId.toString() === suggestedProduct.id.toString();
+      });
+
+      if (!exists) {
+        currentCart.push({
+          id: suggestedProduct.id,
+          quantity: 1,
+          color: suggestedProduct.colors?.[0] || 'Premium Black',
+          size: suggestedProduct.sizes?.[0] || 'Regular'
+        });
+        localStorage.setItem('emahu_cart', JSON.stringify(currentCart));
+        window.dispatchEvent(new Event('storage'));
+        
+        loadCartAndProducts();
+      }
+    } catch (err) {
+      console.error('Failed to add suggestion to cart:', err);
     }
   };
 
@@ -646,6 +692,56 @@ export default function CartPage() {
 
                 </div>
               ))}
+
+              {/* Cross-selling suggestions (shows only when 1 item in cart) */}
+              {cartSuggestions.length > 0 && (
+                <div style={{ marginTop: '24px', background: '#fafafa', border: '1px dashed #cbd5e1', borderRadius: '16px', padding: '20px' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '0.82rem', color: '#475569', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    🔥 Complete Your Delivery
+                  </h4>
+                  <p style={{ margin: '0 0 16px 0', fontSize: '0.76rem', color: '#64748b', lineHeight: '1.4' }}>
+                    Add these matching products to your cart for combined shipping!
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                    {cartSuggestions.map((s, idx) => (
+                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ width: '100%', height: '110px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', marginBottom: '10px' }}>
+                            {isRealImage(s.img) ? (
+                              <img src={s.img} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <span style={{ fontSize: '2.5rem' }}>{s.img || '📦'}</span>
+                            )}
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.74rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '750' }}>{s.brand}</p>
+                          <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', fontWeight: '700', color: '#0f172a', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', height: '38px', lineHeight: '1.2' }}>{s.name}</p>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: '850', color: '#4169e1' }}>₹{s.price.toLocaleString('en-IN')}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleAddSuggestionToCart(s)}
+                            style={{
+                              background: '#eff6ff',
+                              color: '#2563eb',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '6px',
+                              padding: '5px 10px',
+                              fontSize: '0.72rem',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right: Order Summary Bento card */}
@@ -801,23 +897,7 @@ export default function CartPage() {
                 </div>
               </div>
 
-              {/* Trust Badge Indicators */}
-              <div className="cart-summary-trust">
-                <div className="cart-trust-item">
-                  <span className="cart-trust-item__dot" style={{ backgroundColor: '#4169e1' }} />
-                  <div>
-                    <strong>Secure Escrow Locks Protection</strong>
-                    <p>Funds held in safety escrow, released only when you inspect and verify delivery.</p>
-                  </div>
-                </div>
-                <div className="cart-trust-item">
-                  <span className="cart-trust-item__dot" style={{ backgroundColor: '#10b981' }} />
-                  <div>
-                    <strong>Carbon-Neutral Fast EV Transit</strong>
-                    <p>Zero carbon emission localized EV couriers route directly to your door.</p>
-                  </div>
-                </div>
-              </div>
+
 
               {/* Large Matte Checkout Button */}
               {hasDeliveredOrder && (

@@ -26,6 +26,46 @@ const categorySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: false  // Optional: allows seeding without a user context
+    },
+    brands: {
+      type: [String],
+      default: []
+    },
+    attributes: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
+    },
+    specifications: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
+    },
+    validationRules: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    },
+    shippingTemplate: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    },
+    seoTemplate: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    },
+    icon: {
+      type: String,
+      default: ''
+    },
+    image: {
+      type: String,
+      default: ''
+    },
+    order: {
+      type: Number,
+      default: 0
+    },
+    isEnabled: {
+      type: Boolean,
+      default: true
     }
   },
   {
