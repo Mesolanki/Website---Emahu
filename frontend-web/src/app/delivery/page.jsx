@@ -399,14 +399,6 @@ export default function DeliveryPortal() {
   };
 
   const handleSendEmailOtp = async () => {
-    if (!email.trim()) {
-      setErrors((prev) => ({ ...prev, email: 'Email address is required' }));
-      return;
-    }
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      setErrors((prev) => ({ ...prev, email: 'Enter a valid email address' }));
-      return;
-    }
     if (!phoneNumber.trim()) {
       setErrors((prev) => ({ ...prev, phoneNumber: 'Phone number is required to send verification code' }));
       return;
@@ -1480,6 +1472,19 @@ export default function DeliveryPortal() {
                             </button>
                           </div>
                           {errors.otp && <span className="form-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
+                          {devOtp && (
+                            <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '8px' }}>
+                              <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>📱 Code also shown here (simulated SMS):</div>
+                              <div
+                                style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#fff', background: 'rgba(0,0,0,0.25)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
+                                onClick={() => setEmailOtp(devOtp)}
+                                title="Click to auto-fill"
+                              >
+                                {devOtp}
+                              </div>
+                              <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
+                            </div>
+                          )}
                         </div>
                       )}
 
