@@ -32,11 +32,13 @@ const userSchema = new mongoose.Schema(
         values: ['buyer', 'seller', 'delivery', 'admin'],
         message: '{VALUE} is not a valid role. Allowed roles are: buyer, seller, delivery, admin'
       },
-      default: 'buyer'
+      default: 'buyer',
+      index: true
     },
     phone: {
       type: String,
-      trim: true
+      trim: true,
+      index: true
     },
     isEmailVerified: {
       type: Boolean,

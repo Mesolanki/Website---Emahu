@@ -12,14 +12,16 @@ const orderSchema = new mongoose.Schema(
     },
     sellerId: {
       type: String,
-      required: true
+      required: true,
+      index: true
     },
     sellerEmail: {
       type: String
     },
     userId: {
       type: String,
-      required: true
+      required: true,
+      index: true
     },
     date: {
       type: String,
@@ -77,7 +79,8 @@ const orderSchema = new mongoose.Schema(
         '🔓 FUNDS RELEASED',
         '❌ Order Rejected by Seller'
       ],
-      default: 'PENDING_APPROVAL'
+      default: 'PENDING_APPROVAL',
+      index: true
     },
     timeline: [
       {
@@ -137,7 +140,8 @@ const orderSchema = new mongoose.Schema(
     sellerRejected: Boolean,
     deliveryPartnerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+      ref: 'User',
+      index: true
     },
     deliveryStatus: {
       type: String,

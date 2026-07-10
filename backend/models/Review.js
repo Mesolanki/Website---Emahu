@@ -5,12 +5,14 @@ const reviewSchema = new mongoose.Schema(
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',
-      required: [true, 'Review must belong to a product']
+      required: [true, 'Review must belong to a product'],
+      index: true
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'Review must belong to a user']
+      required: [true, 'Review must belong to a user'],
+      index: true
     },
     name: {
       type: String,

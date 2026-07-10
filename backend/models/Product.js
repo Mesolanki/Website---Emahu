@@ -23,7 +23,8 @@ const productSchema = new mongoose.Schema(
     category: {
       type: String,
       required: [true, 'Please provide a merchandise category'],
-      trim: true
+      trim: true,
+      index: true
     },
     subcategory: {
       type: String,
@@ -72,7 +73,8 @@ const productSchema = new mongoose.Schema(
     seller: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true
+      required: true,
+      index: true
     },
     sales: {
       type: Number,
@@ -86,7 +88,8 @@ const productSchema = new mongoose.Schema(
     approvalStatus: {
       type: String,
       enum: ['pending', 'approved', 'rejected', 'changes_requested'],
-      default: 'pending'
+      default: 'pending',
+      index: true
     },
     adminCode: {
       type: String
