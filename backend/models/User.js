@@ -12,7 +12,7 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: [true, 'Please provide an email'],
-      unique: true,
+      unique: false,
       trim: true,
       lowercase: true,
       match: [
@@ -257,4 +257,16 @@ userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-module.exports = mongoose.model('User', userSchema);
+const User = mongoose.model('User', userSchema);
+
+// Drop legacy single-field unique index and replace with compound unique index
+mongoose.connection.once('open', async () => {
+  try {
+    await mongoose.connection.db.collection('users').dropIndex('email_1');
+  } catch (err) {}
+  try {
+    await mongoose.connection.db.collection('users').createIndex({ email: 1, role: 1 }, { unique: true });
+  } catch (err) {}
+});
+
+module.exports = User;

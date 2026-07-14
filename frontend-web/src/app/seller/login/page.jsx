@@ -81,7 +81,7 @@ export default function SellerLogin() {
 
     try {
       // Call actual backend authentication
-      const data = await loginUser(email, password);
+      const data = await loginUser(email, password, 'seller');
 
       // Verify the user is a seller
       if (data.user.role !== 'seller' && data.user.role !== 'admin') {
@@ -90,7 +90,14 @@ export default function SellerLogin() {
 
       saveAuthSession(data, 'seller');
       setLoading(false);
-      
+
+      // Show pending notice — still allow dashboard access (read-only mode)
+      if (data.user.status === 'pending') {
+        setError('⏳ Your seller account is pending admin verification. You can browse your dashboard but some features are locked until approved.');
+        setTimeout(() => router.replace('/seller/dashboard'), 3000);
+        return;
+      }
+
       router.replace('/seller/dashboard');
     } catch (err) {
       setLoading(false);
@@ -157,10 +164,18 @@ export default function SellerLogin() {
           </div>
 
           {error && (
-            <div className="sl-error" role="alert">
+            <div
+              className="sl-error"
+              role="alert"
+              style={error.startsWith('⏳') ? {
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                color: '#2563eb'
+              } : {}}
+            >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="sl-error__icon">
-                <circle cx="9" cy="9" r="8" stroke="#ef4444" strokeWidth="1.8" />
-                <path d="M9 6v4M9 12h.01" stroke="#ef4444" strokeWidth="1.8" strokeLinecap="round" />
+                <circle cx="9" cy="9" r="8" stroke={error.startsWith('⏳') ? '#2563eb' : '#ef4444'} strokeWidth="1.8" />
+                <path d="M9 6v4M9 12h.01" stroke={error.startsWith('⏳') ? '#2563eb' : '#ef4444'} strokeWidth="1.8" strokeLinecap="round" />
               </svg>
               <span>{error}</span>
             </div>

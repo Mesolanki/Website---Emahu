@@ -87,7 +87,7 @@ export default function BuyerLogin() {
 
     try {
       // Call actual backend authentication
-      const data = await loginUser(email, password);
+      const data = await loginUser(email, password, 'buyer');
 
       // Verify the user is a buyer
       if (data.user.role !== 'buyer' && data.user.role !== 'admin') {

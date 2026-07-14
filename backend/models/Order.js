@@ -139,8 +139,7 @@ const orderSchema = new mongoose.Schema(
     sellerConfirmed: Boolean,
     sellerRejected: Boolean,
     deliveryPartnerId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      type: mongoose.Schema.Types.Mixed, // ObjectId for real partners, 'sd' for self-delivery
       index: true
     },
     deliveryStatus: {
@@ -165,7 +164,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['unpaid', 'paid', 'released'],
+      enum: ['unpaid', 'pending', 'paid', 'completed', 'released'],
       default: 'unpaid'
     },
     transactionFile: {

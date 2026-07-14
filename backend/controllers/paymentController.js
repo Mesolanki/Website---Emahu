@@ -3,6 +3,14 @@ const User = require('../models/User');
 const PlatformSettings = require('../models/PlatformSettings');
 const Notification = require('../models/Notification');
 const sendEmail = require('../utils/sendEmail');
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET
+});
+
 
 // Helper: get or initialize the singleton settings doc
 const getSettings = async () => {
@@ -258,5 +266,119 @@ exports.getReleasedPayments = async (req, res) => {
   } catch (error) {
     console.error('getReleasedPayments error:', error);
     res.status(500).json({ success: false, error: 'Server error fetching released payments' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// @desc    Create Razorpay Order
+// @route   POST /api/payment/razorpay-order
+// @access  Public
+// ─────────────────────────────────────────────────────────────────────────────
+exports.createRazorpayOrder = async (req, res) => {
+  try {
+    const { amount } = req.body; // in INR
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid amount' });
+    }
+
+    const options = {
+      amount: Math.round(amount * 100), // in paise
+      currency: 'INR',
+      receipt: `receipt_${Date.now()}`
+    };
+
+    const razorpayOrder = await razorpay.orders.create(options);
+    res.status(200).json({
+      success: true,
+      order: razorpayOrder
+    });
+  } catch (error) {
+    console.error('createRazorpayOrder error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create Razorpay order: ' + error.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// @desc    Verify Razorpay Signature and Create Emahu Orders
+// @route   POST /api/payment/razorpay-verify
+// @access  Public
+// ─────────────────────────────────────────────────────────────────────────────
+exports.verifyRazorpaySignature = async (req, res) => {
+  try {
+    const { razorpay_payment_id, razorpay_order_id, razorpay_signature, orders } = req.body;
+
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+      return res.status(400).json({ success: false, error: 'Missing Razorpay signature details' });
+    }
+
+    const shasum = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
+    shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
+    const digest = shasum.digest('hex');
+
+    if (digest !== razorpay_signature) {
+      return res.status(400).json({ success: false, error: 'Transaction signature verification failed' });
+    }
+
+    // Payment is verified! Now insert orders into database.
+    const createdOrders = [];
+    if (orders && Array.isArray(orders)) {
+      const Product = require('../models/Product');
+      const AnalyticsEvent = require('../models/AnalyticsEvent');
+
+      for (const orderData of orders) {
+        // Enforce payment status as COMPLETED and paymentMethod as razorpay
+        orderData.paymentStatus = 'completed';
+        orderData.paymentMethod = 'razorpay';
+        orderData.transactionId = razorpay_payment_id;
+
+        // Create the order in DB
+        const order = await Order.create(orderData);
+        createdOrders.push(order);
+
+        // Decrease stock levels and update sales count
+        if (order.items && order.items.length > 0) {
+          for (const item of order.items) {
+            try {
+              const product = await Product.findById(item.productId);
+              if (product) {
+                product.stock = Math.max(0, product.stock - (item.quantity || 1));
+                product.sales = (product.sales || 0) + (item.quantity || 1);
+                await product.save();
+                console.log(`Updated product ${item.productId}: Stock = ${product.stock}, Sales = ${product.sales}`);
+              }
+            } catch (err) {
+              console.error(`Failed to update stock/sales for product ${item.productId}:`, err);
+            }
+          }
+        }
+
+        // Log purchase events for analytics
+        if (order.items && order.items.length > 0) {
+          for (const item of order.items) {
+            try {
+              await AnalyticsEvent.create({
+                type: 'purchase',
+                productId: item.productId,
+                sellerId: order.sellerId || 'default_seller',
+                userId: order.userId
+              });
+            } catch (e) {
+              console.error('Failed to log purchase analytics event:', e);
+            }
+          }
+        }
+        
+        console.log('DATABASE INSERT SUCCESSFUL VIA RAZORPAY:', order.orderId);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment verified and order(s) created successfully',
+      orders: createdOrders
+    });
+  } catch (error) {
+    console.error('verifyRazorpaySignature error:', error);
+    res.status(500).json({ success: false, error: 'Signature verification & order saving failed: ' + error.message });
   }
 };

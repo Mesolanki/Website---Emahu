@@ -72,6 +72,17 @@ export default function DeliveryPortal() {
   const [isSandboxRestricted, setIsSandboxRestricted] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState(null);
 
+  // Geolocation terms and manual address states
+  const [showLocationTermsModal, setShowLocationTermsModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [manualStreet, setManualStreet] = useState('');
+  const [manualArea, setManualArea] = useState('');
+  const [manualCity, setManualCity] = useState('Ahmedabad');
+  const [manualState, setManualState] = useState('Gujarat');
+  const [manualPincode, setManualPincode] = useState('');
+  const [locationTermsError, setLocationTermsError] = useState('');
+
   const [draftLoaded, setDraftLoaded] = useState(false);
 
   // Load draft on mount
@@ -346,16 +357,11 @@ export default function DeliveryPortal() {
   }, [token]);
 
   // --- Auth Handlers ---
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault();
-    setLoginError('');
-    if (!loginEmail.trim() || !loginPassword) {
-      setLoginError('Please enter both email and password');
-      return;
-    }
+  const proceedToLogin = async () => {
     setLoginLoading(true);
+    setLoginError('');
     try {
-      const data = await loginUser(loginEmail.trim(), loginPassword);
+      const data = await loginUser(loginEmail.trim(), loginPassword, 'delivery');
       if (data.user.role !== 'delivery' && data.user.role !== 'admin') {
         throw new Error('This login portal is restricted to Delivery Partners only.');
       }
@@ -368,6 +374,33 @@ export default function DeliveryPortal() {
       setLoginError(err.message || 'Invalid credentials');
     } finally {
       setLoginLoading(false);
+    }
+  };
+
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    if (!loginEmail.trim() || !loginPassword) {
+      setLoginError('Please enter both email and password');
+      return;
+    }
+
+    // Ask for location permission
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          setLatitude(String(position.coords.latitude.toFixed(6)));
+          setLongitude(String(position.coords.longitude.toFixed(6)));
+          await proceedToLogin();
+        },
+        async (error) => {
+          setPendingAction('login');
+          setShowLocationTermsModal(true);
+        }
+      );
+    } else {
+      setPendingAction('login');
+      setShowLocationTermsModal(true);
     }
   };
 
@@ -418,7 +451,7 @@ export default function DeliveryPortal() {
       const res = await fetch(`${apiBase}/api/auth/send-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone })
+        body: JSON.stringify({ phone: cleanPhone, role: 'delivery' })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -443,6 +476,68 @@ export default function DeliveryPortal() {
       setErrors((prev) => ({ ...prev, phoneNumber: err.message || 'Failed to send verification code. Please try again.' }));
     } finally {
       setOtpLoading(false);
+    }
+  };
+
+  const proceedToRegister = async () => {
+    setLoading(true);
+    setErrors({});
+
+    try {
+      const payload = {
+        name: deliveryName,
+        email: email.trim() || `${phoneNumber.trim()}@emahu.com`,
+        password,
+        role: 'delivery',
+        phone: phoneNumber.trim(),
+        operatingLocation: `${currentArea}, ${coveredCities[0] || currentCity}`,
+        category: regCategory,
+        vehicleType: regCategory === 'single_two_boy' ? vehicleType : 'other',
+        vehicleNumber: regCategory === 'single_two_boy' ? vehicleNumber : regCategory === 'agency' ? `Number of Employees: ${fleetSize}` : 'N/A',
+        currentCity: coveredCities[0] || currentCity,
+        currentArea,
+        pincode,
+        serviceRadius: parseFloat(serviceRadius),
+        perItemCharge: parseFloat(perKmRate),
+        perKmRate: parseFloat(perKmRate),
+        coveredCities,
+        deliveryScope,
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        gstNumber: regCategory === 'partner' ? gstNumber.trim() : undefined,
+        dispatchNotes: regCategory === 'agency'
+          ? `Owner: ${ownerName.trim()}\n${dispatchNotes}`
+          : regCategory === 'partner'
+            ? `Corporate Contact: ${contactName.trim()}\n${dispatchNotes}`
+            : dispatchNotes,
+        status: 'pending',
+        serviceAreaState: regCategory === 'single_two_boy' ? serviceAreaState : selectedStates,
+        address
+      };
+
+      await registerUser(payload);
+
+      const data = await loginUser(payload.email, payload.password, 'delivery');
+      if (data.user.role !== 'delivery') {
+        throw new Error('Verification failed.');
+      }
+      saveAuthSession(data, 'delivery');
+      setUser(data.user);
+      setToken(data.accessToken);
+      setIsLoggedIn(true);
+      setPortalMode('dashboard');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('emahu_delivery_register_draft');
+      }
+
+      setLoading(false);
+      setSubmitted(true);
+      setTimeout(() => {
+        setSubmitted(false);
+      }, 3000);
+    } catch (err) {
+      setLoading(false);
+      setErrors({ apiError: err.message || 'Registration failed' });
     }
   };
 
@@ -477,7 +572,9 @@ export default function DeliveryPortal() {
       }
 
       setIsEmailVerified(true);
+      setIsEmailOtpSent(false);
       setErrors((prev) => ({ ...prev, general: '' }));
+      await proceedToRegister();
     } catch (err) {
       console.error('Verify OTP Error:', err);
       setErrors((prev) => ({ ...prev, otp: err.message || 'Invalid or expired verification code.' }));
@@ -539,69 +636,123 @@ export default function DeliveryPortal() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const validateFormWithoutOtp = () => {
+    const newErrors = {};
+
+    // Category-specific validations
+    if (regCategory === 'single_two_boy') {
+      if (!deliveryName.trim()) newErrors.deliveryName = 'Driver Name is required';
+    } else if (regCategory === 'agency') {
+      if (!deliveryName.trim()) newErrors.deliveryName = 'Agency Name is required';
+      if (!ownerName.trim()) newErrors.ownerName = 'Owner/Manager Name is required';
+      if (!fleetSize.trim() || isNaN(fleetSize) || Number(fleetSize) <= 0) {
+        newErrors.fleetSize = 'Enter a valid number of employees';
+      }
+    } else if (regCategory === 'partner') {
+      if (!deliveryName.trim()) newErrors.deliveryName = 'Company Name is required';
+      if (!contactName.trim()) newErrors.contactName = 'Corporate Contact Name is required';
+      if (!gstNumber.trim()) newErrors.gstNumber = 'GSTIN is required';
+    }
+
+    if (!phoneNumber.trim()) {
+      newErrors.phoneNumber = 'Contact number is required';
+    } else if (!/^\d{10}$/.test(phoneNumber.trim())) {
+      newErrors.phoneNumber = 'Enter a valid 10-digit mobile number';
+    }
+    if (!password || password.length < 6) newErrors.password = 'Password must be >= 6 chars';
+    if (!currentArea.trim()) newErrors.currentArea = 'Area is required';
+    if (!pincode.trim()) newErrors.pincode = 'Pincode is required';
+    if (regCategory === 'single_two_boy') {
+      if (!serviceAreaState) newErrors.serviceAreaState = 'Service state is required';
+      if (!coveredCities || coveredCities.length === 0) {
+        newErrors.coveredCities = 'Covered city is required';
+      } else if (coveredCities.length > 1) {
+        newErrors.coveredCities = 'Single/Two Boy category can only select 1 city';
+      }
+    } else {
+      if (!selectedStates || selectedStates.length === 0) {
+        newErrors.serviceAreaState = 'At least one service state is required';
+      }
+      if (!coveredCities || coveredCities.length === 0) {
+        newErrors.coveredCities = 'At least one covered city is required';
+      } else if (deliveryScope === 'local' && coveredCities.length > 2) {
+        newErrors.coveredCities = 'Local partners can select a maximum of 2 cities';
+      }
+    }
+    if (!address.trim()) newErrors.address = 'Street address is required';
+    if (!serviceRadius.trim() || isNaN(serviceRadius)) newErrors.serviceRadius = 'Enter valid radius (KM)';
+    if (!perKmRate.trim() || isNaN(perKmRate)) newErrors.perKmRate = 'Enter rate per KM';
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleApproveLocationTerms = async () => {
+    if (!termsAccepted) {
+      setLocationTermsError('You must accept the terms & conditions to proceed.');
+      return;
+    }
+    if (!manualStreet.trim() || !manualArea.trim() || !manualCity.trim() || !manualState.trim() || !manualPincode.trim()) {
+      setLocationTermsError('Please fill in all address fields.');
+      return;
+    }
+
+    setLocationTermsError('');
+    setShowLocationTermsModal(false);
+
+    // Save manual address values to state
+    setAddress(manualStreet.trim());
+    setCurrentArea(manualArea.trim());
+    setCurrentCity(manualCity.trim());
+    setServiceAreaState(manualState.trim());
+    setPincode(manualPincode.trim());
+
+    if (manualCity.toLowerCase() === 'ahmedabad') {
+      setLatitude('23.0225');
+      setLongitude('72.5714');
+    } else if (manualCity.toLowerCase() === 'surat') {
+      setLatitude('21.1702');
+      setLongitude('72.8311');
+    } else {
+      setLatitude('23.0225');
+      setLongitude('72.5714');
+    }
+
+    if (pendingAction === 'login') {
+      await proceedToLogin();
+    } else if (pendingAction === 'register') {
+      if (!isEmailVerified) {
+        await handleSendEmailOtp();
+      } else {
+        await proceedToRegister();
+      }
+    }
+  };
+
   const handleRegisterSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+    if (e) e.preventDefault();
+    if (!validateFormWithoutOtp()) return;
 
-    setLoading(true);
-    setErrors({});
-
-    try {
-      const payload = {
-        name: deliveryName,
-        email: email.trim() || `${phoneNumber.trim()}@emahu.com`,
-        password,
-        role: 'delivery',
-        phone: phoneNumber.trim(),
-        operatingLocation: `${currentArea}, ${coveredCities[0] || currentCity}`,
-        category: regCategory,
-        vehicleType: regCategory === 'single_two_boy' ? vehicleType : 'other',
-        vehicleNumber: regCategory === 'single_two_boy' ? vehicleNumber : regCategory === 'agency' ? `Number of Employees: ${fleetSize}` : 'N/A',
-        currentCity: coveredCities[0] || currentCity,
-        currentArea,
-        pincode,
-        serviceRadius: parseFloat(serviceRadius),
-        perItemCharge: parseFloat(perKmRate),
-        perKmRate: parseFloat(perKmRate),
-        coveredCities,
-        deliveryScope,
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
-        gstNumber: regCategory === 'partner' ? gstNumber.trim() : undefined,
-        dispatchNotes: regCategory === 'agency'
-          ? `Owner: ${ownerName.trim()}\n${dispatchNotes}`
-          : regCategory === 'partner'
-            ? `Corporate Contact: ${contactName.trim()}\n${dispatchNotes}`
-            : dispatchNotes,
-        status: 'pending', // Registration status starts as pending for verification flow
-        serviceAreaState: regCategory === 'single_two_boy' ? serviceAreaState : selectedStates,
-        address
-      };
-
-      await registerUser(payload);
-
-      // Auto login returning user details and token
-      const data = await loginUser(payload.email, payload.password);
-      if (data.user.role !== 'delivery') {
-        throw new Error('Verification failed.');
-      }
-      saveAuthSession(data, 'delivery');
-      setUser(data.user);
-      setToken(data.accessToken);
-      setIsLoggedIn(true);
-      setPortalMode('dashboard');
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('emahu_delivery_register_draft');
-      }
-
-      setLoading(false);
-      setSubmitted(true);
-      setTimeout(() => {
-        setSubmitted(false);
-      }, 3000);
-    } catch (err) {
-      setLoading(false);
-      setErrors({ apiError: err.message || 'Registration failed' });
+    // Ask for location permission
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          setLatitude(String(position.coords.latitude.toFixed(6)));
+          setLongitude(String(position.coords.longitude.toFixed(6)));
+          if (!isEmailVerified) {
+            await handleSendEmailOtp();
+          } else {
+            await proceedToRegister();
+          }
+        },
+        async (error) => {
+          setPendingAction('register');
+          setShowLocationTermsModal(true);
+        }
+      );
+    } else {
+      setPendingAction('register');
+      setShowLocationTermsModal(true);
     }
   };
 
@@ -1422,71 +1573,17 @@ export default function DeliveryPortal() {
                         {regCategory === 'single_two_boy' ? 'Mobile Number' :
                           regCategory === 'agency' ? 'Contact Mobile Number' : 'Corporate Mobile Number'}
                       </label>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <input
-                          type="text"
-                          id="phoneNumber"
-                          className={`form-input ${errors.phoneNumber ? 'form-input--error' : ''}`}
-                          placeholder="e.g. 9898989898"
-                          value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                          readOnly={isEmailVerified}
-                          style={{ flex: 1 }}
-                          required
-                        />
-                        {!isEmailVerified && (
-                          <button
-                            type="button"
-                            className="form-btn"
-                            style={{ padding: '0 12px', height: '40px', fontSize: '0.78rem', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap', width: 'auto', margin: 0 }}
-                            onClick={handleSendEmailOtp}
-                            disabled={otpLoading}
-                          >
-                            {otpLoading ? '...' : isEmailOtpSent ? 'Resend' : 'Send Code'}
-                          </button>
-                        )}
-                      </div>
+                      <input
+                        type="text"
+                        id="phoneNumber"
+                        className={`form-input ${errors.phoneNumber ? 'form-input--error' : ''}`}
+                        placeholder="e.g. 9898989898"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        readOnly={isEmailVerified}
+                        required
+                      />
                       {errors.phoneNumber && <span className="form-error">{errors.phoneNumber}</span>}
-
-                      {/* OTP Input UI */}
-                      {isEmailOtpSent && !isEmailVerified && (
-                        <div style={{ marginTop: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', padding: '10px', borderRadius: '8px' }}>
-                          <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>Verification Code</label>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <input
-                              type="text"
-                              className="form-input"
-                              placeholder="Enter 6-digit OTP"
-                              value={emailOtp}
-                              onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                              style={{ flex: 1, height: '36px', fontSize: '0.85rem' }}
-                            />
-                            <button
-                              type="button"
-                              className="form-btn"
-                              style={{ padding: '0 12px', height: '36px', fontSize: '0.78rem', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', width: 'auto', margin: 0 }}
-                              onClick={handleVerifyEmailOtp}
-                              disabled={otpLoading}
-                            >
-                              Verify
-                            </button>
-                          </div>
-                          {errors.otp && <span className="form-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
-                          {devOtp && (
-                            <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '8px' }}>
-                              <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>📱 Code also shown here (simulated SMS):</div>
-                              <div
-                                style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#fff', background: 'rgba(0,0,0,0.25)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
-                                onClick={() => setEmailOtp(devOtp)}
-                                title="Click to auto-fill"
-                              >
-                                {devOtp}
-                              </div>
-                              <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
-                            </div>
-                          )}
-                        </div>
-                      )}
 
                       {isEmailVerified && (
                         <div style={{ color: '#10b981', fontSize: '0.75rem', marginTop: '6px', fontWeight: 'bold' }}>
@@ -2758,6 +2855,332 @@ export default function DeliveryPortal() {
       </footer>
       {/* Invisible Recaptcha Container for Firebase Phone Auth */}
       <div id="recaptcha-container" />
+
+      {isEmailOtpSent && !isEmailVerified && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '420px',
+            padding: '32px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(49, 151, 149, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px'
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#319795" strokeWidth="2">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0f172a', marginBottom: '8px' }}>
+              {otpLoading ? 'Sending Verification Code...' : 'Confirm Your Mobile Number'}
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: '1.5', marginBottom: '24px' }}>
+              {otpLoading 
+                ? 'We are generating and sending a secure verification code...' 
+                : <>We sent a 6-digit verification code to <strong style={{ color: '#0f172a' }}>{phoneNumber}</strong>. Please enter it below.</>
+              }
+            </p>
+
+            {devOtp && (
+              <div style={{
+                background: 'rgba(49, 151, 149, 0.08)',
+                border: '1px solid rgba(49, 151, 149, 0.15)',
+                color: '#319795',
+                padding: '12px',
+                borderRadius: '8px',
+                textAlign: 'center',
+                marginTop: '8px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>🔑 simulated code (check console too):</div>
+                <div
+                  style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#319795', background: 'rgba(0,0,0,0.04)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
+                  onClick={() => setEmailOtp(devOtp)}
+                  title="Click to auto-fill"
+                >
+                  {devOtp}
+                </div>
+                <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
+              </div>
+            )}
+
+            {errors.otp && (
+              <div style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.15)',
+                color: '#ef4444',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                marginBottom: '16px',
+                textAlign: 'left'
+              }}>
+                {errors.otp}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <input
+                type="text"
+                maxLength="6"
+                placeholder="000000"
+                value={emailOtp}
+                onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                style={{
+                  width: '100%',
+                  height: '50px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#f8fafc',
+                  color: '#0f172a',
+                  fontSize: '1.5rem',
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  letterSpacing: '8px',
+                  outline: 'none'
+                }}
+                disabled={otpLoading}
+              />
+              <button
+                type="button"
+                className="lp-nav-link-btn"
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  borderRadius: '8px',
+                  backgroundColor: '#319795',
+                  color: '#ffffff',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  border: 'none',
+                  cursor: otpLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: otpLoading ? 0.7 : 1,
+                  margin: 0
+                }}
+                onClick={handleVerifyEmailOtp}
+                disabled={otpLoading}
+              >
+                {otpLoading ? 'Verifying...' : 'Verify & Register'}
+              </button>
+              <button
+                type="button"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  marginTop: '8px'
+                }}
+                onClick={() => setIsEmailOtpSent(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showLocationTermsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '520px',
+            padding: '32px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+            textAlign: 'left',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: '700', color: '#0f172a', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
+              Emahu Delivery Terms & Location Service
+            </h3>
+
+            <div style={{ marginBottom: '20px', fontSize: '0.85rem', color: '#475569', lineHeight: '1.6' }}>
+              <p style={{ marginBottom: '10px', fontWeight: '600', color: '#0f172a' }}>
+                Location Permission Rejected/Unavailable:
+              </p>
+              <p style={{ marginBottom: '16px' }}>
+                Since GPS access is required to auto-match routes but was not granted, you must manually confirm your operating details and accept the terms of service below.
+              </p>
+              <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '8px', marginBottom: '20px' }}>
+                <strong style={{ color: '#0f172a', display: 'block', marginBottom: '6px' }}>Delivery Partner Agreement:</strong>
+                <ul style={{ paddingLeft: '20px', margin: 0 }}>
+                  <li>You agree to provide accurate, real-time status updates during all dispatches.</li>
+                  <li>You agree to keep the manually provided address accurate for logistics matching.</li>
+                  <li>You consent to share live route coordinates when active orders are in transit.</li>
+                </ul>
+              </div>
+            </div>
+
+            {locationTermsError && (
+              <div style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.15)',
+                color: '#ef4444',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                marginBottom: '16px'
+              }}>
+                {locationTermsError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155' }}>Street Address</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 101, Galaxy Complex"
+                    value={manualStreet}
+                    onChange={(e) => setManualStreet(e.target.value)}
+                    style={{ height: '38px', padding: '0 10px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155' }}>Area / Neighborhood</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Gota"
+                    value={manualArea}
+                    onChange={(e) => setManualArea(e.target.value)}
+                    style={{ height: '38px', padding: '0 10px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155' }}>City</label>
+                  <select
+                    value={manualCity}
+                    onChange={(e) => setManualCity(e.target.value)}
+                    style={{ height: '38px', padding: '0 10px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', backgroundColor: '#ffffff' }}
+                  >
+                    <option value="Ahmedabad">Ahmedabad</option>
+                    <option value="Surat">Surat</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155' }}>State</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Gujarat"
+                    value={manualState}
+                    onChange={(e) => setManualState(e.target.value)}
+                    style={{ height: '38px', padding: '0 10px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155' }}>Pincode</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 382481"
+                    maxLength="6"
+                    value={manualPincode}
+                    onChange={(e) => setManualPincode(e.target.value.replace(/\D/g, ''))}
+                    style={{ height: '38px', padding: '0 10px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', color: '#334155', marginTop: '10px' }}>
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  style={{ marginTop: '3px' }}
+                />
+                <span>I accept all the terms and conditions for delivery services and confirm the address is correct.</span>
+              </label>
+
+              <button
+                type="button"
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  borderRadius: '8px',
+                  backgroundColor: '#319795',
+                  color: '#ffffff',
+                  fontSize: '0.92rem',
+                  fontWeight: '600',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginTop: '10px'
+                }}
+                onClick={handleApproveLocationTerms}
+              >
+                Approve & Continue
+              </button>
+
+              <button
+                type="button"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  alignSelf: 'center',
+                  marginTop: '4px'
+                }}
+                onClick={() => setShowLocationTermsModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

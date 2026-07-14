@@ -35,6 +35,85 @@ const isRealImage = (img) => {
   return clean.startsWith('http') || clean.startsWith('data:image');
 };
 
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => {
+      resolve(true);
+    };
+    script.onerror = () => {
+      resolve(false);
+    };
+    document.body.appendChild(script);
+  });
+};
+
+const sellerServesLocation = (seller, city) => {
+  if (!seller) return false;
+  const cityLower = (city || 'Ahmedabad').toLowerCase().trim();
+
+  const sellerCity = (seller.city || seller.currentCity || '').toLowerCase().trim();
+  const sellerState = (seller.state || '').toLowerCase().trim();
+  const serviceCity = (seller.serviceAreaCity || '').toLowerCase().trim();
+
+  const AHMEDABAD_NEARBY = ['ahmedabad', 'gandhinagar', 'sanand', 'kadi', 'nadiad', 'kalol', 'mehsana', 'anand', 'vadodara', 'surat'];
+  const GUJARAT_ALIASES = ['gujarat', 'guj'];
+
+  // Normalize serviceAreaState to an array
+  let serviceStates = [];
+  if (Array.isArray(seller.serviceAreaState)) {
+    serviceStates = seller.serviceAreaState.map(s => String(s).toLowerCase().trim());
+  } else if (seller.serviceAreaState) {
+    serviceStates = [String(seller.serviceAreaState).toLowerCase().trim()];
+  }
+
+  // coveredCities array
+  const coveredCities = Array.isArray(seller.coveredCities)
+    ? seller.coveredCities.map(c => c.toLowerCase().trim())
+    : [];
+
+  if (cityLower === 'ahmedabad') {
+    if (AHMEDABAD_NEARBY.includes(sellerCity)) return true;
+    if (GUJARAT_ALIASES.some(g => sellerState.includes(g))) return true;
+    if (AHMEDABAD_NEARBY.includes(serviceCity)) return true;
+    if (serviceStates.some(s => GUJARAT_ALIASES.some(g => s.includes(g)))) return true;
+    if (coveredCities.some(c => AHMEDABAD_NEARBY.includes(c))) return true;
+    return false;
+  }
+
+  if (sellerCity === cityLower) return true;
+  if (serviceCity === cityLower) return true;
+  if (coveredCities.includes(cityLower)) return true;
+
+  const cityToStateMap = {
+    'delhi': ['delhi', 'new delhi'],
+    'noida': ['uttar pradesh', 'up', 'delhi'],
+    'mumbai': ['maharashtra', 'mh'],
+    'pune': ['maharashtra', 'mh'],
+    'bangalore': ['karnataka', 'ka'],
+    'hyderabad': ['telangana', 'tg', 'ap'],
+    'kolkata': ['west bengal', 'wb'],
+    'surat': ['gujarat', 'guj'],
+    'vadodara': ['gujarat', 'guj'],
+    'gandhinagar': ['gujarat', 'guj'],
+    'chennai': ['tamil nadu', 'tn']
+  };
+
+  const statesForSelectedCity = cityToStateMap[cityLower] || [];
+  if (statesForSelectedCity.length > 0) {
+    if (statesForSelectedCity.some(s => sellerState.includes(s))) return true;
+    if (serviceStates.some(s => statesForSelectedCity.some(state => s.includes(state)))) return true;
+  }
+
+  return false;
+};
+
 export default function CheckoutPage() {
   const [cartItems, setCartItems] = useState([]);
   const [shippingSpeed, setShippingSpeed] = useState('standard'); // standard | express
@@ -42,7 +121,7 @@ export default function CheckoutPage() {
   const [checkoutStep, setCheckoutStep] = useState('idle'); // idle | securing | success
   const [generatedOrderId, setGeneratedOrderId] = useState('');
   const [orderSellers, setOrderSellers] = useState([]);
-  
+
   // Form fields
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -59,6 +138,7 @@ export default function CheckoutPage() {
   const [deliveryBreakdown, setDeliveryBreakdown] = useState([]);
   const [maxDistanceExceeded, setMaxDistanceExceeded] = useState(false);
   const [deliveryCalculationError, setDeliveryCalculationError] = useState('');
+  const STATES_WITH_PARTNERS = ['Gujarat', 'Maharashtra', 'Delhi', 'Karnataka', 'Tamil Nadu', 'Uttar Pradesh'];
   const [buyerCoordinates, setBuyerCoordinates] = useState({ latitude: '', longitude: '' });
   const [deliverySettings, setDeliverySettings] = useState({
     maxDeliveryDistance: 100,
@@ -69,6 +149,20 @@ export default function CheckoutPage() {
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [termsModalContent, setTermsModalContent] = useState('');
   const [availableProducts, setAvailableProducts] = useState([]);
+  const [showTaxBreakdown, setShowTaxBreakdown] = useState(false);
+
+  const checkoutCity = useMemo(() => {
+    const rawCity = addressType === 'saved'
+      ? (detectCityAndState(address).city || 'Ahmedabad')
+      : city;
+    return (rawCity || 'Ahmedabad').trim();
+  }, [addressType, address, city]);
+
+  const undeliverableItems = useMemo(() => {
+    return cartItems.filter(item => {
+      return !sellerServesLocation(item.seller, checkoutCity);
+    });
+  }, [cartItems, checkoutCity]);
 
   const handleOpenTermsModal = (type) => {
     setTermsModalContent(type);
@@ -156,9 +250,9 @@ export default function CheckoutPage() {
     const R = 6371; // Radius of the Earth in km
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
+    const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
@@ -167,7 +261,7 @@ export default function CheckoutPage() {
   function detectCityAndState(address) {
     if (!address || typeof address !== 'string') return { city: '', state: '' };
     const lower = address.toLowerCase();
-    
+
     const list = [
       { city: 'Ahmedabad', state: 'Gujarat', aliases: ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad nagar', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav', 'gandhinagar', 'sanand'] },
       { city: 'Surat', state: 'Gujarat', aliases: ['surat', 'adajan', 'vesu', 'katargam', 'varachha', 'althan', 'citylight', 'pal', 'piplod', 'dindoli', 'udhna', 'rander', 'bhestan'] },
@@ -185,7 +279,7 @@ export default function CheckoutPage() {
       { city: 'Lucknow', state: 'Uttar Pradesh', aliases: ['lucknow', 'gomti nagar'] },
       { city: 'Chandigarh', state: 'Punjab', aliases: ['chandigarh', 'mohali', 'panchkula'] }
     ];
-    
+
     for (const item of list) {
       const terms = item.aliases || [item.city];
       for (const term of terms) {
@@ -200,15 +294,15 @@ export default function CheckoutPage() {
   // Update/draw Leaflet map showing buyer/seller connection routes
   useEffect(() => {
     if (!leafletLoaded || typeof window === 'undefined' || !window.L) return;
-    
+
     const container = document.getElementById('checkout-route-map');
     if (!container) return;
-    
+
     const bLat = parseFloat(buyerCoordinates.latitude);
     const bLon = parseFloat(buyerCoordinates.longitude);
-    
+
     if (isNaN(bLat) || isNaN(bLon)) return;
-    
+
     // Determine seller coordinates
     let sellerLocations = cartItems.map(item => {
       const sellerObj = item.seller;
@@ -226,14 +320,14 @@ export default function CheckoutPage() {
       // If no item has real coordinates, use the single default location as a fallback
       sellerLocations = [{ latitude: 23.0225, longitude: 72.5714, name: 'Emahu Seller' }];
     }
-    
+
     if (!checkoutMapRef.current) {
       checkoutMapRef.current = window.L.map('checkout-route-map').setView([bLat, bLon], 10);
       window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(checkoutMapRef.current);
     }
-    
+
     if (routePolylineRef.current) {
       checkoutMapRef.current.removeLayer(routePolylineRef.current);
     }
@@ -244,7 +338,7 @@ export default function CheckoutPage() {
       checkoutMapRef.current.removeLayer(marker);
     });
     sellerMarkersRef.current = [];
-    
+
     buyerMarkerRef.current = window.L.marker([bLat, bLon], {
       icon: window.L.divIcon({
         className: 'buyer-marker-icon',
@@ -260,9 +354,9 @@ export default function CheckoutPage() {
         iconAnchor: [40, 36]
       })
     }).addTo(checkoutMapRef.current).bindPopup('Your Location (Buyer)');
-    
+
     const points = [[bLat, bLon]];
-    
+
     sellerLocations.forEach(loc => {
       const sMarker = window.L.marker([loc.latitude, loc.longitude], {
         icon: window.L.divIcon({
@@ -279,14 +373,14 @@ export default function CheckoutPage() {
           iconAnchor: [45, 36]
         })
       }).addTo(checkoutMapRef.current).bindPopup(`Retailer: ${loc.name}`);
-      
+
       sellerMarkersRef.current.push(sMarker);
       points.push([loc.latitude, loc.longitude]);
-      
+
       const poly = window.L.polyline([[bLat, bLon], [loc.latitude, loc.longitude]], { color: '#4f46e5', weight: 3, dashArray: '5, 5' }).addTo(checkoutMapRef.current);
       routePolylineRef.current = poly;
     });
-    
+
     if (points.length > 1) {
       const bounds = window.L.latLngBounds(points);
       checkoutMapRef.current.fitBounds(bounds, { padding: [40, 40] });
@@ -299,14 +393,14 @@ export default function CheckoutPage() {
         async (position) => {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
-          
+
           const coords = {
             latitude: lat.toFixed(6),
             longitude: lon.toFixed(6)
           };
           setBuyerCoordinates(coords);
           localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
-          
+
           // Nominatim reverse-geocoding
           try {
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
@@ -317,7 +411,7 @@ export default function CheckoutPage() {
               const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || '';
               const stateVal = data.address.state || '';
               const postcodeVal = data.address.postcode || data.address.postal || '';
-              
+
               const parts = [road, suburb, cityVal, stateVal].filter(Boolean);
               let fullAddr = parts.join(', ');
               if (postcodeVal) {
@@ -326,7 +420,7 @@ export default function CheckoutPage() {
               if (!fullAddr) {
                 fullAddr = data.display_name;
               }
-              
+
               setAddress(fullAddr);
               setCity(cityVal);
               setStateName(stateVal);
@@ -365,7 +459,7 @@ export default function CheckoutPage() {
         setDeliveryCalculationError('');
         return;
       }
-      
+
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/calculate`, {
           method: 'POST',
@@ -383,7 +477,10 @@ export default function CheckoutPage() {
         });
         const data = await res.json();
         if (data.success) {
-          let baseFee = data.totalDeliveryCharge;
+          const userState = (addressType === 'saved' ? (detectCityAndState(address).state || 'Gujarat') : stateName).trim();
+          const hasPartner = STATES_WITH_PARTNERS.some(s => s.toLowerCase() === userState.toLowerCase());
+
+          let baseFee = hasPartner ? data.totalDeliveryCharge : 0;
           if (shippingSpeed === 'express') {
             baseFee += data.expressDeliverySurcharge || 100;
           }
@@ -401,7 +498,10 @@ export default function CheckoutPage() {
         }
       } catch (err) {
         console.error('Delivery calculation failed:', err);
-        const standardFee = 99;
+        const userState = (addressType === 'saved' ? (detectCityAndState(address).state || 'Gujarat') : stateName).trim();
+        const hasPartner = STATES_WITH_PARTNERS.some(s => s.toLowerCase() === userState.toLowerCase());
+
+        const standardFee = hasPartner ? 99 : 0;
         const expressSurcharge = shippingSpeed === 'express' ? deliverySettings.expressDeliverySurcharge : 0;
         setDeliveryCharge(standardFee + expressSurcharge);
         setDeliveryDistance(0);
@@ -409,7 +509,7 @@ export default function CheckoutPage() {
         setMaxDistanceExceeded(false);
       }
     };
-    
+
     calculateCharge();
   }, [buyerCoordinates.latitude, buyerCoordinates.longitude, cartItems, shippingSpeed, deliverySettings]);
 
@@ -421,7 +521,7 @@ export default function CheckoutPage() {
       if (storedCoords) {
         try {
           setBuyerCoordinates(JSON.parse(storedCoords));
-        } catch (e) {}
+        } catch (e) { }
       }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
@@ -541,15 +641,19 @@ export default function CheckoutPage() {
     let suggestions = availableProducts.filter(p => {
       const pid = p.id.toString();
       if (pid === cartItemId) return false;
+      // Enforce that suggestion is deliverable to selected checkout city
+      if (!sellerServesLocation(p.seller, checkoutCity)) return false;
       return p.category === cartItem.category;
     });
 
     if (suggestions.length === 0) {
-      suggestions = availableProducts.filter(p => p.id.toString() !== cartItemId);
+      suggestions = availableProducts.filter(p => {
+        return p.id.toString() !== cartItemId && sellerServesLocation(p.seller, checkoutCity);
+      });
     }
 
     return suggestions.slice(0, 3);
-  }, [cartItems, availableProducts]);
+  }, [cartItems, availableProducts, checkoutCity]);
 
   const handleAddSuggestionToCart = (suggestedProduct) => {
     try {
@@ -570,7 +674,7 @@ export default function CheckoutPage() {
         });
         localStorage.setItem('emahu_cart', JSON.stringify(currentCart));
         window.dispatchEvent(new Event('storage'));
-        
+
         loadCheckoutData();
       }
     } catch (err) {
@@ -578,16 +682,23 @@ export default function CheckoutPage() {
     }
   };
 
-  const shippingFee = subtotal === 0 ? 0 : deliveryCharge;
+  const shippingFee = (subtotal === 0 || subtotal > 150) ? 0 : deliveryCharge;
   const taxAmount = Math.round(subtotal * 0.18); // 18% Escrow Tax
+  const cgstAmount = Math.round(taxAmount / 2);
+  const sgstAmount = taxAmount - cgstAmount;
   const grandTotal = subtotal + shippingFee + taxAmount;
 
-  const handlePlaceOrder = (e) => {
+  const handlePlaceOrder = async (e) => {
     e.preventDefault();
     if (cartItems.length === 0) return;
 
     if (!agreeToTerms) {
       alert('Checkout Blocked: You must agree to the Terms & Conditions and refund policies to confirm your order.');
+      return;
+    }
+
+    if (undeliverableItems.length > 0) {
+      alert('Checkout Blocked: Some items in your cart cannot be delivered to your delivery location. Please remove them or update your delivery address.');
       return;
     }
 
@@ -625,193 +736,253 @@ export default function CheckoutPage() {
     const unique = Array.from(new Map(sellers.map(s => [s.email + s.name, s])).values());
     setOrderSellers(unique);
 
-    // Step 1: Secure Escrow Locking Animation
-    setCheckoutStep('securing');
-
-    setTimeout(() => {
-      // Step 2: Push to local escrow vault storage
+    // Dynamic order payload generation (needed for signature verification on verify endpoint)
+    let buyerUserId = '';
+    const buyerUserStr = localStorage.getItem('emahu_buyer_user');
+    if (buyerUserStr) {
       try {
-        const storedOrdersStr = localStorage.getItem('emahu_orders') || '[]';
-        const storedOrders = JSON.parse(storedOrdersStr);
-        const notifications = JSON.parse(localStorage.getItem('emahu_notifications') || '[]');
+        buyerUserId = JSON.parse(buyerUserStr).id || JSON.parse(buyerUserStr)._id || '';
+      } catch (err) { }
+    }
+    if (!buyerUserId) {
+      let guestId = localStorage.getItem('emahu_guest_id');
+      if (!guestId) {
+        guestId = 'guest_' + Math.floor(100000 + Math.random() * 900000) + '_' + Date.now();
+        localStorage.setItem('emahu_guest_id', guestId);
+      }
+      buyerUserId = guestId;
+    }
 
-        let buyerUserId = '';
-        const buyerUserStr = localStorage.getItem('emahu_buyer_user');
-        if (buyerUserStr) {
-          try {
-            buyerUserId = JSON.parse(buyerUserStr).id || JSON.parse(buyerUserStr)._id || '';
-          } catch (e) {}
+    const billId = `BILL_${Math.floor(100000 + Math.random() * 900000)}`;
+    const placedOrderIds = [];
+    const orderObjects = [];
+    const notifications = JSON.parse(localStorage.getItem('emahu_notifications') || '[]');
+
+    cartItems.forEach((item, index) => {
+      const orderId = `EMH_${Math.floor(100000 + Math.random() * 900000)}`;
+      placedOrderIds.push(orderId);
+
+      const itemSubtotal = item.price * item.quantity;
+      const bLat = parseFloat(buyerCoordinates.latitude);
+      const bLon = parseFloat(buyerCoordinates.longitude);
+
+      let itemDistance = 0;
+      let itemDeliveryFee = 99;
+
+      const sellerObj = item.seller || null;
+      const sLat = (sellerObj && sellerObj.latitude !== undefined && sellerObj.latitude !== null) ? sellerObj.latitude : 23.0225;
+      const sLon = (sellerObj && sellerObj.longitude !== undefined && sellerObj.longitude !== null) ? sellerObj.longitude : 72.5714;
+
+      if (subtotal > 150) {
+        itemDeliveryFee = (shippingSpeed === 'express') ? (deliverySettings.expressDeliverySurcharge || 100) : 0;
+      } else if (!isNaN(bLat) && !isNaN(bLon)) {
+        itemDistance = getHaversineDistance(bLat, bLon, sLat, sLon);
+        const matchedSlab = deliverySettings.slabs?.find(slab => itemDistance >= slab.fromKm && itemDistance < slab.toKm);
+        itemDeliveryFee = matchedSlab ? matchedSlab.charge : 99;
+        if (shippingSpeed === 'express') {
+          itemDeliveryFee += deliverySettings.expressDeliverySurcharge || 100;
         }
-        if (!buyerUserId) {
-          let guestId = localStorage.getItem('emahu_guest_id');
-          if (!guestId) {
-            guestId = 'guest_' + Math.floor(100000 + Math.random() * 900000) + '_' + Date.now();
-            localStorage.setItem('emahu_guest_id', guestId);
-          }
-          buyerUserId = guestId;
+      } else {
+        itemDeliveryFee = 99;
+        if (shippingSpeed === 'express') {
+          itemDeliveryFee += 100;
         }
+      }
 
-        const billId = `BILL_${Math.floor(100000 + Math.random() * 900000)}`;
-        const placedOrderIds = [];
-        const orderObjects = [];
+      const itemTaxAmount = Math.round(itemSubtotal * 0.18);
+      const itemGrandTotal = itemSubtotal + itemDeliveryFee + itemTaxAmount;
 
-        cartItems.forEach((item, index) => {
-          const orderId = `EMH_${Math.floor(100000 + Math.random() * 900000)}`;
-          placedOrderIds.push(orderId);
+      let sellerId = 'default_seller';
+      let sellerEmail = null;
+      if (sellerObj) {
+        if (typeof sellerObj === 'string') {
+          sellerId = sellerObj;
+        } else if (typeof sellerObj === 'object') {
+          sellerId = sellerObj._id || sellerObj.id || 'default_seller';
+          sellerEmail = sellerObj.email || null;
+        }
+      }
 
-          const subtotal = item.price * item.quantity;
-          
-          const bLat = parseFloat(buyerCoordinates.latitude);
-          const bLon = parseFloat(buyerCoordinates.longitude);
-          
-          let itemDistance = 0;
-          let itemDeliveryFee = 99;
-          
-          const sellerObj = item.seller || null;
-          const sLat = (sellerObj && sellerObj.latitude !== undefined && sellerObj.latitude !== null) ? sellerObj.latitude : 23.0225;
-          const sLon = (sellerObj && sellerObj.longitude !== undefined && sellerObj.longitude !== null) ? sellerObj.longitude : 72.5714;
-          
-          if (!isNaN(bLat) && !isNaN(bLon)) {
-            itemDistance = getHaversineDistance(bLat, bLon, sLat, sLon);
-            const matchedSlab = deliverySettings.slabs?.find(slab => itemDistance >= slab.fromKm && itemDistance < slab.toKm);
-            itemDeliveryFee = matchedSlab ? matchedSlab.charge : 99;
-            if (shippingSpeed === 'express') {
-              itemDeliveryFee += deliverySettings.expressDeliverySurcharge || 100;
-            }
-          } else {
-            // standard fallback
-            itemDeliveryFee = 99;
-            if (shippingSpeed === 'express') {
-              itemDeliveryFee += 100;
-            }
-          }
+      const newOrderPayload = {
+        orderId: orderId,
+        billId: billId,
+        sellerId: sellerId,
+        sellerEmail: sellerEmail,
+        userId: buyerUserId,
+        date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        createdAt: new Date().toISOString(),
+        items: [{
+          productId: item.id || item._id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          brand: item.brand,
+          img: item.img,
+          seller: item.seller || { name: item.brand || 'Emahu Seller', email: 'support@emahu.com', phone: '+91 99999 99999' }
+        }],
+        total: itemGrandTotal,
+        status: 'PENDING_APPROVAL',
+        timeline: [
+          { status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) }
+        ],
+        deliveryAddress: {
+          fullName,
+          phone,
+          email,
+          address,
+          city: addressType === 'saved' ? (detectCityAndState(address).city || 'Ahmedabad') : city,
+          stateName: addressType === 'saved' ? (detectCityAndState(address).state || 'Gujarat') : stateName,
+          pincode: addressType === 'saved' ? (address.match(/\b\d{6}\b/)?.[0] || '380001') : pincode
+        },
+        shippingSpeed,
+        escrowMethod,
+        deliveryPartnerId: STATES_WITH_PARTNERS.some(s => s.toLowerCase() === (addressType === 'saved' ? (detectCityAndState(address).state || 'Gujarat') : stateName).toLowerCase().trim()) ? '' : 'sd',
+        carrier: STATES_WITH_PARTNERS.some(s => s.toLowerCase() === (addressType === 'saved' ? (detectCityAndState(address).state || 'Gujarat') : stateName).toLowerCase().trim()) ? '' : 'Self-Delivery (sd)',
+        buyerLocation: {
+          latitude: !isNaN(bLat) ? bLat : undefined,
+          longitude: !isNaN(bLon) ? bLon : undefined,
+          address: address
+        },
+        sellerLocation: {
+          shopName: (sellerObj && (sellerObj.storeName || sellerObj.name)) || 'Emahu Seller',
+          latitude: sLat,
+          longitude: sLon,
+          address: (sellerObj && sellerObj.address) || 'Ahmedabad, Gujarat'
+        },
+        distanceKm: parseFloat(itemDistance.toFixed(2)),
+        deliveryCharge: itemDeliveryFee,
+        productAmount: itemSubtotal,
+        totalPaid: itemGrandTotal
+      };
 
-          const taxAmount = Math.round(subtotal * 0.18);
-          const grandTotal = subtotal + itemDeliveryFee + taxAmount;
+      orderObjects.push(newOrderPayload);
 
-          let sellerId = 'default_seller';
-          let sellerEmail = null;
-          if (sellerObj) {
-            if (typeof sellerObj === 'string') {
-              sellerId = sellerObj;
-            } else if (typeof sellerObj === 'object') {
-              sellerId = sellerObj._id || sellerObj.id || 'default_seller';
-              sellerEmail = sellerObj.email || null;
-            }
-          }
+      // Push Notifications to display
+      notifications.unshift({
+        id: `notif_${Date.now()}_buyer_${orderId}_${index}`,
+        title: 'Payment Success',
+        message: `Your payment of ₹${itemGrandTotal.toLocaleString('en-IN')} has been locked. Waiting for seller approval for Order #${orderId}.`,
+        role: 'buyer',
+        date: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+        read: false
+      });
+      notifications.unshift({
+        id: `notif_${Date.now()}_seller_${orderId}_${index}`,
+        title: 'New Order Received',
+        message: `New order received. Approval required for Order #${orderId}.`,
+        role: 'seller',
+        date: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+        read: false
+      });
+    });
 
-          const newOrderPayload = {
-            orderId: orderId,
-            billId: billId,
-            sellerId: sellerId,
-            sellerEmail: sellerEmail,
-            userId: buyerUserId,
-            date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-            createdAt: new Date().toISOString(),
-            items: [{
-              productId: item.id || item._id,
-              name: item.name,
-              price: item.price,
-              quantity: item.quantity,
-              brand: item.brand,
-              img: item.img,
-              seller: item.seller || { name: item.brand || 'Emahu Seller', email: 'support@emahu.com', phone: '+91 99999 99999' }
-            }],
-            total: grandTotal,
-            status: 'PENDING_APPROVAL',
-            timeline: [
-              { status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) }
-            ],
-            deliveryAddress: {
-              fullName,
-              phone,
-              email,
-              address,
-              city: addressType === 'saved' ? (detectCityAndState(address).city || 'Ahmedabad') : city,
-              stateName: addressType === 'saved' ? (detectCityAndState(address).state || 'Gujarat') : stateName,
-              pincode: addressType === 'saved' ? (address.match(/\b\d{6}\b/)?.[0] || '380001') : pincode
-            },
-            shippingSpeed,
-            escrowMethod,
-            buyerLocation: {
-              latitude: !isNaN(bLat) ? bLat : undefined,
-              longitude: !isNaN(bLon) ? bLon : undefined,
-              address: address
-            },
-            sellerLocation: {
-              shopName: (sellerObj && (sellerObj.storeName || sellerObj.name)) || 'Emahu Seller',
-              latitude: sLat,
-              longitude: sLon,
-              address: (sellerObj && sellerObj.address) || 'Ahmedabad, Gujarat'
-            },
-            distanceKm: parseFloat(itemDistance.toFixed(2)),
-            deliveryCharge: itemDeliveryFee,
-            productAmount: subtotal,
-            totalPaid: grandTotal
-          };
+    // Step 1: Load Razorpay standard script
+    const scriptLoaded = await loadRazorpayScript();
+    if (!scriptLoaded) {
+      alert('Razorpay Checkout SDK failed to load. Please verify your connection.');
+      return;
+    }
 
-          orderObjects.push(newOrderPayload);
+    // Step 2: Request backend to generate Razorpay order
+    try {
+      const initOrderRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/razorpay-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount: grandTotal })
+      });
+      const orderInitData = await initOrderRes.json();
+      if (!orderInitData.success) {
+        alert('Failed to initialize payment order: ' + (orderInitData.error || 'Unknown error'));
+        return;
+      }
 
-          // Push Notifications
-          notifications.unshift({
-            id: `notif_${Date.now()}_buyer_${orderId}_${index}`,
-            title: 'Payment Success',
-            message: `Your payment of ₹${grandTotal.toLocaleString('en-IN')} has been locked. Waiting for seller approval for Order #${orderId}.`,
-            role: 'buyer',
-            date: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-            read: false
-          });
-          notifications.unshift({
-            id: `notif_${Date.now()}_seller_${orderId}_${index}`,
-            title: 'New Order Received',
-            message: `New order received. Approval required for Order #${orderId}.`,
-            role: 'seller',
-            date: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-            read: false
-          });
-        });
+      const rzpOrder = orderInitData.order;
 
-        // Insert into database and await it
-        (async () => {
+      // Step 3: Launch Razorpay standard checkout dialog
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_TCxKJiam0vUNgJ',
+        amount: rzpOrder.amount,
+        currency: rzpOrder.currency,
+        name: 'Emahu Marketplace',
+        description: 'Securing Escrow Payment',
+        order_id: rzpOrder.id,
+        handler: async function (response) {
+          // Change state to show the Escrow Locking Animation
+          setCheckoutStep('securing');
+
+          // Send payment signature details and order creation payloads to verification endpoint
           try {
-            for (const orderData of orderObjects) {
-              const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(orderData)
+            const verifyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/razorpay-verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                orders: orderObjects
+              })
+            });
+
+            const verifyData = await verifyRes.json();
+            if (verifyData.success) {
+              // Sync to local storage
+              const storedOrdersStr = localStorage.getItem('emahu_orders') || '[]';
+              const storedOrders = JSON.parse(storedOrdersStr);
+
+              orderObjects.forEach(o => {
+                o.paymentStatus = 'completed';
+                o.paymentMethod = 'razorpay';
+                o.transactionId = response.razorpay_payment_id;
+                storedOrders.push(o);
               });
-              const data = await res.json();
-              if (!data.success) {
-                throw new Error(data.error || 'Failed to insert order into database');
-              }
+
+              setGeneratedOrderId(placedOrderIds.join(', '));
+              localStorage.setItem('emahu_orders', JSON.stringify(storedOrders));
+              localStorage.setItem('emahu_notifications', JSON.stringify(notifications));
+
+              // Clear Cart
+              setCartItems([]);
+              localStorage.setItem('emahu_cart', JSON.stringify([]));
+              window.dispatchEvent(new Event('storage'));
+
+              // Move to success step with a slight delay for locking animation
+              setTimeout(() => {
+                setCheckoutStep('success');
+              }, 2000);
+            } else {
+              alert('Escrow payment verification failed: ' + verifyData.error);
+              setCheckoutStep('idle');
             }
-
-            // Sync to local storage
-            orderObjects.forEach(o => storedOrders.push(o));
-            setGeneratedOrderId(placedOrderIds.join(', '));
-            localStorage.setItem('emahu_orders', JSON.stringify(storedOrders));
-            localStorage.setItem('emahu_notifications', JSON.stringify(notifications));
-
-            // Step 3: Clear Cart
-            setCartItems([]);
-            localStorage.setItem('emahu_cart', JSON.stringify([]));
-            window.dispatchEvent(new Event('storage'));
-
-            // Move to success step
-            setCheckoutStep('success');
           } catch (dbErr) {
             console.error('DATABASE INSERT FAILURE:', dbErr);
-            alert('Failed to place order: ' + dbErr.message);
+            alert('Failed to complete order verification: ' + dbErr.message);
             setCheckoutStep('idle');
           }
-        })();
-      } catch (err) {
-        console.error(err);
-        setCheckoutStep('idle');
-      }
-    }, 2800);
+        },
+        prefill: {
+          name: fullName,
+          email: email,
+          contact: phone
+        },
+        theme: {
+          color: '#4f46e5'
+        }
+      };
+
+      const razorpayInstance = new window.Razorpay(options);
+      razorpayInstance.on('payment.failed', function (paymentFailResponse) {
+        alert('Escrow transaction failed: ' + paymentFailResponse.error.description);
+      });
+      razorpayInstance.open();
+    } catch (checkoutErr) {
+      console.error('Checkout error:', checkoutErr);
+      alert('Checkout failed: ' + checkoutErr.message);
+      setCheckoutStep('idle');
+    }
   };
 
   return (
@@ -843,11 +1014,11 @@ export default function CheckoutPage() {
             </div>
             <h2>Payment Secured with Emahu Team Successfully!</h2>
             <p className="co-success-desc">
-              Transaction ID <strong>{generatedOrderId}</strong> has been secured with Emahu Team. 
-              The merchant will be notified to package and route your products via our EV Transit grid. 
+              Transaction ID <strong>{generatedOrderId}</strong> has been secured with Emahu Team.
+              The merchant will be notified to package and route your products via our EV Transit grid.
               Your payment remains protected with Emahu Team until you physically inspect and approve delivery!
             </p>
-            
+
             <div className="co-success-summary-box">
               <div className="co-summary-box-row">
                 <span>Buyer Account:</span>
@@ -879,19 +1050,16 @@ export default function CheckoutPage() {
               <Link href="/buyer/products" className="co-btn-outline">
                 Continue Shopping
               </Link>
-              <Link href="/buyer/orders" className="co-btn-solid">
-                Go to My Orders
-              </Link>
             </div>
           </div>
         ) : (
           /* CHECKOUT FORM AND SUMMARY GRID */
           <div className="co-grid">
-            
+
             {/* Left: Secure checkout inputs form */}
             <div className="co-form-section">
-              <h1 className="co-section-title">Secure Payment with Emahu Team</h1>
-              
+              <h1 className="co-section-title">Secure Payment with Emahu</h1>
+
               {/* GPS Verification Status Banner */}
               {(!buyerCoordinates.latitude || !buyerCoordinates.longitude) ? (
                 <div style={{
@@ -970,14 +1138,14 @@ export default function CheckoutPage() {
               )}
 
               <form onSubmit={handlePlaceOrder} className="co-form">
-                                {addressType === 'saved' ? (
+                {addressType === 'saved' ? (
                   /* Option A: Saved Profile Address Summary Card */
                   <div className="co-form-bento">
                     <div className="co-bento-header">
                       <span className="co-bento-num">01</span>
                       <h3>Recipient & Delivery Details</h3>
                     </div>
-                    
+
                     <div style={{ padding: '24px', borderRadius: '12px', background: '#f8fafc', border: '1.5px solid #e2e8f0', marginTop: '16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                         <span style={{ fontSize: '0.75rem', fontWeight: '800', letterSpacing: '0.5px', color: '#10b981', background: '#ecfdf5', padding: '5px 10px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>✓ USING PROFILE ADDRESS</span>
@@ -1005,7 +1173,7 @@ export default function CheckoutPage() {
                         <span className="co-bento-num">01</span>
                         <h3>Recipient Contact Details</h3>
                       </div>
-                      
+
                       {localStorage.getItem('emahu_buyer_user') && (
                         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
                           <button type="button" onClick={() => setAddressType('saved')} style={{ fontSize: '0.82rem', fontWeight: '750', color: '#4169e1', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
@@ -1013,13 +1181,13 @@ export default function CheckoutPage() {
                           </button>
                         </div>
                       )}
-                      
+
                       <div className="co-input-group">
                         <label>Full Legal Name</label>
-                        <input 
-                          type="text" 
-                          placeholder="e.g. Rahul Sharma" 
-                          required 
+                        <input
+                          type="text"
+                          placeholder="e.g. Rahul Sharma"
+                          required
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
                         />
@@ -1028,20 +1196,20 @@ export default function CheckoutPage() {
                       <div className="co-input-row">
                         <div className="co-input-group">
                           <label>Active Contact Phone</label>
-                          <input 
-                            type="tel" 
-                            placeholder="e.g. +91 98765 43210" 
-                            required 
+                          <input
+                            type="tel"
+                            placeholder="e.g. +91 98765 43210"
+                            required
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
                           />
                         </div>
                         <div className="co-input-group">
                           <label>Email Address</label>
-                          <input 
-                            type="email" 
-                            placeholder="e.g. rahul@example.com" 
-                            required 
+                          <input
+                            type="email"
+                            placeholder="e.g. rahul@example.com"
+                            required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                           />
@@ -1055,13 +1223,13 @@ export default function CheckoutPage() {
                         <span className="co-bento-num">02</span>
                         <h3>Physical Transit Destination</h3>
                       </div>
-                      
+
                       <div className="co-input-group">
                         <label>Street Address, Building, Floor</label>
-                        <input 
-                          type="text" 
-                          placeholder="House No, Suite, Colony, Sector..." 
-                          required 
+                        <input
+                          type="text"
+                          placeholder="House No, Suite, Colony, Sector..."
+                          required
                           value={address}
                           onChange={(e) => setAddress(e.target.value)}
                         />
@@ -1070,30 +1238,30 @@ export default function CheckoutPage() {
                       <div className="co-input-row-three">
                         <div className="co-input-group">
                           <label>City</label>
-                          <input 
-                            type="text" 
-                            placeholder="e.g. New Delhi" 
-                            required 
+                          <input
+                            type="text"
+                            placeholder="e.g. New Delhi"
+                            required
                             value={city}
                             onChange={(e) => setCity(e.target.value)}
                           />
                         </div>
                         <div className="co-input-group">
                           <label>State</label>
-                          <input 
-                            type="text" 
-                            placeholder="e.g. Delhi" 
-                            required 
+                          <input
+                            type="text"
+                            placeholder="e.g. Delhi"
+                            required
                             value={stateName}
                             onChange={(e) => setStateName(e.target.value)}
                           />
                         </div>
                         <div className="co-input-group">
                           <label>Postal Pincode</label>
-                          <input 
-                            type="text" 
-                            placeholder="e.g. 110001" 
-                            required 
+                          <input
+                            type="text"
+                            placeholder="e.g. 110001"
+                            required
                             value={pincode}
                             onChange={(e) => setPincode(e.target.value)}
                           />
@@ -1101,15 +1269,15 @@ export default function CheckoutPage() {
                       </div>
 
                       <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <button 
-                          type="button" 
-                          className="co-btn-outline" 
+                        <button
+                          type="button"
+                          className="co-btn-outline"
                           onClick={handleGPSDetect}
                           style={{ width: 'max-content', padding: '10px 16px', fontSize: '0.85rem', fontWeight: '700' }}
                         >
                           📡 Autofill with Current Location (GPS)
                         </button>
-                        
+
                         {deliveryCalculationError && (
                           <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '0.82rem', fontWeight: '600' }}>
                             ⚠️ {deliveryCalculationError}
@@ -1123,9 +1291,9 @@ export default function CheckoutPage() {
 
                 {/* Terms & Conditions Checkbox */}
                 <div className="co-terms-wrap-mobile" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '16px 0 16px 0', padding: '0 4px' }}>
-                  <input 
+                  <input
                     id="agree-to-terms-chk-mobile"
-                    type="checkbox" 
+                    type="checkbox"
                     checked={agreeToTerms}
                     onChange={(e) => setAgreeToTerms(e.target.checked)}
                     style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
@@ -1151,8 +1319,10 @@ export default function CheckoutPage() {
             {/* Right Side: Sticky Checkout Cart Summary */}
             <div className="co-summary-section">
               <div className="co-summary-sticky-card">
-                <h2 className="co-summary-title">Emahu Team Payment Details</h2>
-                
+                <h2 className="co-summary-title">Payment Details</h2>
+
+
+
                 {/* Cart items listing */}
                 <div className="co-items-list">
                   {cartItems.length === 0 ? (
@@ -1176,7 +1346,9 @@ export default function CheckoutPage() {
                         <div className="co-item-desc">
                           <span className="co-item-brand">{p.brand}</span>
                           <h4>{p.name}</h4>
-                          <span className="co-item-specs">{p.selectedColor} • {p.selectedSize}</span>
+                          <span className="co-item-specs">
+                            {p.selectedSize && p.selectedSize !== 'Default' ? `Variant: ${p.selectedSize}` : (p.selectedColor && p.selectedColor !== 'Premium Black' && p.selectedColor !== 'Default' ? `Color: ${p.selectedColor}` : 'Standard Variant')}
+                          </span>
                         </div>
                         <div className="co-item-price-block">
                           <strong>₹{(p.price * p.quantity).toLocaleString('en-IN')}</strong>
@@ -1232,7 +1404,7 @@ export default function CheckoutPage() {
                         </span>
                       )}
                     </span>
-                    <strong>₹{Number(shippingFee).toFixed(2)}</strong>
+                    <strong>{shippingFee === 0 ? <span style={{ color: '#16a34a', fontWeight: '700' }}>FREE</span> : `₹${Number(shippingFee).toFixed(2)}`}</strong>
                   </div>
 
                   {/* Per-seller delivery breakdown — always shown when multiple sellers */}
@@ -1252,17 +1424,34 @@ export default function CheckoutPage() {
                             </span>
                           </div>
                           <span style={{ fontSize: '0.82rem', fontWeight: '700', color: b.distanceKm > 20 ? '#dc2626' : '#059669' }}>
-                            ₹{Number(b.deliveryCharge).toFixed(2)}
+                            {shippingFee === 0 ? 'FREE' : `₹${Number(b.deliveryCharge).toFixed(2)}`}
                           </span>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  <div className="co-breakdown-row">
-                    <span>GST (18%)</span>
+                  <div
+                    className="co-breakdown-row"
+                    onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    <span>Service Fees {showTaxBreakdown ? '▲' : '▼'}</span>
                     <strong>₹{taxAmount.toLocaleString('en-IN')}</strong>
                   </div>
+
+                  {showTaxBreakdown && (
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 12px', marginTop: '-4px', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', padding: '3px 0' }}>
+                        <span>CGST (9%)</span>
+                        <strong style={{ fontWeight: '600' }}>₹{cgstAmount.toLocaleString('en-IN')}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', padding: '3px 0' }}>
+                        <span>SGST (9%)</span>
+                        <strong style={{ fontWeight: '600' }}>₹{sgstAmount.toLocaleString('en-IN')}</strong>
+                      </div>
+                    </div>
+                  )}
 
                   {deliveryDistance > 0 && (
                     <div className="co-breakdown-row">
@@ -1274,16 +1463,45 @@ export default function CheckoutPage() {
                   <div className="co-summary-divider" style={{ margin: '16px 0' }} />
 
                   <div className="co-breakdown-row co-breakdown-row--total">
-                    <span>Order Total</span>
+                    <span>Total Amount</span>
                     <strong>₹{grandTotal.toLocaleString('en-IN')}</strong>
                   </div>
                 </div>
 
+                {/* Deliverability Warning Notice inside Checkout */}
+                {undeliverableItems.length > 0 && (
+                  <div className="co-delivery-warning" style={{
+                    backgroundColor: '#fef2f2',
+                    border: '1.5px solid #fca5a5',
+                    borderRadius: '10px',
+                    padding: '12px 16px',
+                    marginBottom: '16px',
+                    fontFamily: "'Inter', sans-serif"
+                  }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>⚠️ Delivery Unavailable</span>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: '#991b1b', margin: '6px 0 0 0', lineHeight: 1.4 }}>
+                      The following items in your cart cannot be delivered to <strong>{checkoutCity}</strong>:
+                    </p>
+                    <ul style={{ margin: '6px 0 0 0', paddingLeft: '16px', fontSize: '0.72rem', color: '#b91c1c', fontWeight: '600' }}>
+                      {undeliverableItems.map(item => (
+                        <li key={item.id}>
+                          {item.name} (by {item.sellerStore || item.brand || 'Emahu Seller'})
+                        </li>
+                      ))}
+                    </ul>
+                    <p style={{ fontSize: '0.7rem', color: '#991b1b', margin: '8px 0 0 0', fontStyle: 'italic' }}>
+                      Please remove these items or change your delivery address to complete checkout.
+                    </p>
+                  </div>
+                )}
+
                 {/* Terms & Conditions Checkbox */}
                 <div className="co-terms-wrap-desktop" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '16px 0 12px 0', padding: '0 4px' }}>
-                  <input 
+                  <input
                     id="agree-to-terms-chk"
-                    type="checkbox" 
+                    type="checkbox"
                     checked={agreeToTerms}
                     onChange={(e) => setAgreeToTerms(e.target.checked)}
                     style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
@@ -1295,17 +1513,17 @@ export default function CheckoutPage() {
 
                 {/* Big checkout action */}
                 {cartItems.length > 0 && (
-                  <button 
+                  <button
                     onClick={handlePlaceOrder}
                     className="co-btn-lock-escrow"
-                    disabled={!agreeToTerms}
-                    style={!agreeToTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8', boxShadow: 'none' } : {}}
+                    disabled={!agreeToTerms || undeliverableItems.length > 0}
+                    style={!agreeToTerms || undeliverableItems.length > 0 ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8', boxShadow: 'none' } : {}}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '8px' }}>
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
-                    <span>{!agreeToTerms ? 'Accept Terms to Buy' : 'Buy Now'}</span>
+                    <span>{!agreeToTerms ? 'Accept Terms to Buy' : undeliverableItems.length > 0 ? 'Delivery Unavailable' : 'Buy Now'}</span>
                   </button>
                 )}
 
@@ -1342,7 +1560,7 @@ export default function CheckoutPage() {
       {isTermsModalOpen && (
         <div className="co-modal-overlay" style={{ zIndex: 10000, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
           <div style={{ background: '#ffffff', borderRadius: '16px', width: '90%', maxWidth: '560px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', overflow: 'hidden', maxHeight: '80vh' }}>
-            
+
             {/* Header */}
             <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff' }}>
               <div>
@@ -1364,7 +1582,7 @@ export default function CheckoutPage() {
                 <div>
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>1. Acceptance of Terms</h4>
                   <p style={{ margin: '0 0 16px 0' }}>By checking the agreement box and placing an order on EMAHU, you agree to follow and be bound by these Terms of Service. If you do not accept, you may not complete purchase transactions.</p>
-                  
+
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>2. Role of the Platform</h4>
                   <p style={{ margin: '0 0 16px 0' }}>EMAHU operates as a multi-seller marketplace linking independent vendors with buyers. Delivery services are managed either through platform logistics (third-party courier partners) or via Self-Delivery managed directly by the merchant seller.</p>
 
@@ -1377,7 +1595,7 @@ export default function CheckoutPage() {
                 <div>
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>1. Information Collection</h4>
                   <p style={{ margin: '0 0 16px 0' }}>We collect personal contact details (Full Name, Phone Number, Email, and Address) supplied during checkout to handle secure product delivery. GPS location coordinates are requested only to offer accurate distance-based delivery calculations.</p>
-                  
+
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>2. Information Sharing</h4>
                   <p style={{ margin: '0 0 16px 0' }}>Recipient address details and coordinates are shared solely with the assigned vendor and the logistics dispatch rider executing the shipment handover. We do not sell or lease your address records to third parties.</p>
 
@@ -1390,7 +1608,7 @@ export default function CheckoutPage() {
                 <div>
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>1. Safe Payment Protection</h4>
                   <p style={{ margin: '0 0 16px 0' }}>All product purchase amounts are initially held securely by the EMAHU Team. The merchant does not receive the payment immediately upon dispatch.</p>
-                  
+
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>2. Delivery OTP and Funds Release</h4>
                   <p style={{ margin: '0 0 16px 0' }}>Upon arrival of the shipment at the buyer's destination, the buyer must share the secure 6-digit Delivery OTP with the delivery partner or merchant. Correct entry of this verification code confirms successful handover and releases the payment to the merchant.</p>
 

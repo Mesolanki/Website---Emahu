@@ -1,0 +1,164 @@
+/**
+ * EMAHU Premium Animations CSS
+ * GPU-accelerated additions — complements Framer Motion
+ * Does NOT modify any existing design, layout, or component styles
+ */
+
+/* ─── REDUCED MOTION — Global Override ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Kill Framer Motion transforms */
+  [data-framer-motion] {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+/* ─── WILL-CHANGE OPTIMIZATION ─────────────────────────────────────────────── */
+/* Applied to animating elements for GPU layer promotion */
+.anim-gpu {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* ─── FLOATING ELEMENTS ─────────────────────────────────────────────────────── */
+@keyframes floatY {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50%       { transform: translateY(-18px) rotate(1.5deg); }
+}
+
+@keyframes floatY2 {
+  0%, 100% { transform: translateY(0) rotate(1deg); }
+  50%       { transform: translateY(-14px) rotate(-1deg); }
+}
+
+@keyframes floatY3 {
+  0%, 100% { transform: translateY(0) rotate(-0.8deg); }
+  50%       { transform: translateY(-22px) rotate(0.8deg); }
+}
+
+.float-anim-1 { animation: floatY  6s ease-in-out infinite; }
+.float-anim-2 { animation: floatY2 8s ease-in-out infinite 0.8s; }
+.float-anim-3 { animation: floatY3 7s ease-in-out infinite 1.6s; }
+
+/* ─── SHIMMER / GLOW TEXT ───────────────────────────────────────────────────── */
+@keyframes textGlow {
+  0%, 100% { text-shadow: 0 0 0px transparent; }
+  50%       { text-shadow: 0 0 20px rgba(99, 102, 241, 0.4), 0 0 40px rgba(99, 102, 241, 0.15); }
+}
+
+.glow-on-hover:hover {
+  animation: textGlow 1.6s ease-in-out infinite;
+  cursor: default;
+}
+
+/* ─── RIPPLE EFFECT ─────────────────────────────────────────────────────────── */
+.ripple-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255,255,255,0.35) 0%, transparent 70%);
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease;
+  border-radius: inherit;
+}
+
+.ripple-btn:active::after {
+  transform: scale(2.5);
+  opacity: 0;
+  transition: 0s;
+}
+
+/* ─── GRADIENT BORDER ANIMATION ─────────────────────────────────────────────── */
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animated-gradient-border {
+  background-size: 200% 200%;
+  animation: gradientShift 4s ease infinite;
+}
+
+/* ─── SCROLL INDICATOR ──────────────────────────────────────────────────────── */
+@keyframes scrollBounce {
+  0%, 100% { transform: translateY(0); opacity: 0.6; }
+  50%       { transform: translateY(8px); opacity: 1; }
+}
+
+.scroll-indicator {
+  animation: scrollBounce 2s ease-in-out infinite;
+}
+
+/* ─── STAGGER REVEAL UTILITY ─────────────────────────────────────────────────
+   Used as fallback for elements that can't use Framer Motion directly */
+.reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-stagger.is-visible > *:nth-child(1) { opacity: 1; transform: none; transition-delay: 0s; }
+.reveal-stagger.is-visible > *:nth-child(2) { opacity: 1; transform: none; transition-delay: 0.1s; }
+.reveal-stagger.is-visible > *:nth-child(3) { opacity: 1; transform: none; transition-delay: 0.2s; }
+.reveal-stagger.is-visible > *:nth-child(4) { opacity: 1; transform: none; transition-delay: 0.3s; }
+.reveal-stagger.is-visible > *:nth-child(5) { opacity: 1; transform: none; transition-delay: 0.4s; }
+.reveal-stagger.is-visible > *:nth-child(6) { opacity: 1; transform: none; transition-delay: 0.5s; }
+
+/* ─── BLOB PARALLAX ENHANCEMENT ─────────────────────────────────────────────── */
+.sel-blob {
+  transition: transform 0.1s linear;
+}
+
+/* ─── CARD PERSPECTIVE CONTAINER ────────────────────────────────────────────── */
+.perspective-card-wrap {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+/* ─── HERO IMAGE SCALE IN ───────────────────────────────────────────────────── */
+@keyframes heroImageReveal {
+  from { transform: scale(0.95); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.hero-image-reveal {
+  animation: heroImageReveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── ANIMATED UNDERLINE ─────────────────────────────────────────────────────── */
+.animated-underline {
+  position: relative;
+}
+
+.animated-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: currentColor;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animated-underline:hover::after {
+  width: 100%;
+}

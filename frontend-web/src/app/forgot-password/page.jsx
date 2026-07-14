@@ -92,12 +92,15 @@ export default function ForgotPassword() {
   // Step 1: Submit Email
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim()) {
-      setError('Please enter a registered email address');
+    const input = email.trim();
+    if (!input) {
+      setError('Please enter your registered email address or mobile number');
       return;
     }
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      setError('Enter a valid email address');
+    const isEmail = /\S+@\S+\.\S+/.test(input);
+    const isPhone = /^\d{10}$/.test(input.replace(/\D/g, ''));
+    if (!isEmail && !isPhone) {
+      setError('Enter a valid email address or 10-digit mobile number');
       return;
     }
 
@@ -314,7 +317,7 @@ export default function ForgotPassword() {
             {step === 'success' && 'Reset Successful'}
           </h1>
           <p className="fp-subtitle">
-            {step === 'email' && 'Enter your registered email address to receive a secure password reset OTP code on your mobile number.'}
+            {step === 'email' && 'Enter your registered email address or mobile number to receive a secure password reset OTP code.'}
             {step === 'otp' && 'We have sent a verification code to your registered mobile number.'}
             {step === 'reset' && 'Choose a strong password containing uppercase, lowercase, numbers, and special characters.'}
             {step === 'success' && 'Your password has been updated. You will be redirected to the login page shortly.'}
@@ -338,12 +341,12 @@ export default function ForgotPassword() {
         {step === 'email' && (
           <form className="fp-form" onSubmit={handleEmailSubmit} noValidate>
             <div className="fp-group">
-              <label className="fp-label" htmlFor="fp-email">Email Address</label>
+              <label className="fp-label" htmlFor="fp-email">Email Address or Mobile Number</label>
               <input
                 id="fp-email"
-                type="email"
+                type="text"
                 className="fp-input"
-                placeholder="name@example.com"
+                placeholder="Enter email or 10-digit mobile"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);

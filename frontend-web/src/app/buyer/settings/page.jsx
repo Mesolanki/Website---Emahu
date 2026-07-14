@@ -23,6 +23,12 @@ export default function BuyerSettingsPage() {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [mockOtpCode, setMockOtpCode] = useState('');
+  const [isMockOtpActive, setIsMockOtpActive] = useState(false);
 
   // Analytics States
   const [stats, setStats] = useState({
@@ -201,12 +207,69 @@ export default function BuyerSettingsPage() {
     fetchStats();
   }, [user]);
 
-  const handleProfileSubmit = async (e) => {
-    e.preventDefault();
-    setSuccessMsg('');
-    setErrorMsg('');
-    setLoading(true);
+    const sendOtpToNewPhone = async () => {
+    setOtpLoading(true);
+    setOtpError('');
+    setMockOtpCode('');
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiBase}/api/auth/send-phone-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: profileForm.phone, role: 'buyer' })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send OTP code.');
+      }
+      if (data.devOtp) {
+        setMockOtpCode(data.devOtp);
+        setIsMockOtpActive(true);
+      } else {
+        setIsMockOtpActive(false);
+      }
+    } catch (err) {
+      console.error(err);
+      // Fallback code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setMockOtpCode(code);
+      setIsMockOtpActive(true);
+      setOtpError('Failed to send verification code. Falling back to simulated verification code.');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
 
+  const handleVerifyAndSave = async (e) => {
+    e.preventDefault();
+    setOtpError('');
+    setOtpLoading(true);
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiBase}/api/auth/verify-phone-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: profileForm.phone, otp: otpInput })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Invalid OTP code.');
+      }
+      
+      // OTP is verified! Now save profile
+      await saveProfileData();
+      setIsOtpModalOpen(false);
+      setOtpInput('');
+    } catch (err) {
+      console.error(err);
+      setOtpError(err.message || 'OTP verification failed.');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const saveProfileData = async () => {
+    setLoading(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/update-details`, {
         method: 'PUT',
@@ -236,6 +299,22 @@ export default function BuyerSettingsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    setSuccessMsg('');
+    setErrorMsg('');
+
+    // If phone has changed, verify first!
+    if (user && profileForm.phone !== user.phone) {
+      setIsOtpModalOpen(true);
+      sendOtpToNewPhone();
+      return;
+    }
+
+    // Otherwise save directly
+    await saveProfileData();
   };
 
   return (
@@ -360,293 +439,137 @@ export default function BuyerSettingsPage() {
           </div>
         </section>
 
-        {/* Upgrade / Change Account Role Section */}
-        <section className="upgrade-role-section" style={{ marginTop: '32px' }}>
-          <div className="glass-card settings-card">
-            <h2 className="section-title">Change Account Role</h2>
-            <p className="section-subtitle" style={{ marginBottom: '24px' }}>
-              Switch your account type to become a Seller or a Delivery Partner. Upgrades are subject to admin verification.
-            </p>
-
-            {upgradeSuccess && <div className="settings-alert-success">✓ {upgradeSuccess}</div>}
-            {upgradeError && <div className="settings-alert-error">⚠️ {upgradeError}</div>}
-
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-              <button
-                type="button"
-                className={`settings-submit-btn ${upgradeRole === 'seller' ? 'active-role' : ''}`}
-                style={{
-                  background: upgradeRole === 'seller' ? '#4f46e5' : '#e4e4e7',
-                  color: upgradeRole === 'seller' ? '#fff' : '#18181b',
-                  flex: 1
-                }}
-                onClick={() => { setUpgradeRole(upgradeRole === 'seller' ? null : 'seller'); setUpgradeError(''); setUpgradeSuccess(''); }}
-              >
-                Become Seller (Store Vendor)
-              </button>
-              <button
-                type="button"
-                className={`settings-submit-btn ${upgradeRole === 'delivery' ? 'active-role' : ''}`}
-                style={{
-                  background: upgradeRole === 'delivery' ? '#0d9488' : '#e4e4e7',
-                  color: upgradeRole === 'delivery' ? '#fff' : '#18181b',
-                  flex: 1
-                }}
-                onClick={() => { setUpgradeRole(upgradeRole === 'delivery' ? null : 'delivery'); setUpgradeError(''); setUpgradeSuccess(''); }}
-              >
-                Become Delivery Partner (Courier)
-              </button>
-            </div>
-
-            {upgradeRole === 'seller' && (
-              <form onSubmit={handleUpgradeSubmit} className="profile-form" style={{ borderTop: '1px solid #e4e4e7', paddingTop: '20px' }}>
-                <h3 className="section-title" style={{ fontSize: '1rem', marginBottom: '16px' }}>Store & Identity Profile Details</h3>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label">Store / Company Name *</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={storeForm.storeName}
-                      onChange={(e) => setStoreForm({ ...storeForm, storeName: e.target.value })}
-                      required
-                      placeholder="e.g. Supreme Electro Traders"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Store Category *</label>
-                    <select
-                      className="form-input"
-                      value={storeForm.category}
-                      onChange={(e) => setStoreForm({ ...storeForm, category: e.target.value })}
-                      required
-                    >
-                      <option value="">Select category...</option>
-                      {CATEGORIES.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-grid" style={{ marginTop: '16px' }}>
-                  <div className="form-group">
-                    <label className="form-label">KYC Document Type *</label>
-                    <select
-                      className="form-input"
-                      value={storeForm.kycType}
-                      onChange={(e) => setStoreForm({ ...storeForm, kycType: e.target.value })}
-                      required
-                    >
-                      <option value="pan">PAN Card</option>
-                      <option value="aadhaar">Aadhaar Card</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">KYC Document Number *</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={storeForm.kycNumber}
-                      onChange={(e) => setStoreForm({ ...storeForm, kycNumber: e.target.value })}
-                      required
-                      placeholder={storeForm.kycType === 'pan' ? 'ABCDE1234F' : '123456789012'}
-                    />
-                  </div>
-                </div>
-
-                <h3 className="section-title" style={{ fontSize: '1rem', marginTop: '24px', marginBottom: '16px' }}>Payout Bank Account</h3>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label">Account Holder Name</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={storeForm.bankHolder}
-                      onChange={(e) => setStoreForm({ ...storeForm, bankHolder: e.target.value })}
-                      placeholder="Owner or registered business name"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Bank Name</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={storeForm.bankName}
-                      onChange={(e) => setStoreForm({ ...storeForm, bankName: e.target.value })}
-                      placeholder="e.g. HDFC Bank"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-grid" style={{ marginTop: '16px' }}>
-                  <div className="form-group">
-                    <label className="form-label">Bank Account Number</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={storeForm.accountNumber}
-                      onChange={(e) => setStoreForm({ ...storeForm, accountNumber: e.target.value })}
-                      placeholder="e.g. 5010023456789"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">IFSC Code</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={storeForm.ifscCode}
-                      onChange={(e) => setStoreForm({ ...storeForm, ifscCode: e.target.value })}
-                      placeholder="e.g. HDFC0000123"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group" style={{ marginTop: '16px' }}>
-                  <label className="form-label">GST Number (GSTIN)</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={storeForm.gstNumber}
-                    onChange={(e) => setStoreForm({ ...storeForm, gstNumber: e.target.value })}
-                    placeholder="e.g. 22AAAAA0000A1Z5"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="settings-submit-btn"
-                  style={{ marginTop: '24px', background: '#4f46e5', color: '#fff' }}
-                  disabled={upgradeLoading}
-                >
-                  {upgradeLoading ? 'Submitting Upgrade Request...' : 'Submit Upgrade & Become Seller'}
-                </button>
-              </form>
-            )}
-
-            {upgradeRole === 'delivery' && (
-              <form onSubmit={handleUpgradeSubmit} className="profile-form" style={{ borderTop: '1px solid #e4e4e7', paddingTop: '20px' }}>
-                <h3 className="section-title" style={{ fontSize: '1rem', marginBottom: '16px' }}>Vehicle & Location Details</h3>
-                
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label">Vehicle Type *</label>
-                    <select
-                      className="form-input"
-                      value={vehicleForm.vehicleType}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, vehicleType: e.target.value })}
-                      required
-                    >
-                      <option value="bike">Bike</option>
-                      <option value="scooter">Scooter</option>
-                      <option value="car">Car</option>
-                      <option value="truck">Truck</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Vehicle Registration Number *</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={vehicleForm.vehicleNumber}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, vehicleNumber: e.target.value })}
-                      required
-                      placeholder="e.g. DL-3C-AB-1234"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-grid" style={{ marginTop: '16px' }}>
-                  <div className="form-group">
-                    <label className="form-label">Primary Service City *</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={vehicleForm.currentCity}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, currentCity: e.target.value })}
-                      required
-                      placeholder="e.g. Ahmedabad"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Primary Service Area *</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={vehicleForm.currentArea}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, currentArea: e.target.value })}
-                      required
-                      placeholder="e.g. Gota"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-grid" style={{ marginTop: '16px' }}>
-                  <div className="form-group">
-                    <label className="form-label">Operating Pincode</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={vehicleForm.pincode}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, pincode: e.target.value })}
-                      placeholder="e.g. 382481"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Service Radius (KM)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={vehicleForm.serviceRadius}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, serviceRadius: e.target.value })}
-                      placeholder="15"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-grid" style={{ marginTop: '16px' }}>
-                  <div className="form-group">
-                    <label className="form-label">Payout Rate per KM (₹)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={vehicleForm.perKmRate}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, perKmRate: e.target.value })}
-                      placeholder="5"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Delivery Scope</label>
-                    <select
-                      className="form-input"
-                      value={vehicleForm.deliveryScope}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, deliveryScope: e.target.value })}
-                    >
-                      <option value="local">Local Only</option>
-                      <option value="intercity">Intercity</option>
-                      <option value="interstate">Interstate</option>
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="settings-submit-btn"
-                  style={{ marginTop: '24px', background: '#0d9488', color: '#fff' }}
-                  disabled={upgradeLoading}
-                >
-                  {upgradeLoading ? 'Submitting Upgrade Request...' : 'Submit Upgrade & Become Delivery Partner'}
-                </button>
-              </form>
-            )}
-          </div>
-        </section>
-      </main>
+        </main>
 
       <footer className="settings-footer">
         <p>© 2026 Emahu Consumer Escrow Portal. Secured with military-grade vault encryption.</p>
       </footer>
+      {isOtpModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          animation: 'fadeIn 0.2s ease'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '28px',
+            width: '100%',
+            maxWidth: '420px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            border: '1px solid #e2e8f0',
+            textAlign: 'center',
+            color: '#1e293b'
+          }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>
+              📱 Verify New Mobile Number
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '20px', lineHeight: '1.4' }}>
+              We have sent a 6-digit verification code to <strong style={{ color: '#0f172a' }}>+91 {profileForm.phone}</strong>. Please enter it below to confirm.
+            </p>
+
+            {otpError && (
+              <div style={{ padding: '10px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#ef4444', fontSize: '0.78rem', marginBottom: '16px', fontWeight: '600' }}>
+                {otpError}
+              </div>
+            )}
+
+            {isMockOtpActive && mockOtpCode && (
+              <div style={{ padding: '10px', borderRadius: '8px', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', fontSize: '0.78rem', marginBottom: '16px', fontWeight: '700' }}>
+                🔑 Developer verification code: <span style={{ fontSize: '0.9rem', letterSpacing: '2px' }}>{mockOtpCode}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyAndSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <input
+                type="text"
+                maxLength="6"
+                placeholder="0 0 0 0 0 0"
+                value={otpInput}
+                onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                required
+                style={{
+                  height: '46px',
+                  borderRadius: '10px',
+                  border: '1.5px solid #cbd5e1',
+                  textAlign: 'center',
+                  fontSize: '1.4rem',
+                  fontWeight: '700',
+                  letterSpacing: '8px',
+                  color: '#0f172a',
+                  outline: 'none',
+                  background: '#f8fafc',
+                  transition: 'border-color 0.15s ease'
+                }}
+              />
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setIsOtpModalOpen(false); setOtpInput(''); }}
+                  style={{
+                    flex: 1,
+                    height: '42px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#64748b',
+                    fontWeight: '600',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={otpLoading || otpInput.length !== 6}
+                  style={{
+                    flex: 2,
+                    height: '42px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#4f46e5',
+                    color: '#ffffff',
+                    fontWeight: '700',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    opacity: (otpLoading || otpInput.length !== 6) ? 0.6 : 1
+                  }}
+                >
+                  {otpLoading ? 'Verifying...' : 'Verify & Save'}
+                </button>
+              </div>
+            </form>
+
+            <button
+              type="button"
+              onClick={sendOtpToNewPhone}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#4f46e5',
+                fontSize: '0.8rem',
+                fontWeight: '700',
+                textDecoration: 'underline',
+                marginTop: '16px',
+                cursor: 'pointer'
+              }}
+            >
+              Resend Code
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

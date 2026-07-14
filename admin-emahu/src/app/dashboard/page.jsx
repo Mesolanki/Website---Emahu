@@ -7,16 +7,6 @@ import './dashboard.css';
 import { logoutUser, clearAuthSession } from '@/utils/auth';
 import { indiaStatesCities } from '@/utils/indiaStatesCities';
 let toastIdCounter = 0;
-if (typeof window !== 'undefined') {
-  let url = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
-  url = url.trim();
-  const hostname = window.location.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    process.env.NEXT_PUBLIC_API_URL = url.replace('localhost', '127.0.0.1');
-  } else {
-    process.env.NEXT_PUBLIC_API_URL = url.replace('localhost', hostname).replace('127.0.0.1', hostname);
-  }
-}
 
 const resolveDocUrl = (url) => {
   if (!url || typeof url !== 'string') return '';

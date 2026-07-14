@@ -34,6 +34,88 @@ const isRealImage = (img) => {
   return clean.startsWith('http') || clean.startsWith('data:image');
 };
 
+const sellerServesLocation = (seller, city) => {
+  if (!city) return true; // no city set → show all
+  if (!seller) return false;
+  const cityLower = city.toLowerCase().trim();
+
+  // If seller is mock string or something, we can check it
+  if (typeof seller === 'string') return true;
+
+  // 1. Calculate distance using coordinates from localStorage if available
+  try {
+    const coordsStr = typeof window !== 'undefined' ? localStorage.getItem('emahu_buyer_coordinates') : null;
+    if (coordsStr) {
+      const coords = JSON.parse(coordsStr);
+      const bLat = parseFloat(coords.latitude);
+      const bLon = parseFloat(coords.longitude);
+      const sLat = parseFloat(seller.latitude);
+      const sLon = parseFloat(seller.longitude);
+      
+      if (!isNaN(bLat) && !isNaN(bLon) && !isNaN(sLat) && !isNaN(sLon)) {
+        // Simple Haversine calculation inline
+        const R = 6371; // km
+        const dLat = (sLat - bLat) * Math.PI / 180;
+        const dLon = (sLon - bLon) * Math.PI / 180;
+        const a = 
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) * 
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = R * c;
+        
+        if (distance <= 30) {
+          return true; // within 30 km delivery range!
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to calculate distance in sellerServesLocation:', err);
+  }
+
+  // 2. City name matching and hub matching fallback
+  const sellerCity = (seller.city || seller.currentCity || seller.location || '').toLowerCase().trim();
+  
+  if (sellerCity === cityLower) return true;
+  if (sellerCity.includes(cityLower) || cityLower.includes(sellerCity)) return true;
+
+  const coveredCities = Array.isArray(seller.coveredCities)
+    ? seller.coveredCities.map(c => c.toLowerCase().trim())
+    : [];
+  if (coveredCities.includes(cityLower)) return true;
+
+  // Hub check helper
+  const AHMEDABAD_HUBS = ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav', 'gandhinagar', 'sanand'];
+  const DELHI_HUBS = ['delhi', 'noida', 'gurugram', 'gurgaon', 'faridabad', 'ghaziabad', 'dwarka', 'rohini'];
+  const MUMBAI_HUBS = ['mumbai', 'bombay', 'thane', 'navi mumbai', 'bandra', 'andheri', 'dadar', 'kurla', 'mulund', 'worli', 'lower parel'];
+  const PUNE_HUBS = ['pune', 'pimpri', 'chinchwad', 'kothrud', 'hadapsar', 'wakad', 'aundh', 'baner'];
+  const BANGALORE_HUBS = ['bangalore', 'bengaluru', 'koramangala', 'indiranagar', 'whitefield', 'marathahalli', 'jayanagar', 'electronic city'];
+  const KOLKATA_HUBS = ['kolkata', 'calcutta', 'salt lake', 'howrah', 'jadavpur', 'new town'];
+  const HYDERABAD_HUBS = ['hyderabad', 'secunderabad', 'gachibowli', 'hitech city', 'kondapur', 'madhapur'];
+  const SURAT_HUBS = ['surat', 'adajan', 'vesu', 'katargam', 'varachha', 'althan'];
+  const VADODARA_HUBS = ['vadodara', 'baroda', 'alkapuri', 'manjalpur', 'waghodia'];
+  const RAJKOT_HUBS = ['rajkot', 'kalavad', 'gondal'];
+
+  const matchHub = (hubs) => {
+    const userInHub = hubs.some(h => cityLower.includes(h));
+    const sellerInHub = hubs.some(h => sellerCity.includes(h));
+    return userInHub && sellerInHub;
+  };
+
+  if (matchHub(AHMEDABAD_HUBS)) return true;
+  if (matchHub(DELHI_HUBS)) return true;
+  if (matchHub(MUMBAI_HUBS)) return true;
+  if (matchHub(PUNE_HUBS)) return true;
+  if (matchHub(BANGALORE_HUBS)) return true;
+  if (matchHub(KOLKATA_HUBS)) return true;
+  if (matchHub(HYDERABAD_HUBS)) return true;
+  if (matchHub(SURAT_HUBS)) return true;
+  if (matchHub(VADODARA_HUBS)) return true;
+  if (matchHub(RAJKOT_HUBS)) return true;
+
+  return false;
+};
+
 export default function CartPage() {
   const [cartItems, setCartItems] = useState([]);
   const [availableProducts, setAvailableProducts] = useState([]);
@@ -57,6 +139,7 @@ export default function CartPage() {
   const [buyerCity, setBuyerCity] = useState('');
   const [hasDeliveredOrder, setHasDeliveredOrder] = useState(false);
   const [deliveredOrderId, setDeliveredOrderId] = useState('');
+  const [showTaxBreakdown, setShowTaxBreakdown] = useState(false);
 
   // ── Check for arrived unconfirmed orders ──
   useEffect(() => {
@@ -171,7 +254,56 @@ export default function CartPage() {
 
     try {
       // Combine DB products with static mock products (static get default stock of 99)
-      const allProducts = [...formattedList, ...STATIC_PRODUCTS.map(p => ({ ...p, stock: p.stock ?? 99 }))];
+      const formattedStatic = STATIC_PRODUCTS.map((p, idx) => {
+        let mockCity = 'Ahmedabad';
+        const mod = idx % 5;
+        if (mod === 0) mockCity = 'Delhi';
+        else if (mod === 1) mockCity = 'Mumbai';
+        else if (mod === 2) mockCity = 'Bangalore';
+        else if (mod === 3) mockCity = 'Kolkata';
+        else if (mod === 4) {
+          if (idx % 10 === 4) mockCity = 'Gandhinagar';
+          else mockCity = 'Vadodara';
+        }
+
+        let mappedCategory = p.category || 'Lifestyle & Home';
+        const catLC = mappedCategory.toLowerCase();
+        if (catLC === 'electronics' || catLC === 'tech' || catLC === 'tech & gadgets') {
+          mappedCategory = 'Tech';
+        } else if (catLC === 'apparel' || catLC === 'fashion') {
+          mappedCategory = 'Apparel';
+        } else if (catLC === 'shoes') {
+          mappedCategory = 'Shoes';
+        } else if (catLC === 'kitchen') {
+          mappedCategory = 'Kitchen';
+        } else if (catLC === 'lifestyle' || catLC === 'fitness' || catLC === 'furniture') {
+          mappedCategory = 'Lifestyle';
+        } else if (catLC === 'grocery' || catLC === 'groceries') {
+          mappedCategory = 'Grocery';
+        }
+
+        return {
+          id: p.id,
+          name: p.name,
+          brand: p.brand || p.seller || 'Emahu Seller',
+          category: mappedCategory,
+          price: p.price,
+          original: p.originalPrice || p.price,
+          rating: p.rating || 4.7,
+          reviews: p.reviews || 84,
+          img: p.image,
+          stock: p.stock ?? 99,
+          verified: true,
+          isNew: true,
+          isHot: false,
+          seller: {
+            city: mockCity,
+            currentCity: mockCity
+          }
+        };
+      });
+
+      const allProducts = [...formattedList, ...formattedStatic];
       const seen = new Set();
       const uniqueProducts = allProducts.filter(p => {
         if (!p || !p.id) return false;
@@ -245,12 +377,21 @@ export default function CartPage() {
   };
 
   // Suggestions for cross-selling when there is exactly 1 item in cart
+  // — filtered to only show products deliverable to buyer's current location
   const cartSuggestions = useMemo(() => {
     if (cartItems.length !== 1 || !availableProducts.length) return [];
     const cartItem = cartItems[0];
     const cartItemId = cartItem.id.toString();
 
-    const cleanAvailable = availableProducts.filter(p => p.id.toString() !== cartItemId);
+    // Step 1: remove the item already in cart
+    let cleanAvailable = availableProducts.filter(p => p.id.toString() !== cartItemId);
+
+    // Step 2: filter by delivery location if buyer city is known
+    if (buyerCity && buyerCity.trim() !== '') {
+      cleanAvailable = cleanAvailable.filter(p => sellerServesLocation(p.seller, buyerCity));
+    }
+
+    // Step 3: prefer same category, then fill with others
     const sameCat = cleanAvailable.filter(p => p.category === cartItem.category);
     const otherCat = cleanAvailable.filter(p => p.category !== cartItem.category);
 
@@ -258,7 +399,7 @@ export default function CartPage() {
 
     const combined = [...shuffle(sameCat), ...shuffle(otherCat)];
     return combined.slice(0, 3);
-  }, [cartItems, availableProducts]);
+  }, [cartItems, availableProducts, buyerCity]);
 
   const handleAddSuggestionToCart = (suggestedProduct) => {
     try {
@@ -432,8 +573,10 @@ export default function CartPage() {
 
   // ── Totals ──
   const subtotal = cartItems.reduce((acc, p) => acc + (p.price * p.quantity), 0);
-  const shippingFee = subtotal === 0 ? 0 : deliveryCharge;
+  const shippingFee = (subtotal === 0 || subtotal > 150) ? 0 : deliveryCharge;
   const taxAmount = Math.round(subtotal * 0.18);
+  const cgstAmount = Math.round(taxAmount / 2);
+  const sgstAmount = taxAmount - cgstAmount;
   const grandTotal = subtotal + shippingFee + taxAmount;
 
   // ── Quick checkout (guest) ──
@@ -613,9 +756,13 @@ export default function CartPage() {
                       <Link href={`/buyer/products/${p.id}`}>{p.name}</Link>
                     </h3>
                     <div className="cart-item-row__specs">
-                      <span>Color: <strong>{p.selectedColor}</strong></span>
-                      <span className="cart-item-row__specs-dot" />
-                      <span>Size: <strong>{p.selectedSize}</strong></span>
+                      {p.selectedSize && p.selectedSize !== 'Default' ? (
+                        <span>Variant: <strong>{p.selectedSize}</strong></span>
+                      ) : (
+                        p.selectedColor && p.selectedColor !== 'Default' && p.selectedColor !== 'Premium Black' && (
+                          <span>Color: <strong>{p.selectedColor}</strong></span>
+                        )
+                      )}
                     </div>
                     {/* Stock availability badge */}
                     {p.stock <= 0 ? (
@@ -863,16 +1010,16 @@ export default function CartPage() {
                     )}
                   </span>
                   <strong>
-                    {deliveryCalculating ? (
+                                        {deliveryCalculating ? (
                       <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>calculating...</span>
                     ) : (
-                      `₹${shippingFee}`
+                      shippingFee === 0 ? <span style={{ color: '#16a34a', fontWeight: '700' }}>FREE Delivery</span> : `₹${shippingFee}`
                     )}
                   </strong>
                 </div>
 
                 {/* Per-seller breakdown */}
-                {deliveryBreakdown.length > 1 && (
+                {shippingFee > 0 && deliveryBreakdown.length > 1 && (
                   <div style={{ background: 'rgba(100,116,139,0.05)', borderRadius: '8px', padding: '10px', marginTop: '-4px', marginBottom: '4px' }}>
                     <p style={{ fontSize: '0.71rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Seller Breakdown</p>
                     {deliveryBreakdown.map((b, i) => (
@@ -884,15 +1031,34 @@ export default function CartPage() {
                   </div>
                 )}
 
-                <div className="cart-summary-row">
-                  <span>Vault Escrow Tax (CGST + SGST 18%)</span>
+                <div 
+                  className="cart-summary-row" 
+                  onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    Service Fees {showTaxBreakdown ? '▲' : '▼'}
+                  </span>
                   <strong>₹{taxAmount.toLocaleString('en-IN')}</strong>
                 </div>
+
+                {showTaxBreakdown && (
+                  <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 12px', marginTop: '-4px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', padding: '3px 0' }}>
+                      <span>CGST (9%)</span>
+                      <strong style={{ fontWeight: '600' }}>₹{cgstAmount.toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', padding: '3px 0' }}>
+                      <span>SGST (9%)</span>
+                      <strong style={{ fontWeight: '600' }}>₹{sgstAmount.toLocaleString('en-IN')}</strong>
+                    </div>
+                  </div>
+                )}
 
                 <div className="cart-summary-divider" />
 
                 <div className="cart-summary-row cart-summary-row--total">
-                  <span>Escrow Grand Total</span>
+                  <span>Total Amount</span>
                   <strong>₹{grandTotal.toLocaleString('en-IN')}</strong>
                 </div>
               </div>

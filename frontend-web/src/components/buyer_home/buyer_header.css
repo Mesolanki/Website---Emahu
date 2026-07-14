@@ -628,3 +628,100 @@
     font-size: 1.1rem;
   }
 }
+
+/* ── Location Selector dropdown inside Header ── */
+.bh-location-wrap {
+  position: relative;
+}
+
+.bh-location-wrap--desktop {
+  margin-left: 20px;
+}
+
+@media (max-width: 768px) {
+  .bh-location-wrap--desktop {
+    display: none !important;
+  }
+}
+
+.bh-location-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.bh-location-btn:hover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.bh-location-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 200px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  z-index: 1200;
+  padding: 6px 0;
+  max-height: 250px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  animation: bhDropdownFade 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.bh-location-dropdown-title {
+  padding: 6px 14px 2px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bh-location-dropdown-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 4px 0;
+}
+
+.bh-location-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.bh-location-item:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.bh-location-item--active {
+  color: #12b7b2 !important;
+  font-weight: 700;
+}

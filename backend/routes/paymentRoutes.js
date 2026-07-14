@@ -4,7 +4,9 @@ const {
   getPlatformSettings,
   updatePlatformSettings,
   releasePayment,
-  getReleasedPayments
+  getReleasedPayments,
+  createRazorpayOrder,
+  verifyRazorpaySignature
 } = require('../controllers/paymentController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -13,9 +15,17 @@ router.route('/settings')
   .get(getPlatformSettings)                            // GET  /api/payment/settings
   .put(protect, authorize('admin'), updatePlatformSettings); // PUT  /api/payment/settings
 
+// Razorpay integration
+router.route('/razorpay-order')
+  .post(createRazorpayOrder);                          // POST /api/payment/razorpay-order
+
+router.route('/razorpay-verify')
+  .post(verifyRazorpaySignature);                      // POST /api/payment/razorpay-verify
+
 // Release a specific order's payment (seller-initiated, no auth required for now — orderId is the gate)
 router.route('/release/:orderId')
   .post(releasePayment);                               // POST /api/payment/release/:orderId
+
 
 // Admin: view all released payments
 router.route('/released')

@@ -138,7 +138,7 @@ exports.createProduct = async (req, res) => {
 // @access  Public
 exports.getProducts = async (req, res) => {
   try {
-    const products = await Product.find({ approvalStatus: 'approved' }).populate('seller', 'name email phone storeName latitude longitude address city');
+    const products = await Product.find({ approvalStatus: 'approved' }).populate('seller', 'name email phone storeName latitude longitude address city state serviceAreaState serviceAreaCity coveredCities');
     res.status(200).json({
       success: true,
       products
@@ -181,11 +181,11 @@ exports.getProductById = async (req, res) => {
 
     // Check if the id is a valid ObjectId, otherwise query by SKU code
     if (mongoose.Types.ObjectId.isValid(req.params.id)) {
-      product = await Product.findById(req.params.id).populate('seller', 'name email phone storeName status latitude longitude address city');
+      product = await Product.findById(req.params.id).populate('seller', 'name email phone storeName status latitude longitude address city state serviceAreaState serviceAreaCity coveredCities');
     }
     
     if (!product) {
-      product = await Product.findOne({ sku: req.params.id.toUpperCase() }).populate('seller', 'name email phone storeName status latitude longitude address city');
+      product = await Product.findOne({ sku: req.params.id.toUpperCase() }).populate('seller', 'name email phone storeName status latitude longitude address city state serviceAreaState serviceAreaCity coveredCities');
     }
 
     if (!product) {

@@ -191,7 +191,7 @@ export default function SellerRegister() {
       const res = await fetch(`${API_BASE}/api/auth/send-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone })
+        body: JSON.stringify({ phone: cleanPhone, role: 'seller' })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -293,13 +293,11 @@ export default function SellerRegister() {
     if (!formData.storeName.trim()) newErrors.storeName = 'Store name is required';
     if (!formData.ownerName.trim()) newErrors.ownerName = 'Owner name is required';
     
-    const isGoogleReg = formData.password && formData.password.startsWith('GoogleAuthPass_');
-    if (isGoogleReg) {
-      if (!formData.email.trim()) {
-        newErrors.email = 'Email address is required';
-      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-        newErrors.email = 'Enter a valid email address';
-      }
+    // Email required for all registrations
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email address is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Enter a valid email address';
     }
 
     if (!formData.phone.trim()) {
@@ -586,7 +584,7 @@ export default function SellerRegister() {
                   {errors.ownerName && <span className="sr-error-text">{errors.ownerName}</span>}
                 </div>
 
-                {formData.password && formData.password.startsWith('GoogleAuthPass_') && (
+                {formData.password && formData.password.startsWith('GoogleAuthPass_') ? (
                   <div className="sr-input-group">
                     <label className="sr-label">Connected Google Email</label>
                     <input
@@ -595,6 +593,20 @@ export default function SellerRegister() {
                       value={formData.email}
                       disabled
                     />
+                  </div>
+                ) : (
+                  <div className="sr-input-group">
+                    <label className="sr-label" htmlFor="email">Email Address</label>
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      className={`sr-input ${errors.email ? 'sr-input--error' : ''}`}
+                      placeholder="e.g. rajesh@yourstore.com"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                    />
+                    {errors.email && <span className="sr-error-text">{errors.email}</span>}
                   </div>
                 )}
 
@@ -930,13 +942,13 @@ export default function SellerRegister() {
           padding: '20px'
         }}>
           <div style={{
-            backgroundColor: '#1e293b',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            backgroundColor: '#ffffff',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '420px',
             padding: '32px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
             textAlign: 'center',
             animation: 'fadeIn 0.3s ease-out'
           }}>
@@ -944,31 +956,31 @@ export default function SellerRegister() {
               width: '60px',
               height: '60px',
               borderRadius: '50%',
-              backgroundColor: 'rgba(56, 189, 248, 0.1)',
+              backgroundColor: 'rgba(99, 102, 241, 0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 20px'
             }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2">
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
               </svg>
             </div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#ffffff', marginBottom: '8px' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0f172a', marginBottom: '8px' }}>
               {otpSending ? 'Sending Verification Code...' : 'Confirm Your Mobile Number'}
             </h3>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: '1.5', marginBottom: '24px' }}>
+            <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: '1.5', marginBottom: '24px' }}>
               {otpSending 
                 ? 'We are generating and sending a secure verification code...' 
-                : <>We sent a 6-digit verification code to <strong style={{ color: '#f8fafc' }}>{formData.phone}</strong>. Please enter it below.</>
+                : <>We sent a 6-digit verification code to <strong style={{ color: '#0f172a' }}>{formData.phone}</strong>. Please enter it below.</>
               }
             </p>
 
             {mockOtpCode && (
               <div style={{
-                background: 'rgba(56, 189, 248, 0.1)',
-                border: '1px solid rgba(56, 189, 248, 0.2)',
-                color: '#38bdf8',
+                background: 'rgba(99, 102, 241, 0.08)',
+                border: '1px solid rgba(99, 102, 241, 0.15)',
+                color: '#6366f1',
                 padding: '12px',
                 borderRadius: '8px',
                 textAlign: 'center',
@@ -977,7 +989,7 @@ export default function SellerRegister() {
               }}>
                 <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>🔑 simulated code (check console too):</div>
                 <div
-                  style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#38bdf8', background: 'rgba(0,0,0,0.25)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
+                  style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#6366f1', background: 'rgba(0,0,0,0.04)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
                   onClick={() => setOtpInput(mockOtpCode)}
                   title="Click to auto-fill"
                 >
@@ -990,9 +1002,9 @@ export default function SellerRegister() {
 
             {otpError && (
               <div style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                color: '#f87171',
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.15)',
+                color: '#ef4444',
                 padding: '10px 14px',
                 borderRadius: '8px',
                 fontSize: '0.8rem',
@@ -1002,10 +1014,6 @@ export default function SellerRegister() {
                 {otpError}
               </div>
             )}
-
-
-
-
 
 
             <form onSubmit={handleVerifyOtp}>
@@ -1021,9 +1029,9 @@ export default function SellerRegister() {
                     width: '100%',
                     height: '50px',
                     borderRadius: '10px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                    color: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#f8fafc',
+                    color: '#0f172a',
                     fontSize: '1.5rem',
                     fontWeight: '700',
                     textAlign: 'center',
@@ -1032,8 +1040,8 @@ export default function SellerRegister() {
                     opacity: otpSending ? 0.5 : 1,
                     transition: 'border-color 0.2s'
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
-                  onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+                  onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                  onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
                   required
                 />
               </div>
@@ -1045,8 +1053,8 @@ export default function SellerRegister() {
                   width: '100%',
                   height: '44px',
                   borderRadius: '8px',
-                  backgroundColor: '#38bdf8',
-                  color: '#0f172a',
+                  backgroundColor: '#6366f1',
+                  color: '#ffffff',
                   fontSize: '0.9rem',
                   fontWeight: '600',
                   border: 'none',
@@ -1070,7 +1078,7 @@ export default function SellerRegister() {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#94a3b8',
+                  color: '#64748b',
                   cursor: 'pointer',
                   textDecoration: 'underline'
                 }}
@@ -1085,7 +1093,7 @@ export default function SellerRegister() {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: otpCooldown > 0 ? '#64748b' : '#38bdf8',
+                  color: otpCooldown > 0 ? '#94a3b8' : '#6366f1',
                   cursor: otpCooldown > 0 ? 'not-allowed' : 'pointer',
                   fontWeight: '600'
                 }}

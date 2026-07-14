@@ -77,8 +77,82 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeImg,   setActiveImg]   = useState(0);
   const [activeColor, setActiveColor] = useState(0);
-  const [activeSize,  setActiveSize]  = useState('');
+    const [activeSize,  setActiveSize]  = useState('');
   const [qty,         setQty]         = useState(1);
+  const [activeVariantIndex, setActiveVariantIndex] = useState(0);
+
+    const currentPrice = useMemo(() => {
+    if (product && product.variants && product.variants[activeVariantIndex] && product.variants[activeVariantIndex].price) {
+      return product.variants[activeVariantIndex].price;
+    }
+    return product ? product.price : 0;
+  }, [product, activeVariantIndex]);
+
+  const currentComparePrice = useMemo(() => {
+    if (product && product.variants && product.variants[activeVariantIndex]) {
+      const v = product.variants[activeVariantIndex];
+      if (v.price) {
+        if (product.original > v.price) {
+          return product.original;
+        }
+        return null;
+      }
+    }
+    return product ? product.original : 0;
+  }, [product, activeVariantIndex]);
+
+  const currentDiscount = useMemo(() => {
+    if (!currentComparePrice || currentComparePrice <= currentPrice) return 0;
+    return Math.round(((currentComparePrice - currentPrice) / currentComparePrice) * 100);
+  }, [currentPrice, currentComparePrice]);
+
+  const currentStock = useMemo(() => {
+    if (product && product.variants && product.variants[activeVariantIndex] && product.variants[activeVariantIndex].stock !== undefined) {
+      return product.variants[activeVariantIndex].stock;
+    }
+    return product ? product.stock : 0;
+  }, [product, activeVariantIndex]);
+
+  const currentImages = useMemo(() => {
+    if (product && product.variants && product.variants[activeVariantIndex] && product.variants[activeVariantIndex].images && product.variants[activeVariantIndex].images.length > 0) {
+      return product.variants[activeVariantIndex].images.map(img => cleanImageUrl(img)).filter(Boolean);
+    }
+    return product ? product.imgs : [];
+  }, [product, activeVariantIndex]);
+
+  const currentDescription = useMemo(() => {
+    if (product && product.variants && product.variants[activeVariantIndex] && product.variants[activeVariantIndex].description) {
+      return product.variants[activeVariantIndex].description;
+    }
+    return product ? product.desc : '';
+  }, [product, activeVariantIndex]);
+
+  const currentSku = useMemo(() => {
+    if (product && product.variants && product.variants[activeVariantIndex] && product.variants[activeVariantIndex].sku) {
+      return product.variants[activeVariantIndex].sku;
+    }
+    return product ? product.sku : '';
+  }, [product, activeVariantIndex]);
+
+  const currentSpecs = useMemo(() => {
+    if (!product) return [];
+    return product.specs.map(([k, v]) => {
+      if (k === 'SKU Identifier' && currentSku) {
+        return [k, currentSku];
+      }
+      if (k === 'Available Inventory') {
+        return [k, `${currentStock} units`];
+      }
+      if (k === 'Status') {
+        return [k, currentStock === 0 ? 'Out of Stock' : currentStock <= 10 ? 'Low Stock' : 'In Stock'];
+      }
+      return [k, v];
+    });
+  }, [product, currentSku, currentStock]);
+
+  useEffect(() => {
+    setActiveImg(0);
+  }, [activeVariantIndex]);
   const [wishlist,    setWishlist]    = useState(false);
   const [added,       setAdded]       = useState(false);
   const [activeTab,   setActiveTab]   = useState('desc');
@@ -111,14 +185,16 @@ export default function ProductDetailPage() {
 
           const prodCatNorm = getNormCat(productCategory);
 
-          // Filter products in the same category, excluding current product
+          // Filter products in the same category, excluding current product, delivering to selectedCity
           let matched = data.products.filter(p => {
-            return getNormCat(p.category) === prodCatNorm && String(p._id || p.id) !== String(product.id);
+            return getNormCat(p.category) === prodCatNorm && 
+                   String(p._id || p.id) !== String(product.id) &&
+                   sellerServesLocation(p.seller, selectedCity);
           });
 
           // Fallback if not enough category items
           if (matched.length < 4) {
-            const extra = data.products.filter(p => String(p._id || p.id) !== String(product.id));
+            const extra = data.products.filter(p => String(p._id || p.id) !== String(product.id) && sellerServesLocation(p.seller, selectedCity));
             extra.forEach(p => {
               if (matched.length < 4 && !matched.some(m => String(m._id || m.id) === String(p._id || p.id))) {
                 matched.push(p);
@@ -149,7 +225,7 @@ export default function ProductDetailPage() {
       }
     };
     fetchRelated();
-  }, [product]);
+  }, [product, selectedCity]);
 
   // ── Review system state ──
   const [hasPurchased,   setHasPurchased]   = useState(false);
@@ -166,6 +242,116 @@ export default function ProductDetailPage() {
   useEffect(() => {
     setIsUserLoggedIn(!!localStorage.getItem('emahu_buyer_token'));
   }, []);
+
+  // Selected buyer city for delivery validation
+  const [selectedCity, setSelectedCity] = useState('Ahmedabad');
+
+  useEffect(() => {
+    const syncCity = () => {
+      const storedCity = localStorage.getItem('emahu_buyer_city');
+      if (storedCity) {
+        setSelectedCity(storedCity);
+      } else {
+        const storedUser = localStorage.getItem('emahu_buyer_user');
+        if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser);
+            if (parsed.city) {
+              setSelectedCity(parsed.city);
+            }
+          } catch (_) {}
+        }
+      }
+    };
+    syncCity();
+    window.addEventListener('storage', syncCity);
+    return () => window.removeEventListener('storage', syncCity);
+  }, []);
+
+  // Helper: check if seller serves the buyer location
+  const sellerServesLocation = (seller, city) => {
+    if (!seller) return false;
+    const cityLower = (city || 'Ahmedabad').toLowerCase().trim();
+
+    // 1. Calculate distance using coordinates from localStorage if available
+    try {
+      const coordsStr = typeof window !== 'undefined' ? localStorage.getItem('emahu_buyer_coordinates') : null;
+      if (coordsStr) {
+        const coords = JSON.parse(coordsStr);
+        const bLat = parseFloat(coords.latitude);
+        const bLon = parseFloat(coords.longitude);
+        const sLat = parseFloat(seller.latitude);
+        const sLon = parseFloat(seller.longitude);
+        
+        if (!isNaN(bLat) && !isNaN(bLon) && !isNaN(sLat) && !isNaN(sLon)) {
+          // Simple Haversine calculation inline
+          const R = 6371; // km
+          const dLat = (sLat - bLat) * Math.PI / 180;
+          const dLon = (sLon - bLon) * Math.PI / 180;
+          const a = 
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) * 
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distance = R * c;
+          
+          if (distance <= 30) {
+            return true; // within 30 km delivery range!
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to calculate distance in sellerServesLocation:', err);
+    }
+
+    // 2. City name matching and hub matching fallback
+    const sellerCity = (seller.city || seller.currentCity || seller.location || '').toLowerCase().trim();
+    
+    if (sellerCity === cityLower) return true;
+    if (sellerCity.includes(cityLower) || cityLower.includes(sellerCity)) return true;
+
+    const coveredCities = Array.isArray(seller.coveredCities)
+      ? seller.coveredCities.map(c => c.toLowerCase().trim())
+      : [];
+    if (coveredCities.includes(cityLower)) return true;
+
+    // Hub check helper
+    const AHMEDABAD_HUBS = ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav', 'gandhinagar', 'sanand'];
+    const DELHI_HUBS = ['delhi', 'noida', 'gurugram', 'gurgaon', 'faridabad', 'ghaziabad', 'dwarka', 'rohini'];
+    const MUMBAI_HUBS = ['mumbai', 'bombay', 'thane', 'navi mumbai', 'bandra', 'andheri', 'dadar', 'kurla', 'mulund', 'worli', 'lower parel'];
+    const PUNE_HUBS = ['pune', 'pimpri', 'chinchwad', 'kothrud', 'hadapsar', 'wakad', 'aundh', 'baner'];
+    const BANGALORE_HUBS = ['bangalore', 'bengaluru', 'koramangala', 'indiranagar', 'whitefield', 'marathahalli', 'jayanagar', 'electronic city'];
+    const KOLKATA_HUBS = ['kolkata', 'calcutta', 'salt lake', 'howrah', 'jadavpur', 'new town'];
+    const HYDERABAD_HUBS = ['hyderabad', 'secunderabad', 'gachibowli', 'hitech city', 'kondapur', 'madhapur'];
+    const SURAT_HUBS = ['surat', 'adajan', 'vesu', 'katargam', 'varachha', 'althan'];
+    const VADODARA_HUBS = ['vadodara', 'baroda', 'alkapuri', 'manjalpur', 'waghodia'];
+    const RAJKOT_HUBS = ['rajkot', 'kalavad', 'gondal'];
+
+    const matchHub = (hubs) => {
+      const userInHub = hubs.some(h => cityLower.includes(h));
+      const sellerInHub = hubs.some(h => sellerCity.includes(h));
+      return userInHub && sellerInHub;
+    };
+
+    if (matchHub(AHMEDABAD_HUBS)) return true;
+    if (matchHub(DELHI_HUBS)) return true;
+    if (matchHub(MUMBAI_HUBS)) return true;
+    if (matchHub(PUNE_HUBS)) return true;
+    if (matchHub(BANGALORE_HUBS)) return true;
+    if (matchHub(KOLKATA_HUBS)) return true;
+    if (matchHub(HYDERABAD_HUBS)) return true;
+    if (matchHub(SURAT_HUBS)) return true;
+    if (matchHub(VADODARA_HUBS)) return true;
+    if (matchHub(RAJKOT_HUBS)) return true;
+
+    return false;
+  };
+
+  const isDeliverable = useMemo(() => {
+    if (!product) return false;
+    if (!product.seller) return true;
+    return sellerServesLocation(product.seller, selectedCity);
+  }, [product, selectedCity]);
 
   // Sync wishlist on mount
   useEffect(() => {
@@ -302,8 +488,10 @@ export default function ProductDetailPage() {
             reviews: p.reviews || 84,
             imgs: (p.images && p.images.length > 0) ? p.images.map(img => cleanImageUrl(img)).filter(Boolean) : (p.image && isRealImage(p.image)) ? [cleanImageUrl(p.image)] : [],
             imageEmoji: (!p.image || !isRealImage(p.image)) ? p.image : null,
-            colors: [],
-            sizes: [],
+                        colors: p.colors || [],
+            sizes: p.sizes || [],
+            variants: p.variants || [],
+            sku: p.sku || '',
             desc: p.description || 'Premium quality product listing verified by EMAHU.',
             stock: p.stock,
             status: p.status,
@@ -338,11 +526,24 @@ export default function ProductDetailPage() {
 
       if (!fetchedSuccessfully) {
         // Fallback to STATIC_PRODUCTS
-        const staticProd = STATIC_PRODUCTS.find(p => String(p.id) === String(id));
+        const staticIndex = STATIC_PRODUCTS.findIndex(p => String(p.id) === String(id));
+        const staticProd = STATIC_PRODUCTS[staticIndex];
         if (staticProd) {
           let mappedCategory = staticProd.category;
           if (staticProd.category === 'Electronics' || staticProd.category === 'tech') mappedCategory = 'Tech';
           else if (staticProd.category === 'Fitness' || staticProd.category === 'Furniture' || staticProd.category === 'lifestyle') mappedCategory = 'Lifestyle';
+
+          let mockCity = 'Ahmedabad';
+          const mod = staticIndex % 6;
+          if (mod === 0) mockCity = 'Ahmedabad';
+          else if (mod === 1) mockCity = 'Delhi';
+          else if (mod === 2) mockCity = 'Mumbai';
+          else if (mod === 3) mockCity = 'Bangalore';
+          else if (mod === 4) mockCity = 'Kolkata';
+          else if (mod === 5) {
+            if (staticIndex % 12 === 5) mockCity = 'Gandhinagar';
+            else mockCity = 'Vadodara';
+          }
 
           setProduct({
             id: staticProd.id,
@@ -356,8 +557,10 @@ export default function ProductDetailPage() {
             reviews: staticProd.reviews || 84,
             imgs: (staticProd.images && staticProd.images.length > 0) ? staticProd.images.map(img => cleanImageUrl(img)).filter(Boolean) : (staticProd.image && isRealImage(staticProd.image)) ? [cleanImageUrl(staticProd.image)] : [],
             imageEmoji: (!staticProd.image || !isRealImage(staticProd.image)) ? staticProd.image : null,
-            colors: [],
+                        colors: [],
             sizes: [],
+            variants: [],
+            sku: staticProd.sku || '',
             desc: staticProd.desc || 'Premium quality product listing verified by EMAHU.',
             stock: 10,
             status: 'in-stock',
@@ -372,7 +575,11 @@ export default function ProductDetailPage() {
             verified: true,
             isHot: false,
             onSale: staticProd.originalPrice ? (staticProd.price < staticProd.originalPrice) : false,
-            seller: typeof staticProd.seller === 'string' ? { name: staticProd.seller, id: 'static-seller-' + staticProd.id } : staticProd.seller,
+            seller: {
+              ...(typeof staticProd.seller === 'string' ? { name: staticProd.seller, id: 'static-seller-' + staticProd.id } : staticProd.seller),
+              city: mockCity,
+              currentCity: mockCity
+            },
             sellerStore: typeof staticProd.seller === 'string' ? staticProd.seller : 'Emahu Store',
             sellerName: staticProd.brand
           });
@@ -383,7 +590,7 @@ export default function ProductDetailPage() {
     fetchDbProduct();
   }, [id]);
 
-  const handleAddCart = () => {
+    const handleAddCart = () => {
     if (!isUserLoggedIn) {
       router.push('/buyer/login');
       return;
@@ -391,23 +598,38 @@ export default function ProductDetailPage() {
     try {
       const storedCartStr = localStorage.getItem('emahu_cart') || '[]';
       const storedCart = JSON.parse(storedCartStr);
-      if (!storedCart.some(x => (typeof x === 'object' ? x.id : x) === product.id)) {
+      
+      const selectedVariant = product.variants && product.variants[activeVariantIndex]
+        ? product.variants[activeVariantIndex]
+        : null;
+      const sizeValue = selectedVariant ? selectedVariant.name : 'Default';
+
+      const existingItemIndex = storedCart.findIndex(x => 
+        (typeof x === 'object' ? x.id : x) === product.id && 
+        (typeof x === 'object' ? x.size === sizeValue : sizeValue === 'Default')
+      );
+
+      if (existingItemIndex > -1) {
+        storedCart[existingItemIndex].quantity += qty;
+      } else {
         storedCart.push({
           id: product.id,
           quantity: qty,
-          color: product.colors[activeColor] || 'Default',
-          size: activeSize || 'Default'
-        });
-        localStorage.setItem('emahu_cart', JSON.stringify(storedCart));
-        window.dispatchEvent(new Event('storage'));
-
-        // Log analytics event
-        logAnalyticsEvent({
-          type: 'add_to_cart',
-          productId: product.id,
-          sellerId: product.seller?._id || product.seller?.id || product.seller
+          color: 'Default',
+          size: sizeValue
         });
       }
+      
+      localStorage.setItem('emahu_cart', JSON.stringify(storedCart));
+      window.dispatchEvent(new Event('storage'));
+
+      // Log analytics event
+      logAnalyticsEvent({
+        type: 'add_to_cart',
+        productId: product.id,
+        sellerId: product.seller?._id || product.seller?.id || product.seller
+      });
+
       setAdded(true);
       setTimeout(() => setAdded(false), 2000);
     } catch (err) {
@@ -423,23 +645,38 @@ export default function ProductDetailPage() {
     try {
       const storedCartStr = localStorage.getItem('emahu_cart') || '[]';
       const storedCart = JSON.parse(storedCartStr);
-      if (!storedCart.some(x => (typeof x === 'object' ? x.id : x) === product.id)) {
+      
+      const selectedVariant = product.variants && product.variants[activeVariantIndex]
+        ? product.variants[activeVariantIndex]
+        : null;
+      const sizeValue = selectedVariant ? selectedVariant.name : 'Default';
+
+      const existingItemIndex = storedCart.findIndex(x => 
+        (typeof x === 'object' ? x.id : x) === product.id && 
+        (typeof x === 'object' ? x.size === sizeValue : sizeValue === 'Default')
+      );
+
+      if (existingItemIndex > -1) {
+        storedCart[existingItemIndex].quantity += qty;
+      } else {
         storedCart.push({
           id: product.id,
           quantity: qty,
-          color: product.colors[activeColor] || 'Default',
-          size: activeSize || 'Default'
-        });
-        localStorage.setItem('emahu_cart', JSON.stringify(storedCart));
-        window.dispatchEvent(new Event('storage'));
-
-        // Log analytics event
-        logAnalyticsEvent({
-          type: 'add_to_cart',
-          productId: product.id,
-          sellerId: product.seller?._id || product.seller?.id || product.seller
+          color: 'Default',
+          size: sizeValue
         });
       }
+      
+      localStorage.setItem('emahu_cart', JSON.stringify(storedCart));
+      window.dispatchEvent(new Event('storage'));
+
+      // Log analytics event
+      logAnalyticsEvent({
+        type: 'add_to_cart',
+        productId: product.id,
+        sellerId: product.seller?._id || product.seller?.id || product.seller
+      });
+
       router.push('/buyer/checkout');
     } catch (err) {
       console.error(err);
@@ -540,7 +777,7 @@ export default function ProductDetailPage() {
                 {product.imageEmoji}
               </div>
             ) : (
-              product.imgs.map((img, i) => (
+              currentImages.map((img, i) => (
                 <button key={i} className={`pd-thumb ${activeImg === i ? 'pd-thumb--active' : ''}`} onClick={() => setActiveImg(i)}>
                   <img src={img} alt={`View ${i+1}`} />
                 </button>
@@ -555,7 +792,7 @@ export default function ProductDetailPage() {
                 {product.imageEmoji}
               </div>
             ) : (
-              <img src={product.imgs[activeImg]} alt={product.name} className="pd-main-img" />
+              <img src={currentImages[activeImg]} alt={product.name} className="pd-main-img" />
             )}
             
             {/* Badges */}
@@ -608,19 +845,55 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          {/* Price */}
+                    {/* Price */}
           <div className="pd-price-block">
-            <span className="pd-price">₹{product.price.toLocaleString('en-IN')}</span>
-            {product.onSale && <>
-              <span className="pd-price-orig">₹{product.original.toLocaleString('en-IN')}</span>
-              <span className="pd-price-off">{product.discount}% off</span>
+            <span className="pd-price">₹{currentPrice.toLocaleString('en-IN')}</span>
+            {currentComparePrice && currentComparePrice > currentPrice && <>
+              <span className="pd-price-orig">₹{currentComparePrice.toLocaleString('en-IN')}</span>
+              <span className="pd-price-off">{currentDiscount}% off</span>
             </>}
           </div>
           <p className="pd-price-note">Inclusive of all taxes</p>
 
           <div className="pd-divider" />
 
-          {/* Color */}
+                    {/* Variants Selector */}
+          {product.variants && product.variants.length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <p className="pd-selector-label" style={{ marginBottom: '8px', color: '#475569', fontWeight: '700', fontSize: '0.8rem' }}>🎨 Select Option / Variant</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {product.variants.map((v, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`pd-size-btn ${activeVariantIndex === i ? 'pd-size-btn--active' : ''}`}
+                    onClick={() => {
+                      setActiveVariantIndex(i);
+                      if (v.linkedProductId) {
+                        router.push('/buyer/products/' + v.linkedProductId);
+                      }
+                    }}
+                    style={{
+                      height: '38px',
+                      padding: '0 16px',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      fontWeight: '600',
+                      border: activeVariantIndex === i ? '2px solid #0f172a' : '1px solid #cbd5e1',
+                      background: activeVariantIndex === i ? '#0f172a' : '#ffffff',
+                      color: activeVariantIndex === i ? '#ffffff' : '#0f172a',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {v.name} {v.price && v.price !== product.price ? `(₹${v.price.toLocaleString('en-IN')})` : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Original Colors & Sizes (if any exist independently of variants) */}
           {product.colors.length > 0 && <>
             <p className="pd-selector-label">Color — <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,color:'#6b7280'}}>Option {activeColor+1}</span></p>
             <div className="pd-colors">
@@ -631,7 +904,6 @@ export default function ProductDetailPage() {
             </div>
           </>}
 
-          {/* Size */}
           {product.sizes.length > 0 && <>
             <p className="pd-selector-label">Size</p>
             <div className="pd-sizes">
@@ -643,31 +915,58 @@ export default function ProductDetailPage() {
             <button className="pd-size-guide">Size guide →</button>
           </>}
 
-          {/* Qty */}
+                    {/* Qty */}
           <div className="pd-qty-row">
             <span className="pd-qty-label">Qty</span>
             <div className="pd-qty-ctrl">
-              <button className="pd-qty-btn" onClick={() => setQty(q => Math.max(1, q-1))} disabled={product.stock <= 0}>−</button>
-              <span className="pd-qty-val">{product.stock <= 0 ? 0 : qty}</span>
-              <button className="pd-qty-btn" onClick={() => setQty(q => Math.min(product.stock, q+1))} disabled={product.stock <= 0 || qty >= product.stock}>+</button>
+              <button className="pd-qty-btn" onClick={() => setQty(q => Math.max(1, q-1))} disabled={currentStock <= 0}>−</button>
+              <span className="pd-qty-val">{currentStock <= 0 ? 0 : qty}</span>
+              <button className="pd-qty-btn" onClick={() => setQty(q => Math.min(currentStock, q+1))} disabled={currentStock <= 0 || qty >= currentStock}>+</button>
             </div>
-            {product.stock > 0 ? (
+            {currentStock > 0 ? (
               <span style={{fontSize:'0.78rem',color:'#16a34a',fontWeight:600}}>✓ In Stock</span>
             ) : (
               <span style={{fontSize:'0.78rem',color:'#dc2626',fontWeight:600}}>✕ Out of Stock</span>
             )}
           </div>
 
+          {/* Deliverability Warning Banner */}
+          {!isDeliverable && (
+            <div className="pd-delivery-warning" style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              backgroundColor: '#fffbeb',
+              border: '1.5px solid #fef3c7',
+              borderRadius: '12px',
+              padding: '14px 18px',
+              marginBottom: '20px',
+              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.05)'
+            }}>
+              <span style={{ fontSize: '1.3rem' }}>⚠️</span>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#b45309', fontFamily: "'Inter', sans-serif" }}>
+                  Not Deliverable to {selectedCity}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#d97706', marginTop: '3px', lineHeight: '1.4', fontFamily: "'Inter', sans-serif" }}>
+                  The seller <strong>{product.sellerStore || 'Emahu Seller'}</strong> does not serve your active delivery location. Please select another city from the header to order.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* CTAs */}
           <div className="pd-cta-row">
             <button
               className={`pd-btn-cart ${added?'pd-btn-cart--added':''}`}
               onClick={handleAddCart}
-              disabled={product.stock <= 0}
-              style={product.stock <= 0 ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#4b5563' } : {}}
+              disabled={currentStock <= 0 || !isDeliverable}
+              style={currentStock <= 0 || !isDeliverable ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#4b5563' } : {}}
             >
-              {product.stock <= 0 ? (
+              {currentStock <= 0 ? (
                 'Out of Stock'
+              ) : !isDeliverable ? (
+                'Delivery Unavailable'
               ) : added ? (
                 <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Added!</>
               ) : (
@@ -677,11 +976,11 @@ export default function ProductDetailPage() {
             <button
               className="pd-btn-buy"
               onClick={handleBuyNow}
-              disabled={product.stock <= 0}
-              style={product.stock <= 0 ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#374151' } : {}}
+              disabled={currentStock <= 0 || !isDeliverable}
+              style={currentStock <= 0 || !isDeliverable ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#374151' } : {}}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-              {product.stock <= 0 ? 'Out of Stock' : 'Buy Now'}
+              {currentStock <= 0 ? 'Out of Stock' : !isDeliverable ? 'Delivery Unavailable' : 'Buy Now'}
             </button>
             <button className={`pd-btn-wishlist ${wishlist?'pd-btn-wishlist--active':''}`} onClick={handleToggleWishlist} aria-label="Wishlist">
               <svg width="18" height="18" viewBox="0 0 24 24" fill={wishlist?'#ef4444':'none'} stroke={wishlist?'#ef4444':'#374151'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -691,138 +990,7 @@ export default function ProductDetailPage() {
           </div>
 
 
-          {/* Frequently Bought Together Bundle Card */}
-          {relatedProducts.length > 0 && (
-            <div style={{
-              marginTop: '32px',
-              marginBottom: '20px',
-              padding: '20px',
-              background: '#ffffff',
-              border: '1.5px solid #e2e8f0',
-              borderRadius: '16px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
-              transition: 'all 0.2s'
-            }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '0.88rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                🤝 Frequently Bought Together
-              </h3>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px', flexWrap: 'wrap' }}>
-                {/* Main Product Thumbnail */}
-                <div style={{ width: '70px', height: '70px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', position: 'relative', flexShrink: 0 }}>
-                  {isRealImage(product.image) ? (
-                    <img src={cleanImageUrl(product.image)} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span style={{ fontSize: '2rem' }}>{product.image || '📦'}</span>
-                  )}
-                  <span style={{ position: 'absolute', bottom: '2px', right: '2px', background: '#0f172a', color: '#fff', fontSize: '0.62rem', fontWeight: '800', padding: '1px 4px', borderRadius: '4px' }}>This</span>
-                </div>
-                
-                <span style={{ fontSize: '1.4rem', fontWeight: '300', color: '#94a3b8' }}>+</span>
-                
-                {/* Related Product Thumbnail */}
-                {(() => {
-                  const s = relatedProducts[0];
-                  return (
-                    <div style={{ width: '70px', height: '70px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', position: 'relative', flexShrink: 0 }}>
-                      {isRealImage(s.img) ? (
-                        <img src={s.img} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <span style={{ fontSize: '2rem' }}>{s.img || '📦'}</span>
-                      )}
-                      <span style={{ position: 'absolute', bottom: '2px', right: '2px', background: '#4169e1', color: '#fff', fontSize: '0.62rem', fontWeight: '800', padding: '1px 4px', borderRadius: '4px' }}>Add-on</span>
-                    </div>
-                  );
-                })()}
 
-                {/* Bundle pricing summary */}
-                {(() => {
-                  const s = relatedProducts[0];
-                  const totalBundlePrice = product.price + s.price;
-                  return (
-                    <div style={{ flex: 1, minWidth: '150px' }}>
-                      <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: '700', color: '#334155' }}>
-                        Bundle Accessory
-                      </p>
-                      <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
-                        {s.name}
-                      </p>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', fontWeight: '800', color: '#16a34a' }}>
-                        Total: ₹{totalBundlePrice.toLocaleString('en-IN')}
-                      </p>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Add Bundle Button */}
-              {(() => {
-                const s = relatedProducts[0];
-                return (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!isUserLoggedIn) {
-                        router.push('/buyer/login');
-                        return;
-                      }
-                      try {
-                        const storedCartStr = localStorage.getItem('emahu_cart') || '[]';
-                        const storedCart = JSON.parse(storedCartStr);
-                        
-                        // Add main product
-                        if (!storedCart.some(x => (typeof x === 'object' ? x.id : x).toString() === product.id.toString())) {
-                          storedCart.push({
-                            id: product.id,
-                            quantity: qty,
-                            color: product.colors[activeColor] || 'Default',
-                            size: activeSize || 'Default'
-                          });
-                        }
-                        
-                        // Add suggestion product
-                        const sId = s.id || s._id;
-                        if (!storedCart.some(x => (typeof x === 'object' ? x.id : x).toString() === sId.toString())) {
-                          storedCart.push({
-                            id: sId,
-                            quantity: 1,
-                            color: s.colors?.[0] || 'Default',
-                            size: s.sizes?.[0] || 'Default'
-                          });
-                        }
-                        
-                        localStorage.setItem('emahu_cart', JSON.stringify(storedCart));
-                        window.dispatchEvent(new Event('storage'));
-                        
-                        alert(`🛒 Added Both items to your cart!`);
-                      } catch (err) {
-                        console.error(err);
-                      }
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '11px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, #4169e1, #2b4594)',
-                      color: '#fff',
-                      fontWeight: '700',
-                      fontSize: '0.85rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 14px rgba(65,105,225,0.2)',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    ⚡ Buy Both Together (Add Bundle to Cart)
-                  </button>
-                );
-              })()}
-            </div>
-          )}
 
           {/* Delivery info */}
           <div className="pd-delivery-cards">
@@ -865,7 +1033,7 @@ export default function ProductDetailPage() {
 
         {activeTab === 'desc' && (
           <div className="pd-desc">
-            <p>{product.desc} Built for people who demand the best — designed, inspected, and delivered with premium care through the EMAHU quality assurance system.</p>
+            <p>{currentDescription} Built for people who demand the best — designed, inspected, and delivered with premium care through the EMAHU quality assurance system.</p>
             <p>Every EMAHU-listed product undergoes rigorous 47-point physical inspection at one of our secure hub facilities before reaching your doorstep. Your satisfaction is guaranteed.</p>
             <div className="pd-features-grid">
               {[
@@ -890,7 +1058,7 @@ export default function ProductDetailPage() {
           <div className="pd-specs">
             <table className="pd-specs-table">
               <tbody>
-                {product.specs.map(([k,v]) => (
+                {currentSpecs.map(([k,v]) => (
                   <tr key={k}><td>{k}</td><td>{v}</td></tr>
                 ))}
               </tbody>

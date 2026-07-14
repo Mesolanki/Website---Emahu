@@ -17,7 +17,15 @@ export async function logAnalyticsEvent({ type, productId, sellerId }) {
       }
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        apiUrl = apiUrl.replace('localhost', hostname).replace('127.0.0.1', hostname);
+      } else {
+        apiUrl = apiUrl.replace('localhost', '127.0.0.1');
+      }
+    }
     await fetch(apiUrl + '/api/analytics/events', {
       method: 'POST',
       headers: {

@@ -1,5 +1,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "@/animations/animations.css";
+import LenisProvider from "@/animations/LenisProvider";
+import LoadingScreen from "@/animations/LoadingScreen";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,9 +23,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
-        <main>
-          {children}
-        </main>
+        <LenisProvider>
+          <LoadingScreen />
+          <main>
+            {children}
+          </main>
+        </LenisProvider>
       </body>
     </html>
   );

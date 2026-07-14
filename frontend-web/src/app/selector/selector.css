@@ -1,9 +1,10 @@
+@import url('https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css');
+
 /* 
   Redesigned Selector Stylesheet - EMAHU Marketplace Entry
   Aesthetic: Premium Light Theme, High-End Glassmorphism, Harmonious Accents, & Micro-animations
 */
 
-/* --- GLOBAL LAYOUT VARIABLES & BASE --- */
 .sel-wrapper {
   position: relative;
   min-height: 100vh;
@@ -13,9 +14,24 @@
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
-  padding: 100px 0 60px 0; /* Add top padding to clear the navbar */
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  padding: 90px 0 0 0; /* Add top padding to clear the navbar */
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Scroll snap target sections */
+.sel-snap-section {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-height: calc(100vh - 90px);
+  padding: 60px 24px;
+  position: relative;
+  flex-shrink: 0;
 }
 
 /* Background Clipped Container for Blobs */
@@ -86,7 +102,6 @@
   max-width: 1200px;
   width: 100%;
   margin: 0 auto;
-  padding: 0 24px;
   box-sizing: border-box;
 }
 
@@ -281,16 +296,28 @@
   color: #475569;
 }
 
-/* --- 2. MIDDLE BOARD: CATEGORIES EXPLORER --- */
 .sel-explorer {
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: 28px;
+  background: #ffffff;
+  border-top: 1.5px solid rgba(226, 232, 240, 0.9);
+  border-left: 1px solid rgba(226, 232, 240, 0.6);
+  border-right: 1px solid rgba(226, 232, 240, 0.6);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+  border-radius: 36px 36px 28px 28px;
   padding: 44px;
-  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.03), 0 2px 10px rgba(0, 0, 0, 0.01);
+  box-shadow: 0 -10px 40px rgba(15, 23, 42, 0.04), 0 20px 40px rgba(15, 23, 42, 0.03);
   margin-bottom: 56px;
+  position: relative;
+  will-change: transform;
+}
+
+/* Bottom Sheet Drag Handle at the top of the container */
+.sel-sheet-handle {
+  width: 52px;
+  height: 5px;
+  background: #e2e8f0;
+  border-radius: 10px;
+  margin: -24px auto 24px auto;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .sel-section-title {
@@ -394,7 +421,7 @@
 
 /* --- 3. EXPANDED SUBCATEGORY VIEW --- */
 .sel-subcategory-view {
-  animation: fadeIn 0.4s ease-out;
+  /* Animation handled dynamically via animate.css classes in JSX */
 }
 
 .sel-view-controls {
@@ -1213,5 +1240,105 @@
   }
   .sel-footer__dot {
     display: none;
+  }
+}
+
+/* --- SCROLL REVEAL DOWN-TO-UP ANIMATION FOR CATEGORIES --- */
+.sel-categories-view {
+  min-height: 620px;
+}
+
+.sel-categories-view-sticky-header {
+  will-change: transform, opacity;
+}
+
+.sel-cat-grid-scroll-wrapper {
+  will-change: transform, opacity;
+}
+
+/* --- HOW IT WORKS SECTION STYLES --- */
+.sel-how-section {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 28px;
+  padding: 44px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.02);
+  margin-bottom: 56px;
+  will-change: transform, opacity;
+}
+
+.sel-how-title {
+  font-size: 1.55rem;
+  font-weight: 850;
+  color: #0f172a;
+  text-align: center;
+  margin: 0 0 10px 0;
+  letter-spacing: -0.2px;
+}
+
+.sel-how-subtitle {
+  font-size: 0.92rem;
+  color: #475569;
+  text-align: center;
+  margin: 0 auto 36px auto;
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+.sel-how-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.sel-how-card {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.7);
+  border-radius: 20px;
+  padding: 30px 24px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.01);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.3s ease;
+}
+
+.sel-how-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.03);
+}
+
+.sel-how-card__icon-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.sel-how-card__title {
+  font-size: 1.05rem;
+  font-weight: 750;
+  color: #0f172a;
+  margin: 0;
+}
+
+.sel-how-card__desc {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #475569;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .sel-how-section {
+    padding: 30px 20px;
+  }
+  .sel-how-grid {
+    grid-template-columns: 1fr;
   }
 }

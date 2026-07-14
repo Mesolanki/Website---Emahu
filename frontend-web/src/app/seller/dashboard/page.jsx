@@ -9,14 +9,16 @@ import CategorySelector from '@/components/seller_home/CategorySelector';
 import DynamicProductForm from '@/components/seller_home/DynamicProductForm';
 import API_BASE from '@/utils/config';
 
+let localApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+
 if (typeof window !== 'undefined') {
-  let url = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+  let url = localApiUrl || 'http://127.0.0.1:5000';
   url = url.trim();
   const hostname = window.location.hostname;
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    process.env.NEXT_PUBLIC_API_URL = url.replace('localhost', '127.0.0.1');
+    localApiUrl = url.replace('localhost', '127.0.0.1');
   } else {
-    process.env.NEXT_PUBLIC_API_URL = url.replace('localhost', hostname).replace('127.0.0.1', hostname);
+    localApiUrl = url.replace('localhost', hostname).replace('127.0.0.1', hostname);
   }
 }
 
@@ -26,7 +28,7 @@ const resolveDocUrl = (url) => {
   if (clean.startsWith('data:')) {
     return clean;
   }
-  let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+  let apiUrl = localApiUrl || 'http://127.0.0.1:5000';
   apiUrl = apiUrl.replace(/\/api\/auth$/, '').replace(/\/api$/, '').replace(/\/$/, '');
   clean = clean.replace(/^http:\/\/(localhost|127\.0\.0\.1):5000/, apiUrl);
   return clean;
@@ -171,7 +173,7 @@ const getRandomWeightStr = () => `${(1.5 + Math.random() * 3).toFixed(2)} kg`;
 const generateNotificationId = () => `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
 const getDynamicApiUrl = () => {
-  let base = process.env.NEXT_PUBLIC_API_URL || '';
+  let base = localApiUrl || '';
   base = base.trim();
   // If it's a local address or empty, return an empty string to use Next.js server-side proxy rewrites
   if (!base || base.includes('localhost') || base.includes('127.0.0.1')) {
@@ -499,7 +501,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/sellers`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/admin/sellers`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -522,7 +524,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/sellers/${sellerId}/decision`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/admin/sellers/${sellerId}/decision`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -801,7 +803,7 @@ export default function EmahuProDashboard() {
         longitude: settingsForm.longitude !== '' ? parseFloat(settingsForm.longitude) : undefined
       };
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/update-details`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/update-details`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -830,7 +832,7 @@ export default function EmahuProDashboard() {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/update-details`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/update-details`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -856,7 +858,7 @@ export default function EmahuProDashboard() {
   const fetchAdminDeliverySettings = async () => {
     try {
       setLoadingAdminSettings(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/settings`);
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/delivery/settings`);
       const data = await res.json();
       if (data.success && data.settings) {
         setAdminDeliverySettings(data.settings);
@@ -881,7 +883,7 @@ export default function EmahuProDashboard() {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/settings`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/delivery/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1010,7 +1012,7 @@ export default function EmahuProDashboard() {
                       longitude: parseFloat(lon)
                     };
 
-                    const updateRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/update-details`, {
+                    const updateRes = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/update-details`, {
                       method: 'PUT',
                       headers: {
                         'Content-Type': 'application/json',
@@ -1089,7 +1091,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiBase = localApiUrl || 'http://localhost:5000';
       const res = await fetch(apiBase + '/api/auth/seller/documents', {
         headers: {
           'Authorization': 'Bearer ' + token
@@ -1256,7 +1258,7 @@ export default function EmahuProDashboard() {
       try {
         const token = localStorage.getItem('emahu_seller_token');
         if (!token) return;
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/my`, {
+        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/products/my`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -1297,8 +1299,8 @@ export default function EmahuProDashboard() {
         const sellerUserIdOpt = sellerUser ? (sellerUser._id || sellerUser.id || '').toString() : '';
         try {
           const url = sellerUserIdOpt
-            ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?sellerId=${sellerUserIdOpt}`
-            : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders`;
+            ? `${localApiUrl || 'http://localhost:5000'}/api/orders?sellerId=${sellerUserIdOpt}`
+            : `${localApiUrl || 'http://localhost:5000'}/api/orders`;
           const res = await fetch(url);
           const data = await res.json();
           if (data.success && data.orders) {
@@ -1704,7 +1706,7 @@ export default function EmahuProDashboard() {
 
     const fetchLiveTracking = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/track/live/${selectedDetailedOrder.orderId}`);
+        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/delivery/track/live/${selectedDetailedOrder.orderId}`);
         const data = await res.json();
         if (data.success) {
           setLiveTrackingDetails(data);
@@ -1796,7 +1798,7 @@ export default function EmahuProDashboard() {
   useEffect(() => {
     const fetchPlatformSettings = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/settings`);
+        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/payment/settings`);
         const data = await res.json();
         if (data.success) {
           setPlatformFeePercent(data.platformFeePercent);
@@ -1812,7 +1814,7 @@ export default function EmahuProDashboard() {
   const handleReleasePayment = async (orderId) => {
     setIsReleasingPayment(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/release/${orderId}`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/payment/release/${orderId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1875,7 +1877,7 @@ export default function EmahuProDashboard() {
 
       const unread = notifications.filter(n => !n.read);
       for (const n of unread) {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications/${n.id}/read`, {
+        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/notifications/${n.id}/read`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -1905,7 +1907,7 @@ export default function EmahuProDashboard() {
         delete payload._id;
         delete payload.__v;
 
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}`, {
+        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/orders/${orderId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
@@ -2073,7 +2075,7 @@ export default function EmahuProDashboard() {
       setOrderLoading(prev => ({ ...prev, [orderId]: true }));
       const token = localStorage.getItem('emahu_seller_token');
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/assign`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/delivery/assign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2453,6 +2455,7 @@ export default function EmahuProDashboard() {
   const [newProductImages, setNewProductImages] = useState([]);
   const [newProductSizes, setNewProductSizes] = useState([]);
   const [newProductColors, setNewProductColors] = useState([]);
+  const [newProductVariants, setNewProductVariants] = useState([{ name: '', sku: '', description: '', price: '', stock: '', linkedProductId: '', image: '', searchQuery: '', images: [] }]);
   const [isDragging, setIsDragging] = useState(false);
   const [manualUrlInput, setManualUrlInput] = useState('');
   const [sellerReviews, setSellerReviews] = useState([]);
@@ -2531,8 +2534,8 @@ export default function EmahuProDashboard() {
       setIsSubmittingProduct(true);
       const token = localStorage.getItem('emahu_seller_token');
       const url = resubmitProductId
-        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/${resubmitProductId}/resubmit`
-        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`;
+        ? `${localApiUrl || 'http://localhost:5000'}/api/products/${resubmitProductId}/resubmit`
+        : `${localApiUrl || 'http://localhost:5000'}/api/products`;
       const method = resubmitProductId ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -2550,9 +2553,19 @@ export default function EmahuProDashboard() {
           stock: stockNum,
           image: newProductImage.trim(),
           images: newProductImages,
-          description: newProductDescription.trim(),
-          sizes: newProductSizes,
-          colors: newProductColors
+                    description: newProductDescription.trim(),
+          sizes: [],
+          colors: [],
+                              variants: newProductVariants.filter(v => v.name.trim() !== '').map(v => ({
+            name: v.name.trim(),
+            sku: v.sku ? v.sku.trim() : null,
+            description: v.description ? v.description.trim() : null,
+            price: v.price ? parseFloat(v.price) : priceNum,
+            stock: v.stock ? parseInt(v.stock) : stockNum,
+            linkedProductId: v.linkedProductId || null,
+            image: (v.images && v.images.length > 0) ? v.images[0] : (v.image || ''),
+            images: v.images || []
+          }))
         })
       });
 
@@ -2625,8 +2638,9 @@ export default function EmahuProDashboard() {
     setNewProductDescription('');
     setNewProductImage('');
     setNewProductImages([]);
-    setNewProductSizes([]);
+        setNewProductSizes([]);
     setNewProductColors([]);
+    setNewProductVariants([{ name: '', sku: '', description: '', price: '', stock: '', linkedProductId: '', image: '', searchQuery: '', images: [] }]);
     setManualUrlInput('');
     setFormError('');
     setResubmitProductId(null);
@@ -2642,7 +2656,7 @@ export default function EmahuProDashboard() {
 
     try {
       const token = localStorage.getItem('emahu_seller_token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/${productId}/verify`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/products/${productId}/verify`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2690,10 +2704,136 @@ export default function EmahuProDashboard() {
     setNewProductStock(product.stock.toString());
     setNewProductDescription(product.description || '');
     setNewProductImage(product.image || '');
-    setNewProductImages(product.images || (product.image ? [product.image] : []));
+        setNewProductImages(product.images || (product.image ? [product.image] : []));
     setNewProductSizes(product.sizes || []);
     setNewProductColors(product.colors || []);
+            if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
+      setNewProductVariants(product.variants.map(v => ({
+        name: v.name || '',
+        sku: v.sku || '',
+        description: v.description || '',
+        price: v.price !== undefined ? v.price.toString() : '',
+        stock: v.stock !== undefined ? v.stock.toString() : '',
+        linkedProductId: v.linkedProductId || '',
+        image: v.image || '',
+        images: v.images || (v.image ? [v.image] : []),
+        searchQuery: ''
+      })));
+    } else {
+      setNewProductVariants([{ name: '', sku: '', description: '', price: '', stock: '', linkedProductId: '', image: '', searchQuery: '', images: [] }]);
+    }
     setIsAddModalOpen(true);
+  };
+
+  const renderVariantImageSelector = (index) => {
+    const variant = newProductVariants[index];
+    const images = variant.images || [];
+
+    const handleFileSelect = (e) => {
+      const files = Array.from(e.target.files);
+      processFiles(files);
+    };
+
+    const processFiles = (files) => {
+      files.forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const updated = [...newProductVariants];
+          updated[index].images = [...(updated[index].images || []), ev.target.result];
+          if (!updated[index].image) {
+            updated[index].image = ev.target.result;
+          }
+          setNewProductVariants(updated);
+        };
+        reader.readAsDataURL(file);
+      });
+    };
+
+    const removeImage = (imgIdx) => {
+      const updated = [...newProductVariants];
+      const newImgs = (updated[index].images || []).filter((_, idx) => idx !== imgIdx);
+      updated[index].images = newImgs;
+      updated[index].image = newImgs[0] || '';
+      setNewProductVariants(updated);
+    };
+
+    return (
+      <div style={{ marginTop: '8px', width: '100%' }}>
+        <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '4px' }}>
+          Variant Gallery * (Drag/drop files or click upload)
+        </label>
+
+        <div
+          style={{
+            border: '1px dashed #cbd5e1',
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px',
+            padding: '12px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            position: 'relative'
+          }}
+        >
+          <input
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={handleFileSelect}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              opacity: 0,
+              cursor: 'pointer'
+            }}
+          />
+          <div style={{ fontSize: '1.2rem', marginBottom: '2px' }}>📸</div>
+          <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 600, color: '#334155' }}>
+            Click or drag files here to upload variant images
+          </p>
+        </div>
+
+        {images.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+            {images.map((img, imgIdx) => (
+              <div key={imgIdx} style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                {img.startsWith('http') || img.startsWith('data:') ? (
+                  <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', fontSize: '1.2rem' }}>{img}</div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeImage(imgIdx)}
+                  style={{
+                    position: 'absolute',
+                    top: '2px',
+                    right: '2px',
+                    background: 'rgba(239, 68, 68, 0.85)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '14px',
+                    height: '14px',
+                    fontSize: '9px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    lineHeight: 1
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderMultiImageSelector = () => {
@@ -2894,7 +3034,7 @@ export default function EmahuProDashboard() {
       setReviewsLoading(true);
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/reviews/seller`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/reviews/seller`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -2915,7 +3055,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/reviews/${reviewId}`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/reviews/${reviewId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -2954,7 +3094,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       const productId = productToDelete.id || productToDelete._id;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/${productId}`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/products/${productId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -4294,7 +4434,7 @@ export default function EmahuProDashboard() {
                   try {
                     const token = localStorage.getItem('emahu_seller_token');
                     if (!token) return;
-                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`, {
+                    const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/products`, {
                       headers: {
                         'Authorization': `Bearer ${token}`
                       }
@@ -4416,249 +4556,242 @@ export default function EmahuProDashboard() {
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginTop: '4px', marginBottom: '8px' }}>
                           <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e293b', display: 'block', marginBottom: '12px', letterSpacing: '-0.01em' }}>🎨 Variations &amp; Options</span>
                           
-                          {/* Sizes Option */}
-                          <div style={{ marginBottom: '14px' }}>
-                            <label className="form-label" style={{ fontSize: '0.75rem', color: '#475569', fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-                              {['Apparel & Fashion','Fashion & Apparel'].includes(newProductCategory) ? '👕 Clothing Sizes' :
-                               newProductCategory === 'Electronics & Tech' ? '💾 Storage / Variant' :
-                               ['Kitchen & Dining','Lifestyle & Home','Home & Kitchen'].includes(newProductCategory) ? '📐 Size / Dimensions' :
-                               newProductCategory === 'Beauty & Cosmetics' ? '🧴 Volume / Finish' :
-                               newProductCategory === 'Sports & Fitness' ? '🏋️ Weight Class' :
-                               newProductCategory === 'Toys & Games' ? '🎮 Age Group' :
-                               newProductCategory === 'Books & Stationery' ? '📚 Format / Size' :
-                               newProductCategory === 'Health & Wellness' ? '💊 Pack Size' :
-                               newProductCategory === 'Food & Grocery' ? '⚖️ Weight / Pack' :
-                               newProductCategory === 'Automotive' ? '🔧 Fit Type' :
-                               newProductCategory === 'Pet Supplies' ? '🐾 Pet Size' : '📦 Size / Variant'}
-                            </label>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                              {(() => {
-                                const catSizes = {
-                                  'Apparel & Fashion': ['XS','S','M','L','XL','XXL','XXXL','UK 6','UK 7','UK 8','UK 9','UK 10','UK 11'],
-                                  'Fashion & Apparel': ['XS','S','M','L','XL','XXL','XXXL','UK 6','UK 7','UK 8','UK 9','UK 10','UK 11'],
-                                  'Electronics & Tech': ['64GB','128GB','256GB','512GB','1TB','8GB RAM','16GB RAM','Standard'],
-                                  'Kitchen & Dining': ['Small','Medium','Large','XL','Set of 2','Set of 4','Set of 6'],
-                                  'Lifestyle & Home': ['Single','Double','Queen','King','Small','Medium','Large'],
-                                  'Home & Kitchen': ['Small','Medium','Large','King','Queen','Single','Set of 2'],
-                                  'Beauty & Cosmetics': ['15ml','30ml','50ml','100ml','200ml','Matte','Glossy','Shimmer'],
-                                  'Sports & Fitness': ['Standard','Lightweight','Heavyweight','Junior','Senior','Professional'],
-                                  'Toys & Games': ['Ages 2–4','Ages 5–7','Ages 8–12','Ages 12+','All Ages'],
-                                  'Books & Stationery': ['Hardcover','Paperback','A4','A5','Pack of 5','Pack of 10'],
-                                  'Health & Wellness': ['30 Tabs','60 Tabs','90 Tabs','100g','250g','500g'],
-                                  'Food & Grocery': ['100g','250g','500g','1kg','2kg','5kg'],
-                                  'Automotive': ['Universal Fit','Standard','Pack of 1','Pack of 2','Pack of 4'],
-                                  'Pet Supplies': ['Small Pet','Medium Pet','Large Pet','Standard','XL'],
-                                };
-                                const opts = catSizes[newProductCategory] || ['Small','Medium','Large','Standard','Custom'];
-                                return opts.map(sz => {
-                                  const sel = newProductSizes.includes(sz);
-                                  return (
-                                    <button key={sz} type="button"
-                                      onClick={() => setNewProductSizes(sel ? newProductSizes.filter(s => s !== sz) : [...newProductSizes, sz])}
-                                      style={{ padding: '5px 10px', fontSize: '0.73rem', borderRadius: '6px', cursor: 'pointer', border: sel ? '1.5px solid #6366f1' : '1px solid #e2e8f0', background: sel ? 'rgba(99,102,241,0.08)' : '#ffffff', color: sel ? '#4f46e5' : '#52525b', fontWeight: sel ? '700' : '500', transition: 'all 0.15s ease', boxShadow: sel ? '0 0 0 2px rgba(99,102,241,0.12)' : 'none' }}>
-                                      {sel ? '✓ ' : ''}{sz}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {newProductVariants.map((variant, index) => (
+                              <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', position: 'relative' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: '600', color: '#64748b' }}>Variant #{index + 1} Details</span>
+                                  {newProductVariants.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewProductVariants(newProductVariants.filter((_, i) => i !== index))}
+                                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.72rem', fontWeight: '600', padding: 0 }}
+                                    >
+                                      Remove
                                     </button>
-                                  );
-                                });
-                              })()}
-                            </div>
-                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                              <input id="req-sz-custom-inp" type="text" placeholder="Custom size (e.g. 32, 10)" className="form-input" style={{ margin: 0, height: '28px', fontSize: '0.72rem', flex: 2, padding: '0 6px' }}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    const v = e.target.value.trim();
-                                    const scaleEl = document.getElementById('req-sz-scale-select');
-                                    const scale = scaleEl?.value || '';
-                                    if (v) {
-                                      const fullVal = v + scale;
-                                      if (!newProductSizes.includes(fullVal)) {
-                                        setNewProductSizes([...newProductSizes, fullVal]);
-                                        e.target.value = '';
-                                      }
-                                    }
-                                  }
-                                }}
-                              />
-                              <select id="req-sz-scale-select" className="form-input" style={{ margin: 0, height: '28px', fontSize: '0.72rem', flex: 1.5, background: '#ffffff', color: '#18181b', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0 4px' }}>
-                                {(() => {
-                                  if (['Apparel & Fashion', 'Fashion & Apparel'].includes(newProductCategory)) {
-                                    return (
-                                      <>
-                                        <option value="">No unit</option>
-                                        <option value=" inches">inches</option>
-                                        <option value=" cm">cm</option>
-                                        <option value=" UK">UK Size</option>
-                                        <option value=" US">US Size</option>
-                                        <option value=" EU">EU Size</option>
-                                      </>
-                                    );
-                                  }
-                                  if (newProductCategory === 'Electronics & Tech') {
-                                    return (
-                                      <>
-                                        <option value="">No unit</option>
-                                        <option value="GB">GB</option>
-                                        <option value="TB">TB</option>
-                                        <option value="GB RAM">GB RAM</option>
-                                        <option value="V">Volt (V)</option>
-                                        <option value="W">Watt (W)</option>
-                                        <option value="mAh">mAh</option>
-                                        <option value=" Inches">Inches (Screen)</option>
-                                      </>
-                                    );
-                                  }
-                                  if (['Food & Grocery', 'Health & Wellness', 'Beauty & Cosmetics'].includes(newProductCategory)) {
-                                    return (
-                                      <>
-                                        <option value="">No unit</option>
-                                        <option value=" Kg">Kg</option>
-                                        <option value=" g">g</option>
-                                        <option value=" mg">mg</option>
-                                        <option value=" L">L</option>
-                                        <option value=" ml">ml</option>
-                                        <option value=" Tabs">Tablets</option>
-                                        <option value=" Pack">Pack</option>
-                                      </>
-                                    );
-                                  }
-                                  if (['Kitchen & Dining', 'Lifestyle & Home', 'Home & Kitchen'].includes(newProductCategory)) {
-                                    return (
-                                      <>
-                                        <option value="">No unit</option>
-                                        <option value=" inches">inches</option>
-                                        <option value=" cm">cm</option>
-                                        <option value=" feet">feet</option>
-                                        <option value=" meters">meters</option>
-                                        <option value=" Set of 2">Set of 2</option>
-                                        <option value=" Set of 4">Set of 4</option>
-                                        <option value=" Set of 6">Set of 6</option>
-                                        <option value=" Pack of 2">Pack of 2</option>
-                                        <option value=" Pack of 4">Pack of 4</option>
-                                      </>
-                                    );
-                                  }
-                                  return (
-                                    <>
-                                      <option value="">No unit</option>
-                                      <option value=" inches">inches</option>
-                                      <option value=" cm">cm</option>
-                                      <option value=" UK">UK</option>
-                                      <option value=" US">US</option>
-                                      <option value=" EU">EU</option>
-                                      <option value=" Kg">Kg</option>
-                                      <option value=" g">g</option>
-                                      <option value=" L">L</option>
-                                      <option value=" ml">ml</option>
-                                      <option value=" GB">GB</option>
-                                      <option value=" TB">TB</option>
-                                    </>
-                                  );
-                                })()}
-                              </select>
-                              <button type="button" onClick={() => {
-                                const el = document.getElementById('req-sz-custom-inp');
-                                const scaleEl = document.getElementById('req-sz-scale-select');
-                                const v = el?.value.trim();
-                                const scale = scaleEl?.value || '';
-                                if (v) {
-                                  const fullVal = v + scale;
-                                  if (!newProductSizes.includes(fullVal)) {
-                                    setNewProductSizes([...newProductSizes, fullVal]);
-                                    el.value = '';
-                                  }
-                                }
-                              }}
-                                style={{ height: '28px', padding: '0 10px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#ffffff', color: '#18181b', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '600' }}>+ Add</button>
-                            </div>
-                            {newProductSizes.length > 0 && (
-                              <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                {newProductSizes.map(sz => (
-                                  <span key={sz} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#4f46e5', borderRadius: '20px', padding: '2px 10px', fontSize: '0.7rem', fontWeight: '600' }}>
-                                    {sz}
-                                    <button type="button" onClick={() => setNewProductSizes(newProductSizes.filter(s => s !== sz))} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer', padding: '0', fontSize: '0.8rem', lineHeight: 1 }}>×</button>
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                                  )}
+                                </div>
 
-                          {/* Colors Option */}
-                          <div style={{ marginTop: '14px' }}>
-                            <label className="form-label" style={{ fontSize: '0.75rem', color: '#475569', fontWeight: '600', marginBottom: '8px', display: 'block' }}>🎨 Available Colors</label>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                              {[
-                                {name:'Red',hex:'#ef4444'},{name:'Blue',hex:'#3b82f6'},{name:'Black',hex:'#1a1a1a'},
-                                {name:'White',hex:'#f5f5f5'},{name:'Green',hex:'#22c55e'},{name:'Yellow',hex:'#eab308'},
-                                {name:'Orange',hex:'#f97316'},{name:'Purple',hex:'#a855f7'},{name:'Pink',hex:'#ec4899'},
-                                {name:'Gray',hex:'#6b7280'},{name:'Brown',hex:'#92400e'},{name:'Navy',hex:'#1e3a8a'},
-                                {name:'Beige',hex:'#d4b896'},{name:'Silver',hex:'#cbd5e1'},{name:'Gold',hex:'#d97706'},
-                              ].map(col => {
-                                const sel = newProductColors.includes(col.name);
-                                return (
-                                  <button key={col.name} type="button"
-                                    onClick={() => setNewProductColors(sel ? newProductColors.filter(c => c !== col.name) : [...newProductColors, col.name])}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', fontSize: '0.73rem', borderRadius: '6px', cursor: 'pointer', border: sel ? '1.5px solid #6366f1' : '1px solid #e2e8f0', background: sel ? 'rgba(99,102,241,0.08)' : '#ffffff', color: sel ? '#4f46e5' : '#52525b', fontWeight: sel ? '700' : '500', transition: 'all 0.15s ease' }}>
-                                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: col.hex, display: 'inline-block', flexShrink: 0, border: '1px solid #d1d5db', boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }} />
-                                    {col.name}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center' }}>
-                              <input id="req-col-custom-inp" type="text" placeholder="Custom color name…" className="form-input" style={{ margin: 0, height: '28px', fontSize: '0.72rem', flex: 2, padding: '0 6px' }}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    const v = e.target.value.trim();
-                                    const picker = document.getElementById('req-col-picker-inp');
-                                    const hex = picker?.value || '#319795';
-                                    if (v) {
-                                      const fullVal = `${v} (${hex})`;
-                                      if (!newProductColors.includes(fullVal)) {
-                                        setNewProductColors([...newProductColors, fullVal]);
-                                        e.target.value = '';
-                                      }
-                                    } else {
-                                      if (!newProductColors.includes(hex)) {
-                                        setNewProductColors([...newProductColors, hex]);
-                                      }
-                                    }
-                                  }
-                                }}
-                              />
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '2px 6px', height: '28px', boxSizing: 'border-box' }}>
-                                <input id="req-col-picker-inp" type="color" defaultValue="#319795" style={{ border: 'none', background: 'none', width: '20px', height: '20px', cursor: 'pointer', padding: 0 }} />
+                                <div className="form-group" style={{ margin: 0, position: 'relative' }}>
+                                  <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>🔗 Link to Existing Product (Search...)</label>
+                                  <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px', marginBottom: '4px' }}
+                                    placeholder="Search by product name to link..."
+                                    value={variant.searchQuery || ''}
+                                    onChange={(e) => {
+                                      const updated = [...newProductVariants];
+                                      updated[index].searchQuery = e.target.value;
+                                      setNewProductVariants(updated);
+                                    }}
+                                  />
+                                  {variant.searchQuery && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: '#ffffff',
+                                      border: '1px solid #cbd5e1',
+                                      borderRadius: '8px',
+                                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                      zIndex: 100,
+                                      maxHeight: '160px',
+                                      overflowY: 'auto'
+                                    }}>
+                                      {products
+                                        .filter(p => 
+                                          p.name.toLowerCase().includes(variant.searchQuery.toLowerCase()) &&
+                                          String(p.id || p._id) !== String(resubmitProductId)
+                                        )
+                                        .map(p => (
+                                          <div
+                                            key={p.id || p._id}
+                                            onClick={() => {
+                                              const updated = [...newProductVariants];
+                                              updated[index].linkedProductId = p.id || p._id;
+                                              updated[index].name = p.name;
+                                              updated[index].sku = p.sku || '';
+                                              updated[index].description = p.description || '';
+                                              updated[index].price = p.price.toString();
+                                              updated[index].stock = p.stock.toString();
+                                              updated[index].image = p.image || '';
+                                              updated[index].images = p.images || (p.image ? [p.image] : []);
+                                              updated[index].searchQuery = '';
+                                              setNewProductVariants(updated);
+                                            }}
+                                            style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '8px',
+                                              padding: '8px',
+                                              cursor: 'pointer',
+                                              borderBottom: '1px solid #f1f5f9',
+                                              fontSize: '0.78rem'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                          >
+                                            <div style={{ width: '24px', height: '24px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
+                                              {p.image && (p.image.startsWith('http') || p.image.startsWith('data:')) ? (
+                                                <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                              ) : (
+                                                <span>{p.image || '📦'}</span>
+                                              )}
+                                            </div>
+                                            <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                              <strong>{p.name}</strong> <span style={{ color: '#64748b' }}>(₹{p.price})</span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+
+                                  {variant.linkedProductId && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '6px', marginBottom: '8px' }}>
+                                      <div style={{ width: '28px', height: '28px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
+                                        {variant.image && (variant.image.startsWith('http') || variant.image.startsWith('data:')) ? (
+                                          <img src={variant.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                          <span>{variant.image || '📦'}</span>
+                                        )}
+                                      </div>
+                                      <div style={{ flex: 1, fontSize: '0.72rem', color: '#4f46e5', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        🔗 Linked: {variant.name}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updated = [...newProductVariants];
+                                          updated[index].linkedProductId = '';
+                                          updated[index].image = '';
+                                          updated[index].images = [];
+                                          updated[index].searchQuery = '';
+                                          setNewProductVariants(updated);
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.72rem', padding: 0 }}
+                                      >
+                                        Unlink
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                  <div className="form-group" style={{ margin: 0 }}>
+                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Variant Name / Description *</label>
+                                    <input
+                                      type="text"
+                                      className="form-input"
+                                      style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
+                                      placeholder="e.g. Small / Red or 128GB Storage"
+                                      value={variant.name}
+                                      onChange={(e) => {
+                                        const updated = [...newProductVariants];
+                                        updated[index].name = e.target.value;
+                                        setNewProductVariants(updated);
+                                      }}
+                                      required
+                                    />
+                                  </div>
+                                  <div className="form-group" style={{ margin: 0 }}>
+                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>SKU (Optional)</label>
+                                    <input
+                                      type="text"
+                                      className="form-input"
+                                      style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
+                                      placeholder="e.g. EARBUD-SMALL-RED"
+                                      value={variant.sku || ''}
+                                      onChange={(e) => {
+                                        const updated = [...newProductVariants];
+                                        updated[index].sku = e.target.value;
+                                        setNewProductVariants(updated);
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="form-group" style={{ margin: 0 }}>
+                                  <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Description (Optional)</label>
+                                  <textarea
+                                    className="form-input"
+                                    style={{ height: '50px', fontSize: '0.8rem', padding: '6px', resize: 'none' }}
+                                    placeholder="Variant specific description..."
+                                    value={variant.description || ''}
+                                    onChange={(e) => {
+                                      const updated = [...newProductVariants];
+                                      updated[index].description = e.target.value;
+                                      setNewProductVariants(updated);
+                                    }}
+                                  />
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                  <div className="form-group" style={{ margin: 0 }}>
+                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Price (INR) [Optional]</label>
+                                    <input
+                                      type="number"
+                                      className="form-input"
+                                      style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
+                                      placeholder="Use main price if empty"
+                                      value={variant.price}
+                                      onChange={(e) => {
+                                        const updated = [...newProductVariants];
+                                        updated[index].price = e.target.value;
+                                        setNewProductVariants(updated);
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="form-group" style={{ margin: 0 }}>
+                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Stock [Optional]</label>
+                                    <input
+                                      type="number"
+                                      className="form-input"
+                                      style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
+                                      placeholder="Use main stock if empty"
+                                      value={variant.stock}
+                                      onChange={(e) => {
+                                        const updated = [...newProductVariants];
+                                        updated[index].stock = e.target.value;
+                                        setNewProductVariants(updated);
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {renderVariantImageSelector(index)}
                               </div>
-                              <button type="button" onClick={() => {
-                                const el = document.getElementById('req-col-custom-inp');
-                                const picker = document.getElementById('req-col-picker-inp');
-                                const v = el?.value.trim();
-                                const hex = picker?.value || '#319795';
-                                if (v) {
-                                  const fullVal = `${v} (${hex})`;
-                                  if (!newProductColors.includes(fullVal)) {
-                                    setNewProductColors([...newProductColors, fullVal]);
-                                    el.value = '';
-                                  }
-                                } else {
-                                  if (!newProductColors.includes(hex)) {
-                                    setNewProductColors([...newProductColors, hex]);
-                                  }
-                                }
+                            ))}
+
+                            <button
+                              type="button"
+                              onClick={() => setNewProductVariants([...newProductVariants, { name: '', sku: '', description: '', price: '', stock: '', linkedProductId: '', image: '', searchQuery: '', images: [] }])}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                width: '100%',
+                                height: '36px',
+                                borderRadius: '8px',
+                                border: '1px dashed #6366f1',
+                                background: 'rgba(99, 102, 241, 0.04)',
+                                color: '#6366f1',
+                                fontSize: '0.8rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
                               }}
-                                style={{ height: '28px', padding: '0 10px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#ffffff', color: '#18181b', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '600' }}>+ Add</button>
-                            </div>
-                            {newProductColors.length > 0 && (
-                              <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                {newProductColors.map(c => (
-                                  <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#4f46e5', borderRadius: '20px', padding: '2px 10px', fontSize: '0.7rem', fontWeight: '600' }}>
-                                    {c}
-                                    <button type="button" onClick={() => setNewProductColors(newProductColors.filter(x => x !== c))} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer', padding: '0', fontSize: '0.8rem', lineHeight: 1 }}>×</button>
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.04)';
+                              }}
+                            >
+                              ➕ Add Variant
+                            </button>
                           </div>
                         </div>
 
@@ -7773,7 +7906,7 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/${productId}/admin-decision`, {
+      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/products/${productId}/admin-decision`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -8069,7 +8202,7 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
       const token = localStorage.getItem('emahu_seller_token');
 
       if (needsBusiness && businessDocUrl.trim()) {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents`, {
+        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/seller/documents`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -8093,7 +8226,7 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
       }
 
       if (needsId && idDocUrl.trim()) {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/seller/documents`, {
+        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/seller/documents`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

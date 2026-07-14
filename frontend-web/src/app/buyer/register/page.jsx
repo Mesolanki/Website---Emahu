@@ -143,7 +143,7 @@ export default function BuyerRegister() {
       const res = await fetch(`${apiBase}/api/auth/send-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone })
+        body: JSON.stringify({ phone: cleanPhone, role: 'buyer' })
       });
       const data = await res.json();
       if (!res.ok) {

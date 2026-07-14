@@ -193,7 +193,7 @@ exports.register = async (req, res) => {
     }
 
     // Check if user already exists
-    const userExists = await User.findOne({ email: finalEmail });
+    const userExists = await User.findOne({ email: finalEmail, role });
     if (userExists) {
       return res.status(400).json({
         success: false,
@@ -325,7 +325,7 @@ exports.register = async (req, res) => {
 // @access  Public
 exports.login = async (req, res) => {
   try {
-    const { email, password, twoFactorCode } = req.body;
+    const { email, password, twoFactorCode, role } = req.body;
 
     // Simple validation
     if (!email || !password) {
@@ -347,6 +347,9 @@ exports.login = async (req, res) => {
           { email: `${cleanPhone}@emahu.com` }
         ]
       };
+    }
+    if (role) {
+      query.role = role;
     }
     const user = await User.findOne(query).select('+password +twoFactorSecret');
     if (!user) {
@@ -522,7 +525,7 @@ exports.googleLogin = async (req, res) => {
     }
 
     // Find if user exists
-    let user = await User.findOne({ email: finalEmail });
+    let user = await User.findOne({ email: finalEmail, role: role || 'buyer' });
 
     if (!user) {
       console.log(`Google user not found: ${finalEmail}. Returning exists: false for registration completion.`);
@@ -1343,7 +1346,11 @@ exports.sendOtp = async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     
     // Check if a registered user already exists with this email
-    const existingUser = await User.findOne({ email: cleanEmail });
+    const query = { email: cleanEmail };
+    if (req.body.role) {
+      query.role = req.body.role;
+    }
+    const existingUser = await User.findOne(query);
     if (existingUser) {
       return res.status(400).json({ success: false, error: 'A user with this email already exists' });
     }
@@ -1467,8 +1474,22 @@ exports.verifyOtp = async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const otpCode = otp.trim();
 
-    // Check if user exists (forgot password verification)
-    const user = await User.findOne({ email: cleanEmail });
+    // Check if user exists (forgot password verification) - search by email or phone
+    let query = {};
+    if (cleanEmail.includes('@')) {
+      query = { email: cleanEmail };
+    } else {
+      const cleanPhone = cleanEmail.replace(/\D/g, '');
+      const last10Digits = cleanPhone.slice(-10);
+      query = {
+        $or: [
+          { phone: last10Digits },
+          { phone: cleanEmail },
+          { email: cleanEmail }
+        ]
+      };
+    }
+    const user = await User.findOne(query);
     if (user && user.otpCode) {
       if (user.otpAttempts >= 5) {
         return res.status(400).json({ success: false, error: 'Too many failed attempts. Verification locked. Please request a new OTP.' });
@@ -1575,7 +1596,7 @@ exports.firebaseVerify = async (req, res) => {
 // @access  Public
 exports.sendPhoneOtp = async (req, res) => {
   try {
-    const { phone } = req.body;
+    const { phone, role } = req.body;
     if (!phone || !phone.trim()) {
       return res.status(400).json({ success: false, error: 'Please provide a phone number' });
     }
@@ -1586,7 +1607,11 @@ exports.sendPhoneOtp = async (req, res) => {
     }
 
     // Check if user with this phone already exists
-    const existingUser = await User.findOne({ phone: cleanPhone });
+    const query = { phone: cleanPhone };
+    if (role) {
+      query.role = role;
+    }
+    const existingUser = await User.findOne(query);
     if (existingUser) {
       return res.status(400).json({ success: false, error: 'A user with this phone number already exists' });
     }
@@ -1795,15 +1820,29 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     if (!email || !email.trim()) {
-      return res.status(400).json({ success: false, error: 'Please provide an email address' });
+      return res.status(400).json({ success: false, error: 'Please provide an email address or mobile number' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanInput = email.trim();
+    let query = {};
+    if (cleanInput.includes('@')) {
+      query = { email: cleanInput.toLowerCase() };
+    } else {
+      const cleanPhone = cleanInput.replace(/\D/g, '');
+      const last10Digits = cleanPhone.slice(-10);
+      query = {
+        $or: [
+          { phone: last10Digits },
+          { phone: cleanInput },
+          { email: cleanInput.toLowerCase() }
+        ]
+      };
+    }
     
     // Check if user exists
-    const user = await User.findOne({ email: cleanEmail });
+    const user = await User.findOne(query);
     if (!user) {
-      return res.status(404).json({ success: false, error: 'No user registered with this email address' });
+      return res.status(404).json({ success: false, error: 'No user registered with this email address or mobile number' });
     }
 
     // Generate secure 6-digit OTP
@@ -1850,15 +1889,29 @@ exports.resendOtp = async (req, res) => {
   try {
     const { email } = req.body;
     if (!email || !email.trim()) {
-      return res.status(400).json({ success: false, error: 'Please provide an email address' });
+      return res.status(400).json({ success: false, error: 'Please provide an email address or mobile number' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanInput = email.trim();
+    let query = {};
+    if (cleanInput.includes('@')) {
+      query = { email: cleanInput.toLowerCase() };
+    } else {
+      const cleanPhone = cleanInput.replace(/\D/g, '');
+      const last10Digits = cleanPhone.slice(-10);
+      query = {
+        $or: [
+          { phone: last10Digits },
+          { phone: cleanInput },
+          { email: cleanInput.toLowerCase() }
+        ]
+      };
+    }
 
     // Check if user exists
-    const user = await User.findOne({ email: cleanEmail });
+    const user = await User.findOne(query);
     if (!user) {
-      return res.status(404).json({ success: false, error: 'No user registered with this email address' });
+      return res.status(404).json({ success: false, error: 'No user registered with this email address or mobile number' });
     }
 
     // Check rate limit: 60 seconds
@@ -1932,12 +1985,26 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanInput = email.trim();
+    let query = {};
+    if (cleanInput.includes('@')) {
+      query = { email: cleanInput.toLowerCase() };
+    } else {
+      const cleanPhone = cleanInput.replace(/\D/g, '');
+      const last10Digits = cleanPhone.slice(-10);
+      query = {
+        $or: [
+          { phone: last10Digits },
+          { phone: cleanInput },
+          { email: cleanInput.toLowerCase() }
+        ]
+      };
+    }
 
     // Find user
-    const user = await User.findOne({ email: cleanEmail });
+    const user = await User.findOne(query);
     if (!user) {
-      return res.status(404).json({ success: false, error: 'No user registered with this email address' });
+      return res.status(404).json({ success: false, error: 'No user registered with this email address or mobile number' });
     }
 
     // Verify token validity

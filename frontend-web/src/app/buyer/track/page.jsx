@@ -33,7 +33,15 @@ function LiveTrackingMap({ orderId, trackingData, leafletLoaded }) {
 
     // Initialize Leaflet map if not already done
     if (!mapRef.current) {
-      mapRef.current = window.L.map(mapContainerId).setView([cLat, cLon], 13);
+      mapRef.current = window.L.map(mapContainerId, {
+        zoomControl: false,
+        dragging: false,
+        touchZoom: false,
+        doubleClickZoom: false,
+        scrollWheelZoom: false,
+        boxZoom: false,
+        keyboard: false
+      }).setView([cLat, cLon], 13);
       window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(mapRef.current);

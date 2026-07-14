@@ -11,21 +11,28 @@ async function seed() {
     await mongoose.connect(MONGODB_URI);
     console.log('MongoDB connection successful.');
 
-    // 1. Fetch the seller user with email 'qwert@test.com'
+    // 1. Fetch or create the seller user with email 'qwert@test.com'
     let seller = await User.findOne({ email: 'qwert@test.com' });
     
-    // If the seller doesn't exist, let's create them
     if (!seller) {
       console.log('Seller with email qwert@test.com not found. Creating seller...');
-      seller = await User.create({
-        name: 'ds',
+      seller = new User({
         email: 'qwert@test.com',
         password: 'password123',
         role: 'seller',
-        phone: '+91 90000 11111',
-        address: 'Emahu Tech Park, Block C, Bangalore, Karnataka'
       });
     }
+
+    seller.name = 'Main Store Seller';
+    seller.phone = '+91 90000 11111';
+    seller.address = 'Emahu Tech Park, CG Road, Ahmedabad, Gujarat';
+    seller.city = 'Ahmedabad';
+    seller.currentCity = 'Ahmedabad';
+    seller.coveredCities = ['Ahmedabad', 'Delhi', 'Mumbai', 'Pune', 'Bangalore', 'Kolkata', 'Hyderabad', 'Surat', 'Vadodara', 'Rajkot'];
+    seller.latitude = 23.0225;
+    seller.longitude = 72.5714;
+    seller.status = 'approved';
+    await seller.save();
     
     console.log(`Using Seller: ${seller.name} (${seller.email}) - ID: ${seller._id}`);
 
@@ -299,10 +306,9 @@ async function seed() {
       }
     ];
 
-    // 3. Clear any existing products with duplicate SKUs to avoid Unique Constraint failures
-    const skus = fakeProducts.map(p => p.sku);
-    console.log('Cleaning up existing mock products with duplicate SKUs...');
-    await Product.deleteMany({ sku: { $in: skus } });
+    // 3. Clear all existing products from database to ensure generic ones are removed
+    console.log('Cleaning up all existing products in the database...');
+    await Product.deleteMany({});
 
     // 4. Insert products directly into MongoDB
     console.log('Inserting 10 fake products into MongoDB database under qwert@test.com...');

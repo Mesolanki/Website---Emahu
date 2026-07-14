@@ -138,6 +138,9 @@ export default function ProductsPage() {
   const [showNew, setShowNew]             = useState(false);
   const [viewMode, setViewMode]           = useState('grid');
   const [wishlist, setWishlist]           = useState([]);
+  const [selectedCity, setSelectedCity]   = useState('Ahmedabad');
+  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
+  const locationDropdownRef               = useRef(null);
   const [cartAdded, setCartAdded]         = useState([]);
   const [searchQuery, setSearchQuery]     = useState('');
   const [page, setPage]                   = useState(1);
@@ -343,7 +346,7 @@ export default function ProductsPage() {
 
   // Combine database products (shown at top) with default static ones
   const allProductsCombined = useMemo(() => {
-    const formattedStatic = ALL_PRODUCTS.map(p => {
+    const formattedStatic = ALL_PRODUCTS.map((p, idx) => {
       let mappedCategory = p.category || 'Lifestyle & Home';
       const catLC = mappedCategory.toLowerCase();
       if (catLC === 'electronics' || catLC === 'tech' || catLC === 'tech & gadgets') {
@@ -359,15 +362,120 @@ export default function ProductsPage() {
       } else if (catLC === 'grocery' || catLC === 'groceries') {
         mappedCategory = 'Grocery & Essentials';
       }
+
+      let mockCity = 'Ahmedabad';
+      const mod = idx % 6;
+      if (mod === 0) mockCity = 'Ahmedabad';
+      else if (mod === 1) mockCity = 'Delhi';
+      else if (mod === 2) mockCity = 'Mumbai';
+      else if (mod === 3) mockCity = 'Bangalore';
+      else if (mod === 4) mockCity = 'Kolkata';
+      else if (mod === 5) {
+        if (idx % 12 === 5) mockCity = 'Gandhinagar';
+        else mockCity = 'Vadodara';
+      }
+
       return {
         ...p,
         category: mappedCategory,
         sellerStore: p.seller || 'Emahu Store',
-        sellerName: p.brand
+        sellerName: p.brand,
+        seller: {
+          ...p.seller,
+          city: mockCity,
+          currentCity: mockCity
+        }
       };
     });
     return [...formattedDbProducts, ...formattedStatic];
   }, [formattedDbProducts]);
+
+  // Helper: does this seller serve the selected city?
+  const sellerServesLocation = (seller, city) => {
+    if (!seller) return false;
+    const cityLower = (city || 'Ahmedabad').toLowerCase().trim();
+
+    try {
+      const coordsStr = typeof window !== 'undefined' ? localStorage.getItem('emahu_buyer_coordinates') : null;
+      if (coordsStr) {
+        const coords = JSON.parse(coordsStr);
+        const bLat = parseFloat(coords.latitude);
+        const bLon = parseFloat(coords.longitude);
+        const sLat = parseFloat(seller.latitude);
+        const sLon = parseFloat(seller.longitude);
+        
+        if (!isNaN(bLat) && !isNaN(bLon) && !isNaN(sLat) && !isNaN(sLon)) {
+          const R = 6371; // km
+          const dLat = (sLat - bLat) * Math.PI / 180;
+          const dLon = (sLon - bLon) * Math.PI / 180;
+          const a = 
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) * 
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distance = R * c;
+          
+          if (distance <= 30) {
+            return true;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to calculate distance in sellerServesLocation:', err);
+    }
+
+    const sellerCity = (seller.city || seller.currentCity || seller.location || '').toLowerCase().trim();
+    
+    if (sellerCity === cityLower) return true;
+    if (sellerCity.includes(cityLower) || cityLower.includes(sellerCity)) return true;
+
+    const coveredCities = Array.isArray(seller.coveredCities)
+      ? seller.coveredCities.map(c => c.toLowerCase().trim())
+      : [];
+    if (coveredCities.includes(cityLower)) return true;
+
+    const AHMEDABAD_HUBS = ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav', 'gandhinagar', 'sanand'];
+    const DELHI_HUBS = ['delhi', 'noida', 'gurugram', 'gurgaon', 'faridabad', 'ghaziabad', 'dwarka', 'rohini'];
+    const MUMBAI_HUBS = ['mumbai', 'bombay', 'thane', 'navi mumbai', 'bandra', 'andheri', 'dadar', 'kurla', 'mulund', 'worli', 'lower parel'];
+    const PUNE_HUBS = ['pune', 'pimpri', 'chinchwad', 'kothrud', 'hadapsar', 'wakad', 'aundh', 'baner'];
+    const BANGALORE_HUBS = ['bangalore', 'bengaluru', 'koramangala', 'indiranagar', 'whitefield', 'marathahalli', 'jayanagar', 'electronic city'];
+    const KOLKATA_HUBS = ['kolkata', 'calcutta', 'salt lake', 'howrah', 'jadavpur', 'new town'];
+    const HYDERABAD_HUBS = ['hyderabad', 'secunderabad', 'gachibowli', 'hitech city', 'kondapur', 'madhapur'];
+    const SURAT_HUBS = ['surat', 'adajan', 'vesu', 'katargam', 'varachha', 'althan'];
+    const VADODARA_HUBS = ['vadodara', 'baroda', 'alkapuri', 'manjalpur', 'waghodia'];
+    const RAJKOT_HUBS = ['rajkot', 'kalavad', 'gondal'];
+
+    const matchHub = (hubs) => {
+      const userInHub = hubs.some(h => cityLower.includes(h));
+      const sellerInHub = hubs.some(h => sellerCity.includes(h));
+      return userInHub && sellerInHub;
+    };
+
+    if (matchHub(AHMEDABAD_HUBS)) return true;
+    if (matchHub(DELHI_HUBS)) return true;
+    if (matchHub(MUMBAI_HUBS)) return true;
+    if (matchHub(PUNE_HUBS)) return true;
+    if (matchHub(BANGALORE_HUBS)) return true;
+    if (matchHub(KOLKATA_HUBS)) return true;
+    if (matchHub(HYDERABAD_HUBS)) return true;
+    if (matchHub(SURAT_HUBS)) return true;
+    if (matchHub(VADODARA_HUBS)) return true;
+    if (matchHub(RAJKOT_HUBS)) return true;
+
+    return false;
+  };
+
+  // Filter products by selected buyer location first
+  const locationFilteredProducts = useMemo(() => {
+    return allProductsCombined.filter(p => sellerServesLocation(p.seller, selectedCity));
+  }, [allProductsCombined, selectedCity]);
+
+  // Dynamic brand cleanup effect to reset selected brands not available in the new location
+  useEffect(() => {
+    const availableBrandsInNewCity = new Set(locationFilteredProducts.map(p => p.brand).filter(Boolean));
+    setBrands(prev => prev.filter(b => availableBrandsInNewCity.has(b)));
+    setPage(1);
+  }, [selectedCity, locationFilteredProducts]);
 
   // Dynamically update maxPriceLimit based on all products in database and static catalog
   useEffect(() => {
@@ -401,10 +509,66 @@ export default function ProductsPage() {
         const parsed = JSON.parse(storedCart);
         setTimeout(() => setCartAdded(parsed.map(x => typeof x === 'object' ? x.id : x)), 0);
       }
+
+      const storedCity = localStorage.getItem('emahu_buyer_city');
+      if (storedCity) {
+        setSelectedCity(storedCity);
+      } else {
+        const storedUser = localStorage.getItem('emahu_buyer_user');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          if (parsed.city) {
+            setSelectedCity(parsed.city);
+            localStorage.setItem('emahu_buyer_city', parsed.city);
+          }
+        }
+      }
     } catch (e) {
       console.error(e);
     }
   }, []);
+
+  // Sync selected city on storage changes & close dropdown on click outside
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const storedCity = localStorage.getItem('emahu_buyer_city');
+        if (storedCity) {
+          setSelectedCity(storedCity);
+        } else {
+          const storedUser = localStorage.getItem('emahu_buyer_user');
+          if (storedUser) {
+            const parsed = JSON.parse(storedUser);
+            if (parsed.city) {
+              setSelectedCity(parsed.city);
+            }
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    const handleClickOutside = (e) => {
+      if (locationDropdownRef.current && !locationDropdownRef.current.contains(e.target)) {
+        setLocationDropdownOpen(false);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleCityChange = (city) => {
+    setSelectedCity(city);
+    localStorage.setItem('emahu_buyer_city', city);
+    window.dispatchEvent(new Event('storage'));
+    setPage(1);
+  };
 
   const addToCart = (e, id) => {
     e.preventDefault();
@@ -481,13 +645,13 @@ export default function ProductsPage() {
 
   // Collect unique subcategories for the active category
   const availableSubcategories = useMemo(() => {
-    const base = category === 'All' ? allProductsCombined : allProductsCombined.filter(p => p.category === category);
+    const base = category === 'All' ? locationFilteredProducts : locationFilteredProducts.filter(p => p.category === category);
     const subs = Array.from(new Set(base.map(p => p.subcategory).filter(s => s && s !== 'General')));
     return subs;
-  }, [allProductsCombined, category]);
+  }, [locationFilteredProducts, category]);
 
   const filtered = useMemo(() => {
-    let items = [...allProductsCombined];
+    let items = [...locationFilteredProducts];
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       items = items.filter(p =>
@@ -510,11 +674,11 @@ export default function ProductsPage() {
     if (sortBy === 'discount')   items.sort((a,b) => b.discount - a.discount);
     if (sortBy === 'newest')     items.sort((a,b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
     return items;
-  }, [allProductsCombined, category, activeSubcategory, showVerified, showOnSale, showNew, brands, maxPrice, sortBy, searchQuery]);
+  }, [locationFilteredProducts, category, activeSubcategory, showVerified, showOnSale, showNew, brands, maxPrice, sortBy, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const paged      = filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
-  const catCount   = v => v === 'All' ? allProductsCombined.length : allProductsCombined.filter(p => p.category === v).length;
+  const catCount   = v => v === 'All' ? locationFilteredProducts.length : locationFilteredProducts.filter(p => p.category === v).length;
 
   return (
     <div className="bp-page">
@@ -604,7 +768,7 @@ export default function ProductsPage() {
       {/* Meta bar */}
       <div className="bp-metabar">
         <span className="bp-metabar__count">
-          {filtered.length} of {allProductsCombined.length} results
+          {filtered.length} of {locationFilteredProducts.length} results
         </span>
         <div className="bp-metabar__right">
           <button className="bp-filter-toggle-btn" onClick={() => setShowMobileFilters(true)}>
@@ -671,17 +835,17 @@ export default function ProductsPage() {
             <label className="bp-check-item">
               <input type="checkbox" checked={showVerified} onChange={e => { setShowVerified(e.target.checked); setPage(1); }} />
               EMAHU Verified
-              <span className="bp-check-item__count">{allProductsCombined.filter(p=>p.verified).length}</span>
+              <span className="bp-check-item__count">{locationFilteredProducts.filter(p=>p.verified).length}</span>
             </label>
             <label className="bp-check-item">
               <input type="checkbox" checked={showOnSale} onChange={e => { setShowOnSale(e.target.checked); setPage(1); }} />
               On Sale
-              <span className="bp-check-item__count">{allProductsCombined.filter(p=>p.onSale).length}</span>
+              <span className="bp-check-item__count">{locationFilteredProducts.filter(p=>p.onSale).length}</span>
             </label>
             <label className="bp-check-item">
               <input type="checkbox" checked={showNew} onChange={e => { setShowNew(e.target.checked); setPage(1); }} />
               New Arrivals
-              <span className="bp-check-item__count">{allProductsCombined.filter(p=>p.isNew).length}</span>
+              <span className="bp-check-item__count">{locationFilteredProducts.filter(p=>p.isNew).length}</span>
             </label>
           </div>
 
@@ -740,7 +904,7 @@ export default function ProductsPage() {
                   />
                   All Subcategories
                   <span className="bp-check-item__count">
-                    {category === 'All' ? allProductsCombined.length : allProductsCombined.filter(p => p.category === category).length}
+                    {category === 'All' ? locationFilteredProducts.length : locationFilteredProducts.filter(p => p.category === category).length}
                   </span>
                 </label>
                 {availableSubcategories.map(sub => (
@@ -753,7 +917,7 @@ export default function ProductsPage() {
                     />
                     {sub}
                     <span className="bp-check-item__count">
-                      {allProductsCombined.filter(p => p.subcategory === sub && (category === 'All' || p.category === category)).length}
+                      {locationFilteredProducts.filter(p => p.subcategory === sub && (category === 'All' || p.category === category)).length}
                     </span>
                   </label>
                 ))}
@@ -768,11 +932,11 @@ export default function ProductsPage() {
               <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
             </div>
             <div className="bp-filter-scroll-container">
-              {Array.from(new Set(allProductsCombined.map(p => p.brand).filter(Boolean))).slice(0, 30).map(b => (
+              {Array.from(new Set(locationFilteredProducts.map(p => p.brand).filter(Boolean))).slice(0, 30).map(b => (
                 <label key={b} className="bp-check-item">
                   <input type="checkbox" checked={brands.includes(b)} onChange={() => { toggleBrand(b); setPage(1); }} />
                   {b}
-                  <span className="bp-check-item__count">{allProductsCombined.filter(p=>p.brand===b).length}</span>
+                  <span className="bp-check-item__count">{locationFilteredProducts.filter(p=>p.brand===b).length}</span>
                 </label>
               ))}
             </div>

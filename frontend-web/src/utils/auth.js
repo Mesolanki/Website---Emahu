@@ -45,12 +45,12 @@ export async function registerUser(userData) {
 /**
  * Securely log in user & retrieve dual tokens
  */
-export async function loginUser(email, password) {
+export async function loginUser(email, password, role) {
   try {
     const response = await fetch(`${API_BASE_URL}/login`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, role }),
     });
 
     const data = await response.json();

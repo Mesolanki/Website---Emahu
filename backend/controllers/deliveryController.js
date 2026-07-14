@@ -1184,7 +1184,7 @@ exports.createDeliveryPartner = async (req, res) => {
       deliveryScope
     } = req.body;
     
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ email, role: 'delivery' });
     if (userExists) {
       return res.status(400).json({ success: false, error: 'User with this email already exists' });
     }
