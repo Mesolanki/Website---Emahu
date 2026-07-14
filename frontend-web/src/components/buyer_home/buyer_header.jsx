@@ -144,53 +144,13 @@ export default function BuyerHeader() {
     return () => window.removeEventListener('storage', checkLogin);
   }, []);
 
-  // Click outside listener and storage sync for city with auto-detection fallback
+  // Geolocation auto-detection on arrival & click outside listener
   useEffect(() => {
     const syncCity = () => {
       try {
         const storedCity = localStorage.getItem('emahu_buyer_city');
         if (storedCity) {
           setSelectedCity(storedCity);
-        } else {
-          const storedUser = localStorage.getItem('emahu_buyer_user');
-          if (storedUser) {
-            try {
-              const parsed = JSON.parse(storedUser);
-              if (parsed.city) {
-                setSelectedCity(parsed.city);
-                localStorage.setItem('emahu_buyer_city', parsed.city);
-                return;
-              }
-            } catch (_) {}
-          }
-          // Real-time Auto Geolocation detection fallback
-          if (typeof window !== 'undefined' && navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              async (position) => {
-                try {
-                  const lat = position.coords.latitude;
-                  const lon = position.coords.longitude;
-                  const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                  const data = await res.json();
-                  if (data && data.address) {
-                    const cityVal = data.address.city || data.address.town || data.address.village || data.address.state_district || '';
-                    if (cityVal) {
-                      const cleanCity = cityVal.replace(/District|Corporation/gi, '').trim();
-                      const capitalized = cleanCity.charAt(0).toUpperCase() + cleanCity.slice(1);
-                      setSelectedCity(capitalized);
-                      localStorage.setItem('emahu_buyer_city', capitalized);
-                      window.dispatchEvent(new Event('storage'));
-                    }
-                  }
-                } catch (geocodingErr) {
-                  console.warn('Reverse geocoding auto-detection failed:', geocodingErr);
-                }
-              },
-              (geoErr) => {
-                console.warn('Geolocation prompt denied or failed, using Ahmedabad:', geoErr);
-              }
-            );
-          }
         }
       } catch (e) {
         console.error(e);
@@ -198,15 +158,42 @@ export default function BuyerHeader() {
     };
     syncCity();
 
+    // Request GPS permission and update location on page arrival
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            localStorage.setItem('emahu_buyer_coordinates', JSON.stringify({ latitude: lat, longitude: lon }));
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+            const data = await res.json();
+            if (data && data.address) {
+              const cityVal = data.address.city || data.address.town || data.address.village || data.address.state_district || '';
+              if (cityVal) {
+                const cleanCity = cityVal.replace(/District|Corporation/gi, '').trim();
+                const capitalized = cleanCity.charAt(0).toUpperCase() + cleanCity.slice(1);
+                setSelectedCity(capitalized);
+                localStorage.setItem('emahu_buyer_city', capitalized);
+                window.dispatchEvent(new Event('storage'));
+              }
+            }
+          } catch (geocodingErr) {
+            console.warn('Reverse geocoding auto-detection failed:', geocodingErr);
+          }
+        },
+        (geoErr) => {
+          console.warn('Geolocation permission denied or failed on arrival:', geoErr);
+        }
+      );
+    }
+
     const handleClickOutside = (e) => {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
         setProfileDropdownOpen(false);
       }
       if (notifRef.current && !notifRef.current.contains(e.target)) {
         setIsNotifOpen(false);
-      }
-      if (locationDropdownRef.current && !locationDropdownRef.current.contains(e.target)) {
-        setLocationDropdownOpen(false);
       }
     };
 
@@ -225,18 +212,23 @@ export default function BuyerHeader() {
     setLocationDropdownOpen(false);
   };
 
-  const handleDetectLocation = () => {
+  const promptManualCity = () => {
+    const manual = prompt("Enter your city name manually:");
+    if (manual && manual.trim()) {
+      const clean = manual.trim();
+      const capitalized = clean.charAt(0).toUpperCase() + clean.slice(1);
+      handleCityChange(capitalized);
+    }
+  };
+
+  const handleLocationButtonClick = () => {
     if (typeof window !== 'undefined' && navigator.geolocation) {
-      setDetecting(true);
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           try {
             const lat = position.coords.latitude;
             const lon = position.coords.longitude;
-            
-            // Save coordinates for distance check
             localStorage.setItem('emahu_buyer_coordinates', JSON.stringify({ latitude: lat, longitude: lon }));
-            
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
             const data = await res.json();
             if (data && data.address) {
@@ -245,27 +237,25 @@ export default function BuyerHeader() {
                 const cleanCity = cityVal.replace(/District|Corporation/gi, '').trim();
                 const capitalized = cleanCity.charAt(0).toUpperCase() + cleanCity.slice(1);
                 handleCityChange(capitalized);
+                alert(`Location updated to ${capitalized} automatically!`);
               } else {
-                alert('Could not determine city name from coordinates. Please enter manually.');
+                promptManualCity();
               }
             } else {
-              alert('Could not retrieve address details. Please enter manually.');
+              promptManualCity();
             }
-          } catch (geocodingErr) {
-            console.warn('Reverse geocoding failed:', geocodingErr);
-            alert('Failed to detect city. Please enter manually.');
-          } finally {
-            setDetecting(false);
+          } catch (err) {
+            console.warn('Geocoding failed, prompting manual:', err);
+            promptManualCity();
           }
         },
         (geoErr) => {
-          console.warn('Geolocation failed:', geoErr);
-          alert('GPS access denied or failed. Please enter manually.');
-          setDetecting(false);
+          console.warn('Geolocation failed, prompting manual:', geoErr);
+          promptManualCity();
         }
       );
     } else {
-      alert('Geolocation is not supported by your browser.');
+      promptManualCity();
     }
   };
 
@@ -330,118 +320,26 @@ export default function BuyerHeader() {
           <div className="bh-location-wrap bh-location-wrap--desktop" ref={locationDropdownRef}>
             <button 
               className="bh-location-btn" 
-              onClick={() => setLocationDropdownOpen(!locationDropdownOpen)}
-              aria-expanded={locationDropdownOpen}
-              aria-label="Select Location"
+              onClick={handleLocationButtonClick}
+              aria-label="Detect or enter location"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                border: '1px solid #e5e7eb',
+                background: '#f9fafb',
+                color: '#374151',
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                outline: 'none'
+              }}
             >
               <span style={{ fontSize: '1rem', display: 'flex', alignItems: 'center' }}>📍</span>
               <span style={{ fontWeight: 600 }}>{selectedCity}</span>
-              <svg 
-                width="10" 
-                height="10" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="3" 
-                style={{ 
-                  marginLeft: '4px', 
-                  transform: locationDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease'
-                }}
-              >
-                <path d="M6 9l6 6 6-6"/>
-              </svg>
             </button>
-            <AnimatePresence>
-              {locationDropdownOpen && (
-                <motion.div 
-                  className="bh-location-dropdown"
-                  initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -6, scale: 0.97 }}
-                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                  style={{ width: '300px', padding: '16px' }}
-                >
-                  <div className="bh-location-dropdown-title" style={{ marginBottom: '12px', fontWeight: 'bold', fontSize: '0.9rem', color: '#111827' }}>Set Your Delivery Location</div>
-                  
-                  {/* Auto-detect button */}
-                  <button
-                    onClick={handleDetectLocation}
-                    disabled={detecting}
-                    className="bh-location-detect-btn"
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      backgroundColor: '#12b7b2',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontWeight: '600',
-                      fontSize: '0.85rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      marginBottom: '14px',
-                      transition: 'background-color 0.2s'
-                    }}
-                  >
-                    <span>📍</span>
-                    <span>{detecting ? 'Detecting...' : 'Auto-detect via GPS'}</span>
-                  </button>
-
-                  <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0', color: '#9ca3af', fontSize: '0.75rem', justifyContent: 'center' }}>
-                    <span style={{ borderBottom: '1px solid #e5e7eb', flex: 1 }}></span>
-                    <span style={{ margin: '0 8px' }}>OR</span>
-                    <span style={{ borderBottom: '1px solid #e5e7eb', flex: 1 }}></span>
-                  </div>
-
-                  {/* Manual input form */}
-                  <form 
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (manualCity.trim()) {
-                        handleCityChange(manualCity.trim());
-                        setManualCity('');
-                      }
-                    }}
-                    style={{ display: 'flex', gap: '8px', marginTop: '10px' }}
-                  >
-                    <input
-                      type="text"
-                      placeholder="Enter city manually..."
-                      value={manualCity}
-                      onChange={(e) => setManualCity(e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        outline: 'none',
-                        color: '#111827'
-                      }}
-                    />
-                    <button
-                      type="submit"
-                      style={{
-                        padding: '8px 14px',
-                        backgroundColor: '#111827',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontWeight: '600',
-                        fontSize: '0.85rem',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Set
-                    </button>
-                  </form>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           {/* Right Side: Action Icons (desktop) */}
