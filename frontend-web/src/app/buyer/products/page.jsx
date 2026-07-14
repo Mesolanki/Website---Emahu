@@ -740,24 +740,7 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Horizontal Category Button Filters (Pills/Chips) */}
-      <div className="category-filter-container">
-        <button
-          className={`category-filter-btn ${category === 'All' ? 'category-filter-btn--active' : ''}`}
-          onClick={() => { setCategory('All'); setActiveSubcategory('All'); setPage(1); }}
-        >
-          All Departments
-        </button>
-        {categoryTiles.map(tile => (
-          <button
-            key={tile.value}
-            className={`category-filter-btn ${category === tile.value ? 'category-filter-btn--active' : ''}`}
-            onClick={() => { setCategory(tile.value); setActiveSubcategory('All'); setPage(1); }}
-          >
-            {tile.label}
-          </button>
-        ))}
-      </div>
+
 
       <div className="bp-divider" />
 
