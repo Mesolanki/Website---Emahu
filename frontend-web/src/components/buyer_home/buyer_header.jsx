@@ -22,6 +22,8 @@ export default function BuyerHeader() {
   const [selectedCity, setSelectedCity] = useState('Ahmedabad');
   const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
   const locationDropdownRef = useRef(null);
+  const [detecting, setDetecting] = useState(false);
+  const [manualCity, setManualCity] = useState('');
   
   const [cartCount, setCartCount] = useState(0);
   const [wishCount, setWishCount] = useState(0);
@@ -223,6 +225,50 @@ export default function BuyerHeader() {
     setLocationDropdownOpen(false);
   };
 
+  const handleDetectLocation = () => {
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      setDetecting(true);
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            
+            // Save coordinates for distance check
+            localStorage.setItem('emahu_buyer_coordinates', JSON.stringify({ latitude: lat, longitude: lon }));
+            
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+            const data = await res.json();
+            if (data && data.address) {
+              const cityVal = data.address.city || data.address.town || data.address.village || data.address.state_district || '';
+              if (cityVal) {
+                const cleanCity = cityVal.replace(/District|Corporation/gi, '').trim();
+                const capitalized = cleanCity.charAt(0).toUpperCase() + cleanCity.slice(1);
+                handleCityChange(capitalized);
+              } else {
+                alert('Could not determine city name from coordinates. Please enter manually.');
+              }
+            } else {
+              alert('Could not retrieve address details. Please enter manually.');
+            }
+          } catch (geocodingErr) {
+            console.warn('Reverse geocoding failed:', geocodingErr);
+            alert('Failed to detect city. Please enter manually.');
+          } finally {
+            setDetecting(false);
+          }
+        },
+        (geoErr) => {
+          console.warn('Geolocation failed:', geoErr);
+          alert('GPS access denied or failed. Please enter manually.');
+          setDetecting(false);
+        }
+      );
+    } else {
+      alert('Geolocation is not supported by your browser.');
+    }
+  };
+
   // Lock body scroll when mobile menu is open
   useEffect(() => {
     if (mobileMenuOpen) {
@@ -314,127 +360,85 @@ export default function BuyerHeader() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.97 }}
                   transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                  style={{ width: '300px', padding: '16px' }}
                 >
-                  <div className="bh-location-dropdown-title">Select Location</div>
-                  <div className="bh-location-dropdown-divider" />
-                  {/* All India option */}
+                  <div className="bh-location-dropdown-title" style={{ marginBottom: '12px', fontWeight: 'bold', fontSize: '0.9rem', color: '#111827' }}>Set Your Delivery Location</div>
+                  
+                  {/* Auto-detect button */}
                   <button
-                    onClick={() => handleCityChange('All India')}
-                    className={`bh-location-item bh-location-item--all ${selectedCity === 'All India' ? 'bh-location-item--active' : ''}`}
+                    onClick={handleDetectLocation}
+                    disabled={detecting}
+                    className="bh-location-detect-btn"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      backgroundColor: '#12b7b2',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      marginBottom: '14px',
+                      transition: 'background-color 0.2s'
+                    }}
                   >
-                    <span>🇮🇳 All India</span>
-                    {selectedCity === 'All India' && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
+                    <span>📍</span>
+                    <span>{detecting ? 'Detecting...' : 'Auto-detect via GPS'}</span>
                   </button>
-                  <div className="bh-location-dropdown-divider" />
 
-                  {/* Gujarat */}
-                  <div className="bh-location-state-label">Gujarat</div>
-                  {['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Gandhinagar', 'Bhavnagar', 'Jamnagar', 'Junagadh', 'Anand', 'Mehsana', 'Nadiad', 'Morbi'].map(city => (
-                    <button key={city} onClick={() => handleCityChange(city)} className={`bh-location-item ${selectedCity === city ? 'bh-location-item--active' : ''}`}>
-                      <span>{city}</span>
-                      {selectedCity === city && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
-                    </button>
-                  ))}
-                  <div className="bh-location-dropdown-divider" />
+                  <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0', color: '#9ca3af', fontSize: '0.75rem', justifyContent: 'center' }}>
+                    <span style={{ borderBottom: '1px solid #e5e7eb', flex: 1 }}></span>
+                    <span style={{ margin: '0 8px' }}>OR</span>
+                    <span style={{ borderBottom: '1px solid #e5e7eb', flex: 1 }}></span>
+                  </div>
 
-                  {/* Maharashtra */}
-                  <div className="bh-location-state-label">Maharashtra</div>
-                  {['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Aurangabad', 'Thane', 'Navi Mumbai', 'Solapur', 'Kolhapur', 'Amravati'].map(city => (
-                    <button key={city} onClick={() => handleCityChange(city)} className={`bh-location-item ${selectedCity === city ? 'bh-location-item--active' : ''}`}>
-                      <span>{city}</span>
-                      {selectedCity === city && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
+                  {/* Manual input form */}
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (manualCity.trim()) {
+                        handleCityChange(manualCity.trim());
+                        setManualCity('');
+                      }
+                    }}
+                    style={{ display: 'flex', gap: '8px', marginTop: '10px' }}
+                  >
+                    <input
+                      type="text"
+                      placeholder="Enter city manually..."
+                      value={manualCity}
+                      onChange={(e) => setManualCity(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '0.85rem',
+                        outline: 'none',
+                        color: '#111827'
+                      }}
+                    />
+                    <button
+                      type="submit"
+                      style={{
+                        padding: '8px 14px',
+                        backgroundColor: '#111827',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontWeight: '600',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Set
                     </button>
-                  ))}
-                  <div className="bh-location-dropdown-divider" />
-
-                  {/* Delhi NCR */}
-                  <div className="bh-location-state-label">Delhi NCR</div>
-                  {['Delhi', 'Noida', 'Gurugram', 'Faridabad', 'Ghaziabad'].map(city => (
-                    <button key={city} onClick={() => handleCityChange(city)} className={`bh-location-item ${selectedCity === city ? 'bh-location-item--active' : ''}`}>
-                      <span>{city}</span>
-                      {selectedCity === city && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
-                    </button>
-                  ))}
-                  <div className="bh-location-dropdown-divider" />
-
-                  {/* Karnataka */}
-                  <div className="bh-location-state-label">Karnataka</div>
-                  {['Bangalore', 'Mysore', 'Mangalore', 'Hubli', 'Belgaum'].map(city => (
-                    <button key={city} onClick={() => handleCityChange(city)} className={`bh-location-item ${selectedCity === city ? 'bh-location-item--active' : ''}`}>
-                      <span>{city}</span>
-                      {selectedCity === city && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
-                    </button>
-                  ))}
-                  <div className="bh-location-dropdown-divider" />
-
-                  {/* Tamil Nadu */}
-                  <div className="bh-location-state-label">Tamil Nadu</div>
-                  {['Chennai', 'Coimbatore', 'Madurai', 'Salem', 'Tiruchirappalli'].map(city => (
-                    <button key={city} onClick={() => handleCityChange(city)} className={`bh-location-item ${selectedCity === city ? 'bh-location-item--active' : ''}`}>
-                      <span>{city}</span>
-                      {selectedCity === city && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
-                    </button>
-                  ))}
-                  <div className="bh-location-dropdown-divider" />
-
-                  {/* Telangana */}
-                  <div className="bh-location-state-label">Telangana</div>
-                  {['Hyderabad', 'Warangal', 'Nizamabad'].map(city => (
-                    <button key={city} onClick={() => handleCityChange(city)} className={`bh-location-item ${selectedCity === city ? 'bh-location-item--active' : ''}`}>
-                      <span>{city}</span>
-                      {selectedCity === city && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
-                    </button>
-                  ))}
-                  <div className="bh-location-dropdown-divider" />
-
-                  {/* West Bengal */}
-                  <div className="bh-location-state-label">West Bengal</div>
-                  {['Kolkata', 'Howrah', 'Siliguri', 'Asansol', 'Durgapur'].map(city => (
-                    <button key={city} onClick={() => handleCityChange(city)} className={`bh-location-item ${selectedCity === city ? 'bh-location-item--active' : ''}`}>
-                      <span>{city}</span>
-                      {selectedCity === city && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
-                    </button>
-                  ))}
-                  <div className="bh-location-dropdown-divider" />
-
-                  {/* Rajasthan */}
-                  <div className="bh-location-state-label">Rajasthan</div>
-                  {['Jaipur', 'Jodhpur', 'Udaipur', 'Kota', 'Ajmer'].map(city => (
-                    <button key={city} onClick={() => handleCityChange(city)} className={`bh-location-item ${selectedCity === city ? 'bh-location-item--active' : ''}`}>
-                      <span>{city}</span>
-                      {selectedCity === city && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
-                    </button>
-                  ))}
-                  <div className="bh-location-dropdown-divider" />
-
-                  {/* Uttar Pradesh */}
-                  <div className="bh-location-state-label">Uttar Pradesh</div>
-                  {['Lucknow', 'Kanpur', 'Agra', 'Varanasi', 'Allahabad', 'Meerut'].map(city => (
-                    <button key={city} onClick={() => handleCityChange(city)} className={`bh-location-item ${selectedCity === city ? 'bh-location-item--active' : ''}`}>
-                      <span>{city}</span>
-                      {selectedCity === city && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
-                    </button>
-                  ))}
-                  <div className="bh-location-dropdown-divider" />
-
-                  {/* Punjab & Haryana */}
-                  <div className="bh-location-state-label">Punjab & Haryana</div>
-                  {['Chandigarh', 'Ludhiana', 'Amritsar', 'Jalandhar', 'Ambala'].map(city => (
-                    <button key={city} onClick={() => handleCityChange(city)} className={`bh-location-item ${selectedCity === city ? 'bh-location-item--active' : ''}`}>
-                      <span>{city}</span>
-                      {selectedCity === city && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
-                    </button>
-                  ))}
-                  <div className="bh-location-dropdown-divider" />
-
-                  {/* Madhya Pradesh */}
-                  <div className="bh-location-state-label">Madhya Pradesh</div>
-                  {['Bhopal', 'Indore', 'Gwalior', 'Jabalpur'].map(city => (
-                    <button key={city} onClick={() => handleCityChange(city)} className={`bh-location-item ${selectedCity === city ? 'bh-location-item--active' : ''}`}>
-                      <span>{city}</span>
-                      {selectedCity === city && <span style={{ color: '#12b7b2', fontWeight: 'bold' }}>✓</span>}
-                    </button>
-                  ))}
+                  </form>
                 </motion.div>
               )}
             </AnimatePresence>
