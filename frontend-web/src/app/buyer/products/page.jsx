@@ -712,26 +712,45 @@ export default function ProductsPage() {
 
       </div>
 
-      {/* Dynamic Search Bar */}
-      <div className="bp-search-container">
-        <div className="bp-search-wrapper">
-          <input
-            type="text"
-            className="bp-search-input"
-            placeholder="Search products by name, brand or category..."
-            value={searchQuery}
-            onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
-          />
-          <svg className="bp-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          {searchQuery && (
-            <button className="bp-search-clear" onClick={() => { setSearchQuery(''); setPage(1); }} aria-label="Clear search">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          )}
+      {/* Amazon-style Search Bar */}
+      <div className="amazon-search-container">
+        <div className="amazon-search-bar">
+          <div className="amazon-search-select-wrap">
+            <select 
+              className="amazon-search-select"
+              value={category}
+              onChange={e => { setCategory(e.target.value); setActiveSubcategory('All'); setPage(1); }}
+            >
+              <option value="All">All Departments</option>
+              {categoryTiles.map(tile => (
+                <option key={tile.value} value={tile.value}>{tile.label}</option>
+              ))}
+            </select>
+            <span className="amazon-search-select-arrow">▼</span>
+          </div>
+          
+          <div className="amazon-search-input-wrap">
+            <input
+              type="text"
+              className="amazon-search-input"
+              placeholder="Search products by name, brand or category..."
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
+            />
+            {searchQuery && (
+              <button className="amazon-search-clear" onClick={() => { setSearchQuery(''); setPage(1); }} aria-label="Clear search">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
+          </div>
+          
+          <button className="amazon-search-submit-btn" aria-label="Submit Search">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
         </div>
       </div>
 
