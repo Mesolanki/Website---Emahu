@@ -58,58 +58,95 @@ const sellerServesLocation = (seller, city) => {
   if (!seller) return false;
   const cityLower = (city || 'Ahmedabad').toLowerCase().trim();
 
-  const sellerCity = (seller.city || seller.currentCity || '').toLowerCase().trim();
-  const sellerState = (seller.state || '').toLowerCase().trim();
-  const serviceCity = (seller.serviceAreaCity || '').toLowerCase().trim();
+  // All India option
+  if (cityLower === 'all india' || cityLower === 'india') return true;
 
-  const AHMEDABAD_NEARBY = ['ahmedabad', 'gandhinagar', 'sanand', 'kadi', 'nadiad', 'kalol', 'mehsana', 'anand', 'vadodara', 'surat'];
-  const GUJARAT_ALIASES = ['gujarat', 'guj'];
+  if (typeof seller === 'string') return true;
 
-  // Normalize serviceAreaState to an array
-  let serviceStates = [];
-  if (Array.isArray(seller.serviceAreaState)) {
-    serviceStates = seller.serviceAreaState.map(s => String(s).toLowerCase().trim());
-  } else if (seller.serviceAreaState) {
-    serviceStates = [String(seller.serviceAreaState).toLowerCase().trim()];
-  }
+  // 1. Calculate distance using coordinates if available
+  try {
+    const bLat = parseFloat(seller.latitude);
+    const bLon = parseFloat(seller.longitude);
+    // distance logic can be computed if coordinate inputs are available, otherwise fall back to string parsing
+  } catch (_) {}
 
-  // coveredCities array
+  const sellerCity = (seller.city || seller.currentCity || seller.location || seller.address || '').toLowerCase().trim();
+  const sellerState = (seller.state || seller.serviceAreaState || seller.address || '').toLowerCase().trim();
+
+  if (sellerCity === cityLower) return true;
+  if (sellerCity.includes(cityLower) || cityLower.includes(sellerCity)) return true;
+
   const coveredCities = Array.isArray(seller.coveredCities)
     ? seller.coveredCities.map(c => c.toLowerCase().trim())
     : [];
+  if (coveredCities.includes(cityLower) || coveredCities.some(c => cityLower.includes(c) || c.includes(cityLower))) return true;
 
-  if (cityLower === 'ahmedabad') {
-    if (AHMEDABAD_NEARBY.includes(sellerCity)) return true;
-    if (GUJARAT_ALIASES.some(g => sellerState.includes(g))) return true;
-    if (AHMEDABAD_NEARBY.includes(serviceCity)) return true;
-    if (serviceStates.some(s => GUJARAT_ALIASES.some(g => s.includes(g)))) return true;
-    if (coveredCities.some(c => AHMEDABAD_NEARBY.includes(c))) return true;
-    return false;
-  }
-
-  if (sellerCity === cityLower) return true;
-  if (serviceCity === cityLower) return true;
-  if (coveredCities.includes(cityLower)) return true;
-
+  // City to State Map for state level coverage matching
   const cityToStateMap = {
-    'delhi': ['delhi', 'new delhi'],
-    'noida': ['uttar pradesh', 'up', 'delhi'],
-    'mumbai': ['maharashtra', 'mh'],
-    'pune': ['maharashtra', 'mh'],
-    'bangalore': ['karnataka', 'ka'],
-    'hyderabad': ['telangana', 'tg', 'ap'],
-    'kolkata': ['west bengal', 'wb'],
-    'surat': ['gujarat', 'guj'],
-    'vadodara': ['gujarat', 'guj'],
-    'gandhinagar': ['gujarat', 'guj'],
-    'chennai': ['tamil nadu', 'tn']
+    // Gujarat
+    'ahmedabad': 'gujarat', 'surat': 'gujarat', 'vadodara': 'gujarat', 'rajkot': 'gujarat', 
+    'gandhinagar': 'gujarat', 'bhavnagar': 'gujarat', 'jamnagar': 'gujarat', 'junagadh': 'gujarat', 
+    'anand': 'gujarat', 'mehsana': 'gujarat', 'nadiad': 'gujarat', 'morbi': 'gujarat',
+    // Maharashtra
+    'mumbai': 'maharashtra', 'pune': 'maharashtra', 'nagpur': 'maharashtra', 'nashik': 'maharashtra', 
+    'aurangabad': 'maharashtra', 'thane': 'maharashtra', 'navi mumbai': 'maharashtra', 
+    'solapur': 'maharashtra', 'kolhapur': 'maharashtra', 'amravati': 'maharashtra',
+    // Delhi NCR
+    'delhi': 'delhi', 'noida': 'uttar pradesh', 'gurugram': 'haryana', 'faridabad': 'haryana', 'ghaziabad': 'uttar pradesh',
+    // Karnataka
+    'bangalore': 'karnataka', 'bengaluru': 'karnataka', 'mysore': 'karnataka', 'mangalore': 'karnataka', 'hubli': 'karnataka', 'belgaum': 'karnataka',
+    // Tamil Nadu
+    'chennai': 'tamil nadu', 'coimbatore': 'tamil nadu', 'madurai': 'tamil nadu', 'salem': 'tamil nadu', 'tiruchirappalli': 'tamil nadu',
+    // Telangana
+    'hyderabad': 'telangana', 'warangal': 'telangana', 'nizamabad': 'telangana',
+    // West Bengal
+    'kolkata': 'west bengal', 'howrah': 'west bengal', 'siliguri': 'west bengal', 'asansol': 'west bengal', 'durgapur': 'west bengal',
+    // Rajasthan
+    'jaipur': 'rajasthan', 'jodhpur': 'rajasthan', 'udaipur': 'rajasthan', 'kota': 'rajasthan', 'ajmer': 'rajasthan',
+    // Uttar Pradesh
+    'lucknow': 'uttar pradesh', 'kanpur': 'uttar pradesh', 'agra': 'uttar pradesh', 'varanasi': 'uttar pradesh', 'allahabad': 'uttar pradesh', 'meerut': 'uttar pradesh',
+    // Punjab & Haryana
+    'chandigarh': 'punjab', 'ludhiana': 'punjab', 'amritsar': 'punjab', 'jalandhar': 'punjab', 'ambala': 'haryana',
+    // Madhya Pradesh
+    'bhopal': 'madhya pradesh', 'indore': 'madhya pradesh', 'gwalior': 'madhya pradesh', 'jabalpur': 'madhya pradesh'
   };
 
-  const statesForSelectedCity = cityToStateMap[cityLower] || [];
-  if (statesForSelectedCity.length > 0) {
-    if (statesForSelectedCity.some(s => sellerState.includes(s))) return true;
-    if (serviceStates.some(s => statesForSelectedCity.some(state => s.includes(state)))) return true;
+  const buyerState = cityToStateMap[cityLower];
+  const sellerStateMapped = cityToStateMap[sellerCity];
+
+  if (buyerState) {
+    if (sellerState.includes(buyerState) || (sellerStateMapped && sellerStateMapped === buyerState)) {
+      return true;
+    }
   }
+
+  const AHMEDABAD_HUBS = ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav', 'gandhinagar', 'sanand'];
+  const DELHI_HUBS = ['delhi', 'noida', 'gurugram', 'gurgaon', 'faridabad', 'ghaziabad', 'dwarka', 'rohini'];
+  const MUMBAI_HUBS = ['mumbai', 'bombay', 'thane', 'navi mumbai', 'bandra', 'andheri', 'dadar', 'kurla', 'mulund', 'worli', 'lower parel'];
+  const PUNE_HUBS = ['pune', 'pimpri', 'chinchwad', 'kothrud', 'hadapsar', 'wakad', 'aundh', 'baner'];
+  const BANGALORE_HUBS = ['bangalore', 'bengaluru', 'koramangala', 'indiranagar', 'whitefield', 'marathahalli', 'jayanagar', 'electronic city'];
+  const KOLKATA_HUBS = ['kolkata', 'calcutta', 'salt lake', 'howrah', 'jadavpur', 'new town'];
+  const HYDERABAD_HUBS = ['hyderabad', 'secunderabad', 'gachibowli', 'hitech city', 'kondapur', 'madhapur'];
+  const SURAT_HUBS = ['surat', 'adajan', 'vesu', 'katargam', 'varachha', 'althan'];
+  const VADODARA_HUBS = ['vadodara', 'baroda', 'alkapuri', 'manjalpur', 'waghodia'];
+  const RAJKOT_HUBS = ['rajkot', 'kalavad', 'gondal'];
+
+  const matchHub = (hubs) => {
+    const userInHub = hubs.some(h => cityLower.includes(h));
+    const sellerInHub = hubs.some(h => sellerCity.includes(h));
+    return userInHub && sellerInHub;
+  };
+
+  if (matchHub(AHMEDABAD_HUBS)) return true;
+  if (matchHub(DELHI_HUBS)) return true;
+  if (matchHub(MUMBAI_HUBS)) return true;
+  if (matchHub(PUNE_HUBS)) return true;
+  if (matchHub(BANGALORE_HUBS)) return true;
+  if (matchHub(KOLKATA_HUBS)) return true;
+  if (matchHub(HYDERABAD_HUBS)) return true;
+  if (matchHub(SURAT_HUBS)) return true;
+  if (matchHub(VADODARA_HUBS)) return true;
+  if (matchHub(RAJKOT_HUBS)) return true;
 
   return false;
 };
