@@ -165,131 +165,146 @@
   color: #1a1a1a;
 }
 
-/* ── Amazon-style Search Bar ── */
-.amazon-search-container {
-  padding: 0 40px 24px;
+/* ── Theme-styled Full-Width Search Bar ── */
+.theme-search-container {
+  padding: 0 40px 20px;
   animation: fadeDown 0.5s ease 0.1s both;
+  width: 100%;
 }
 
-.amazon-search-bar {
+.theme-search-bar {
   display: flex;
-  max-width: 650px;
-  height: 46px;
+  width: 100%;
+  height: 48px;
   background: #ffffff;
-  border: 1.5px solid #cccccc;
-  border-radius: 8px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
   overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
-.amazon-search-bar:focus-within {
-  border-color: #ff9900;
-  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.25);
+.theme-search-bar:focus-within {
+  border-color: #12b7b2;
+  box-shadow: 0 0 0 4px rgba(18, 183, 178, 0.15), 0 10px 30px rgba(18, 183, 178, 0.05);
+  transform: translateY(-1px);
 }
 
-/* Category select wrap */
-.amazon-search-select-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  background-color: #f3f3f3;
-  border-right: 1.5px solid #cccccc;
-  padding: 0 12px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.amazon-search-select-wrap:hover {
-  background-color: #e3e3e3;
-}
-
-.amazon-search-select {
-  appearance: none;
-  background: transparent;
-  border: none;
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: #444444;
-  padding: 0 20px 0 0;
-  cursor: pointer;
-  outline: none;
-  height: 100%;
-  font-family: inherit;
-}
-
-.amazon-search-select-arrow {
-  position: absolute;
-  right: 12px;
-  font-size: 0.65rem;
-  color: #666666;
-  pointer-events: none;
-}
-
-/* Input wrap */
-.amazon-search-input-wrap {
+.theme-search-input-wrap {
   position: relative;
   flex: 1;
   display: flex;
   align-items: center;
 }
 
-.amazon-search-input {
+.theme-search-icon {
+  position: absolute;
+  left: 18px;
+  color: #9ca3af;
+  pointer-events: none;
+  transition: color 0.25s;
+}
+
+.theme-search-bar:focus-within .theme-search-icon {
+  color: #12b7b2;
+}
+
+.theme-search-input {
   width: 100%;
   height: 100%;
   border: none;
   outline: none;
-  padding: 0 36px 0 16px;
-  font-size: 0.9rem;
-  color: #111111;
+  padding: 0 44px 0 50px;
+  font-size: 0.92rem;
+  color: #111827;
+  font-weight: 500;
   font-family: inherit;
   background: transparent;
 }
 
-.amazon-search-input::placeholder {
-  color: #888888;
+.theme-search-input::placeholder {
+  color: #9ca3af;
 }
 
-.amazon-search-clear {
+.theme-search-clear {
   position: absolute;
-  right: 12px;
+  right: 16px;
   background: none;
   border: none;
-  color: #999999;
+  color: #9ca3af;
   cursor: pointer;
-  padding: 4px;
+  padding: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background-color 0.2s, color 0.2s;
+  transition: all 0.2s;
 }
 
-.amazon-search-clear:hover {
-  background-color: #eeeeee;
-  color: #333333;
+.theme-search-clear:hover {
+  background-color: #f3f4f6;
+  color: #111827;
 }
 
-/* Submit button */
-.amazon-search-submit-btn {
-  width: 50px;
+.theme-search-submit-btn {
+  padding: 0 28px;
   height: 100%;
-  background-color: #febd69;
+  background-color: #111827;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #111111;
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
-.amazon-search-submit-btn:hover {
-  background-color: #f3a847;
+.theme-search-submit-btn:hover {
+  background-color: #12b7b2;
+  color: #ffffff;
 }
 
-.amazon-search-submit-btn:active {
-  background-color: #e29023;
+/* ── Category Button Filters (Pills/Chips) ── */
+.category-filter-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 40px 24px;
+  animation: fadeDown 0.6s ease 0.15s both;
+}
+
+.category-filter-btn {
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: 1.5px solid #e5e7eb;
+  background-color: #ffffff;
+  color: #4b5563;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+}
+
+.category-filter-btn:hover {
+  border-color: #12b7b2;
+  color: #12b7b2;
+  background-color: rgba(18, 183, 178, 0.03);
+}
+
+.category-filter-btn--active {
+  border-color: #12b7b2;
+  background-color: #12b7b2;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(18, 183, 178, 0.2);
+}
+
+.category-filter-btn--active:hover {
+  background-color: #0fa29d;
+  border-color: #0fa29d;
+  color: #ffffff;
 }
 
 /* ── Divider ── */
