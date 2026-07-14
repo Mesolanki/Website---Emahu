@@ -316,31 +316,7 @@ export default function BuyerHeader() {
           </Link>
 
 
-          {/* Location Selector */}
-          <div className="bh-location-wrap bh-location-wrap--desktop" ref={locationDropdownRef}>
-            <button 
-              className="bh-location-btn" 
-              onClick={handleLocationButtonClick}
-              aria-label="Detect or enter location"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                border: '1px solid #e5e7eb',
-                background: '#f9fafb',
-                color: '#374151',
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                outline: 'none'
-              }}
-            >
-              <span style={{ fontSize: '1rem', display: 'flex', alignItems: 'center' }}>📍</span>
-              <span style={{ fontWeight: 600 }}>{selectedCity}</span>
-            </button>
-          </div>
+
 
           {/* Right Side: Action Icons (desktop) */}
           <div className="bh-header__right">
