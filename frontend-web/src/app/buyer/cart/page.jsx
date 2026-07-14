@@ -74,54 +74,19 @@ const sellerServesLocation = (seller, city) => {
   }
 
   const sellerCity = (seller.city || seller.currentCity || seller.location || seller.address || '').toLowerCase().trim();
-  const sellerState = (seller.state || seller.serviceAreaState || seller.address || '').toLowerCase().trim();
-
-  if (sellerCity === cityLower) return true;
-  if (sellerCity.includes(cityLower) || cityLower.includes(sellerCity)) return true;
-
+  
+  // Check if seller delivers to All India/India (coveredCities has All India)
   const coveredCities = Array.isArray(seller.coveredCities)
     ? seller.coveredCities.map(c => c.toLowerCase().trim())
     : [];
+  if (coveredCities.includes('all india') || coveredCities.includes('india')) return true;
+
+  // Exact or contains match on city
+  if (sellerCity === cityLower) return true;
+  if (sellerCity.includes(cityLower) || cityLower.includes(sellerCity)) return true;
+
+  // Buyer city specifically in covered cities
   if (coveredCities.includes(cityLower) || coveredCities.some(c => cityLower.includes(c) || c.includes(cityLower))) return true;
-
-  // City to State Map for state level coverage matching
-  const cityToStateMap = {
-    // Gujarat
-    'ahmedabad': 'gujarat', 'surat': 'gujarat', 'vadodara': 'gujarat', 'rajkot': 'gujarat', 
-    'gandhinagar': 'gujarat', 'bhavnagar': 'gujarat', 'jamnagar': 'gujarat', 'junagadh': 'gujarat', 
-    'anand': 'gujarat', 'mehsana': 'gujarat', 'nadiad': 'gujarat', 'morbi': 'gujarat',
-    // Maharashtra
-    'mumbai': 'maharashtra', 'pune': 'maharashtra', 'nagpur': 'maharashtra', 'nashik': 'maharashtra', 
-    'aurangabad': 'maharashtra', 'thane': 'maharashtra', 'navi mumbai': 'maharashtra', 
-    'solapur': 'maharashtra', 'kolhapur': 'maharashtra', 'amravati': 'maharashtra',
-    // Delhi NCR
-    'delhi': 'delhi', 'noida': 'uttar pradesh', 'gurugram': 'haryana', 'faridabad': 'haryana', 'ghaziabad': 'uttar pradesh',
-    // Karnataka
-    'bangalore': 'karnataka', 'bengaluru': 'karnataka', 'mysore': 'karnataka', 'mangalore': 'karnataka', 'hubli': 'karnataka', 'belgaum': 'karnataka',
-    // Tamil Nadu
-    'chennai': 'tamil nadu', 'coimbatore': 'tamil nadu', 'madurai': 'tamil nadu', 'salem': 'tamil nadu', 'tiruchirappalli': 'tamil nadu',
-    // Telangana
-    'hyderabad': 'telangana', 'warangal': 'telangana', 'nizamabad': 'telangana',
-    // West Bengal
-    'kolkata': 'west bengal', 'howrah': 'west bengal', 'siliguri': 'west bengal', 'asansol': 'west bengal', 'durgapur': 'west bengal',
-    // Rajasthan
-    'jaipur': 'rajasthan', 'jodhpur': 'rajasthan', 'udaipur': 'rajasthan', 'kota': 'rajasthan', 'ajmer': 'rajasthan',
-    // Uttar Pradesh
-    'lucknow': 'uttar pradesh', 'kanpur': 'uttar pradesh', 'agra': 'uttar pradesh', 'varanasi': 'uttar pradesh', 'allahabad': 'uttar pradesh', 'meerut': 'uttar pradesh',
-    // Punjab & Haryana
-    'chandigarh': 'punjab', 'ludhiana': 'punjab', 'amritsar': 'punjab', 'jalandhar': 'punjab', 'ambala': 'haryana',
-    // Madhya Pradesh
-    'bhopal': 'madhya pradesh', 'indore': 'madhya pradesh', 'gwalior': 'madhya pradesh', 'jabalpur': 'madhya pradesh'
-  };
-
-  const buyerState = cityToStateMap[cityLower];
-  const sellerStateMapped = cityToStateMap[sellerCity];
-
-  if (buyerState) {
-    if (sellerState.includes(buyerState) || (sellerStateMapped && sellerStateMapped === buyerState)) {
-      return true;
-    }
-  }
 
   const AHMEDABAD_HUBS = ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav', 'gandhinagar', 'sanand'];
   const DELHI_HUBS = ['delhi', 'noida', 'gurugram', 'gurgaon', 'faridabad', 'ghaziabad', 'dwarka', 'rohini'];
