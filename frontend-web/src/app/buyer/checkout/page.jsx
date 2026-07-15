@@ -1706,7 +1706,7 @@ export default function CheckoutPage() {
                         </li>
                       ))}
                     </ul>
-                    <p style={{ fontSize: '0.7 fiction', color: '#991b1b', margin: '8px 0 0 0', fontStyle: 'italic' }}>
+                    <p style={{ fontSize: '0.72rem', color: '#991b1b', margin: '8px 0 0 0', fontStyle: 'italic' }}>
                       Please remove these items or change your delivery address to complete checkout.
                     </p>
                   </div>
