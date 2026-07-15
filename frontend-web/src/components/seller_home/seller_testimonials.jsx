@@ -6,9 +6,9 @@ import './seller_testimonials.css';
 /* ─── Stat counters ─────────────────────────────────────────────── */
 const stats = [
   { value: 12400, suffix: '+', label: 'Active Sellers', prefix: '' },
-  { value: 58,    suffix: ' Cr+', label: 'Total Payouts', prefix: '₹' },
+  { value: 58, suffix: ' Cr+', label: 'Total Payouts', prefix: '₹' },
   { value: 28000, suffix: '+', label: 'Pin Codes Served', prefix: '' },
-  { value: 99.7,  suffix: '%', label: 'On-Time Payout Rate', prefix: '', decimals: 1 },
+  { value: 99.7, suffix: '%', label: 'On-Time Payout Rate', prefix: '', decimals: 1 },
 ];
 
 /* ─── Testimonial cards data ─────────────────────────────────────── */
@@ -56,7 +56,7 @@ const testimonials = [
     color: '#d97706',
     rating: 5,
     revenue: '₹3.5L / mo',
-    quote: 'The escrow system gives me full confidence that every buyer payment is protected. No more worrying about chargebacks or disputed orders eating into margins.',
+    quote: 'The Emahu system gives me full confidence that every buyer payment is protected. No more worrying about chargebacks or disputed orders eating into margins.',
   },
   {
     name: 'Kavita Joshi',
@@ -112,24 +112,24 @@ export default function SellerTestimonials() {
   useEffect(() => {
     const el = statsRef.current;
     if (!el) return;
-    
+
     // Safety fallback: auto-trigger after 1200ms if observer is slow
     const timer = setTimeout(() => {
       setStatsStarted(true);
     }, 1200);
 
     const observer = new IntersectionObserver(
-      ([entry]) => { 
-        if (entry.isIntersecting) { 
-          setStatsStarted(true); 
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setStatsStarted(true);
           clearTimeout(timer);
-          observer.disconnect(); 
-        } 
+          observer.disconnect();
+        }
       },
       { threshold: 0.05 }
     );
     observer.observe(el);
-    
+
     return () => {
       clearTimeout(timer);
       observer.disconnect();

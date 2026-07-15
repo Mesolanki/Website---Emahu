@@ -13,6 +13,7 @@ export default function BuyerSettingsPage() {
   // Profile States
   const [profileForm, setProfileForm] = useState({
     name: '',
+    email: '',
     phone: '',
     address: '',
     city: '',
@@ -142,6 +143,7 @@ export default function BuyerSettingsPage() {
         setUser(parsed);
         setProfileForm({
           name: parsed.name || '',
+          email: parsed.email || '',
           phone: parsed.phone || '',
           address: parsed.address || '',
           city: parsed.city || '',
@@ -165,7 +167,7 @@ export default function BuyerSettingsPage() {
         const userId = user.id || user._id;
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${userId}`);
         const data = await res.json();
-        
+
         if (data.success && data.orders) {
           const fetchedOrders = data.orders;
 
@@ -173,9 +175,9 @@ export default function BuyerSettingsPage() {
           const totalTransactions = fetchedOrders.length;
 
           // Active Locks vs Completed
-          const activeLocks = fetchedOrders.filter(o => 
-            !o.status.includes('RELEASED') && 
-            !o.status.includes('REJECTED') && 
+          const activeLocks = fetchedOrders.filter(o =>
+            !o.status.includes('RELEASED') &&
+            !o.status.includes('REJECTED') &&
             !o.status.includes('DISPUTED')
           ).length;
 
@@ -207,7 +209,7 @@ export default function BuyerSettingsPage() {
     fetchStats();
   }, [user]);
 
-    const sendOtpToNewPhone = async () => {
+  const sendOtpToNewPhone = async () => {
     setOtpLoading(true);
     setOtpError('');
     setMockOtpCode('');
@@ -255,7 +257,7 @@ export default function BuyerSettingsPage() {
       if (!res.ok) {
         throw new Error(data.error || 'Invalid OTP code.');
       }
-      
+
       // OTP is verified! Now save profile
       await saveProfileData();
       setIsOtpModalOpen(false);
@@ -286,7 +288,15 @@ export default function BuyerSettingsPage() {
         const updatedUser = { ...user, ...data.user };
         localStorage.setItem('emahu_buyer_user', JSON.stringify(updatedUser));
         setUser(updatedUser);
-        
+        setProfileForm({
+          name: data.user.name || '',
+          email: data.user.email || '',
+          phone: data.user.phone || '',
+          address: data.user.address || '',
+          city: data.user.city || '',
+          state: data.user.state || ''
+        });
+
         // Dispatch local event to sync header name
         window.dispatchEvent(new Event('storage'));
         setSuccessMsg('Your profile has been updated successfully!');
@@ -342,7 +352,7 @@ export default function BuyerSettingsPage() {
                 <p className="stat-desc">Order groups placed in system</p>
               </div>
               <div className="stat-card">
-                <span className="stat-label">Active Escrow Locks</span>
+                <span className="stat-label">Active Emahu Locks</span>
                 <h3 className="stat-val" style={{ color: '#4169e1' }}>{stats.activeLocks}</h3>
                 <p className="stat-desc">Capital secured inside vault</p>
               </div>
@@ -396,6 +406,18 @@ export default function BuyerSettingsPage() {
               </div>
 
               <div className="form-group" style={{ marginTop: '16px' }}>
+                <label className="form-label">Email Address</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={profileForm.email}
+                  onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                  required
+                  placeholder="e.g. name@example.com"
+                />
+              </div>
+
+              <div className="form-group" style={{ marginTop: '16px' }}>
                 <label className="form-label">Default Shipping Address</label>
                 <input
                   type="text"
@@ -439,10 +461,10 @@ export default function BuyerSettingsPage() {
           </div>
         </section>
 
-        </main>
+      </main>
 
       <footer className="settings-footer">
-        <p>© 2026 Emahu Consumer Escrow Portal. Secured with military-grade vault encryption.</p>
+        <p>© 2026 Emahu Consumer Emahu Portal. Secured with military-grade vault encryption.</p>
       </footer>
       {isOtpModalOpen && (
         <div style={{

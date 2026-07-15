@@ -19,6 +19,7 @@ export default function BuyerLogin() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [hasOpenedTerms, setHasOpenedTerms] = useState(false);
 
   // If already logged in, redirect directly to the buyer account marketplace home
   useEffect(() => {
@@ -115,13 +116,13 @@ export default function BuyerLogin() {
       {/* Main Single Login Card (No Sidebar needed for simple login) */}
       <div className="br-container" style={{ maxWidth: '480px', gridTemplateColumns: '1fr' }}>
         <div className="br-form-panel" style={{ padding: '48px 40px' }}>
-          
+
           {/* Logo Header */}
           <div style={{ textAlign: 'center', marginBottom: '28px' }}>
             <Link href="/" className="br-logo" style={{ marginBottom: '16px', justifyContent: 'center' }}>
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
                 <rect width="32" height="32" rx="10" fill="#4169e1" />
-                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
               </svg>
               <span className="br-logo__text">EMAHU</span>
             </Link>
@@ -131,7 +132,7 @@ export default function BuyerLogin() {
 
           {!success ? (
             <form onSubmit={handleSubmit} className="br-form-grid br-form-grid--full" style={{ marginBottom: '24px' }}>
-              
+
               {errors.general && (
                 <div style={{ color: '#ef4444', backgroundColor: '#fef2f2', padding: '10px 14px', borderRadius: '8px', border: '1px solid #fca5a5', fontSize: '0.85rem', marginBottom: '8px' }}>
                   {errors.general}
@@ -178,22 +179,30 @@ export default function BuyerLogin() {
 
               {/* Terms & Conditions Checkbox */}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '12px 0 8px 0', padding: '0 2px' }}>
-                <input 
+                <input
                   id="agree-portal-terms"
-                  type="checkbox" 
+                  type="checkbox"
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
-                  style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
+                  disabled={!hasOpenedTerms}
+                  style={{ width: '16px', height: '16px', marginTop: '2px', cursor: hasOpenedTerms ? 'pointer' : 'not-allowed' }}
                 />
-                <label htmlFor="agree-portal-terms" style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
-                  I agree to the <a href="#" onClick={(e) => { e.preventDefault(); alert("EMAHU Terms of Service & Partner Conditions: By signing in, you agree to inspect items upon receipt, release escrow payments promptly, and follow the marketplace standard of conduct."); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+                <label htmlFor="agree-portal-terms" style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4', cursor: hasOpenedTerms ? 'pointer' : 'not-allowed', userSelect: 'none' }}>
+                  <span style={{ color: hasOpenedTerms ? '#475569' : '#94a3b8' }}>
+                    I agree to the <a href="#" onClick={(e) => { e.preventDefault(); setHasOpenedTerms(true); alert("EMAHU Buyer Agreement & Liability Disclaimer:\n\n1. CONNECTOR DISCLAIMER: EMAHU is a technology provider linking independent stores and logistics carriers. We are not a seller, merchant, or shipping agent, and assume no liability for item quality, description mismatches, or shipping delays.\n2. EmahuAGREEMENT: Funds for your order are held in an Emahuholding account and only released to the merchant upon delivery verification. You are responsible for ensuring package integrity before releasing the Delivery OTP code to the rider.\n3. LIMITATION OF LIABILITY: You agree to indemnify and hold harmless EMAHU, its operators, and developers from any claims, medical issues from products, or financial losses. All purchases are at your own risk.\n4. REFUNDS & DISPUTES: Refunds are only eligible before OTP entry or under active dispute resolution before fund release. Once the OTP is shared, the transaction is finalized."); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+                  </span>
+                  {!hasOpenedTerms && (
+                    <span style={{ color: '#e53e3e', display: 'block', fontSize: '0.72rem', marginTop: '4px', fontWeight: '600' }}>
+                      ⚠️ Please click and read the Terms link first to unlock this checkbox.
+                    </span>
+                  )}
                 </label>
               </div>
 
-              <button 
-                type="submit" 
-                className="br-btn br-btn--next" 
-                style={{ width: '100%', marginTop: '12px', ...(!agreeTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8' } : {}) }} 
+              <button
+                type="submit"
+                className="br-btn br-btn--next"
+                style={{ width: '100%', marginTop: '12px', ...(!agreeTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8' } : {}) }}
                 disabled={loading || !agreeTerms}
               >
                 {loading ? 'Authenticating...' : 'Sign In'}

@@ -6,7 +6,7 @@ const { getHaversineDistance, resolveCharge } = require('./deliveryController');
 function detectCityAndState(address) {
   if (!address || typeof address !== 'string') return { city: '', state: '' };
   const lower = address.toLowerCase();
-  
+
   const list = [
     { city: 'Ahmedabad', state: 'Gujarat', aliases: ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad nagar', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav', 'gandhinagar', 'sanand'] },
     { city: 'Surat', state: 'Gujarat', aliases: ['surat', 'adajan', 'vesu', 'katargam', 'varachha', 'althan', 'citylight', 'pal', 'piplod', 'dindoli', 'udhna', 'rander', 'bhestan'] },
@@ -24,7 +24,7 @@ function detectCityAndState(address) {
     { city: 'Lucknow', state: 'Uttar Pradesh', aliases: ['lucknow', 'gomti nagar'] },
     { city: 'Chandigarh', state: 'Punjab', aliases: ['chandigarh', 'mohali', 'panchkula'] }
   ];
-  
+
   for (const item of list) {
     const terms = item.aliases || [item.city];
     for (const term of terms) {
@@ -42,7 +42,7 @@ function detectCityAndState(address) {
 exports.createOrder = async (req, res) => {
   try {
     const orderData = req.body;
-    
+
     // Auto-generate orderId and date if missing
     if (!orderData.orderId) {
       orderData.orderId = `EMH_${Math.floor(100000 + Math.random() * 900000)}`;
@@ -50,15 +50,15 @@ exports.createOrder = async (req, res) => {
     if (!orderData.date) {
       orderData.date = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     }
-    
+
     // Auto-detect city/state from buyer address
     const bAddr = orderData.buyerLocation?.address || orderData.deliveryAddress?.address || '';
     if (!orderData.deliveryAddress) {
       orderData.deliveryAddress = {};
     }
     if (
-      !orderData.deliveryAddress.city || 
-      !orderData.deliveryAddress.stateName || 
+      !orderData.deliveryAddress.city ||
+      !orderData.deliveryAddress.stateName ||
       orderData.deliveryAddress.city.toLowerCase().includes('profile')
     ) {
       const detected = detectCityAndState(bAddr);
@@ -68,7 +68,7 @@ exports.createOrder = async (req, res) => {
       }
     }
     if (
-      !orderData.deliveryAddress.pincode || 
+      !orderData.deliveryAddress.pincode ||
       orderData.deliveryAddress.pincode.toLowerCase().includes('profile')
     ) {
       const match = bAddr.match(/\b\d{6}\b/);
@@ -78,7 +78,7 @@ exports.createOrder = async (req, res) => {
         orderData.deliveryAddress.pincode = '380001';
       }
     }
-    
+
     // Check if the buyer has any unconfirmed delivered orders (Removed per request)
     /*
     if (orderData.userId) {
@@ -98,7 +98,7 @@ exports.createOrder = async (req, res) => {
     // Calculate and verify delivery charges
     let distanceKm = 0;
     let deliveryCharge = 0;
-    
+
     const settings = await DeliverySetting.findOne() || {
       maxDeliveryDistance: 100,
       expressDeliverySurcharge: 100,
@@ -137,7 +137,7 @@ exports.createOrder = async (req, res) => {
     let sLon = 72.5714;
     let sAddress = 'Ahmedabad, Gujarat';
     let sName = 'Emahu Seller';
-    
+
     if (orderData.sellerId) {
       const mongoose = require('mongoose');
       if (mongoose.Types.ObjectId.isValid(orderData.sellerId)) {
@@ -183,7 +183,7 @@ exports.createOrder = async (req, res) => {
     } else {
       distanceKm = getHaversineDistance(bLat, bLon, sLat, sLon);
     }
-    
+
 
 
 
@@ -212,14 +212,14 @@ exports.createOrder = async (req, res) => {
     orderData.distanceKm = parseFloat(distanceKm.toFixed(2));
     orderData.deliveryCharge = deliveryCharge;
     orderData.productAmount = productAmount;
-    
+
     // Add express surcharge if express delivery selected
     if (orderData.shippingSpeed === 'express') {
       deliveryCharge += settings.expressDeliverySurcharge || 100;
       orderData.deliveryCharge = deliveryCharge;
     }
 
-    // Recalculate escrow grand total (subtotal + deliveryCharge + 18% GST of subtotal)
+    // Recalculate Emahu grand total (subtotal + deliveryCharge + 18% GST of subtotal)
     const taxAmount = Math.round(productAmount * 0.18);
     orderData.total = productAmount + deliveryCharge + taxAmount;
     orderData.totalPaid = orderData.total;
@@ -230,10 +230,10 @@ exports.createOrder = async (req, res) => {
     console.log('Seller ID:', orderData.sellerId);
     console.log('User ID:', orderData.userId);
     console.log(`Verified Subtotal: ₹${productAmount}, Distance: ${distanceKm.toFixed(2)} KM, Delivery Charge: ₹${deliveryCharge}, Total: ₹${orderData.total}`);
-    
+
     // Ensure database insert runs every time
     const order = await Order.create(orderData);
-    
+
     // Decrease stock levels and update sales count
     if (order.items && order.items.length > 0) {
       const Product = require('../models/Product');
@@ -251,7 +251,7 @@ exports.createOrder = async (req, res) => {
         }
       }
     }
-    
+
     // Log purchase events for analytics
     if (order.items && order.items.length > 0) {
       const AnalyticsEvent = require('../models/AnalyticsEvent');
@@ -268,7 +268,7 @@ exports.createOrder = async (req, res) => {
         }
       }
     }
-    
+
     console.log('DATABASE INSERT SUCCESSFUL:', order.orderId);
     console.log('------------------------------');
 
@@ -291,7 +291,7 @@ exports.createOrder = async (req, res) => {
 exports.getOrders = async (req, res) => {
   try {
     const { sellerId, userId, orderId, billId } = req.query;
-    
+
     // Enforce that orders are fetched only for a specific seller, buyer, or specific order/bill ID
     if (!sellerId && !userId && !orderId && !billId) {
       return res.status(200).json({
@@ -337,7 +337,7 @@ exports.updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = { ...req.body };
-    
+
     // Normalize empty strings that fail Mongoose schema casting/validation to null
     if (updateData.deliveryPartnerId === '') {
       updateData.deliveryPartnerId = null;

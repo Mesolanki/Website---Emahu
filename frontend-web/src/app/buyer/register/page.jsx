@@ -18,6 +18,7 @@ export default function BuyerRegister() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [hasOpenedTerms, setHasOpenedTerms] = useState(false);
 
   // Form State Values
   const [formData, setFormData] = useState({
@@ -162,7 +163,7 @@ export default function BuyerRegister() {
       }
     } catch (err) {
       console.error('Send OTP Error:', err);
-      
+
       // Fallback
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setMockOtpCode(code);
@@ -230,14 +231,11 @@ export default function BuyerRegister() {
     if (!formData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
     }
-    
-    const isGoogleReg = formData.password && formData.password.startsWith('GoogleAuthPass_');
-    if (isGoogleReg) {
-      if (!formData.email.trim()) {
-        newErrors.email = 'Email address is required';
-      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-        newErrors.email = 'Enter a valid email address';
-      }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email address is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Enter a valid email address';
     }
 
     if (!formData.phone.trim()) {
@@ -338,19 +336,19 @@ export default function BuyerRegister() {
       <div className="br-blob br-blob--2" />
 
       <div className="br-container">
-        
+
         {/* Step Indicator Panel (Left Sidebar) */}
         <div className="br-progress-panel">
           <Link href="/" className="br-logo">
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
               <rect width="32" height="32" rx="10" fill="#4169e1" />
-              <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+              <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
             </svg>
             <span className="br-logo__text">EMAHU</span>
           </Link>
 
           <div className="br-steps-list">
-            
+
             {/* Step 1 indicator */}
             <div className={`br-step-item ${step === 1 ? 'br-step-item--active' : ''} ${step > 1 ? 'br-step-item--completed' : ''}`}>
               <div className="br-step-item__number">
@@ -393,7 +391,7 @@ export default function BuyerRegister() {
 
         {/* Right side form card */}
         <div className="br-form-panel">
-          
+
           {!success ? (
             <>
               {errors.general && (
@@ -423,7 +421,7 @@ export default function BuyerRegister() {
                       {errors.fullName && <span className="br-error">{errors.fullName}</span>}
                     </div>
 
-                    {formData.password && formData.password.startsWith('GoogleAuthPass_') && (
+                    {formData.password && formData.password.startsWith('GoogleAuthPass_') ? (
                       <div className="br-field br-field--full">
                         <label className="br-label">Connected Google Email</label>
                         <input
@@ -432,6 +430,20 @@ export default function BuyerRegister() {
                           value={formData.email}
                           disabled
                         />
+                      </div>
+                    ) : (
+                      <div className="br-field br-field--full">
+                        <label className="br-label" htmlFor="email">Email Address</label>
+                        <input
+                          type="email"
+                          id="email"
+                          name="email"
+                          className={`br-input ${errors.email ? 'br-input--error' : ''}`}
+                          placeholder="e.g. name@example.com"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                        />
+                        {errors.email && <span className="br-error">{errors.email}</span>}
                       </div>
                     )}
 
@@ -480,22 +492,30 @@ export default function BuyerRegister() {
 
                   {/* Terms & Conditions Checkbox */}
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '20px 0 12px 0', padding: '0 4px' }}>
-                    <input 
+                    <input
                       id="agree-portal-terms"
-                      type="checkbox" 
+                      type="checkbox"
                       checked={agreeTerms}
                       onChange={(e) => setAgreeTerms(e.target.checked)}
-                      style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
+                      disabled={!hasOpenedTerms}
+                      style={{ width: '16px', height: '16px', marginTop: '2px', cursor: hasOpenedTerms ? 'pointer' : 'not-allowed' }}
                     />
-                    <label htmlFor="agree-portal-terms" style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
-                      I agree to the <a href="#" onClick={(e) => { e.preventDefault(); alert("EMAHU Terms of Service & Partner Conditions: By signing up, you agree to inspect items upon receipt, release escrow payments promptly, and follow the marketplace standard of conduct."); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+                    <label htmlFor="agree-portal-terms" style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4', cursor: hasOpenedTerms ? 'pointer' : 'not-allowed', userSelect: 'none' }}>
+                      <span style={{ color: hasOpenedTerms ? '#475569' : '#94a3b8' }}>
+                        I agree to the <a href="#" onClick={(e) => { e.preventDefault(); setHasOpenedTerms(true); alert("EMAHU Buyer Agreement & Liability Disclaimer:\n\n1. CONNECTOR DISCLAIMER: EMAHU is a technology provider linking independent stores and logistics carriers. We are not a seller, merchant, or shipping agent, and assume no liability for item quality, description mismatches, or shipping delays.\n2. EmahuAGREEMENT: Funds for your order are held in an Emahuholding account and only released to the merchant upon delivery verification. You are responsible for ensuring package integrity before releasing the Delivery OTP code to the rider.\n3. LIMITATION OF LIABILITY: You agree to indemnify and hold harmless EMAHU, its operators, and developers from any claims, medical issues from products, or financial losses. All purchases are at your own risk.\n4. REFUNDS & DISPUTES: Refunds are only eligible before OTP entry or under active dispute resolution before fund release. Once the OTP is shared, the transaction is finalized."); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+                      </span>
+                      {!hasOpenedTerms && (
+                        <span style={{ color: '#e53e3e', display: 'block', fontSize: '0.72rem', marginTop: '4px', fontWeight: '600' }}>
+                          ⚠️ Please click and read the Terms link first to unlock this checkbox.
+                        </span>
+                      )}
                     </label>
                   </div>
- 
+
                   <div className="br-form-actions">
-                    <button 
-                      type="button" 
-                      className="br-btn br-btn--next" 
+                    <button
+                      type="button"
+                      className="br-btn br-btn--next"
                       onClick={handleNext}
                       disabled={!agreeTerms}
                       style={!agreeTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8' } : {}}
@@ -667,15 +687,15 @@ export default function BuyerRegister() {
               margin: '0 auto 20px'
             }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4169e1" strokeWidth="2">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
             </div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0f172a', marginBottom: '8px' }}>
               {otpLoading ? 'Sending Verification Code...' : 'Confirm Your Mobile Number'}
             </h3>
             <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: '1.5', marginBottom: '24px' }}>
-              {otpLoading 
-                ? 'We are generating and sending a secure verification code...' 
+              {otpLoading
+                ? 'We are generating and sending a secure verification code...'
                 : <>We sent a 6-digit verification code to <strong style={{ color: '#0f172a' }}>{formData.phone}</strong>. Please enter it below.</>
               }
             </p>

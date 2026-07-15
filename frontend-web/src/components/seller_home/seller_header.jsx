@@ -149,14 +149,8 @@ export default function SellerHeader() {
           <Link href="/" className="sh-logo" id="sh-logo-link">
             <div className="sh-logo__icon">
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="EMAHU Logo">
-                <rect width="32" height="32" rx="10" fill="url(#shLogoGrad)" />
-                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-                <defs>
-                  <linearGradient id="shLogoGrad" x1="0" y1="0" x2="32" y2="32">
-                    <stop stopColor="#5a7ef5" />
-                    <stop offset="1" stopColor="#2b4594" />
-                  </linearGradient>
-                </defs>
+                <rect width="32" height="32" rx="10" fill="#4169e1" />
+                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
               </svg>
               <div className="sh-logo__icon-glow" />
             </div>

@@ -13,9 +13,9 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the Earth in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
+  const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const d = R * c; // Distance in km
@@ -49,7 +49,7 @@ async function generateAndSaveDeliveryOtp(order) {
 function detectCityAndState(address) {
   if (!address || typeof address !== 'string') return { city: '', state: '' };
   const lower = address.toLowerCase();
-  
+
   const list = [
     // Gujarat cities and common neighborhoods
     { city: 'Ahmedabad', state: 'Gujarat', aliases: ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad nagar', 'sg highway', 'sindhu bhavan', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav'] },
@@ -76,7 +76,7 @@ function detectCityAndState(address) {
     { city: 'Chandigarh', state: 'Punjab', aliases: ['chandigarh', 'mohali', 'panchkula'] },
     { city: 'Ahmedabad', state: 'Gujarat', aliases: ['gandhinagar', 'sanand'] }  // satellite cities
   ];
-  
+
   for (const item of list) {
     const searchTerms = item.aliases || [item.city];
     for (const term of searchTerms) {
@@ -149,19 +149,19 @@ exports.getDeliverySettings = async (req, res) => {
 exports.updateDeliverySettings = async (req, res) => {
   try {
     const { maxDeliveryDistance, expressDeliverySurcharge, slabs } = req.body;
-    
+
     let settings = await DeliverySetting.findOne();
     if (!settings) {
       settings = new DeliverySetting();
     }
-    
+
     if (maxDeliveryDistance !== undefined) settings.maxDeliveryDistance = maxDeliveryDistance;
 
     if (expressDeliverySurcharge !== undefined) settings.expressDeliverySurcharge = expressDeliverySurcharge;
     if (slabs !== undefined) settings.slabs = slabs;
-    
+
     await settings.save();
-    
+
     // Log admin action
     const AuditLog = require('../models/AuditLog');
     try {
@@ -175,7 +175,7 @@ exports.updateDeliverySettings = async (req, res) => {
     } catch (logErr) {
       console.error('Failed to log update delivery settings to AuditLog:', logErr);
     }
-    
+
     res.status(200).json({
       success: true,
       message: 'Delivery settings updated successfully',
@@ -202,14 +202,14 @@ exports.getHaversineDistance = getHaversineDistance;
 exports.calculateDeliveryCharge = async (req, res) => {
   try {
     const { buyerLat, buyerLon, cartItems } = req.body;
-    
+
     if (buyerLat === undefined || buyerLon === undefined || !cartItems || !cartItems.length) {
       return res.status(400).json({
         success: false,
         error: 'Please provide buyerLat, buyerLon, and cartItems list'
       });
     }
-    
+
     // Get settings
     let settings = await DeliverySetting.findOne();
     if (!settings) {
@@ -226,13 +226,13 @@ exports.calculateDeliveryCharge = async (req, res) => {
         ]
       });
     }
-    
+
     const results = [];
     let overallError = null;
-    
+
     // Process items. Group them by seller for distance-based delivery charge
     const sellerGroups = {};
-    
+
     for (const item of cartItems) {
       const prodId = item.productId || item.id;
       const product = await Product.findById(prodId).populate('seller');
@@ -242,7 +242,7 @@ exports.calculateDeliveryCharge = async (req, res) => {
           error: `Product with ID ${prodId} not found`
         });
       }
-      
+
       const seller = product.seller;
       if (!seller) {
         return res.status(400).json({
@@ -250,7 +250,7 @@ exports.calculateDeliveryCharge = async (req, res) => {
           error: `Product "${product.name}" does not have an assigned seller`
         });
       }
-      
+
       const sId = seller._id.toString();
       if (!sellerGroups[sId]) {
         sellerGroups[sId] = {
@@ -263,7 +263,7 @@ exports.calculateDeliveryCharge = async (req, res) => {
           items: []
         };
       }
-      
+
       const qty = item.quantity || 1;
       sellerGroups[sId].subtotal += product.price * qty;
       sellerGroups[sId].items.push({
@@ -273,18 +273,18 @@ exports.calculateDeliveryCharge = async (req, res) => {
         quantity: qty
       });
     }
-    
+
     let maxDistance = 0;
     let maxDistanceSellerId = null;
     const sellerDistances = {};
-    
+
     for (const sId in sellerGroups) {
       const group = sellerGroups[sId];
-      
+
       // Default fallback if seller has no coordinates: Ahmedabad (23.0225, 72.5714)
       const sLat = group.sellerLat !== undefined ? group.sellerLat : 23.0225;
       const sLon = group.sellerLon !== undefined ? group.sellerLon : 72.5714;
-      
+
       const googleDist = await getGoogleMapsDistance(sLat, sLon, buyerLat, buyerLon);
       const distance = googleDist ? googleDist.distanceKm : getHaversineDistance(buyerLat, buyerLon, sLat, sLon);
       sellerDistances[sId] = distance;
@@ -292,13 +292,13 @@ exports.calculateDeliveryCharge = async (req, res) => {
         maxDistance = distance;
       }
     }
-    
+
     let totalDeliveryCharge = 0;
 
     for (const sId in sellerGroups) {
       const group = sellerGroups[sId];
       const distance = sellerDistances[sId];
-      
+
       const chargeResult = resolveCharge(distance, group.subtotal, settings);
       if (chargeResult.error) {
         return res.status(400).json({
@@ -306,10 +306,10 @@ exports.calculateDeliveryCharge = async (req, res) => {
           error: `Delivery calculation failed for seller "${group.sellerName}": ${chargeResult.error}`
         });
       }
-      
+
       const sellerCharge = chargeResult.charge;
       totalDeliveryCharge += sellerCharge;
-      
+
       results.push({
         sellerId: sId,
         sellerName: group.sellerName,
@@ -319,7 +319,7 @@ exports.calculateDeliveryCharge = async (req, res) => {
         items: group.items
       });
     }
-    
+
     res.status(200).json({
       success: true,
       buyerLocation: { latitude: buyerLat, longitude: buyerLon },
@@ -342,7 +342,7 @@ exports.calculateDeliveryCharge = async (req, res) => {
 exports.assignOrderToPartner = async (req, res) => {
   try {
     const { orderId, deliveryPartnerId } = req.body;
-    
+
     if (!orderId || !deliveryPartnerId) {
       return res.status(400).json({ success: false, error: 'Please provide orderId and deliveryPartnerId' });
     }
@@ -435,10 +435,10 @@ exports.assignOrderToPartner = async (req, res) => {
     order.status = 'DELIVERY_ASSIGNED';
     order.deliveryCost = totalCost;
     order.deliveryCharge = totalCost;
-    
+
     // Generate and save secure OTP immediately on assignment
     await generateAndSaveDeliveryOtp(order);
-    
+
     const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     order.timeline.push({
       status: 'DELIVERY_ASSIGNED',
@@ -446,7 +446,7 @@ exports.assignOrderToPartner = async (req, res) => {
       desc: `Order assigned to courier partner: ${partner.name}. Waiting for partner acceptance.`,
       date: dateStr
     });
-    
+
     await order.save();
 
     // Create or update DeliveryAssignment
@@ -558,7 +558,7 @@ exports.updateAssignmentStatus = async (req, res) => {
         order.deliveryPartnerId = partnerId;
         order.deliveryStatus = 'accepted';
         order.status = 'LABEL_GENERATED';
-        
+
         // Generate and save secure OTP immediately on self-assignment
         await generateAndSaveDeliveryOtp(order);
       } else if (status === 'rejected') {
@@ -647,7 +647,7 @@ exports.updateAssignmentStatus = async (req, res) => {
             const buyerEmail = order.deliveryAddress?.email;
             const buyerName = order.deliveryAddress?.fullName || 'Valued Customer';
             const sellerEmail = order.sellerEmail;
-            
+
             // Build items HTML list for the buyer's email
             let itemsHtml = '';
             if (order.items && order.items.length) {
@@ -671,7 +671,7 @@ exports.updateAssignmentStatus = async (req, res) => {
               timeStyle: 'short'
             });
 
-            const fullAddress = order.deliveryAddress?.address 
+            const fullAddress = order.deliveryAddress?.address
               ? `${order.deliveryAddress.address}, ${order.deliveryAddress.city || ''} - ${order.deliveryAddress.pincode || ''}`
               : 'N/A';
 
@@ -898,7 +898,7 @@ exports.getPartnerOrders = async (req, res) => {
     const assignedOrders = await Order.find({ orderId: { $in: assignedOrderIds } }).lean();
 
     const orders = [];
-    
+
     // Add assigned/interacted orders (excluding purely rejected ones to keep dashboard clean)
     for (const o of assignedOrders) {
       const status = assignmentMap[o.orderId];
@@ -965,7 +965,7 @@ exports.getDeliveryAnalytics = async (req, res) => {
     const activePartners = await User.countDocuments({ role: 'delivery', status: 'approved', isActivePartner: true });
     const completedDeliveries = await DeliveryAssignment.countDocuments({ currentStatus: 'delivered' });
     const pendingDeliveries = await DeliveryAssignment.countDocuments({ currentStatus: { $ne: 'delivered' } });
-    
+
     const revenueResult = await DeliveryAssignment.aggregate([
       { $match: { currentStatus: 'delivered' } },
       { $group: { _id: null, total: { $sum: '$deliveryCharge' } } }
@@ -1155,13 +1155,13 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
 // @access  Private (Admin only)
 exports.createDeliveryPartner = async (req, res) => {
   try {
-    const { 
-      name, 
-      email, 
-      password, 
-      phone, 
-      operatingLocation, 
-      vehicleType, 
+    const {
+      name,
+      email,
+      password,
+      phone,
+      operatingLocation,
+      vehicleType,
       vehicleNumber,
       currentCity,
       currentArea,
@@ -1183,7 +1183,7 @@ exports.createDeliveryPartner = async (req, res) => {
       coveredCities,
       deliveryScope
     } = req.body;
-    
+
     const userExists = await User.findOne({ email, role: 'delivery' });
     if (userExists) {
       return res.status(400).json({ success: false, error: 'User with this email already exists' });
@@ -1248,14 +1248,14 @@ exports.createDeliveryPartner = async (req, res) => {
 // @access  Private (Admin only)
 exports.updateDeliveryPartner = async (req, res) => {
   try {
-    const { 
-      name, 
-      email, 
-      phone, 
-      operatingLocation, 
-      vehicleType, 
-      vehicleNumber, 
-      isActivePartner, 
+    const {
+      name,
+      email,
+      phone,
+      operatingLocation,
+      vehicleType,
+      vehicleNumber,
+      isActivePartner,
       status,
       currentCity,
       currentArea,
@@ -1277,7 +1277,7 @@ exports.updateDeliveryPartner = async (req, res) => {
       coveredCities,
       deliveryScope
     } = req.body;
-    
+
     const partner = await User.findById(req.params.id);
     if (!partner || partner.role !== 'delivery') {
       return res.status(404).json({ success: false, error: 'Delivery partner not found' });
@@ -1292,7 +1292,7 @@ exports.updateDeliveryPartner = async (req, res) => {
     if (isActivePartner !== undefined) partner.isActivePartner = isActivePartner;
     if (status !== undefined) partner.status = status;
     if (address !== undefined) partner.address = address;
-    
+
     // Auto-detect currentCity on update if it is empty/undefined
     let resolvedCurrentCity = currentCity;
     if (resolvedCurrentCity === undefined || resolvedCurrentCity === '') {
@@ -1304,7 +1304,7 @@ exports.updateDeliveryPartner = async (req, res) => {
       }
     }
     if (resolvedCurrentCity !== undefined) partner.currentCity = resolvedCurrentCity;
-    
+
     if (currentArea !== undefined) partner.currentArea = currentArea;
     if (pincode !== undefined) partner.pincode = pincode;
     if (serviceRadius !== undefined) partner.serviceRadius = Number(serviceRadius);
@@ -1317,7 +1317,7 @@ exports.updateDeliveryPartner = async (req, res) => {
     if (rateAbove2Km !== undefined) partner.rateAbove2Km = Number(rateAbove2Km);
     if (latitude !== undefined) partner.latitude = Number(latitude);
     if (longitude !== undefined) partner.longitude = Number(longitude);
-    
+
     if (perKmRate !== undefined) {
       partner.perKmRate = Number(perKmRate);
       partner.perItemCharge = Number(perKmRate);
@@ -1326,7 +1326,7 @@ exports.updateDeliveryPartner = async (req, res) => {
     }
     if (coveredCities !== undefined) partner.coveredCities = coveredCities;
     if (deliveryScope !== undefined) partner.deliveryScope = deliveryScope;
-    
+
     if (salaryRequirement !== undefined) partner.salaryRequirement = salaryRequirement;
     if (serviceAreaCountry !== undefined) partner.serviceAreaCountry = serviceAreaCountry;
     if (serviceAreaRegion !== undefined) partner.serviceAreaRegion = serviceAreaRegion;
@@ -1374,18 +1374,18 @@ exports.deleteDeliveryPartner = async (req, res) => {
 // @access  Private (Delivery Partner only)
 exports.updatePartnerProfile = async (req, res) => {
   try {
-    const { 
-      currentCity, 
-      currentArea, 
-      pincode, 
-      serviceRadius, 
-      perItemCharge, 
+    const {
+      currentCity,
+      currentArea,
+      pincode,
+      serviceRadius,
+      perItemCharge,
       rateUpTo2Km,
       rateAbove2Km,
-      isActivePartner, 
-      vehicleType, 
-      vehicleNumber, 
-      latitude, 
+      isActivePartner,
+      vehicleType,
+      vehicleNumber,
+      latitude,
       longitude,
       operatingLocation,
       salaryRequirement,
@@ -1431,7 +1431,7 @@ exports.updatePartnerProfile = async (req, res) => {
     if (vehicleNumber !== undefined) partner.vehicleNumber = vehicleNumber;
     if (latitude !== undefined) partner.latitude = Number(latitude);
     if (longitude !== undefined) partner.longitude = Number(longitude);
-    
+
     if (perKmRate !== undefined) {
       partner.perKmRate = Number(perKmRate);
       partner.perItemCharge = Number(perKmRate);
@@ -1468,7 +1468,7 @@ async function notifyDeliveryCompleted(order, partner) {
     const buyerEmail = order.deliveryAddress?.email;
     const buyerName = order.deliveryAddress?.fullName || 'Valued Customer';
     const sellerEmail = order.sellerEmail;
-    
+
     // Build items HTML list for the buyer's email
     let itemsHtml = '';
     if (order.items && order.items.length) {
@@ -1492,7 +1492,7 @@ async function notifyDeliveryCompleted(order, partner) {
       timeStyle: 'short'
     });
 
-    const fullAddress = order.deliveryAddress?.address 
+    const fullAddress = order.deliveryAddress?.address
       ? `${order.deliveryAddress.address}, ${order.deliveryAddress.city || ''} - ${order.deliveryAddress.pincode || ''}`
       : 'N/A';
 
@@ -1709,7 +1709,7 @@ exports.getLiveTrackingDetails = async (req, res) => {
 
       const googleDist = await getGoogleMapsDistance(partnerLoc.latitude, partnerLoc.longitude, destLat, destLon);
       remainingDistance = googleDist ? googleDist.distanceKm : getHaversineDistance(partnerLoc.latitude, partnerLoc.longitude, destLat, destLon);
-      
+
       const durationSec = googleDist ? googleDist.durationSec : Math.round(remainingDistance * 2.4 * 60);
       etaMinutes = Math.max(1, Math.round(durationSec / 60));
     }
@@ -1951,16 +1951,16 @@ exports.verifyDeliveryOtp = async (req, res) => {
       order.platformFeePercent = feePercent;
       order.platformFeeAmount = feeAmount;
       order.sellerNetPayout = netPayout;
-      console.log(`[Auto Escrow Release] Order #${orderId} delivered via OTP. Funds released automatically to seller ${order.sellerId}: netPayout = ₹${netPayout}`);
+      console.log(`[Auto Emahu Release] Order #${orderId} delivered via OTP. Funds released automatically to seller ${order.sellerId}: netPayout = ₹${netPayout}`);
     } catch (payErr) {
-      console.error('[Auto Escrow Release Error]', payErr);
+      console.error('[Auto Emahu Release Error]', payErr);
     }
 
     const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     order.timeline.push({
       status: '🔓 FUNDS RELEASED',
       label: 'Delivered & Payment Released',
-      desc: `Package delivered successfully. Verified via secure OTP. Escrow funds automatically released to merchant.`,
+      desc: `Package delivered successfully. Verified via secure OTP. Emahu funds automatically released to merchant.`,
       date: dateStr
     });
     await order.save();

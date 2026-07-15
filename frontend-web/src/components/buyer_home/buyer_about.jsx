@@ -12,10 +12,10 @@ const buyerModules = [
     badge: '100% Verified Drops',
   },
   {
-    id: 'escrow',
-    title: 'Encrypted Escrow Vault',
+    id: 'Emahu',
+    title: 'Encrypted Emahu Vault',
     tagline: 'Zero-Risk Secure Payments',
-    desc: 'Your money is fully protected. When you buy, your payment is locked in a military-grade secure escrow vault. Funds are only routed to the seller after you confirm delivery and product satisfaction.',
+    desc: 'Your money is fully protected. When you buy, your payment is locked in a military-grade secure Emahu vault. Funds are only routed to the seller after you confirm delivery and product satisfaction.',
     badge: 'Encrypted Checkout',
   },
   {
@@ -54,7 +54,7 @@ export default function BuyerAbout() {
 
   const renderTabIcon = (id, isActive) => {
     const strokeColor = isActive ? 'currentColor' : '#64748b';
-    
+
     if (id === 'shield') {
       return (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -62,7 +62,7 @@ export default function BuyerAbout() {
         </svg>
       );
     }
-    if (id === 'escrow') {
+    if (id === 'Emahu') {
       return (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -99,7 +99,7 @@ export default function BuyerAbout() {
       </div>
 
       <div className="ba-container">
-        
+
         {/* Section Header */}
         <div className="ba-header">
           <span className="ba-header__badge">Emahu Assurance</span>
@@ -111,7 +111,7 @@ export default function BuyerAbout() {
 
         {/* Dashboard Panels */}
         <div className="ba-dashboard">
-          
+
           {/* Left Panel: Tabs Control */}
           <div className="ba-controls">
             <div className="ba-controls__list">
@@ -145,7 +145,7 @@ export default function BuyerAbout() {
               <div className="ba-canvas__plate" />
 
               <div className={`ba-visual-container ${animateState ? 'ba-visual-container--active' : ''}`}>
-                
+
                 {/* 🛡️ TAB 1: 100% Quality Inspected */}
                 {activeTab === 'shield' && (
                   <div className="ba-vis">
@@ -157,7 +157,7 @@ export default function BuyerAbout() {
                         </div>
                         <span className="ba-console__badge-pill">99.8% Index</span>
                       </div>
-                      
+
                       <div className="ba-console__body">
                         <div className="ba-console__metric">
                           <span className="ba-console__metric-lbl">BATCH INSPECTION STATUS</span>
@@ -180,12 +180,12 @@ export default function BuyerAbout() {
                   </div>
                 )}
 
-                {/* 💳 TAB 2: Encrypted Escrow Vault */}
-                {activeTab === 'escrow' && (
+                {/* 💳 TAB 2: Encrypted Emahu Vault */}
+                {activeTab === 'Emahu' && (
                   <div className="ba-vis">
                     <div className="ba-pipeline">
                       <div className="ba-pipeline__header">
-                        <span className="ba-pipeline__title">ESCROW PROTECTION ROUTER</span>
+                        <span className="ba-pipeline__title">Emahu PROTECTION ROUTER</span>
                         <span className="ba-pipeline__badge">VAULT LOCKED</span>
                       </div>
 
@@ -194,7 +194,7 @@ export default function BuyerAbout() {
                           <div className="ba-step__circle">1</div>
                           <span className="ba-step__lbl">Paid</span>
                         </div>
-                        
+
                         <div className="ba-flow__line ba-flow__line--active" />
 
                         <div className="ba-flow__step ba-flow__step--success">
@@ -222,7 +222,7 @@ export default function BuyerAbout() {
                         </div>
                         <div className="ba-ledger__footer">
                           <span className="ba-ledger__status-dot" />
-                          <span className="ba-ledger__status-txt">Protected by Emahu Escrow Guarantee</span>
+                          <span className="ba-ledger__status-txt">Protected by Emahu Emahu Guarantee</span>
                         </div>
                       </div>
                     </div>

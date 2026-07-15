@@ -53,7 +53,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: 
+  background-image:
     linear-gradient(rgba(65, 105, 225, 0.02) 1px, transparent 1px),
     linear-gradient(90deg, rgba(65, 105, 225, 0.02) 1px, transparent 1px);
   background-size: 40px 40px;
@@ -270,8 +270,15 @@
 }
 
 @keyframes baFadeIn {
-  from { opacity: 0; transform: translateY(12px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* 🛡️ VISUAL 1: QUALITY SHIELD CONSOLE */
@@ -310,9 +317,20 @@
 }
 
 @keyframes baPulse {
-  0% { transform: scale(0.9); opacity: 0.6; }
-  50% { transform: scale(1.2); opacity: 1; }
-  100% { transform: scale(0.9); opacity: 0.6; }
+  0% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
 }
 
 .ba-console__status {
@@ -390,7 +408,7 @@
   color: var(--accent-secondary, #12b7b2);
 }
 
-/* 💳 VISUAL 2: ESCROW PIPELINE */
+/* 💳 VISUAL 2: Emahu PIPELINE */
 .ba-pipeline {
   background-color: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.05);
@@ -498,8 +516,13 @@
 }
 
 @keyframes baSlideFlow {
-  from { left: 0%; }
-  to { left: 100%; }
+  from {
+    left: 0%;
+  }
+
+  to {
+    left: 100%;
+  }
 }
 
 .ba-ledger {

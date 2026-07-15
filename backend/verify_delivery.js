@@ -25,7 +25,7 @@ async function requestAndVerifyOtp(email) {
   if (!sendData.success) throw new Error(`Send OTP failed for ${email}: ${sendData.error}`);
   const otp = sendData.devOtp;
   if (!otp) throw new Error(`devOtp not returned in response. Make sure NODE_ENV=development`);
-  
+
   const verifyRes = await fetch(`${BASE_URL}/api/auth/verify-otp`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -38,7 +38,7 @@ async function requestAndVerifyOtp(email) {
 async function runTests() {
   console.log('🚀 Starting Integration Tests for Delivery Management System...');
   const testId = Date.now();
-  
+
   // Credentials
   const buyerEmail = `test_buyer_${testId}@emahu.com`;
   const sellerEmail = `test_seller_${testId}@emahu.com`;
@@ -102,7 +102,7 @@ async function runTests() {
     });
     const adminRegData = await adminReg.json();
     if (!adminRegData.success) throw new Error('Admin registration failed: ' + adminRegData.error);
-    
+
     const adminLogin = await fetch(`${BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -275,7 +275,7 @@ async function runTests() {
         productAmount: 5000,
         distanceKm: 12.5, // 12.5 KM
         shippingSpeed: 'standard',
-        escrowMethod: 'wallet',
+        EmahuMethod: 'wallet',
         deliveryAddress: {
           fullName: 'Amit Patel',
           phone: '9998887776',
@@ -292,7 +292,7 @@ async function runTests() {
     const orderAhdData = await orderAhdRes.json();
     orderAhdId = orderAhdData.order.orderId;
     console.log(`✅ Ahmedabad Order Created. ID: ${orderAhdId}. Delivery Charge: ₹${orderAhdData.order.deliveryCharge}`);
-    
+
     // Verify distance calculation billing (12.5 KM * ₹2 = ₹25)
     if (orderAhdData.order.deliveryCharge !== 25) {
       throw new Error(`Expected delivery charge to be ₹25 (12.5 KM * ₹2), but got ₹${orderAhdData.order.deliveryCharge}`);
@@ -311,7 +311,7 @@ async function runTests() {
         productAmount: 15000,
         distanceKm: 8.0, // 8.0 KM
         shippingSpeed: 'standard',
-        escrowMethod: 'wallet',
+        EmahuMethod: 'wallet',
         deliveryAddress: {
           fullName: 'Bhavin Shah',
           phone: '9998887775',
@@ -633,7 +633,7 @@ async function runTests() {
     try {
       const mongoose = require('mongoose');
       await mongoose.disconnect();
-    } catch (_) {}
+    } catch (_) { }
     process.exit(1);
   }
 }

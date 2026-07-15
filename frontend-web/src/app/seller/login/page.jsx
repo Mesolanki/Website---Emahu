@@ -20,6 +20,7 @@ export default function SellerLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [hasOpenedTerms, setHasOpenedTerms] = useState(false);
 
   // If already logged in, redirect directly to the seller dashboard (unless expired)
   useEffect(() => {
@@ -116,19 +117,19 @@ export default function SellerLogin() {
       <div className="sl-sparkle sl-sparkle--2" />
 
       <div className="sl-container">
-        
+
         {/* Left Side: Brand Cinematic Welcome Panel */}
         <div className="sl-brand-card">
           <div className="sl-brand-card__overlay" />
           <div className="sl-brand-card__content">
             <Link href="/" className="sl-logo">
               <svg width="40" height="40" viewBox="0 0 32 32" fill="none">
-                <rect width="32" height="32" rx="10" fill="white" />
-                <path d="M8 12h16M8 16h12M8 20h14" stroke="#2b4594" strokeWidth="2.2" strokeLinecap="round" />
+                <rect width="32" height="32" rx="10" fill="#4169e1" />
+                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
               </svg>
               <span className="sl-logo__text">EMAHU</span>
             </Link>
-            
+
             <div className="sl-brand-card__hero-text">
               <h1 className="sl-brand-card__title">Empower Your Business Today.</h1>
               <p className="sl-brand-card__desc">
@@ -182,7 +183,7 @@ export default function SellerLogin() {
           )}
 
           <form className="sl-form" onSubmit={handleSubmit}>
-            
+
             {/* Input Group: Phone/Email */}
             <div className="sl-input-group">
               <label className="sl-label" htmlFor="sl-email">Phone Number or Email</label>
@@ -242,15 +243,23 @@ export default function SellerLogin() {
 
             {/* Terms & Conditions Checkbox */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '12px 0 8px 0', padding: '0 2px' }}>
-              <input 
+              <input
                 id="agree-portal-terms"
-                type="checkbox" 
+                type="checkbox"
                 checked={agreeTerms}
                 onChange={(e) => setAgreeTerms(e.target.checked)}
-                style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
+                disabled={!hasOpenedTerms}
+                style={{ width: '16px', height: '16px', marginTop: '2px', cursor: hasOpenedTerms ? 'pointer' : 'not-allowed' }}
               />
-              <label htmlFor="agree-portal-terms" style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
-                I agree to the <a href="#" onClick={(e) => { e.preventDefault(); alert("EMAHU Seller Terms & Partner Conditions: By signing in, you agree to list genuine verified products, fulfill shipments within standard delivery periods, and process returns in compliance with our safety protocol."); }} style={{ color: '#60a5fa', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+              <label htmlFor="agree-portal-terms" style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', cursor: hasOpenedTerms ? 'pointer' : 'not-allowed', userSelect: 'none' }}>
+                <span style={{ color: hasOpenedTerms ? '#cbd5e1' : '#a0aec0' }}>
+                  I agree to the <a href="#" onClick={(e) => { e.preventDefault(); setHasOpenedTerms(true); alert("EMAHU Seller Agreement & Liability Disclaimer:\n\n1. PLATFORM ROLE: EMAHU acts solely as a matching portal and technology facilitator connecting sellers, buyers, and delivery partners. We do not own, inspect, handle, or guarantee any merchant listings or physical transactions.\n2. NO LIABILITY: Under no circumstances shall EMAHU, its owners, or developers be liable for direct, indirect, or consequential damages, loss of business, payment disputes, chargebacks, or inventory damage.\n3. LEGAL COMPLIANCE: Sellers are independent businesses and solely responsible for local taxes, product safety, licensing, and compliance. Any illegal, prohibited, or out-of-stock items listed will lead to permanent termination and forfeit of pending Emahubalances to buyers.\n4. EmahuRELEASES: Payments are held in secure Emahuand released to you only after successful delivery OTP validation by the courier. Emahudisputes will be handled by the team, and our decision is final and binding."); }} style={{ color: '#60a5fa', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+                </span>
+                {!hasOpenedTerms && (
+                  <span style={{ color: '#f87171', display: 'block', fontSize: '0.72rem', marginTop: '4px', fontWeight: '600' }}>
+                    ⚠️ Please click and read the Terms link first to unlock this checkbox.
+                  </span>
+                )}
               </label>
             </div>
 

@@ -52,18 +52,18 @@ const sellerServesLocation = (seller, city) => {
       const bLon = parseFloat(coords.longitude);
       const sLat = parseFloat(seller.latitude);
       const sLon = parseFloat(seller.longitude);
-      
+
       if (!isNaN(bLat) && !isNaN(bLon) && !isNaN(sLat) && !isNaN(sLon)) {
         const R = 6371; // km
         const dLat = (sLat - bLat) * Math.PI / 180;
         const dLon = (sLon - bLon) * Math.PI / 180;
-        const a = 
+        const a =
           Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) * 
+          Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) *
           Math.sin(dLon / 2) * Math.sin(dLon / 2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         const distance = R * c;
-        
+
         if (distance <= 30) {
           return true;
         }
@@ -74,7 +74,7 @@ const sellerServesLocation = (seller, city) => {
   }
 
   const sellerCity = (seller.city || seller.currentCity || seller.location || seller.address || '').toLowerCase().trim();
-  
+
   // Check if seller delivers to All India/India (coveredCities has All India)
   const coveredCities = Array.isArray(seller.coveredCities)
     ? seller.coveredCities.map(c => c.toLowerCase().trim())
@@ -212,7 +212,7 @@ export default function CartPage() {
             setBuyerCity(storedCity);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   }, []);
 
@@ -423,7 +423,7 @@ export default function CartPage() {
         });
         localStorage.setItem('emahu_cart', JSON.stringify(currentCart));
         window.dispatchEvent(new Event('storage'));
-        
+
         loadCartAndProducts();
       }
     } catch (err) {
@@ -490,7 +490,7 @@ export default function CartPage() {
             const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || '';
             const stateVal = data.address.state || '';
             const postcodeVal = data.address.postcode || data.address.postal || '';
-            
+
             const road = data.address.road || '';
             const suburb = data.address.suburb || data.address.neighbourhood || '';
             const parts = [road, suburb, cityVal, stateVal].filter(Boolean);
@@ -508,7 +508,7 @@ export default function CartPage() {
             localStorage.setItem('emahu_buyer_pincode', postcodeVal);
             localStorage.setItem('emahu_buyer_full_address', fullAddr);
           }
-        } catch (_) {}
+        } catch (_) { }
       },
       (err) => {
         console.error('GPS error:', err);
@@ -596,7 +596,7 @@ export default function CartPage() {
         let buyerUserId = '';
         const buyerUserStr = localStorage.getItem('emahu_buyer_user');
         if (buyerUserStr) {
-          try { buyerUserId = JSON.parse(buyerUserStr).id || JSON.parse(buyerUserStr)._id || ''; } catch (e) {}
+          try { buyerUserId = JSON.parse(buyerUserStr).id || JSON.parse(buyerUserStr)._id || ''; } catch (e) { }
         }
         if (!buyerUserId) {
           let guestId = localStorage.getItem('emahu_guest_id');
@@ -663,7 +663,7 @@ export default function CartPage() {
               pincode: localStorage.getItem('emahu_buyer_pincode') || '380001'
             },
             shippingSpeed: 'standard',
-            escrowMethod: 'wallet'
+            EmahuMethod: 'wallet'
           });
         });
 
@@ -700,7 +700,7 @@ export default function CartPage() {
           <div>
             <h1 className="cart-title">Your Secure Shopping Cart</h1>
             <p className="cart-subtitle">
-              All orders are routed via localized physical verification hubs and protected in locked Escrow vaults.
+              All orders are routed via localized physical verification hubs and protected in locked Emahu vaults.
             </p>
           </div>
           {cartItems.length > 0 && (
@@ -901,7 +901,7 @@ export default function CartPage() {
               {/* ── GPS Location Detection ── */}
               <div style={{ marginBottom: '16px', padding: '14px', background: 'rgba(65,105,225,0.06)', borderRadius: '10px', border: '1px solid rgba(65,105,225,0.15)' }}>
                 <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#4169e1', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4169e1" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4169e1" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
                   DELIVERY LOCATION
                 </div>
 
@@ -911,7 +911,7 @@ export default function CartPage() {
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
                           Location Pin Verified
                         </div>
                         <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: '600', lineHeight: 1.5 }}>
@@ -955,12 +955,12 @@ export default function CartPage() {
                       </>
                     ) : buyerCoordinates.latitude ? (
                       <>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
                         Update Location
                       </>
                     ) : (
                       <>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
                         Detect My Location
                       </>
                     )}
@@ -1013,7 +1013,7 @@ export default function CartPage() {
                     )}
                   </span>
                   <strong>
-                                        {deliveryCalculating ? (
+                    {deliveryCalculating ? (
                       <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>calculating...</span>
                     ) : (
                       shippingFee === 0 ? <span style={{ color: '#16a34a', fontWeight: '700' }}>FREE Delivery</span> : `₹${shippingFee}`
@@ -1034,8 +1034,8 @@ export default function CartPage() {
                   </div>
                 )}
 
-                <div 
-                  className="cart-summary-row" 
+                <div
+                  className="cart-summary-row"
                   onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
                   style={{ cursor: 'pointer', userSelect: 'none' }}
                 >
@@ -1084,10 +1084,10 @@ export default function CartPage() {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: '#dc2626', color: '#fff', fontSize: '0.75rem', fontWeight: 'bold' }}>!</span>
-                    <strong style={{ color: '#dc2626' }}>Escrow Vault Confirmation Required</strong>
+                    <strong style={{ color: '#dc2626' }}>Emahu Vault Confirmation Required</strong>
                   </div>
                   Please inspect and confirm delivery of your arrived order <strong>#{deliveredOrderId}</strong> before placing any new orders.
-                  <button 
+                  <button
                     onClick={() => window.location.href = '/buyer/orders'}
                     style={{
                       marginTop: '10px',
@@ -1110,7 +1110,7 @@ export default function CartPage() {
                 </div>
               )}
 
-              <button 
+              <button
                 onClick={(e) => {
                   if (hasDeliveredOrder) {
                     e.preventDefault();
@@ -1125,7 +1125,7 @@ export default function CartPage() {
                   window.location.href = '/buyer/checkout';
                 }}
                 disabled={hasDeliveredOrder}
-                className="cart-checkout-btn" 
+                className="cart-checkout-btn"
                 style={{
                   textDecoration: 'none',
                   display: 'flex',
@@ -1151,7 +1151,7 @@ export default function CartPage() {
         )}
       </main>
 
-      {/* ─── SECURE ESCROW CHECKOUT MODAL OVERLAY ─── */}
+      {/* ─── SECURE Emahu CHECKOUT MODAL OVERLAY ─── */}
       {checkoutStep !== 'idle' && (
         <div className="cart-modal-overlay">
           <div className="cart-modal">
@@ -1166,7 +1166,7 @@ export default function CartPage() {
                   </svg>
                 </div>
                 <h2>Securing Vault Lock Pipeline...</h2>
-                <p>Transferring payment of <strong>₹{grandTotal.toLocaleString('en-IN')}</strong> safely into military-grade escrow holdings vault.</p>
+                <p>Transferring payment of <strong>₹{grandTotal.toLocaleString('en-IN')}</strong> safely into military-grade Emahu holdings vault.</p>
                 <div className="cart-progress-bar">
                   <div className="cart-progress-fill" />
                 </div>
@@ -1180,7 +1180,7 @@ export default function CartPage() {
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </div>
-                <h2>Escrow Transaction Locked!</h2>
+                <h2>Emahu Transaction Locked!</h2>
                 <p className="cart-success-desc">
                   Your funds are secured completely! The merchant has been ordered to dispatch the delivery. Funds are locked and will be sent to the merchant only after your doorstep delivery approval check.
                 </p>

@@ -5,11 +5,13 @@
 .sa-section {
   position: relative;
   width: 100%;
-  background: #f8fafc; /* Sleek, crisp slate-white background */
+  background: #f8fafc;
+  /* Sleek, crisp slate-white background */
   padding: 120px 24px;
   overflow: hidden;
   font-family: 'Inter', sans-serif;
-  color: #0f172a; /* Slate dark text */
+  color: #0f172a;
+  /* Slate dark text */
   border-bottom: 1px solid rgba(15, 23, 42, 0.05);
 }
 
@@ -136,7 +138,7 @@
   cursor: pointer;
   outline: none;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(15, 23, 42, 0.01),
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
@@ -145,7 +147,7 @@
   background: rgba(255, 255, 255, 0.95);
   border-color: rgba(15, 23, 42, 0.1);
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 12px 24px -10px rgba(15, 23, 42, 0.04),
     0 0 1px rgba(15, 23, 42, 0.05);
 }
@@ -153,7 +155,7 @@
 .sa-tab-btn--active {
   background: #ffffff;
   border-color: rgba(15, 23, 42, 0.08);
-  box-shadow: 
+  box-shadow:
     0 20px 40px -12px rgba(15, 23, 42, 0.06),
     0 0 1px rgba(15, 23, 42, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -164,12 +166,15 @@
 .sa-tab-btn--shield.sa-tab-btn--active {
   border-left: 4px solid #2563eb;
 }
-.sa-tab-btn--escrow.sa-tab-btn--active {
+
+.sa-tab-btn--Emahu.sa-tab-btn--active {
   border-left: 4px solid #16a34a;
 }
+
 .sa-tab-btn--catalog.sa-tab-btn--active {
   border-left: 4px solid #4f46e5;
 }
+
 .sa-tab-btn--logistics.sa-tab-btn--active {
   border-left: 4px solid #ea580c;
 }
@@ -191,10 +196,21 @@
   opacity: 1;
 }
 
-.sa-tab-btn--shield .sa-tab-btn__indicator { background: #2563eb; }
-.sa-tab-btn--escrow .sa-tab-btn__indicator { background: #16a34a; }
-.sa-tab-btn--catalog .sa-tab-btn__indicator { background: #4f46e5; }
-.sa-tab-btn--logistics .sa-tab-btn__indicator { background: #ea580c; }
+.sa-tab-btn--shield .sa-tab-btn__indicator {
+  background: #2563eb;
+}
+
+.sa-tab-btn--Emahu .sa-tab-btn__indicator {
+  background: #16a34a;
+}
+
+.sa-tab-btn--catalog .sa-tab-btn__indicator {
+  background: #4f46e5;
+}
+
+.sa-tab-btn--logistics .sa-tab-btn__indicator {
+  background: #ea580c;
+}
 
 /* Icon Container inside buttons */
 .sa-tab-btn__icon {
@@ -221,7 +237,7 @@
   color: #2563eb;
 }
 
-.sa-tab-btn--escrow.sa-tab-btn--active .sa-tab-btn__icon {
+.sa-tab-btn--Emahu.sa-tab-btn--active .sa-tab-btn__icon {
   background: rgba(22, 163, 74, 0.08);
   border-color: rgba(22, 163, 74, 0.15);
   color: #16a34a;
@@ -286,7 +302,7 @@
   border-radius: 28px;
   padding: 44px;
   overflow: hidden;
-  box-shadow: 
+  box-shadow:
     0 30px 60px -15px rgba(15, 23, 42, 0.04),
     0 0 0 1px rgba(15, 23, 42, 0.02),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -300,7 +316,7 @@
 .sa-canvas__plate {
   position: absolute;
   inset: 0;
-  background: 
+  background:
     radial-gradient(circle at top right, rgba(37, 99, 235, 0.04), transparent 60%),
     radial-gradient(circle at bottom left, rgba(79, 70, 229, 0.03), transparent 60%);
   pointer-events: none;
@@ -308,10 +324,21 @@
 }
 
 /* Dynamic active state borders */
-.sa-canvas--shield { border-color: rgba(37, 99, 235, 0.15); }
-.sa-canvas--escrow { border-color: rgba(22, 163, 74, 0.15); }
-.sa-canvas--catalog { border-color: rgba(79, 70, 229, 0.15); }
-.sa-canvas--logistics { border-color: rgba(234, 88, 12, 0.15); }
+.sa-canvas--shield {
+  border-color: rgba(37, 99, 235, 0.15);
+}
+
+.sa-canvas--Emahu {
+  border-color: rgba(22, 163, 74, 0.15);
+}
+
+.sa-canvas--catalog {
+  border-color: rgba(79, 70, 229, 0.15);
+}
+
+.sa-canvas--logistics {
+  border-color: rgba(234, 88, 12, 0.15);
+}
 
 /* Animated visual container */
 .sa-visual-container {
@@ -496,26 +523,42 @@
 }
 
 @keyframes beaconPulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.4); opacity: 0.4; }
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.4);
+    opacity: 0.4;
+  }
 }
 
 @keyframes floatShield {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-8px) scale(1.03); }
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-8px) scale(1.03);
+  }
 }
 
 
 /* ==========================================================================
-   💼 2. ESCROW STYLES: Settlement Payout Pipeline
+   💼 2. Emahu STYLES: Settlement Payout Pipeline
    ========================================================================== */
 
-.sa-vis--escrow {
+.sa-vis--Emahu {
   max-width: 480px;
   width: 100%;
 }
 
-.sa-escrow-terminal {
+.sa-Emahu-terminal {
   width: 100%;
   background: #f8fafc;
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -619,8 +662,13 @@
 }
 
 @keyframes flowPulse {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 /* Ledger Box */
@@ -722,7 +770,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 .sa-input__icon {
@@ -742,9 +790,17 @@
 }
 
 @keyframes studioSweep {
-  0% { top: 5%; }
-  50% { top: 92%; }
-  100% { top: 5%; }
+  0% {
+    top: 5%;
+  }
+
+  50% {
+    top: 92%;
+  }
+
+  100% {
+    top: 5%;
+  }
 }
 
 /* Divider Arrow */
@@ -759,8 +815,17 @@
 }
 
 @keyframes sparkPulse {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(1.2) rotate(180deg); opacity: 1; }
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: scale(1.2) rotate(180deg);
+    opacity: 1;
+  }
 }
 
 /* Studio Output Pane */
@@ -777,8 +842,18 @@
 }
 
 @keyframes previewFade {
-  0%, 100% { opacity: 0.2; transform: scale(0.97); }
-  45%, 55% { opacity: 1; transform: scale(1); }
+
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.97);
+  }
+
+  45%,
+  55% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .sa-output__header {
@@ -997,14 +1072,17 @@
   background: rgba(37, 99, 235, 0.06);
   color: #2563eb;
 }
-.sa-canvas--escrow .sa-info__badge {
+
+.sa-canvas--Emahu .sa-info__badge {
   background: rgba(22, 163, 74, 0.06);
   color: #16a34a;
 }
+
 .sa-canvas--catalog .sa-info__badge {
   background: rgba(79, 70, 229, 0.06);
   color: #4f46e5;
 }
+
 .sa-canvas--logistics .sa-info__badge {
   background: rgba(234, 88, 12, 0.06);
   color: #ea580c;
@@ -1037,7 +1115,7 @@
     max-width: 100%;
     min-width: 0;
   }
-  
+
   .sa-controls__list {
     flex-direction: row;
     overflow-x: auto;
@@ -1051,7 +1129,7 @@
   .sa-controls__list::-webkit-scrollbar {
     display: none;
   }
-  
+
   .sa-tab-btn {
     flex: 0 0 280px;
     scroll-snap-align: start;

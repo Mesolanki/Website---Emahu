@@ -23,14 +23,8 @@ export default function SellerFooter() {
           <div className="sff-brand">
             <Link href="/" className="sff-logo">
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <rect width="32" height="32" rx="10" fill="url(#sffLogoGrad)" />
-                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-                <defs>
-                  <linearGradient id="sffLogoGrad" x1="0" y1="0" x2="32" y2="32">
-                    <stop stopColor="#5a7ef5" />
-                    <stop offset="1" stopColor="#2b4594" />
-                  </linearGradient>
-                </defs>
+                <rect width="32" height="32" rx="10" fill="#4169e1" />
+                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
               </svg>
               <div className="sff-logo__text">
                 <span className="sff-logo__brand">EMAHU</span>

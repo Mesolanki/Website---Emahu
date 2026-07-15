@@ -305,8 +305,8 @@ export default function ForgotPassword() {
         <div className="fp-header">
           <Link href="/" className="fp-logo">
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="10" fill="#6366f1" />
-              <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+              <rect width="32" height="32" rx="10" fill="#4169e1" />
+              <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
             </svg>
             <span className="fp-logo-text">EMAHU</span>
           </Link>

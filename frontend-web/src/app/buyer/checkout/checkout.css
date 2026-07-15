@@ -17,11 +17,13 @@
   font-size: 0.8rem;
   color: #64748b;
 }
+
 .co-breadcrumb a {
   color: #64748b;
   text-decoration: none;
   transition: color 0.2s ease;
 }
+
 .co-breadcrumb a:hover {
   color: #4169e1;
   text-decoration: underline;
@@ -66,6 +68,7 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
   transition: all 0.2s ease;
 }
+
 .co-form-bento:hover {
   border-color: #cbd5e1;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.03);
@@ -106,6 +109,7 @@
   width: 100%;
   margin-bottom: 16px;
 }
+
 .co-input-group:last-child {
   margin-bottom: 0;
 }
@@ -128,6 +132,7 @@
   background-color: #ffffff;
   transition: all 0.2s ease;
 }
+
 .co-input-group input:focus {
   border-color: #4169e1;
   box-shadow: 0 0 0 3px rgba(65, 105, 225, 0.1);
@@ -162,10 +167,12 @@
   background: #ffffff;
   transition: all 0.2s ease;
 }
+
 .co-shipping-card:hover {
   border-color: #cbd5e1;
   transform: translateY(-1px);
 }
+
 .co-shipping-card--selected {
   border-color: #4169e1 !important;
   background-color: rgba(65, 105, 225, 0.02);
@@ -184,6 +191,7 @@
   margin-top: 2px;
   transition: all 0.2s ease;
 }
+
 .co-shipping-card--selected .co-shipping-radio {
   border-color: #4169e1;
 }
@@ -195,6 +203,7 @@
   background-color: transparent;
   transition: all 0.2s ease;
 }
+
 .co-shipping-card--selected .co-shipping-radio-dot {
   background-color: #4169e1;
 }
@@ -209,10 +218,12 @@
   align-items: center;
   margin-bottom: 4px;
 }
+
 .co-shipping-title-row strong {
   font-size: 0.95rem;
   color: #0f172a;
 }
+
 .co-shipping-title-row span {
   font-size: 0.9rem;
   font-weight: 800;
@@ -226,8 +237,8 @@
   line-height: 1.4;
 }
 
-/* Escrow Lock Payment Method Cards */
-.co-escrow-methods {
+/* Emahu Lock Payment Method Cards */
+.co-Emahu-methods {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
@@ -248,27 +259,32 @@
   text-align: center;
   transition: all 0.2s ease;
 }
+
 .co-method-tab:hover {
   border-color: #cbd5e1;
 }
+
 .co-method-tab--selected {
   border-color: #4169e1 !important;
   background-color: rgba(65, 105, 225, 0.02);
   color: #4169e1;
 }
+
 .co-method-tab svg {
   color: #64748b;
   transition: color 0.2s ease;
 }
+
 .co-method-tab--selected svg {
   color: #4169e1;
 }
+
 .co-method-tab strong {
   font-size: 0.85rem;
   font-weight: 700;
 }
 
-.co-escrow-guarantee-note {
+.co-Emahu-guarantee-note {
   background-color: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -277,11 +293,13 @@
   gap: 10px;
   align-items: flex-start;
 }
-.co-escrow-guarantee-note svg {
+
+.co-Emahu-guarantee-note svg {
   margin-top: 2px;
   flex-shrink: 0;
 }
-.co-escrow-guarantee-note span {
+
+.co-Emahu-guarantee-note span {
   font-size: 0.75rem;
   color: #475569;
   line-height: 1.4;
@@ -316,12 +334,15 @@
   padding-right: 8px;
   margin-bottom: 24px;
 }
+
 .co-items-list::-webkit-scrollbar {
   width: 4px;
 }
+
 .co-items-list::-webkit-scrollbar-track {
   background: #f1f5f9;
 }
+
 .co-items-list::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 2px;
@@ -331,11 +352,13 @@
   text-align: center;
   padding: 24px 0;
 }
+
 .co-empty-cart-summary p {
   font-size: 0.85rem;
   color: #64748b;
   margin-bottom: 12px;
 }
+
 .co-explore-link {
   color: #4169e1;
   font-size: 0.85rem;
@@ -358,6 +381,7 @@
   position: relative;
   border: 1px solid #e2e8f0;
 }
+
 .co-item-img-wrap img {
   width: 100%;
   height: 100%;
@@ -390,12 +414,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .co-item-brand {
   font-size: 0.65rem;
   text-transform: uppercase;
   color: #94a3b8;
   font-weight: 700;
 }
+
 .co-item-specs {
   font-size: 0.7rem;
   color: #64748b;
@@ -404,11 +430,13 @@
 .co-item-price-block {
   text-align: right;
 }
+
 .co-item-price-block strong {
   font-size: 0.85rem;
   color: #0f172a;
   display: block;
 }
+
 .co-item-price-block span {
   font-size: 0.68rem;
   color: #94a3b8;
@@ -433,16 +461,19 @@
   font-size: 0.82rem;
   color: #64748b;
 }
+
 .co-breakdown-row strong {
   color: #334155;
   font-weight: 700;
 }
+
 .co-breakdown-row--total {
   font-size: 1.1rem;
   color: #0f172a;
   font-weight: 850;
   margin-top: 4px;
 }
+
 .co-breakdown-row--total strong {
   color: #0f172a;
   font-weight: 850;
@@ -450,7 +481,7 @@
 }
 
 /* Big action lock CTA */
-.co-btn-lock-escrow {
+.co-btn-lock-Emahu {
   width: 100%;
   margin-top: 28px;
   background-color: #0f172a;
@@ -467,7 +498,8 @@
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
   transition: all 0.2s ease;
 }
-.co-btn-lock-escrow:hover {
+
+.co-btn-lock-Emahu:hover {
   background-color: #1e293b;
   border-color: #1e293b;
   transform: translateY(-1px);
@@ -506,7 +538,7 @@
   display: none;
 }
 
-/* ─── SECURE ESCROW CHECKOUT MODAL OVERLAY ─── */
+/* ─── SECURE Emahu CHECKOUT MODAL OVERLAY ─── */
 .co-modal-overlay {
   position: fixed;
   inset: 0;
@@ -647,6 +679,7 @@
   font-size: 0.85rem;
   color: #64748b;
 }
+
 .co-summary-box-row strong {
   color: #334155;
   font-weight: 700;
@@ -670,6 +703,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
 }
+
 .co-btn-outline:hover {
   background-color: #f1f5f9;
   border-color: #94a3b8;
@@ -688,6 +722,7 @@
   box-shadow: 0 4px 10px rgba(65, 105, 225, 0.2);
   transition: all 0.2s ease;
 }
+
 .co-btn-solid:hover {
   background-color: #2b4594;
   border-color: #2b4594;
@@ -697,32 +732,63 @@
 
 /* ─── ANIMATION KEYFRAMES ─── */
 @keyframes modalFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes modalScaleIn {
-  from { opacity: 0; transform: scale(0.9) translateY(20px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 @keyframes spinRing {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes fillBar {
-  to { width: 100%; }
+  to {
+    width: 100%;
+  }
 }
 
 @keyframes successEntry {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes pulseGreen {
-  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.2); }
-  70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.2);
+  }
+
+  70% {
+    box-shadow: 0 0 0 15px rgba(16, 185, 129, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
 
 /* ─── RESPONSIVE ADJUSTMENTS ─── */
@@ -731,38 +797,47 @@
     grid-template-columns: 1fr;
     gap: 40px;
   }
+
   .co-summary-sticky-card {
     position: static;
   }
 }
 
 @media (max-width: 640px) {
+
   .co-input-row,
   .co-input-row-three {
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  .co-escrow-methods {
+
+  .co-Emahu-methods {
     grid-template-columns: 1fr;
     gap: 12px;
   }
+
   .co-success-actions {
     flex-direction: column;
     gap: 12px;
   }
+
   .co-success-actions a {
     width: 100%;
     text-align: center;
   }
+
   .co-section-title {
     font-size: 1.8rem;
   }
+
   .co-form-bento {
     padding: 24px;
   }
-  .co-btn-lock-escrow {
+
+  .co-btn-lock-Emahu {
     display: none;
   }
+
   .co-btn-submit-mobile {
     display: flex;
     width: 100%;
@@ -784,6 +859,7 @@
 .co-terms-wrap-desktop {
   display: flex !important;
 }
+
 .co-terms-wrap-mobile {
   display: none !important;
 }
@@ -792,6 +868,7 @@
   .co-terms-wrap-desktop {
     display: none !important;
   }
+
   .co-terms-wrap-mobile {
     display: flex !important;
   }
@@ -802,6 +879,7 @@
   position: relative;
   width: 100%;
 }
+
 .co-suggestions-list {
   position: absolute;
   top: 100%;
@@ -818,6 +896,7 @@
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
   z-index: 1000;
 }
+
 .co-suggestion-item {
   padding: 12px 16px;
   font-size: 0.85rem;
@@ -827,13 +906,16 @@
   transition: background-color 0.2s ease;
   text-align: left;
 }
+
 .co-suggestion-item:last-child {
   border-bottom: none;
 }
+
 .co-suggestion-item:hover {
   background-color: #f8fafc;
   color: #4169e1;
 }
+
 .co-suggestions-loading {
   padding: 12px 16px;
   font-size: 0.82rem;

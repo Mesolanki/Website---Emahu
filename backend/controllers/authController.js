@@ -731,6 +731,30 @@ exports.updateDetails = async (req, res) => {
       bankName: req.body.bankName !== undefined ? req.body.bankName : req.user.bankName
     };
 
+    if (req.body.email && req.body.email.trim()) {
+      const newEmail = req.body.email.trim().toLowerCase();
+      if (newEmail !== req.user.email) {
+        if (!/\S+@\S+\.\S+/.test(newEmail)) {
+          return res.status(400).json({
+            success: false,
+            error: 'Please enter a valid email address'
+          });
+        }
+        const emailExists = await User.findOne({
+          email: newEmail,
+          role: req.user.role,
+          _id: { $ne: req.user.id }
+        });
+        if (emailExists) {
+          return res.status(400).json({
+            success: false,
+            error: 'A user with this email already exists'
+          });
+        }
+        fieldsToUpdate.email = newEmail;
+      }
+    }
+
     const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
       new: true,
       runValidators: true

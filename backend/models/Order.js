@@ -125,7 +125,7 @@ const orderSchema = new mongoose.Schema(
     shippingSpeed: {
       type: String
     },
-    escrowMethod: {
+    EmahuMethod: {
       type: String
     },
     carrier: String,

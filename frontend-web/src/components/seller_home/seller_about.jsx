@@ -12,10 +12,10 @@ const aboutModules = [
     badge: 'Maximize Profit',
   },
   {
-    id: 'escrow',
-    title: 'Secure Escrow Router',
+    id: 'Emahu',
+    title: 'Secure Emahu Router',
     tagline: 'Admin-verified Weekly Transfers',
-    desc: 'Never worry about missing or delayed payouts. Our automated escrow vault monitors buyer payments and routes them through a strict, multi-layer admin verification cycle for direct Friday settlement.',
+    desc: 'Never worry about missing or delayed payouts. Our automated Emahu vault monitors buyer payments and routes them through a strict, multi-layer admin verification cycle for direct Friday settlement.',
     badge: '100% Protected',
   },
   {
@@ -56,7 +56,7 @@ export default function SellerAbout() {
   // Render highly-professional inline SVGs for tab buttons
   const renderTabIcon = (id, isActive) => {
     const strokeColor = isActive ? 'currentColor' : '#64748b';
-    
+
     if (id === 'shield') {
       return (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -64,7 +64,7 @@ export default function SellerAbout() {
         </svg>
       );
     }
-    if (id === 'escrow') {
+    if (id === 'Emahu') {
       return (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="2" height="14" width="20" y="7" rx="2" ry="2" />
@@ -144,7 +144,7 @@ export default function SellerAbout() {
 
               {/* Dynamic Animation Display based on Tab */}
               <div className={`sa-visual-container ${animateState ? 'sa-visual-container--active' : ''}`}>
-                
+
                 {/* 🛡️ TAB 1: ZERO-COMMISSION SHIELD DASHBOARD */}
                 {activeTab === 'shield' && (
                   <div className="sa-vis sa-vis--shield">
@@ -157,7 +157,7 @@ export default function SellerAbout() {
                         </div>
                         <div className="sa-console__savings-pill">Saved 100%</div>
                       </div>
-                      
+
                       <div className="sa-console__body">
                         {/* Saved Metric Block */}
                         <div className="sa-console__metric">
@@ -199,12 +199,12 @@ export default function SellerAbout() {
                   </div>
                 )}
 
-                {/* 💼 TAB 2: SECURE ESCROW ROUTER */}
-                {activeTab === 'escrow' && (
-                  <div className="sa-vis sa-vis--escrow">
-                    <div className="sa-escrow-terminal">
+                {/* 💼 TAB 2: SECURE Emahu ROUTER */}
+                {activeTab === 'Emahu' && (
+                  <div className="sa-vis sa-vis--Emahu">
+                    <div className="sa-Emahu-terminal">
                       <div className="sa-terminal__header">
-                        <span className="sa-terminal__title">ESCROW ROUTING PIPELINE</span>
+                        <span className="sa-terminal__title">Emahu ROUTING PIPELINE</span>
                         <span className="sa-terminal__badge">AUTO-VERIFICATION ON</span>
                       </div>
 
@@ -214,7 +214,7 @@ export default function SellerAbout() {
                           <div className="sa-step__circle">1</div>
                           <span className="sa-step__lbl">Buyer Deposit</span>
                         </div>
-                        
+
                         <div className="sa-flow__line sa-flow__line--active" />
 
                         <div className="sa-flow__step sa-flow__step--active">
@@ -224,7 +224,7 @@ export default function SellerAbout() {
                               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                             </svg>
                           </div>
-                          <span className="sa-step__lbl">Escrow Locked</span>
+                          <span className="sa-step__lbl">Emahu Locked</span>
                         </div>
 
                         <div className="sa-flow__line sa-flow__line--pulsing" />
@@ -243,7 +243,7 @@ export default function SellerAbout() {
                         </div>
                         <div className="sa-ledger__footer">
                           <span className="sa-ledger__status-dot" />
-                          <span className="sa-ledger__status-txt">Escrow Secured • Direct Deposit HDFC Bank</span>
+                          <span className="sa-ledger__status-txt">Emahu Secured • Direct Deposit HDFC Bank</span>
                         </div>
                       </div>
                     </div>
@@ -308,7 +308,7 @@ export default function SellerAbout() {
                           </div>
                           <span className="sa-carrier__price">₹62/kg</span>
                         </div>
-                        
+
                         <div className="sa-carrier-card sa-carrier-card--inactive">
                           <div className="sa-carrier__details">
                             <span className="sa-carrier__name">Delhivery Express</span>

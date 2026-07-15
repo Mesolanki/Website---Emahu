@@ -187,7 +187,8 @@
   display: flex;
   gap: 4px;
   margin-bottom: 18px;
-  color: #fbbf24; /* Amber Gold stars */
+  color: #fbbf24;
+  /* Amber Gold stars */
 }
 
 .bx-review-card__quote {
@@ -321,7 +322,8 @@
 .bx-cta-section {
   position: relative;
   padding: 100px 0;
-  background-color: #0f172a; /* Deep matte navy slate background */
+  background-color: #0f172a;
+  /* Deep matte navy slate background */
   overflow: hidden;
   text-align: center;
   color: #ffffff;
@@ -450,7 +452,7 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 24px;
   }
-  
+
   .bx-bento-grid {
     grid-template-columns: 1fr;
     gap: 20px;
@@ -461,7 +463,7 @@
   .bx-header__title {
     font-size: 1.85rem;
   }
-  
+
   .bx-section {
     padding: 60px 0;
   }
@@ -479,11 +481,11 @@
   .bx-steps {
     grid-template-columns: 1fr;
   }
-  
+
   .bx-faq-header {
     padding: 18px 20px;
   }
-  
+
   .bx-faq-content {
     padding: 0 20px 20px 20px;
   }
@@ -496,21 +498,21 @@
 }
 
 /* ───────────────────────────────────────
-   6. SAFE ESCROW & SECURITY VAULT
+   6. SAFE Emahu & SECURITY VAULT
    ─────────────────────────────────────── */
-.bx-escrow-section {
+.bx-Emahu-section {
   background-color: #f8fafc;
 }
 
-.bx-escrow-grid {
+.bx-Emahu-grid {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 60px;
   align-items: center;
 }
 
-/* Escrow Interactive Visual Simulator */
-.bx-escrow-visual {
+/* Emahu Interactive Visual Simulator */
+.bx-Emahu-visual {
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.05);
   border-radius: 24px;
@@ -519,7 +521,7 @@
   position: relative;
 }
 
-.bx-escrow-badge {
+.bx-Emahu-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -534,7 +536,7 @@
   margin-bottom: 24px;
 }
 
-.bx-escrow-shield {
+.bx-Emahu-shield {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -547,7 +549,7 @@
   position: relative;
 }
 
-.bx-escrow-shield::before {
+.bx-Emahu-shield::before {
   content: '';
   position: absolute;
   inset: -8px;
@@ -557,16 +559,21 @@
 }
 
 @keyframes rotateClockwise {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.bx-escrow-amount {
+.bx-Emahu-amount {
   text-align: center;
   margin-bottom: 35px;
 }
 
-.bx-escrow-amount__num {
+.bx-Emahu-amount__num {
   font-size: 2.5rem;
   font-weight: 850;
   color: #0f172a;
@@ -574,7 +581,7 @@
   margin-bottom: 6px;
 }
 
-.bx-escrow-amount__label {
+.bx-Emahu-amount__label {
   font-size: 0.8rem;
   color: #64748b;
   font-weight: 600;
@@ -582,14 +589,14 @@
   letter-spacing: 0.5px;
 }
 
-/* Escrow flow pipeline steps */
-.bx-escrow-pipeline {
+/* Emahu flow pipeline steps */
+.bx-Emahu-pipeline {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.bx-escrow-step {
+.bx-Emahu-step {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -601,20 +608,20 @@
   cursor: pointer;
 }
 
-.bx-escrow-step:hover {
+.bx-Emahu-step:hover {
   background: #ffffff;
   border-color: rgba(65, 105, 225, 0.15);
   transform: translateX(4px);
   box-shadow: 0 8px 24px rgba(65, 105, 225, 0.03);
 }
 
-.bx-escrow-step--active {
+.bx-Emahu-step--active {
   background: #ffffff;
   border-color: #12b7b2;
   box-shadow: 0 10px 30px rgba(18, 183, 178, 0.06);
 }
 
-.bx-escrow-step__icon {
+.bx-Emahu-step__icon {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -629,23 +636,23 @@
   transition: all 0.3s;
 }
 
-.bx-escrow-step--active .bx-escrow-step__icon {
+.bx-Emahu-step--active .bx-Emahu-step__icon {
   background: #12b7b2;
   color: #ffffff;
 }
 
-.bx-escrow-step__label {
+.bx-Emahu-step__label {
   font-size: 0.88rem;
   font-weight: 700;
   color: #334155;
   transition: color 0.3s;
 }
 
-.bx-escrow-step--active .bx-escrow-step__label {
+.bx-Emahu-step--active .bx-Emahu-step__label {
   color: #0f172a;
 }
 
-.bx-escrow-step__status {
+.bx-Emahu-step__status {
   margin-left: auto;
   font-size: 0.75rem;
   font-weight: 800;
@@ -657,24 +664,24 @@
   transition: all 0.3s;
 }
 
-.bx-escrow-step--active .bx-escrow-step__status {
+.bx-Emahu-step--active .bx-Emahu-step__status {
   background: rgba(18, 183, 178, 0.1);
   color: #12b7b2;
 }
 
-/* Escrow content pillars */
-.bx-escrow-pillars {
+/* Emahu content pillars */
+.bx-Emahu-pillars {
   display: flex;
   flex-direction: column;
   gap: 32px;
 }
 
-.bx-escrow-pillar {
+.bx-Emahu-pillar {
   display: flex;
   gap: 20px;
 }
 
-.bx-escrow-pillar__icon-wrap {
+.bx-Emahu-pillar__icon-wrap {
   width: 52px;
   height: 52px;
   border-radius: 16px;
@@ -688,14 +695,14 @@
   border: 1px solid rgba(0, 0, 0, 0.02);
 }
 
-.bx-escrow-pillar__title {
+.bx-Emahu-pillar__title {
   font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
   margin: 0 0 8px 0;
 }
 
-.bx-escrow-pillar__desc {
+.bx-Emahu-pillar__desc {
   font-size: 0.9rem;
   line-height: 1.55;
   color: #475569;
@@ -703,18 +710,18 @@
 }
 
 @media (max-width: 992px) {
-  .bx-escrow-grid {
+  .bx-Emahu-grid {
     grid-template-columns: 1fr;
     gap: 48px;
   }
 }
 
 @media (max-width: 640px) {
-  .bx-escrow-visual {
+  .bx-Emahu-visual {
     padding: 24px;
   }
-  .bx-escrow-amount__num {
+
+  .bx-Emahu-amount__num {
     font-size: 2rem;
   }
 }
-

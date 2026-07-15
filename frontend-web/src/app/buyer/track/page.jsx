@@ -10,7 +10,7 @@ import './track.css';
 function LiveTrackingMap({ orderId, trackingData, leafletLoaded }) {
   const mapRef = useRef(null);
   const mapContainerId = `map-container-${orderId}`;
-  
+
   const markerCourierRef = useRef(null);
   const markerSellerRef = useRef(null);
   const markerBuyerRef = useRef(null);
@@ -26,7 +26,7 @@ function LiveTrackingMap({ orderId, trackingData, leafletLoaded }) {
     const sLon = trackingData.sellerLocation?.longitude || 72.5714;
     const bLat = trackingData.buyerLocation?.latitude || 23.0225;
     const bLon = trackingData.buyerLocation?.longitude || 72.5714;
-    
+
     // Fallback: If courier coordinates are not yet set/known, default to seller
     const cLat = trackingData.partnerLocation?.latitude || sLat;
     const cLon = trackingData.partnerLocation?.longitude || sLon;
@@ -136,7 +136,7 @@ function TrackOrderContent() {
 
   // Loaded orders list from localStorage
   const [allOrders, setAllOrders] = useState([]);
-  
+
   const [liveTracking, setLiveTracking] = useState({});
   const [leafletLoaded, setLeafletLoaded] = useState(false);
 
@@ -165,8 +165,8 @@ function TrackOrderContent() {
   useEffect(() => {
     if (!activeOrder || !activeOrder.ordersList) return;
 
-    const activeSubOrders = activeOrder.ordersList.filter(o => 
-      o.deliveryPartnerId && 
+    const activeSubOrders = activeOrder.ordersList.filter(o =>
+      o.deliveryPartnerId &&
       ['assigned', 'accepted', 'picked_up', 'in_transit', 'out_for_delivery', 'arrived'].includes(o.deliveryStatus)
     );
 
@@ -205,8 +205,8 @@ function TrackOrderContent() {
   useEffect(() => {
     // 1. Load from localStorage first for instant initial paint
     try {
-      const disableMockData = 
-        process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' || 
+      const disableMockData =
+        process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' ||
         process.env.NODE_ENV === 'production';
 
       const storedOrders = localStorage.getItem('emahu_orders');
@@ -235,9 +235,9 @@ function TrackOrderContent() {
               }
             ],
             total: 31958,
-            status: '🔒 ESCROW VAULT SECURED',
+            status: '🔒 Emahu VAULT SECURED',
             shippingSpeed: 'standard',
-            escrowMethod: 'wallet',
+            EmahuMethod: 'wallet',
             deliveryAddress: {
               fullName: 'Rahul Sharma',
               phone: '+91 98765 43210',
@@ -264,7 +264,7 @@ function TrackOrderContent() {
     if (buyerUserStr) {
       try {
         buyerUserId = JSON.parse(buyerUserStr).id || JSON.parse(buyerUserStr)._id || '';
-      } catch (e) {}
+      } catch (e) { }
     }
     if (!buyerUserId) {
       buyerUserId = localStorage.getItem('emahu_guest_id') || '';
@@ -293,7 +293,7 @@ function TrackOrderContent() {
     return () => clearInterval(interval);
   }, []);
 
-  // Live polling of the specific tracked order by Escrow Lock ID (queryId)
+  // Live polling of the specific tracked order by Emahu Lock ID (queryId)
   useEffect(() => {
     if (!queryId) return;
 
@@ -305,7 +305,7 @@ function TrackOrderContent() {
         if (data.success && data.orders && data.orders.length > 0) {
           setAllOrders(prev => {
             // Filter out existing instances of this order/bill to prevent duplication
-            const otherOrders = prev.filter(ord => 
+            const otherOrders = prev.filter(ord =>
               ord.orderId.toLowerCase() !== queryId.trim().toLowerCase() &&
               (!ord.billId || ord.billId.toLowerCase() !== queryId.trim().toLowerCase())
             );
@@ -325,11 +325,11 @@ function TrackOrderContent() {
   // Update tracking view if query param ID changes or if orders loaded
   useEffect(() => {
     if (queryId && allOrders.length > 0) {
-      const matchingGroup = allOrders.filter(ord => 
-        (ord.billId && ord.billId.toLowerCase() === queryId.trim().toLowerCase()) || 
+      const matchingGroup = allOrders.filter(ord =>
+        (ord.billId && ord.billId.toLowerCase() === queryId.trim().toLowerCase()) ||
         ord.orderId.toLowerCase() === queryId.trim().toLowerCase()
       );
-      
+
       if (matchingGroup.length > 0) {
         const first = matchingGroup[0];
         const mergedItems = [];
@@ -367,7 +367,7 @@ function TrackOrderContent() {
           items: o.items
         }));
 
-        let overallStatus = '🔒 ESCROW VAULT SECURED';
+        let overallStatus = '🔒 Emahu VAULT SECURED';
         if (hasDisputed) {
           overallStatus = '⚠️ VAULT DISPUTED / FROZEN';
         } else if (allReleased) {
@@ -428,7 +428,7 @@ function TrackOrderContent() {
       } else {
         setTimeout(() => {
           setActiveOrder(null);
-          setErrorMsg(`No active transaction found with Escrow Lock ID "${queryId}". Please verify the code and try again.`);
+          setErrorMsg(`No active transaction found with Emahu Lock ID "${queryId}". Please verify the code and try again.`);
         }, 0);
       }
     } else if (!queryId) {
@@ -450,14 +450,14 @@ function TrackOrderContent() {
   const getTrackingSteps = (status, isFullyRejected) => {
     // Only collapse timeline to rejected if ALL sub-orders are rejected
     const isRejected = isFullyRejected || status === 'REJECTED';
-    
+
     const statusVal = status === '🔓 FUNDS RELEASED' ? 'COMPLETED' : (status === '⚠️ VAULT DISPUTED / FROZEN' ? 'COMPLETED' : status);
     const currentIndex = STATUS_ORDER.indexOf(statusVal);
-    
+
     const stepsData = [
       {
         title: 'Payment Completed',
-        desc: '✅ Checkout lock success. Escrow vault capital secured.',
+        desc: '✅ Checkout lock success. Emahu vault capital secured.',
         status: 'PAYMENT_COMPLETED'
       },
       {
@@ -502,19 +502,19 @@ function TrackOrderContent() {
       },
       {
         title: 'Delivered',
-        desc: '🎉 Package delivered. Awaiting escrow release.',
+        desc: '🎉 Package delivered. Awaiting Emahu release.',
         status: 'DELIVERED'
       },
       {
         title: 'Order Completed',
-        desc: '✅ Escrow release confirmation received. Transaction completed.',
+        desc: '✅ Emahu release confirmation received. Transaction completed.',
         status: 'COMPLETED'
       }
     ];
 
     return stepsData.map((step, idx) => {
       let state = 'upcoming';
-      
+
       if (isRejected) {
         if (idx === 0) state = 'completed';
         else if (idx === 1) state = 'disputed'; // Rejection indicator color
@@ -549,25 +549,25 @@ function TrackOrderContent() {
     <div className="track-container">
       {/* Header Search Dashboard */}
       <div className="track-search-section">
-        <h1 className="track-main-title">Direct Escrow Track</h1>
-        <p className="track-main-subtitle">Enter your Emahu Escrow Lock ID code to trace secure courier dispatch, inspect status, and verify vault holdings.</p>
-        
+        <h1 className="track-main-title">Direct Emahu Track</h1>
+        <p className="track-main-subtitle">Enter your Emahu Emahu Lock ID code to trace secure courier dispatch, inspect status, and verify vault holdings.</p>
+
         <form onSubmit={handleSearchSubmit} className="track-search-form">
           <div className="track-input-wrapper">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5">
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
-            <input 
-              type="text" 
-              placeholder="e.g., EMH_772918" 
+            <input
+              type="text"
+              placeholder="e.g., EMH_772918"
               value={searchId}
               onChange={(e) => setSearchId(e.target.value)}
               className="track-search-input"
             />
           </div>
           <button type="submit" className="track-search-btn">
-            Trace Escrow Code
+            Trace Emahu Code
           </button>
         </form>
 
@@ -576,15 +576,14 @@ function TrackOrderContent() {
 
       {activeOrder ? (
         <div className="track-grid-layout">
-          
+
           {/* Left Column: Tracking Timeline */}
           <div className="track-timeline-card">
             <div className="timeline-card-header">
-              <h3>📦 LIVE DISPATCH & ESCROW STATUS</h3>
-              <span className={`track-status-badge ${
-                activeOrder.status.includes('DISPUTED') ? 'badge-disputed' : 
+              <h3>📦 LIVE DISPATCH & Emahu STATUS</h3>
+              <span className={`track-status-badge ${activeOrder.status.includes('DISPUTED') ? 'badge-disputed' :
                 activeOrder.status.includes('RELEASED') ? 'badge-released' : 'badge-locked'
-              }`}>
+                }`}>
                 {activeOrder.status}
               </span>
             </div>
@@ -595,7 +594,7 @@ function TrackOrderContent() {
                 <div className="dispute-alert-icon">⚠️</div>
                 <div>
                   <h4>TRANSACTION HOLD: VAULT DISPUTED</h4>
-                  <p>Escrow capital remains completely frozen. The courier has been instructed to hold dispatch/delivery. Emahu claims arbitration will contact both parties within 24 hours to resolve quality claims.</p>
+                  <p>Emahu capital remains completely frozen. The courier has been instructed to hold dispatch/delivery. Emahu claims arbitration will contact both parties within 24 hours to resolve quality claims.</p>
                 </div>
               </div>
             )}
@@ -615,7 +614,7 @@ function TrackOrderContent() {
                   <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#78350f', lineHeight: 1.5 }}>
                     {activeOrder.rejectedSubOrders.length} item group(s) were rejected by the seller.
                     The remaining items are still being processed and tracked below.
-                    Escrow funds for rejected items will be refunded automatically.
+                    Emahu funds for rejected items will be refunded automatically.
                   </p>
                   {activeOrder.rejectedSubOrders.map((rs, ri) => rs.rejectionReason && (
                     <div key={ri} style={{ marginTop: '6px', fontSize: '0.75rem', color: '#92400e', background: 'rgba(245,158,11,0.12)', borderRadius: '6px', padding: '4px 10px', display: 'inline-block' }}>
@@ -637,7 +636,7 @@ function TrackOrderContent() {
                 <div>
                   <p style={{ margin: 0, fontWeight: '700', fontSize: '0.85rem', color: '#991b1b' }}>All Items Rejected by Seller</p>
                   <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#7f1d1d', lineHeight: 1.5 }}>
-                    The seller rejected this entire order. Escrow vault funds will be fully refunded to your account.
+                    The seller rejected this entire order. Emahu vault funds will be fully refunded to your account.
                   </p>
                 </div>
               </div>
@@ -657,7 +656,7 @@ function TrackOrderContent() {
                     </span>
                   </div>
                   <LiveTrackingMap orderId={subOrdId} trackingData={trackingData} leafletLoaded={leafletLoaded} />
-                  
+
                   {/* Distance and ETA */}
                   {trackingData.remainingDistanceKm !== null && (
                     <div style={{ display: 'flex', gap: '20px', background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
@@ -703,13 +702,13 @@ function TrackOrderContent() {
 
           {/* Right Column: Order Info Details */}
           <div className="track-info-sidebar">
-            
-            {/* Escrow summary details */}
+
+            {/* Emahu summary details */}
             <div className="sidebar-info-block">
-              <h3>🔒 Escrow Agreement</h3>
+              <h3>🔒 </h3>
               <div className="sidebar-metrics-grid">
                 <div>
-                  <span>Escrow Lock ID</span>
+                  <span>Emahu Lock ID</span>
                   <strong>{activeOrder.orderId}</strong>
                 </div>
                 <div>
@@ -757,17 +756,17 @@ function TrackOrderContent() {
                       </div>
                       {displayPhone && (
                         <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
-                          <a 
-                            href={`tel:${displayPhone}`} 
-                            style={{ 
-                              flex: 1, 
-                              textAlign: 'center', 
-                              padding: '8px 12px', 
-                              background: '#319795', 
-                              color: '#fff', 
-                              borderRadius: '6px', 
-                              fontSize: '0.75rem', 
-                              fontWeight: 'bold', 
+                          <a
+                            href={`tel:${displayPhone}`}
+                            style={{
+                              flex: 1,
+                              textAlign: 'center',
+                              padding: '8px 12px',
+                              background: '#319795',
+                              color: '#fff',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold',
                               textDecoration: 'none',
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -777,19 +776,19 @@ function TrackOrderContent() {
                           >
                             📞 Call Partner
                           </a>
-                          <a 
-                            href={`https://wa.me/91${displayPhone.replace(/\D/g, '')}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            style={{ 
-                              flex: 1, 
-                              textAlign: 'center', 
-                              padding: '8px 12px', 
-                              background: '#10b981', 
-                              color: '#fff', 
-                              borderRadius: '6px', 
-                              fontSize: '0.75rem', 
-                              fontWeight: 'bold', 
+                          <a
+                            href={`https://wa.me/91${displayPhone.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              flex: 1,
+                              textAlign: 'center',
+                              padding: '8px 12px',
+                              background: '#10b981',
+                              color: '#fff',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold',
                               textDecoration: 'none',
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -846,7 +845,7 @@ function TrackOrderContent() {
                 {activeOrder.items.map((item, idx) => {
                   const isItemRejected = item._sellerRejected || (item._status && (item._status.includes('REJECTED') || item._status === '❌ Order Rejected by Seller'));
                   const isItemPending = !item._status || item._status === 'PENDING_APPROVAL';
-                  const isItemConfirmed = !isItemRejected && item._status && ['APPROVED','DELIVERY_ASSIGNED','LABEL_GENERATED','READY_FOR_PICKUP','PICKED_UP','IN_TRANSIT','OUT_FOR_DELIVERY','DELIVERED','COMPLETED','✓ Delivery Confirmed by Seller','🔓 FUNDS RELEASED'].some(s => item._status.includes(s));
+                  const isItemConfirmed = !isItemRejected && item._status && ['APPROVED', 'DELIVERY_ASSIGNED', 'LABEL_GENERATED', 'READY_FOR_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', '✓ Delivery Confirmed by Seller', '🔓 FUNDS RELEASED'].some(s => item._status.includes(s));
                   return (
                     <div key={idx} className="sidebar-product-row" style={isItemRejected ? { opacity: 0.7, background: 'rgba(239,68,68,0.04)', borderRadius: '10px', padding: '6px 8px' } : {}}>
                       <img src={item.img} alt={item.name} style={isItemRejected ? { filter: 'grayscale(0.5)' } : {}} />
@@ -956,7 +955,7 @@ function TrackOrderContent() {
         <div className="track-zero-state">
           <div className="zero-icon">🔍</div>
           <h3>Trace Active Orders</h3>
-          <p>Please enter an Escrow Lock ID above or visit your active transactions directory to start live tracking.</p>
+          <p>Please enter an Emahu Lock ID above or visit your active transactions directory to start live tracking.</p>
           <Link href="/buyer/orders" className="track-zero-btn">
             View My Locked Orders
           </Link>
@@ -970,7 +969,7 @@ export default function OrderTrackingPage() {
   return (
     <div className="track-page">
       <BuyerHeader />
-      
+
       {/* Breadcrumbs */}
       <nav className="track-breadcrumb">
         <Link href="/">Home</Link>
@@ -985,7 +984,7 @@ export default function OrderTrackingPage() {
         <Suspense fallback={
           <div className="track-loading-state">
             <div className="spinner" />
-            <p>Loading escrow tracking details...</p>
+            <p>Loading Emahu tracking details...</p>
           </div>
         }>
           <TrackOrderContent />

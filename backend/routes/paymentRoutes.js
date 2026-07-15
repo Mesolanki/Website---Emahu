@@ -22,9 +22,9 @@ router.route('/razorpay-order')
 router.route('/razorpay-verify')
   .post(verifyRazorpaySignature);                      // POST /api/payment/razorpay-verify
 
-// Release a specific order's payment (seller-initiated, no auth required for now — orderId is the gate)
+// Release a specific order's payment (admin-only)
 router.route('/release/:orderId')
-  .post(releasePayment);                               // POST /api/payment/release/:orderId
+  .post(protect, authorize('admin'), releasePayment);  // POST /api/payment/release/:orderId
 
 
 // Admin: view all released payments

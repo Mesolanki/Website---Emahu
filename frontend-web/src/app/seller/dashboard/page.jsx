@@ -79,10 +79,10 @@ const openDocInNewTab = (url) => {
             </style>
           </head>
           <body>
-            ${clean.startsWith('data:application/pdf') ? 
-              '<embed src="' + clean + '" type="application/pdf" width="100%" height="100%" />' : 
-              '<img src="' + clean + '" alt="Document Preview" />'
-            }
+            ${clean.startsWith('data:application/pdf') ?
+          '<embed src="' + clean + '" type="application/pdf" width="100%" height="100%" />' :
+          '<img src="' + clean + '" alt="Document Preview" />'
+        }
           </body>
         </html>
       `);
@@ -255,7 +255,7 @@ const getCategoryOptions = (storeCategory) => {
 function LiveTrackingMap({ orderId, trackingData, leafletLoaded }) {
   const mapRef = useRef(null);
   const mapContainerId = `map-container-${orderId}`;
-  
+
   const markerCourierRef = useRef(null);
   const markerSellerRef = useRef(null);
   const markerBuyerRef = useRef(null);
@@ -271,12 +271,20 @@ function LiveTrackingMap({ orderId, trackingData, leafletLoaded }) {
     const sLon = trackingData.sellerLocation?.longitude || 72.5714;
     const bLat = trackingData.buyerLocation?.latitude || 23.0225;
     const bLon = trackingData.buyerLocation?.longitude || 72.5714;
-    
+
     const cLat = trackingData.partnerLocation?.latitude || sLat;
     const cLon = trackingData.partnerLocation?.longitude || sLon;
 
     if (!mapRef.current) {
-      mapRef.current = window.L.map(mapContainerId).setView([cLat, cLon], 13);
+      mapRef.current = window.L.map(mapContainerId, {
+        zoomControl: false,
+        dragging: false,
+        touchZoom: false,
+        doubleClickZoom: false,
+        scrollWheelZoom: false,
+        boxZoom: false,
+        keyboard: false
+      }).setView([cLat, cLon], 13);
       window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(mapRef.current);
@@ -378,7 +386,7 @@ export default function EmahuProDashboard() {
       sellerConfirmed: o.sellerConfirmed || false,
       sellerRejected: o.sellerRejected || false,
       paymentStatus: o.paymentStatus || 'unpaid',
-      escrowMethod: o.escrowMethod || '',
+      EmahuMethod: o.EmahuMethod || '',
       shippingSpeed: o.shippingSpeed || '',
       deliveryStatus: o.deliveryStatus || 'unassigned',
       deliveryPartnerId: o.deliveryPartnerId || null,
@@ -1076,7 +1084,7 @@ export default function EmahuProDashboard() {
     const isApproved = sellerUser?.status === 'approved' || allDocsApproved;
     if (sellerUser) {
       if (!isApproved) {
-        if (activeTab !== 'status') {
+        if (activeTab !== 'status' && activeTab !== 'requests') {
           setTimeout(() => setActiveTab('status'), 0);
         }
       } else {
@@ -1214,21 +1222,7 @@ export default function EmahuProDashboard() {
     router.push('/seller/login');
   };
 
-  const handleSwitchToBuyer = async () => {
-    try {
-      const token = localStorage.getItem('emahu_seller_token');
-      if (!token) return;
-      const data = await changeUserRole('buyer', token);
-      if (data.success) {
-        clearAuthSession('seller');
-        saveAuthSession(data, 'buyer');
-        router.push('/buyer/products');
-      }
-    } catch (err) {
-      console.error('Error switching to buyer:', err);
-      triggerToast('Switch Failed', err.message || 'Could not change account role to buyer', 'danger');
-    }
-  };
+
 
   // Ref for GSTIN text selection to match user screenshot
   const gstinRef = useRef(null);
@@ -1404,8 +1398,8 @@ export default function EmahuProDashboard() {
           console.log('Filtered Orders count:', myOrders.length);
           console.groupEnd();
 
-          const disableMockData = 
-            process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' || 
+          const disableMockData =
+            process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' ||
             process.env.NODE_ENV === 'production';
 
           if (myOrders.length === 0 && !disableMockData) {
@@ -1429,7 +1423,7 @@ export default function EmahuProDashboard() {
                 status: 'PENDING_APPROVAL',
                 timeline: [{ status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: baseTime }],
                 deliveryAddress: { fullName: 'Rahul Sharma', phone: '+91 98765 43210', email: 'rahul@example.com', address: 'Flat 402, Royal Residency, Sector 15', city: 'Gandhinagar', stateName: 'Gujarat', pincode: '382016' },
-                shippingSpeed: 'express', escrowMethod: 'wallet'
+                shippingSpeed: 'express', EmahuMethod: 'wallet'
               },
               {
                 orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
@@ -1440,7 +1434,7 @@ export default function EmahuProDashboard() {
                 status: 'PENDING_APPROVAL',
                 timeline: [{ status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: baseTime }],
                 deliveryAddress: { fullName: 'Priya Mehta', phone: '+91 87654 32100', email: 'priya@example.com', address: 'B-204, Sunrise Apartments', city: 'Pune', stateName: 'Maharashtra', pincode: '411001' },
-                shippingSpeed: 'standard', escrowMethod: 'upi'
+                shippingSpeed: 'standard', EmahuMethod: 'upi'
               },
               {
                 orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
@@ -1455,7 +1449,7 @@ export default function EmahuProDashboard() {
                   { status: 'APPROVED', label: 'Seller Approved', desc: '✅ Order approved by seller.', date: baseTime }
                 ],
                 deliveryAddress: { fullName: 'Amit Kumar', phone: '+91 76543 21000', email: 'amit@example.com', address: '12, MG Road', city: 'Bangalore', stateName: 'Karnataka', pincode: '560001' },
-                shippingSpeed: 'standard', escrowMethod: 'card'
+                shippingSpeed: 'standard', EmahuMethod: 'card'
               },
               {
                 orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
@@ -1471,7 +1465,7 @@ export default function EmahuProDashboard() {
                   { status: 'REJECTED', label: 'Seller Rejected', desc: '❌ Rejected: Out of Stock', date: baseTime }
                 ],
                 deliveryAddress: { fullName: 'Sneha Reddy', phone: '+91 65432 10000', email: 'sneha@example.com', address: '45, Jubilee Hills', city: 'Hyderabad', stateName: 'Telangana', pincode: '500033' },
-                shippingSpeed: 'express', escrowMethod: 'wallet'
+                shippingSpeed: 'express', EmahuMethod: 'wallet'
               }
             ];
 
@@ -1552,8 +1546,8 @@ export default function EmahuProDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [orderLoading, setOrderLoading] = useState({});
-  const [verifyingEscrow, setVerifyingEscrow] = useState({});
-  const [verifiedEscrow, setVerifiedEscrow] = useState({});
+  const [verifyingEmahu, setVerifyingEmahu] = useState({});
+  const [verifiedEmahu, setVerifiedEmahu] = useState({});
 
   // States for delivery partner selection modal
   const [availablePartners, setAvailablePartners] = useState([]);
@@ -1609,14 +1603,11 @@ export default function EmahuProDashboard() {
           throw new Error('Incorrect delivery verification code. Please ask the customer for the correct code.');
         }
 
-        // OTP verified successfully
+        // OTP verified successfully — delivery confirmed
         await handleAdvanceOrderStatus(otpVerifyingOrderId, 'DELIVERED', '✅ Order delivered successfully. Verified via secure OTP.');
-        
-        // Trigger auto payment release
-        await handleReleasePayment(otpVerifyingOrderId);
 
         setIsOtpModalOpen(false);
-        triggerToast('Delivery Confirmed', `Order #${otpVerifyingOrderId} verified and delivered successfully!`, 'success');
+        triggerToast('Delivery Confirmed', `Order #${otpVerifyingOrderId} verified and delivered. Admin will process the fund settlement shortly.`, 'success');
       }
     } catch (err) {
       console.error('OTP Verification Error:', err);
@@ -1696,7 +1687,7 @@ export default function EmahuProDashboard() {
       return;
     }
 
-    const hasPartner = selectedDetailedOrder.deliveryPartnerId && 
+    const hasPartner = selectedDetailedOrder.deliveryPartnerId &&
       ['assigned', 'accepted', 'picked_up', 'in_transit', 'out_for_delivery', 'arrived'].includes(selectedDetailedOrder.deliveryStatus);
 
     if (!hasPartner) {
@@ -1924,13 +1915,13 @@ export default function EmahuProDashboard() {
     }
   };
 
-  const handleVerifyEscrow = (orderId, amount) => {
-    if (verifyingEscrow[orderId] || verifiedEscrow[orderId]) return;
-    setVerifyingEscrow(prev => ({ ...prev, [orderId]: true }));
+  const handleVerifyEmahu = (orderId, amount) => {
+    if (verifyingEmahu[orderId] || verifiedEmahu[orderId]) return;
+    setVerifyingEmahu(prev => ({ ...prev, [orderId]: true }));
     setTimeout(() => {
-      setVerifyingEscrow(prev => ({ ...prev, [orderId]: false }));
-      setVerifiedEscrow(prev => ({ ...prev, [orderId]: true }));
-      triggerToast('Escrow Verified', `Cryptographic check complete. ₹${amount.toLocaleString('en-IN')} locked in Emahu Secure Vault.`, 'success');
+      setVerifyingEmahu(prev => ({ ...prev, [orderId]: false }));
+      setVerifiedEmahu(prev => ({ ...prev, [orderId]: true }));
+      triggerToast('Emahu Verified', `Cryptographic check complete. ₹${amount.toLocaleString('en-IN')} locked in Emahu Secure Vault.`, 'success');
     }, 1200);
   };
 
@@ -1968,10 +1959,10 @@ export default function EmahuProDashboard() {
           }
           return o;
         });
-        
+
         safeSetLocalStorageOrders(updated);
         window.dispatchEvent(new Event('storage'));
-        
+
 
 
         triggerToast('Status Updated', `Order #${orderId} marked as ${nextStatus.replace(/_/g, ' ')}.`, 'success');
@@ -2494,6 +2485,22 @@ export default function EmahuProDashboard() {
       setFormError('Please add at least one product image to the gallery');
       return;
     }
+
+    // Validate variants if they are added
+    const hasVariants = newProductVariants.length > 1 || (newProductVariants[0] && newProductVariants[0].name.trim() !== '');
+    if (hasVariants) {
+      for (let i = 0; i < newProductVariants.length; i++) {
+        const v = newProductVariants[i];
+        if (!v.name || !v.name.trim() || !v.sku || !v.sku.trim() || !v.description || !v.description.trim() || !v.price || !v.price.trim() || !v.stock || !v.stock.trim()) {
+          setFormError(`Please fill in all required fields for Variant #${i + 1}`);
+          return;
+        }
+        if (!v.images || v.images.length === 0) {
+          setFormError(`Variant #${i + 1}: Please add at least one image to the Variant Gallery`);
+          return;
+        }
+      }
+    }
     if (
       !newProductName.trim() ||
       !newProductBrand.trim() ||
@@ -2553,10 +2560,10 @@ export default function EmahuProDashboard() {
           stock: stockNum,
           image: newProductImage.trim(),
           images: newProductImages,
-                    description: newProductDescription.trim(),
+          description: newProductDescription.trim(),
           sizes: [],
           colors: [],
-                              variants: newProductVariants.filter(v => v.name.trim() !== '').map(v => ({
+          variants: newProductVariants.filter(v => v.name.trim() !== '').map(v => ({
             name: v.name.trim(),
             sku: v.sku ? v.sku.trim() : null,
             description: v.description ? v.description.trim() : null,
@@ -2638,7 +2645,7 @@ export default function EmahuProDashboard() {
     setNewProductDescription('');
     setNewProductImage('');
     setNewProductImages([]);
-        setNewProductSizes([]);
+    setNewProductSizes([]);
     setNewProductColors([]);
     setNewProductVariants([{ name: '', sku: '', description: '', price: '', stock: '', linkedProductId: '', image: '', searchQuery: '', images: [] }]);
     setManualUrlInput('');
@@ -2704,10 +2711,10 @@ export default function EmahuProDashboard() {
     setNewProductStock(product.stock.toString());
     setNewProductDescription(product.description || '');
     setNewProductImage(product.image || '');
-        setNewProductImages(product.images || (product.image ? [product.image] : []));
+    setNewProductImages(product.images || (product.image ? [product.image] : []));
     setNewProductSizes(product.sizes || []);
     setNewProductColors(product.colors || []);
-            if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
+    if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
       setNewProductVariants(product.variants.map(v => ({
         name: v.name || '',
         sku: v.sku || '',
@@ -3362,28 +3369,25 @@ export default function EmahuProDashboard() {
         <Link href="/" className="sidebar-brand">
           <div className="sidebar-logo">
             <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="8" fill="#6366f1" />
-              <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+              <rect width="32" height="32" rx="8" fill="#4169e1" />
+              <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
             </svg>
           </div>
           <span className="sidebar-title">EMAHU</span>
-          <span className="sidebar-title-tag">Pro</span>
         </Link>
 
         <ul className="sidebar-menu">
-          {!isApproved && (
-            <li>
-              <button
-                className={`sidebar-item-btn ${activeTab === 'status' ? 'active' : ''}`}
-                onClick={() => { setActiveTab('status'); setIsSidebarOpen(false); }}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                  <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>Verification Status</span>
-              </button>
-            </li>
-          )}
+          <li>
+            <button
+              className={`sidebar-item-btn ${activeTab === 'status' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('status'); setIsSidebarOpen(false); }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Verification Status</span>
+            </button>
+          </li>
           <li>
             <button
               className={`sidebar-item-btn ${activeTab === 'overview' ? 'active' : ''}`}
@@ -3416,7 +3420,6 @@ export default function EmahuProDashboard() {
           <li>
             <button
               className={`sidebar-item-btn ${activeTab === 'requests' ? 'active' : ''}`}
-              disabled={!isApproved}
               onClick={() => { setActiveTab('requests'); setIsSidebarOpen(false); }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3427,7 +3430,6 @@ export default function EmahuProDashboard() {
                 <polyline points="10 9 9 9 8 9" />
               </svg>
               <span>Verification Requests</span>
-              {!isApproved && <span style={{ marginLeft: 'auto' }}>🔒</span>}
             </button>
           </li>
           <li>
@@ -3505,12 +3507,7 @@ export default function EmahuProDashboard() {
             <span className="sidebar-username">{sellerUser ? sellerUser.name : 'Pro Seller Inc.'}</span>
             <span className="sidebar-usertag">{sellerUser ? sellerUser.email : 'Premium Account'}</span>
           </div>
-          <button className="logout-btn" onClick={handleSwitchToBuyer} title="Switch to Buyer Portal" style={{ marginRight: '8px', color: '#6366f1' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </button>
+
           <button className="logout-btn" onClick={handleSignOut} title="Log Out">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
@@ -4313,7 +4310,14 @@ export default function EmahuProDashboard() {
                                   )}
                                 </div>
                                 <div className="product-meta-details">
-                                  <span className="product-name">{product.name}</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span className="product-name">{product.name}</span>
+                                    {product.variants && product.variants.length > 0 && (
+                                      <span style={{ fontSize: '0.65rem', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', color: '#6366f1', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                                        {product.variants.length} options
+                                      </span>
+                                    )}
+                                  </div>
                                   {isApproved ? (
                                     <span className="product-sku">{product.sku}</span>
                                   ) : (
@@ -4333,8 +4337,8 @@ export default function EmahuProDashboard() {
                             <td>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <span className={`status-badge ${isApproved ? 'in-stock' :
-                                    (isPending && product.adminCode) ? 'low-stock' :
-                                      isPending ? 'draft' : 'out-of-stock'
+                                  (isPending && product.adminCode) ? 'low-stock' :
+                                    isPending ? 'draft' : 'out-of-stock'
                                   }`}>
                                   {isApproved ? 'Approved & Live' :
                                     (isPending && product.adminCode) ? 'Pending Activation' :
@@ -4349,24 +4353,23 @@ export default function EmahuProDashboard() {
                                   <div style={{ display: 'flex', gap: '4px', marginTop: '6px', alignItems: 'center' }}>
                                     <input
                                       type="text"
-                                      placeholder="Admin Code"
+                                      placeholder="Enter Code"
                                       className="form-input"
                                       style={{
                                         height: '28px',
                                         fontSize: '0.75rem',
                                         padding: '2px 6px',
                                         width: '100px',
-                                        background: '#f0fdf4',
-                                        borderColor: '#10b981',
-                                        color: '#059669',
+                                        background: 'var(--bg-secondary)',
+                                        borderColor: 'var(--border-color)',
+                                        color: 'var(--text-primary)',
                                         borderRadius: '6px',
                                         fontWeight: '700',
                                         textAlign: 'center',
-                                        cursor: 'not-allowed',
                                         letterSpacing: '0.05em'
                                       }}
-                                      value={product.adminCode || ''}
-                                      readOnly={true}
+                                      value={verifyCodes[product.id || product._id] || ''}
+                                      onChange={(e) => setVerifyCodes(prev => ({ ...prev, [product.id || product._id]: e.target.value }))}
                                     />
                                     <button
                                       className="company-portal-btn"
@@ -4555,7 +4558,7 @@ export default function EmahuProDashboard() {
                         {/* Variations & Options */}
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginTop: '4px', marginBottom: '8px' }}>
                           <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e293b', display: 'block', marginBottom: '12px', letterSpacing: '-0.01em' }}>🎨 Variations &amp; Options</span>
-                          
+
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {newProductVariants.map((variant, index) => (
                               <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', position: 'relative' }}>
@@ -4573,110 +4576,112 @@ export default function EmahuProDashboard() {
                                 </div>
 
                                 <div className="form-group" style={{ margin: 0, position: 'relative' }}>
-                                  <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>🔗 Link to Existing Product (Search...)</label>
-                                  <input
-                                    type="text"
-                                    className="form-input"
-                                    style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px', marginBottom: '4px' }}
-                                    placeholder="Search by product name to link..."
-                                    value={variant.searchQuery || ''}
-                                    onChange={(e) => {
-                                      const updated = [...newProductVariants];
-                                      updated[index].searchQuery = e.target.value;
-                                      setNewProductVariants(updated);
-                                    }}
-                                  />
-                                  {variant.searchQuery && (
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: '100%',
-                                      left: 0,
-                                      right: 0,
-                                      background: '#ffffff',
-                                      border: '1px solid #cbd5e1',
-                                      borderRadius: '8px',
-                                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                                      zIndex: 100,
-                                      maxHeight: '160px',
-                                      overflowY: 'auto'
-                                    }}>
-                                      {products
-                                        .filter(p => 
-                                          p.name.toLowerCase().includes(variant.searchQuery.toLowerCase()) &&
-                                          String(p.id || p._id) !== String(resubmitProductId)
-                                        )
-                                        .map(p => (
-                                          <div
-                                            key={p.id || p._id}
-                                            onClick={() => {
-                                              const updated = [...newProductVariants];
-                                              updated[index].linkedProductId = p.id || p._id;
-                                              updated[index].name = p.name;
-                                              updated[index].sku = p.sku || '';
-                                              updated[index].description = p.description || '';
-                                              updated[index].price = p.price.toString();
-                                              updated[index].stock = p.stock.toString();
-                                              updated[index].image = p.image || '';
-                                              updated[index].images = p.images || (p.image ? [p.image] : []);
-                                              updated[index].searchQuery = '';
-                                              setNewProductVariants(updated);
-                                            }}
-                                            style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '8px',
-                                              padding: '8px',
-                                              cursor: 'pointer',
-                                              borderBottom: '1px solid #f1f5f9',
-                                              fontSize: '0.78rem'
-                                            }}
-                                            onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                          >
-                                            <div style={{ width: '24px', height: '24px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
-                                              {p.image && (p.image.startsWith('http') || p.image.startsWith('data:')) ? (
-                                                <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                              ) : (
-                                                <span>{p.image || '📦'}</span>
-                                              )}
-                                            </div>
-                                            <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                              <strong>{p.name}</strong> <span style={{ color: '#64748b' }}>(₹{p.price})</span>
-                                            </div>
-                                          </div>
-                                        ))}
-                                    </div>
-                                  )}
-
-                                  {variant.linkedProductId && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '6px', marginBottom: '8px' }}>
-                                      <div style={{ width: '28px', height: '28px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
-                                        {variant.image && (variant.image.startsWith('http') || variant.image.startsWith('data:')) ? (
-                                          <img src={variant.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        ) : (
-                                          <span>{variant.image || '📦'}</span>
-                                        )}
-                                      </div>
-                                      <div style={{ flex: 1, fontSize: '0.72rem', color: '#4f46e5', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        🔗 Linked: {variant.name}
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const updated = [...newProductVariants];
-                                          updated[index].linkedProductId = '';
-                                          updated[index].image = '';
-                                          updated[index].images = [];
-                                          updated[index].searchQuery = '';
-                                          setNewProductVariants(updated);
-                                        }}
-                                        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.72rem', padding: 0 }}
-                                      >
-                                        Unlink
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
+                                   {!variant.linkedProductId ? (
+                                     <>
+                                       <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>🔗 Link to Existing Product (Search...)</label>
+                                       <input
+                                         type="text"
+                                         className="form-input"
+                                         style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px', marginBottom: '4px' }}
+                                         placeholder="Search by product name to link..."
+                                         value={variant.searchQuery || ''}
+                                         onChange={(e) => {
+                                           const updated = [...newProductVariants];
+                                           updated[index].searchQuery = e.target.value;
+                                           setNewProductVariants(updated);
+                                         }}
+                                       />
+                                       {variant.searchQuery && (
+                                         <div style={{
+                                           position: 'absolute',
+                                           top: '100%',
+                                           left: 0,
+                                           right: 0,
+                                           background: '#ffffff',
+                                           border: '1px solid #cbd5e1',
+                                           borderRadius: '8px',
+                                           boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                           zIndex: 100,
+                                           maxHeight: '160px',
+                                           overflowY: 'auto'
+                                         }}>
+                                           {products
+                                             .filter(p =>
+                                               p.name.toLowerCase().includes(variant.searchQuery.toLowerCase()) &&
+                                               String(p.id || p._id) !== String(resubmitProductId)
+                                             )
+                                             .map(p => (
+                                               <div
+                                                 key={p.id || p._id}
+                                                 onClick={() => {
+                                                   const updated = [...newProductVariants];
+                                                   updated[index].linkedProductId = p.id || p._id;
+                                                   updated[index].name = p.name;
+                                                   updated[index].sku = p.sku || '';
+                                                   updated[index].description = p.description || '';
+                                                   updated[index].price = p.price.toString();
+                                                   updated[index].stock = p.stock.toString();
+                                                   updated[index].image = p.image || '';
+                                                   updated[index].images = p.images || (p.image ? [p.image] : []);
+                                                   updated[index].searchQuery = '';
+                                                   setNewProductVariants(updated);
+                                                 }}
+                                                 style={{
+                                                   display: 'flex',
+                                                   alignItems: 'center',
+                                                   gap: '8px',
+                                                   padding: '8px',
+                                                   cursor: 'pointer',
+                                                   borderBottom: '1px solid #f1f5f9',
+                                                   fontSize: '0.78rem'
+                                                 }}
+                                                 onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                                                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                               >
+                                                 <div style={{ width: '24px', height: '24px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
+                                                   {p.image && (p.image.startsWith('http') || p.image.startsWith('data:')) ? (
+                                                     <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                   ) : (
+                                                     <span>{p.image || '📦'}</span>
+                                                   )}
+                                                 </div>
+                                                 <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                   <strong>{p.name}</strong> <span style={{ color: '#64748b' }}>(₹{p.price})</span>
+                                                 </div>
+                                               </div>
+                                             ))}
+                                         </div>
+                                       )}
+                                     </>
+                                   ) : (
+                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '6px', marginBottom: '8px' }}>
+                                       <div style={{ width: '28px', height: '28px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
+                                         {variant.image && (variant.image.startsWith('http') || variant.image.startsWith('data:')) ? (
+                                           <img src={variant.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                         ) : (
+                                           <span>{variant.image || '📦'}</span>
+                                         )}
+                                       </div>
+                                       <div style={{ flex: 1, fontSize: '0.72rem', color: '#4f46e5', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                         🔗 Linked: {variant.name}
+                                       </div>
+                                       <button
+                                         type="button"
+                                         onClick={() => {
+                                           const updated = [...newProductVariants];
+                                           updated[index].linkedProductId = '';
+                                           updated[index].image = '';
+                                           updated[index].images = [];
+                                           updated[index].searchQuery = '';
+                                           setNewProductVariants(updated);
+                                         }}
+                                         style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.72rem', padding: 0 }}
+                                       >
+                                         Unlink
+                                       </button>
+                                     </div>
+                                   )}
+                                 </div>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                   <div className="form-group" style={{ margin: 0 }}>
@@ -4696,7 +4701,7 @@ export default function EmahuProDashboard() {
                                     />
                                   </div>
                                   <div className="form-group" style={{ margin: 0 }}>
-                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>SKU (Optional)</label>
+                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>SKU *</label>
                                     <input
                                       type="text"
                                       className="form-input"
@@ -4708,12 +4713,13 @@ export default function EmahuProDashboard() {
                                         updated[index].sku = e.target.value;
                                         setNewProductVariants(updated);
                                       }}
+                                      required
                                     />
                                   </div>
                                 </div>
 
                                 <div className="form-group" style={{ margin: 0 }}>
-                                  <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Description (Optional)</label>
+                                  <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Description *</label>
                                   <textarea
                                     className="form-input"
                                     style={{ height: '50px', fontSize: '0.8rem', padding: '6px', resize: 'none' }}
@@ -4724,38 +4730,41 @@ export default function EmahuProDashboard() {
                                       updated[index].description = e.target.value;
                                       setNewProductVariants(updated);
                                     }}
+                                    required
                                   />
                                 </div>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                   <div className="form-group" style={{ margin: 0 }}>
-                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Price (INR) [Optional]</label>
+                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Price (INR) *</label>
                                     <input
                                       type="number"
                                       className="form-input"
                                       style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
-                                      placeholder="Use main price if empty"
+                                      placeholder="e.g. 999"
                                       value={variant.price}
                                       onChange={(e) => {
                                         const updated = [...newProductVariants];
                                         updated[index].price = e.target.value;
                                         setNewProductVariants(updated);
                                       }}
+                                      required
                                     />
                                   </div>
                                   <div className="form-group" style={{ margin: 0 }}>
-                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Stock [Optional]</label>
+                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Stock *</label>
                                     <input
                                       type="number"
                                       className="form-input"
                                       style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
-                                      placeholder="Use main stock if empty"
+                                      placeholder="e.g. 50"
                                       value={variant.stock}
                                       onChange={(e) => {
                                         const updated = [...newProductVariants];
                                         updated[index].stock = e.target.value;
                                         setNewProductVariants(updated);
                                       }}
+                                      required
                                     />
                                   </div>
                                 </div>
@@ -4815,14 +4824,14 @@ export default function EmahuProDashboard() {
                           {isSubmittingProduct ? (
                             <>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: 'spin 1s linear infinite' }}>
-                                <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" strokeOpacity="0.3"/>
+                                <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" strokeOpacity="0.3" />
                                 <path d="M21 12a9 9 0 0 0-9-9" />
                               </svg>
                               Submitting...
                             </>
                           ) : (
                             <>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z"/></svg>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z" /></svg>
                               Submit for Admin Review
                             </>
                           )}
@@ -4840,166 +4849,172 @@ export default function EmahuProDashboard() {
                     <div style={{ overflowX: 'auto', width: '100%' }}>
                       <div style={{ maxHeight: '550px', overflowY: 'auto' }}>
                         <table className="portal-table" style={{ width: '100%', minWidth: '500px', fontSize: '0.85rem' }}>
-                        <thead>
-                          <tr>
-                            <th style={{ textAlign: 'left', padding: '10px' }}>Product</th>
-                            <th style={{ textAlign: 'left', padding: '10px' }}>Category</th>
-                            <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
-                            <th style={{ textAlign: 'left', padding: '10px' }}>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {products.map((product) => {
-                            const isApproved = product.approvalStatus === 'approved';
-                            const isPending = product.approvalStatus === 'pending';
-                            const isRejected = product.approvalStatus === 'rejected';
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: 'left', padding: '10px' }}>Product</th>
+                              <th style={{ textAlign: 'left', padding: '10px' }}>Category</th>
+                              <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
+                              <th style={{ textAlign: 'left', padding: '10px' }}>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {products.map((product) => {
+                              const isApproved = product.approvalStatus === 'approved';
+                              const isPending = product.approvalStatus === 'pending';
+                              const isRejected = product.approvalStatus === 'rejected';
 
-                            return (
-                              <tr key={product.id || product._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                <td style={{ padding: '12px 10px' }}>
-                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                    <div style={{
-                                      width: '32px',
-                                      height: '32px',
-                                      borderRadius: '6px',
-                                      overflow: 'hidden',
-                                      border: '1px solid var(--border-color)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      backgroundColor: 'rgba(0,0,0,0.05)',
-                                      flexShrink: 0
-                                    }}>
-                                      {isRealImage(product.image) ? (
-                                        <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                      ) : (
-                                        <span style={{ fontSize: '1.2rem' }}>{cleanImageUrl(product.image) || '📦'}</span>
-                                      )}
+                              return (
+                                <tr key={product.id || product._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                  <td style={{ padding: '12px 10px' }}>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                      <div style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        borderRadius: '6px',
+                                        overflow: 'hidden',
+                                        border: '1px solid var(--border-color)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: 'rgba(0,0,0,0.05)',
+                                        flexShrink: 0
+                                      }}>
+                                        {isRealImage(product.image) ? (
+                                          <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                          <span style={{ fontSize: '1.2rem' }}>{cleanImageUrl(product.image) || '📦'}</span>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{product.name}</div>
+                                          {product.variants && product.variants.length > 0 && (
+                                            <span style={{ fontSize: '0.62rem', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', color: '#6366f1', padding: '0.5px 4px', borderRadius: '3px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                                              {product.variants.length} options
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>₹{product.price.toLocaleString('en-IN')}</div>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{product.name}</div>
-                                      <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>₹{product.price.toLocaleString('en-IN')}</div>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td style={{ padding: '12px 10px' }}>
-                                  <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{product.category}</div>
-                                </td>
-                                <td style={{ padding: '12px 10px' }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <span className={`status-badge ${isApproved ? 'in-stock' :
+                                  </td>
+                                  <td style={{ padding: '12px 10px' }}>
+                                    <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{product.category}</div>
+                                  </td>
+                                  <td style={{ padding: '12px 10px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <span className={`status-badge ${isApproved ? 'in-stock' :
                                         (isPending && product.adminCode) ? 'low-stock' :
                                           isPending ? 'draft' : 'out-of-stock'
-                                      }`} style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
-                                      {isApproved ? 'Approved & Live' :
-                                        (isPending && product.adminCode) ? 'Pending Activation' :
-                                          isPending ? 'Under Review' : 'Rejected'}
-                                    </span>
-
-                                    {isPending && product.adminCode && (
-                                      <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
-                                        Code Generated!
+                                        }`} style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
+                                        {isApproved ? 'Approved & Live' :
+                                          (isPending && product.adminCode) ? 'Pending Activation' :
+                                            isPending ? 'Under Review' : 'Rejected'}
                                       </span>
-                                    )}
 
-                                    {isRejected && (
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                        {product.rejectionReason && (
-                                          <span style={{ fontSize: '0.72rem', color: '#ef4444', maxWidth: '140px', wordBreak: 'break-all' }}>
-                                            Reason: {product.rejectionReason}
-                                          </span>
-                                        )}
-                                        <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 'bold' }}>
-                                          Rejections: {product.approvalAttempts || 0} / 3
+                                      {isPending && product.adminCode && (
+                                        <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
+                                          Code Generated!
                                         </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                                <td style={{ padding: '12px 10px' }}>
-                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                    <button
-                                      className="company-portal-btn"
-                                      style={{
-                                        height: '24px',
-                                        fontSize: '0.7rem',
-                                        padding: '0 8px',
-                                        background: 'var(--bg-secondary)',
-                                        border: '1px solid var(--border-color)',
-                                        color: 'var(--text-primary)',
-                                        cursor: 'pointer'
-                                      }}
-                                      onClick={() => setSelectedDetailedProduct(product)}
-                                    >
-                                      Details
-                                    </button>
+                                      )}
 
-                                    {isPending && product.adminCode && (
-                                      <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
-                                        <input
-                                          type="text"
-                                          placeholder="Admin Code"
-                                          className="form-input"
-                                          style={{
-                                            height: '24px',
-                                            fontSize: '0.7rem',
-                                            padding: '2px 4px',
-                                            width: '85px',
-                                            borderRadius: '4px',
-                                            background: 'rgba(255,255,255,0.08)',
-                                            borderColor: 'var(--color-success)',
-                                            color: '#10b981',
-                                            fontWeight: 'bold',
-                                            textAlign: 'center',
-                                            cursor: 'not-allowed'
-                                          }}
-                                          value={product.adminCode || ''}
-                                          readOnly={true}
-                                        />
-                                        <button
-                                          className="company-portal-btn"
-                                          style={{
-                                            height: '24px',
-                                            fontSize: '0.7rem',
-                                            padding: '0 4px',
-                                            background: 'var(--color-success)',
-                                            borderColor: 'var(--color-success)',
-                                            width: '85px'
-                                          }}
-                                          onClick={() => handleVerifyProductCode(product.id || product._id)}
-                                        >
-                                          Verify Code
-                                        </button>
-                                      </div>
-                                    )}
-                                    {isPending && !product.adminCode && (
-                                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>Pending Admin</span>
-                                    )}
-                                    {isApproved && (
-                                      <span style={{ fontSize: '0.78rem', color: 'var(--color-success)', fontWeight: '600' }}>
-                                        ✓ Live
-                                      </span>
-                                    )}
-                                    {isRejected && (
-                                      <button className="action-btn" title="Fix and Resubmit" onClick={() => handleOpenResubmitModal(product)}>
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                        </svg>
+                                      {isRejected && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                          {product.rejectionReason && (
+                                            <span style={{ fontSize: '0.72rem', color: '#ef4444', maxWidth: '140px', wordBreak: 'break-all' }}>
+                                              Reason: {product.rejectionReason}
+                                            </span>
+                                          )}
+                                          <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 'bold' }}>
+                                            Rejections: {product.approvalAttempts || 0} / 3
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '12px 10px' }}>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                      <button
+                                        className="company-portal-btn"
+                                        style={{
+                                          height: '24px',
+                                          fontSize: '0.7rem',
+                                          padding: '0 8px',
+                                          background: 'var(--bg-secondary)',
+                                          border: '1px solid var(--border-color)',
+                                          color: 'var(--text-primary)',
+                                          cursor: 'pointer'
+                                        }}
+                                        onClick={() => setSelectedDetailedProduct(product)}
+                                      >
+                                        Details
                                       </button>
-                                    )}
-                                  </div>
-                                </td>
+
+                                      {isPending && product.adminCode && (
+                                        <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
+                                          <input
+                                            type="text"
+                                            placeholder="Enter Code"
+                                            className="form-input"
+                                            style={{
+                                              height: '24px',
+                                              fontSize: '0.7rem',
+                                              padding: '2px 4px',
+                                              width: '85px',
+                                              borderRadius: '4px',
+                                              background: 'var(--bg-secondary)',
+                                              borderColor: 'var(--border-color)',
+                                              color: 'var(--text-primary)',
+                                              fontWeight: 'bold',
+                                              textAlign: 'center'
+                                            }}
+                                            value={verifyCodes[product.id || product._id] || ''}
+                                            onChange={(e) => setVerifyCodes(prev => ({ ...prev, [product.id || product._id]: e.target.value }))}
+                                          />
+                                          <button
+                                            className="company-portal-btn"
+                                            style={{
+                                              height: '24px',
+                                              fontSize: '0.7rem',
+                                              padding: '0 4px',
+                                              background: 'var(--color-success)',
+                                              borderColor: 'var(--color-success)',
+                                              width: '85px'
+                                            }}
+                                            onClick={() => handleVerifyProductCode(product.id || product._id)}
+                                          >
+                                            Verify Code
+                                          </button>
+                                        </div>
+                                      )}
+                                      {isPending && !product.adminCode && (
+                                        <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>Pending Admin</span>
+                                      )}
+                                      {isApproved && (
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--color-success)', fontWeight: '600' }}>
+                                          ✓ Live
+                                        </span>
+                                      )}
+                                      {isRejected && (
+                                        <button className="action-btn" title="Fix and Resubmit" onClick={() => handleOpenResubmitModal(product)}>
+                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                          </svg>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            {products.length === 0 && (
+                              <tr>
+                                <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No requests submitted yet.</td>
                               </tr>
-                            );
-                          })}
-                          {products.length === 0 && (
-                            <tr>
-                              <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No requests submitted yet.</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
 
@@ -5107,8 +5122,8 @@ export default function EmahuProDashboard() {
                           <td>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                               <span className={`status-badge ${order.status === 'COMPLETED' || order.status === 'DELIVERED' ? 'in-stock' :
-                                  order.status === 'REJECTED' ? 'out-of-stock' :
-                                    order.status === 'PENDING_APPROVAL' ? 'draft' : 'low-stock'
+                                order.status === 'REJECTED' ? 'out-of-stock' :
+                                  order.status === 'PENDING_APPROVAL' ? 'draft' : 'low-stock'
                                 }`}>
                                 {order.status === 'PENDING_APPROVAL' ? 'Pending Approval' :
                                   order.status === 'APPROVED' ? 'Approved' :
@@ -5620,7 +5635,7 @@ export default function EmahuProDashboard() {
                   {settingsSubTab === 'payout' && (
                     <form onSubmit={handleSaveBankDetails}>
                       <h4 className="settings-section-title">Bank Payout Configuration</h4>
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '24px' }}>Configure your verified settlement account details. All released escrow transaction payments will be routed here directly.</p>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '24px' }}>Configure your verified settlement account details. All released Emahu transaction payments will be routed here directly.</p>
 
                       <div className="form-grid-2">
                         <div className="form-group">
@@ -5717,8 +5732,8 @@ export default function EmahuProDashboard() {
 
                     return (
                       <div>
-                        <h4 className="settings-section-title">Payment History &amp; Escrow Holdings</h4>
-                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '24px' }}>Monitor settled payments, active customer capital holds, and penalty history inside the Emahu Escrow grid.</p>
+                        <h4 className="settings-section-title">Payment History &amp; Emahu Holdings</h4>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '24px' }}>Monitor settled payments, active customer capital holds, and penalty history inside the Emahu Emahu grid.</p>
 
                         {/* Financial Summary Cards */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '32px' }}>
@@ -5729,7 +5744,7 @@ export default function EmahuProDashboard() {
                           </div>
 
                           <div className="stats-box" style={{ background: 'rgba(65,105,225,0.06)', border: '1px solid rgba(65,105,225,0.15)', padding: '16px', borderRadius: '10px' }}>
-                            <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', color: '#4169e1', fontWeight: 700, letterSpacing: '0.5px' }}>Locked Escrow Holds</span>
+                            <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', color: '#4169e1', fontWeight: 700, letterSpacing: '0.5px' }}>Locked Emahu Holds</span>
                             <h3 style={{ fontSize: '1.5rem', margin: '4px 0', color: '#4169e1', fontWeight: 800 }}>₹{totalLocked.toLocaleString('en-IN')}</h3>
                             <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>Held securely in vault</p>
                           </div>
@@ -5747,7 +5762,7 @@ export default function EmahuProDashboard() {
                             ⚡ Emahu 15-Day Settlement Billing Cycle
                           </div>
                           <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                            Escrow funds are held for a standard <strong>15-day payment cycle</strong>. Once 15 days have elapsed, the payout is eligible to be released. Payout transfers made by the administrator will have their transfer receipt screenshot attached in the ledger table below.
+                            Emahu funds are held for a standard <strong>15-day payment cycle</strong>. Once 15 days have elapsed, the payout is eligible to be released. Payout transfers made by the administrator will have their transfer receipt screenshot attached in the ledger table below.
                           </p>
                         </div>
 
@@ -5809,7 +5824,7 @@ export default function EmahuProDashboard() {
                                             backgroundColor: raw.paymentStatus === 'paid' ? 'rgba(16,185,129,0.1)' : isReleased ? 'rgba(59,130,246,0.1)' : isRejected ? 'rgba(239,68,68,0.1)' : 'rgba(156,163,175,0.1)',
                                             color: raw.paymentStatus === 'paid' ? '#10b981' : isReleased ? '#3b82f6' : isRejected ? '#ef4444' : '#9ca3af'
                                           }}>
-                                            {raw.paymentStatus === 'paid' ? '🔓 Paid & Settled' : isReleased ? '⌛ Payout Processing' : isRejected ? '❌ Cancelled' : '🔒 Escrow Locked'}
+                                            {raw.paymentStatus === 'paid' ? '🔓 Paid & Settled' : isReleased ? '⌛ Payout Processing' : isRejected ? '❌ Cancelled' : '🔒 Emahu Locked'}
                                           </span>
                                           {raw.paymentStatus === 'paid' && raw.transactionFile && (
                                             <a
@@ -5821,27 +5836,20 @@ export default function EmahuProDashboard() {
                                             </a>
                                           )}
                                           {!isReleased && !isRejected && (raw.status === 'DELIVERED' || raw.status === 'COMPLETED') && (
-                                            <button
-                                              onClick={() => {
-                                                setSelectedDetailedOrderId(raw.orderId);
-                                                setIsReleaseModalOpen(true);
-                                              }}
-                                              style={{
-                                                padding: '4px 8px',
-                                                background: '#10b981',
-                                                color: '#fff',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                fontSize: '0.72rem',
-                                                fontWeight: '700',
-                                                cursor: 'pointer',
-                                                marginTop: '4px',
-                                                boxShadow: '0 2px 6px rgba(16,185,129,0.15)',
-                                                width: 'max-content'
-                                              }}
-                                            >
-                                              💰 Release Payout
-                                            </button>
+                                            <span style={{
+                                              display: 'inline-block',
+                                              padding: '3px 8px',
+                                              background: 'rgba(245,158,11,0.1)',
+                                              color: '#f59e0b',
+                                              border: '1px solid rgba(245,158,11,0.2)',
+                                              borderRadius: '4px',
+                                              fontSize: '0.7rem',
+                                              fontWeight: '600',
+                                              marginTop: '4px',
+                                              width: 'max-content'
+                                            }}>
+                                              ⏳ Awaiting Admin Settlement
+                                            </span>
                                           )}
                                         </div>
                                       </td>
@@ -6058,7 +6066,7 @@ export default function EmahuProDashboard() {
                             <td>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <span className={`status-badge ${isApproved ? 'in-stock' :
-                                    isPending ? 'draft' : 'out-of-stock'
+                                  isPending ? 'draft' : 'out-of-stock'
                                   }`} style={{ display: 'inline-block', width: 'fit-content' }}>
                                   {seller.status === 'approved' ? 'Approved & Active' :
                                     seller.status === 'rejected' ? 'Rejected' :
@@ -6196,66 +6204,108 @@ export default function EmahuProDashboard() {
               </div>
 
               {/* Product Variations Details (Category-wise label) */}
-              {((selectedDetailedProduct.sizes && selectedDetailedProduct.sizes.length > 0) || 
+              {((selectedDetailedProduct.sizes && selectedDetailedProduct.sizes.length > 0) ||
                 (selectedDetailedProduct.colors && selectedDetailedProduct.colors.length > 0)) && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <div>
-                    <strong style={{ color: 'var(--text-secondary)' }}>
-                      {['Apparel & Fashion','Fashion & Apparel'].includes(selectedDetailedProduct.category) ? '👕 Sizes:' :
-                       selectedDetailedProduct.category === 'Electronics & Tech' ? '💾 Storage/Specs:' :
-                       ['Kitchen & Dining','Lifestyle & Home','Home & Kitchen'].includes(selectedDetailedProduct.category) ? '📐 Dimensions:' :
-                       selectedDetailedProduct.category === 'Beauty & Cosmetics' ? '🧴 Vol/Finish:' :
-                       selectedDetailedProduct.category === 'Sports & Fitness' ? '🏋️ Weight:' :
-                       '📦 Sizes/Variants:'}
-                    </strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
-                      {selectedDetailedProduct.sizes && selectedDetailedProduct.sizes.length > 0 ? (
-                        selectedDetailedProduct.sizes.map(sz => (
-                          <span key={sz} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600' }}>{sz}</span>
-                        ))
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.75rem' }}>None Selected</span>
-                      )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div>
+                      <strong style={{ color: 'var(--text-secondary)' }}>
+                        {['Apparel & Fashion', 'Fashion & Apparel'].includes(selectedDetailedProduct.category) ? '👕 Sizes:' :
+                          selectedDetailedProduct.category === 'Electronics & Tech' ? '💾 Storage/Specs:' :
+                            ['Kitchen & Dining', 'Lifestyle & Home', 'Home & Kitchen'].includes(selectedDetailedProduct.category) ? '📐 Dimensions:' :
+                              selectedDetailedProduct.category === 'Beauty & Cosmetics' ? '🧴 Vol/Finish:' :
+                                selectedDetailedProduct.category === 'Sports & Fitness' ? '🏋️ Weight:' :
+                                  '📦 Sizes/Variants:'}
+                      </strong>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                        {selectedDetailedProduct.sizes && selectedDetailedProduct.sizes.length > 0 ? (
+                          selectedDetailedProduct.sizes.map(sz => (
+                            <span key={sz} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600' }}>{sz}</span>
+                          ))
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.75rem' }}>None Selected</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <strong style={{ color: 'var(--text-secondary)' }}>🎨 Colors:</strong>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                        {selectedDetailedProduct.colors && selectedDetailedProduct.colors.length > 0 ? (
+                          selectedDetailedProduct.colors.map(colName => {
+                            const hexMap = {
+                              Red: '#ef4444', Blue: '#3b82f6', Black: '#1a1a1a', White: '#f5f5f5', Green: '#22c55e',
+                              Yellow: '#eab308', Orange: '#f97316', Purple: '#a855f7', Pink: '#ec4899', Gray: '#6b7280',
+                              Brown: '#92400e', Navy: '#1e3a8a', Beige: '#d4b896', Silver: '#cbd5e1', Gold: '#d97706'
+                            };
+                            const hexMatch = colName.match(/#(?:[0-9a-fA-F]{3}){1,2}\b/);
+                            const hex = hexMatch ? hexMatch[0] : (hexMap[colName] || (colName.startsWith('#') ? colName : 'rgba(255,255,255,0.1)'));
+                            return (
+                              <span key={colName} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600' }}>
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: hex, display: 'inline-block', border: (colName === 'White' || hex === '#f5f5f5' || hex === '#ffffff') ? '1px solid rgba(255,255,255,0.2)' : 'none' }} />
+                                {colName}
+                              </span>
+                            );
+                          })
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.75rem' }}>None Selected</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <strong style={{ color: 'var(--text-secondary)' }}>🎨 Colors:</strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
-                      {selectedDetailedProduct.colors && selectedDetailedProduct.colors.length > 0 ? (
-                        selectedDetailedProduct.colors.map(colName => {
-                          const hexMap = {
-                            Red: '#ef4444', Blue: '#3b82f6', Black: '#1a1a1a', White: '#f5f5f5', Green: '#22c55e',
-                            Yellow: '#eab308', Orange: '#f97316', Purple: '#a855f7', Pink: '#ec4899', Gray: '#6b7280',
-                            Brown: '#92400e', Navy: '#1e3a8a', Beige: '#d4b896', Silver: '#cbd5e1', Gold: '#d97706'
-                          };
-                          const hexMatch = colName.match(/#(?:[0-9a-fA-F]{3}){1,2}\b/);
-                          const hex = hexMatch ? hexMatch[0] : (hexMap[colName] || (colName.startsWith('#') ? colName : 'rgba(255,255,255,0.1)'));
-                          return (
-                            <span key={colName} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600' }}>
-                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: hex, display: 'inline-block', border: (colName === 'White' || hex === '#f5f5f5' || hex === '#ffffff') ? '1px solid rgba(255,255,255,0.2)' : 'none' }} />
-                              {colName}
-                            </span>
-                          );
-                        })
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.75rem' }}>None Selected</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
+                )}
 
               <div>
                 <strong style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Description:</strong>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-primary)' }}>{selectedDetailedProduct.description}</p>
               </div>
 
+              {selectedDetailedProduct.variants && selectedDetailedProduct.variants.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '4px' }}>
+                  <strong style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'block', marginBottom: '8px' }}>🎨 Variants & Options:</strong>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {selectedDetailedProduct.variants.map((v, vIdx) => (
+                      <div key={vIdx} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '10px', borderRadius: '8px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-surface)', flexShrink: 0 }}>
+                          {v.image && (v.image.startsWith('http') || v.image.startsWith('data:')) ? (
+                            <img src={v.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <span style={{ fontSize: '1.2rem' }}>{v.image || '📦'}</span>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {v.name}
+                          </div>
+                          {v.sku && (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              SKU: <code style={{ background: 'rgba(255,255,255,0.05)', padding: '1px 4px', borderRadius: '3px' }}>{v.sku}</code>
+                            </div>
+                          )}
+                          {v.description && (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {v.description}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#10b981' }}>
+                            ₹{parseFloat(v.price || selectedDetailedProduct.price).toLocaleString('en-IN')}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Stock: <strong>{v.stock !== undefined && v.stock !== '' ? v.stock : selectedDetailedProduct.stock}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '4px' }}>
                 <strong style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Request Status:</strong>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
                   <span className={`status-badge ${selectedDetailedProduct.approvalStatus === 'approved' ? 'in-stock' :
-                      (selectedDetailedProduct.approvalStatus === 'pending' && selectedDetailedProduct.adminCode) ? 'low-stock' :
-                        selectedDetailedProduct.approvalStatus === 'pending' ? 'draft' : 'out-of-stock'
+                    (selectedDetailedProduct.approvalStatus === 'pending' && selectedDetailedProduct.adminCode) ? 'low-stock' :
+                      selectedDetailedProduct.approvalStatus === 'pending' ? 'draft' : 'out-of-stock'
                     }`}>
                     {selectedDetailedProduct.approvalStatus === 'approved' ? 'Approved & Live' :
                       (selectedDetailedProduct.approvalStatus === 'pending' && selectedDetailedProduct.adminCode) ? 'Pending Activation' :
@@ -6320,7 +6370,7 @@ export default function EmahuProDashboard() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                   <span className={`status-badge ${selectedDetailedSeller.status === 'approved' ? 'in-stock' :
-                      selectedDetailedSeller.status === 'pending' ? 'draft' : 'out-of-stock'
+                    selectedDetailedSeller.status === 'pending' ? 'draft' : 'out-of-stock'
                     }`}>
                     {selectedDetailedSeller.status === 'approved' ? 'Approved' :
                       selectedDetailedSeller.status === 'rejected' ? 'Rejected' :
@@ -6497,7 +6547,7 @@ export default function EmahuProDashboard() {
         </div>
       )}
 
-            {/* --- ADD PRODUCT MODAL --- */}
+      {/* --- ADD PRODUCT MODAL --- */}
       <DynamicProductForm
         isOpen={isAddModalOpen}
         onClose={() => {
@@ -6526,7 +6576,7 @@ export default function EmahuProDashboard() {
           fetchProducts();
         }}
       />
-      
+
       {/* --- DELIVERY PARTNER MODAL (LIGHT MODE) --- */}
       {isDeliveryModalOpen && (
         <div className="modal-overlay" style={{ zIndex: 9999 }}>
@@ -6728,8 +6778,8 @@ export default function EmahuProDashboard() {
             {/* Confirm Footer */}
             {selectedPartnerId && (() => {
               const isSelfDelivery = selectedPartnerId === 'sd';
-              const partner = isSelfDelivery 
-                ? { _id: 'sd', name: 'Self-Delivery (sd)', totalCost: 0, currentCity: 'Merchant Location' } 
+              const partner = isSelfDelivery
+                ? { _id: 'sd', name: 'Self-Delivery (sd)', totalCost: 0, currentCity: 'Merchant Location' }
                 : availablePartners.find(p => p._id === selectedPartnerId);
 
               return (
@@ -6772,11 +6822,11 @@ export default function EmahuProDashboard() {
         return (
           <div className="modal-overlay" style={{ zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
             <div style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '480px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-              
+
               {/* Header */}
               <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>💰 Release Escrow Payment</h3>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>💰 Release Emahu Payment</h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>Order #{selectedDetailedOrder.orderId}</p>
                 </div>
                 <button onClick={() => setIsReleaseModalOpen(false)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#64748b', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -6787,13 +6837,13 @@ export default function EmahuProDashboard() {
               {/* Content */}
               <div style={{ padding: '22px' }}>
                 <p style={{ margin: '0 0 20px 0', fontSize: '0.84rem', color: '#475569', lineHeight: '1.5' }}>
-                  The customer has received the shipment. Please authorize the release of the escrow funds. The platform commission fee will be automatically deducted.
+                  The customer has received the shipment. Please authorize the release of the Emahu funds. The platform commission fee will be automatically deducted.
                 </p>
 
                 {/* Calculation breakdown card */}
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
                   <h4 style={{ margin: '0 0 12px 0', fontSize: '0.88rem', fontWeight: '700', color: '#0f172a' }}>Settlement Summary</h4>
-                  
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#475569', marginBottom: '8px' }}>
                     <span>Order Bill (Products Total)</span>
                     <span style={{ fontWeight: '600', color: '#0f172a' }}>₹{productAmount.toLocaleString('en-IN')}</span>
@@ -6828,7 +6878,7 @@ export default function EmahuProDashboard() {
                   >
                     Cancel
                   </button>
-                  
+
                   <button
                     onClick={() => handleReleasePayment(selectedDetailedOrder.orderId)}
                     disabled={isReleasingPayment}
@@ -6855,12 +6905,12 @@ export default function EmahuProDashboard() {
           </div>
         );
       })()}
-      
+
       {/* --- SELF-DELIVERED OTP VERIFICATION MODAL (LIGHT MODE) --- */}
       {isOtpModalOpen && (
         <div className="modal-overlay" style={{ zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
           <div style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '440px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-            
+
             {/* Header */}
             <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff' }}>
               <div>
@@ -6931,7 +6981,7 @@ export default function EmahuProDashboard() {
                 >
                   Cancel
                 </button>
-                
+
                 <button
                   type="submit"
                   disabled={isOtpSubmitting || otpCodeEntered.length !== 6}
@@ -6957,7 +7007,7 @@ export default function EmahuProDashboard() {
           </div>
         </div>
       )}
-      
+
       {/* --- REJECTION REASON MODAL --- */}
       {isRejectModalOpen && (
         <div className="modal-overlay" style={{ zIndex: 9999 }}>
@@ -7270,7 +7320,7 @@ export default function EmahuProDashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
                       {[['Order ID', <span key="id" style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#0f172a' }}>{selectedDetailedOrder.orderId}</span>],
                       ['Date', selectedDetailedOrder.date],
-                      ['Payment Status', <span key="status" style={{ color: '#16a34a', fontWeight: '600' }}>🔒 Secured in Escrow</span>],
+                      ['Payment Status', <span key="status" style={{ color: '#16a34a', fontWeight: '600' }}>🔒 Secured in Emahu</span>],
                       ].map(([label, val], i) => (
                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: i < 2 ? '1px solid #f0f0f0' : 'none', paddingBottom: i < 2 ? '8px' : '0' }}>
                           <span style={{ color: '#64748b' }}>{label}</span>
@@ -7284,16 +7334,16 @@ export default function EmahuProDashboard() {
                     </div>
                   </div>
 
-                  {/* Escrow Lock Details */}
+                  {/* Emahu Lock Details */}
                   <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
                     <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: '700', color: '#64748b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>🔐</span> Buyer Escrow Vault Lock
+                      <span>🔐</span> Buyer Emahu Vault Lock
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ color: '#64748b' }}>Vault Status</span>
-                        {verifiedEscrow[selectedDetailedOrder.orderId] ? (
+                        {verifiedEmahu[selectedDetailedOrder.orderId] ? (
                           <span style={{ color: '#16a34a', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             🟢 LOCKED &amp; VERIFIED
                           </span>
@@ -7305,9 +7355,9 @@ export default function EmahuProDashboard() {
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
-                        <span style={{ color: '#64748b' }}>Escrow Account</span>
+                        <span style={{ color: '#64748b' }}>Emahu Account</span>
                         <strong style={{ textTransform: 'capitalize' }}>
-                          {selectedDetailedOrder.escrowMethod ? `${selectedDetailedOrder.escrowMethod} Escrow` : 'Wallet Vault'}
+                          {selectedDetailedOrder.EmahuMethod ? `${selectedDetailedOrder.EmahuMethod} Emahu` : 'Wallet Vault'}
                         </strong>
                       </div>
 
@@ -7349,26 +7399,26 @@ export default function EmahuProDashboard() {
 
                       {/* Interactive Verification Action */}
                       <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '12px', marginTop: '4px' }}>
-                        {verifiedEscrow[selectedDetailedOrder.orderId] ? (
+                        {verifiedEmahu[selectedDetailedOrder.orderId] ? (
                           <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', padding: '10px 12px', color: '#065f46', fontSize: '0.8rem', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                             <span style={{ fontSize: '1rem', marginTop: '2px' }}>🛡️</span>
                             <div>
-                              <strong style={{ display: 'block', marginBottom: '2px' }}>Escrow Custody Confirmed</strong>
+                              <strong style={{ display: 'block', marginBottom: '2px' }}>Emahu Custody Confirmed</strong>
                               <span>Ledger verification successful. Funds of ₹{selectedDetailedOrder.total?.toLocaleString('en-IN')} are locked in custody. Release authorized only upon successful delivery.</span>
                             </div>
                           </div>
                         ) : (
                           <button
-                            onClick={() => handleVerifyEscrow(selectedDetailedOrder.orderId, selectedDetailedOrder.total || 0)}
-                            disabled={verifyingEscrow[selectedDetailedOrder.orderId]}
+                            onClick={() => handleVerifyEmahu(selectedDetailedOrder.orderId, selectedDetailedOrder.total || 0)}
+                            disabled={verifyingEmahu[selectedDetailedOrder.orderId]}
                             style={{
-                              width: '100%', padding: '9px 12px', background: verifyingEscrow[selectedDetailedOrder.orderId] ? '#cbd5e1' : '#4f46e5',
-                              color: verifyingEscrow[selectedDetailedOrder.orderId] ? '#475569' : '#fff', border: 'none', borderRadius: '8px',
-                              fontSize: '0.8rem', fontWeight: '700', cursor: verifyingEscrow[selectedDetailedOrder.orderId] ? 'not-allowed' : 'pointer',
+                              width: '100%', padding: '9px 12px', background: verifyingEmahu[selectedDetailedOrder.orderId] ? '#cbd5e1' : '#4f46e5',
+                              color: verifyingEmahu[selectedDetailedOrder.orderId] ? '#475569' : '#fff', border: 'none', borderRadius: '8px',
+                              fontSize: '0.8rem', fontWeight: '700', cursor: verifyingEmahu[selectedDetailedOrder.orderId] ? 'not-allowed' : 'pointer',
                               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s'
                             }}
                           >
-                            {verifyingEscrow[selectedDetailedOrder.orderId] ? (
+                            {verifyingEmahu[selectedDetailedOrder.orderId] ? (
                               <>
                                 <svg style={{ animation: 'spin 1s linear infinite' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                                   <circle cx="12" cy="12" r="10" stroke="rgba(0,0,0,0.1)" />
@@ -7377,7 +7427,7 @@ export default function EmahuProDashboard() {
                                 Verifying Lock Ledger...
                               </>
                             ) : (
-                              '🔎 Verify Escrow Lock Status'
+                              '🔎 Verify Emahu Lock Status'
                             )}
                           </button>
                         )}
@@ -7450,14 +7500,14 @@ export default function EmahuProDashboard() {
                       {leafletLoaded && selectedDetailedOrder.buyerLocation?.latitude !== undefined && selectedDetailedOrder.sellerLocation?.latitude !== undefined && (
                         <div style={{ marginTop: '12px' }}>
                           <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '6px' }}>🗺️ Live Transit Route Map</span>
-                          <LiveTrackingMap 
-                            orderId={selectedDetailedOrder.orderId} 
+                          <LiveTrackingMap
+                            orderId={selectedDetailedOrder.orderId}
                             trackingData={liveTrackingDetails || {
                               sellerLocation: selectedDetailedOrder.sellerLocation,
                               buyerLocation: selectedDetailedOrder.buyerLocation,
                               partnerLocation: null
-                            }} 
-                            leafletLoaded={leafletLoaded} 
+                            }}
+                            leafletLoaded={leafletLoaded}
                           />
                         </div>
                       )}
@@ -7519,9 +7569,9 @@ export default function EmahuProDashboard() {
                       {selectedDetailedOrder.status === 'PENDING_APPROVAL' && (
                         <div style={{ background: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: '12px', padding: '18px' }}>
                           <p style={{ fontSize: '0.82rem', color: '#92400e', fontWeight: '600', margin: '0 0 12px 0' }}>⌛ Awaiting your decision. Approve or reject this order.</p>
-                          {!verifiedEscrow[selectedDetailedOrder.orderId] && (
+                          {!verifiedEmahu[selectedDetailedOrder.orderId] && (
                             <div style={{ fontSize: '0.76rem', color: '#b45309', background: '#fef3c7', padding: '8px 10px', borderRadius: '6px', marginBottom: '14px', border: '1px solid #fde68a' }}>
-                              💡 <strong>Tip:</strong> Click the <strong>Verify Escrow Lock Status</strong> button in the left panel first to ensure buyer payment is securely locked.
+                              💡 <strong>Tip:</strong> Click the <strong>Verify Emahu Lock Status</strong> button in the left panel first to ensure buyer payment is securely locked.
                             </div>
                           )}
                           <div style={{ display: 'flex', gap: '10px' }}>
@@ -7554,7 +7604,7 @@ export default function EmahuProDashboard() {
                             <span style={{ fontSize: '1.25rem' }}>✓</span> Order Confirmed &amp; Secured
                           </div>
                           <div style={{ fontSize: '0.82rem', opacity: 0.9, lineHeight: '1.4' }}>
-                            This order is approved. Escrow funds are locked in custody and protected under Emahu vault terms.
+                            This order is approved. Emahu funds are locked in custody and protected under Emahu vault terms.
                           </div>
                         </div>
                       )}
@@ -7618,7 +7668,7 @@ export default function EmahuProDashboard() {
                           {/* Progress Shipping State buttons */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
                             <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>TRANSIT WORKFLOW ADVANCEMENT ACTIONS</span>
-                            
+
                             {(selectedDetailedOrder.status === 'APPROVED' || (selectedDetailedOrder.status === 'READY_FOR_PICKUP' && !selectedDetailedOrder.carrier)) && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <button
@@ -7744,8 +7794,8 @@ export default function EmahuProDashboard() {
                                 <div style={{ fontSize: '1.8rem', marginBottom: '6px' }}>🎉</div>
                                 <p style={{ color: '#15803d', fontWeight: '700', fontSize: '0.9rem', margin: '0 0 4px 0' }}>Order Delivered</p>
                                 <p style={{ color: '#16a34a', fontSize: '0.78rem', margin: 0, lineHeight: '1.4' }}>
-                                  {selectedDetailedOrder.paymentStatus === 'released' || selectedDetailedOrder.paymentReleased ? 
-                                    '💰 Payout has been successfully released to your merchant account.' : 
+                                  {selectedDetailedOrder.paymentStatus === 'released' || selectedDetailedOrder.paymentReleased ?
+                                    '💰 Payout has been successfully released to your merchant account.' :
                                     'Awaiting payout clearance from Admin settlement processing.'}
                                 </p>
                               </div>
@@ -7773,7 +7823,7 @@ export default function EmahuProDashboard() {
                               <strong>Reason:</strong> {selectedDetailedOrder.rejectionReason}
                             </div>
                           )}
-                          <p style={{ fontSize: '0.77rem', color: '#94a3b8', marginTop: '10px', marginBottom: 0 }}>Escrow funds will be automatically returned to the buyer.</p>
+                          <p style={{ fontSize: '0.77rem', color: '#94a3b8', marginTop: '10px', marginBottom: 0 }}>Emahu funds will be automatically returned to the buyer.</p>
                         </div>
                       )}
 

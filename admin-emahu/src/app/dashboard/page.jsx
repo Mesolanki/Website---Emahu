@@ -65,10 +65,10 @@ const openDocInNewTab = (url) => {
             </style>
           </head>
           <body>
-            ${clean.startsWith('data:application/pdf') ? 
-              '<embed src="' + clean + '" type="application/pdf" width="100%" height="100%" />' : 
-              '<img src="' + clean + '" alt="Document Preview" />'
-            }
+            ${clean.startsWith('data:application/pdf') ?
+          '<embed src="' + clean + '" type="application/pdf" width="100%" height="100%" />' :
+          '<img src="' + clean + '" alt="Document Preview" />'
+        }
           </body>
         </html>
       `);
@@ -215,7 +215,7 @@ export default function AdminDashboard() {
   // Seller documents states
   const [selectedSellerDocs, setSelectedSellerDocs] = useState(null); // { sellerId, documents }
   const [loadingDocsSellerId, setLoadingDocsSellerId] = useState('');
-  
+
   // Premium Seller Detail Drawer Modal States
   const [selectedDetailSeller, setSelectedDetailSeller] = useState(null);
   const [detailTab, setDetailTab] = useState('profile'); // 'profile' | 'payout' | 'kyc' | 'performance'
@@ -225,6 +225,10 @@ export default function AdminDashboard() {
   const [releasingOrderId, setReleasingOrderId] = useState('');
   const [releasedReceipt, setReleasedReceipt] = useState(null);
   const [orderPenalties, setOrderPenalties] = useState({}); // { [orderId]: { amount: '', reason: '' } }
+
+  // Release Fund Panel (multi-step: bank → payment → confirm)
+  const [releasePanel, setReleasePanel] = useState(null); // { order, seller, penalty }
+  const [releasePanelStep, setReleasePanelStep] = useState('bank'); // 'bank' | 'payment' | 'confirm'
 
   // Inline custom SKUs map
   const [customSkus, setCustomSkus] = useState({});
@@ -242,7 +246,7 @@ export default function AdminDashboard() {
   const [selectedAdminCategory, setSelectedAdminCategory] = useState(null);
   const [isCategoryFormSaving, setIsCategoryFormSaving] = useState(false);
   const [categoryHubSearchQuery, setCategoryHubSearchQuery] = useState('');
-  
+
   // Category form fields state
   const [catFormName, setCatFormName] = useState('');
   const [catFormParentId, setCatFormParentId] = useState('');
@@ -363,7 +367,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('emahu_admin_logged_in') === 'true';
     const token = localStorage.getItem('emahu_admin_token');
-    
+
     let isTokenExpired = false;
     if (token) {
       const payload = decodeToken(token);
@@ -421,7 +425,7 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem('emahu_admin_token');
       if (!token) return;
-      
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/sellers`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -432,7 +436,7 @@ export default function AdminDashboard() {
         return;
       }
       const data = await res.json();
-      
+
       if (data.success) {
         const sortedSellers = (data.sellers || [])
           .map(s => ({ ...s, status: s.status || 'approved' }))
@@ -583,7 +587,7 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem('emahu_admin_token');
       const isNew = !selectedAdminCategory || selectedAdminCategory.id === 'new';
-      
+
       const payload = {
         name: catFormName.trim(),
         parentId: catFormParentId || null,
@@ -697,7 +701,7 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem('emahu_admin_token');
       if (!token) return;
-      
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/admin/delivery-partners`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -708,7 +712,7 @@ export default function AdminDashboard() {
         return;
       }
       const data = await res.json();
-      
+
       if (data.success) {
         setDeliveryPartners(data.deliveryPartners || []);
         setDeliveryPartnersError(false);
@@ -778,7 +782,7 @@ export default function AdminDashboard() {
     setPayoutSubmitting(true);
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      
+
       const orderTotal = selectedDetailOrder.total || 0;
       const productAmount = selectedDetailOrder.productAmount || orderTotal;
       const feePercent = selectedDetailOrder.platformFeePercent !== undefined ? selectedDetailOrder.platformFeePercent : platformFeePercent;
@@ -845,7 +849,7 @@ export default function AdminDashboard() {
       const est = customTrackingData?.estDays || estDays || '';
 
       nextStatus = 'LABEL_GENERATED'; // transition directly to label generated as in seller dashboard
-      
+
       const filtered1 = timeline.filter(t => t.status !== 'DELIVERY_ASSIGNED');
       filtered1.push({
         status: 'DELIVERY_ASSIGNED',
@@ -1096,7 +1100,7 @@ export default function AdminDashboard() {
       const releaseData = await releaseRes.json();
       if (releaseData.success) {
         triggerToast('Success', `Payment for Order #${orderId} has been successfully released!`, 'success');
-        
+
         // Show receipt dialog
         setReleasedReceipt({
           orderId: releaseData.orderId,
@@ -1201,7 +1205,7 @@ export default function AdminDashboard() {
         setIs2FAEnabled(true);
         setIsSettingUp2FA(false);
         setTotpCode('');
-        
+
         const updatedUser = { ...adminUser, isTwoFactorEnabled: true };
         setAdminUser(updatedUser);
         localStorage.setItem('emahu_admin_user', JSON.stringify(updatedUser));
@@ -1235,7 +1239,7 @@ export default function AdminDashboard() {
       if (data.success) {
         setIs2FAEnabled(false);
         setTotpCode('');
-        
+
         const updatedUser = { ...adminUser, isTwoFactorEnabled: false };
         setAdminUser(updatedUser);
         localStorage.setItem('emahu_admin_user', JSON.stringify(updatedUser));
@@ -1402,7 +1406,7 @@ export default function AdminDashboard() {
         setEditPartnerDeliveryScope(selectedDetailPartner.deliveryScope || 'local');
         setEditPartnerPerKmRate(String(selectedDetailPartner.perKmRate || selectedDetailPartner.perItemCharge || '5'));
         setEditPartnerCoveredCities(selectedDetailPartner.coveredCities || []);
-        
+
         if (selectedDetailPartner.serviceAreaState) {
           if (Array.isArray(selectedDetailPartner.serviceAreaState)) {
             setEditPartnerServiceAreaState(selectedDetailPartner.serviceAreaState[0] || '');
@@ -1747,8 +1751,8 @@ export default function AdminDashboard() {
     setFeedbackTargetId(id);
     setFeedbackDecision(decision);
     setFeedbackText(
-      decision === 'more_info_requested' 
-        ? 'Please provide additional details or verify your uploaded documents.' 
+      decision === 'more_info_requested'
+        ? 'Please provide additional details or verify your uploaded documents.'
         : ''
     );
     setIsFeedbackModalOpen(true);
@@ -1810,73 +1814,73 @@ export default function AdminDashboard() {
               <div className="ad-detail-info-grid">
                 <div className="ad-detail-info-section">
                   <h4>Carrier Credentials & Specs</h4>
-                  
+
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Name / Driver Name</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      className="ad-modal-input" 
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={newPartnerName} 
-                      onChange={(e) => setNewPartnerName(e.target.value)} 
+                      value={newPartnerName}
+                      onChange={(e) => setNewPartnerName(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Mobile Number</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      className="ad-modal-input" 
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={newPartnerPhone} 
-                      onChange={(e) => setNewPartnerPhone(e.target.value)} 
+                      value={newPartnerPhone}
+                      onChange={(e) => setNewPartnerPhone(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Operating Location / City Hub</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      className="ad-modal-input" 
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={newPartnerOperatingLocation} 
-                      onChange={(e) => setNewPartnerOperatingLocation(e.target.value)} 
+                      value={newPartnerOperatingLocation}
+                      onChange={(e) => setNewPartnerOperatingLocation(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Salary Requirement</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      className="ad-modal-input" 
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={newPartnerSalaryRequirement} 
-                      onChange={(e) => setNewPartnerSalaryRequirement(e.target.value)} 
+                      value={newPartnerSalaryRequirement}
+                      onChange={(e) => setNewPartnerSalaryRequirement(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Street Address</label>
-                    <input 
-                      type="text" 
-                      className="ad-modal-input" 
+                    <input
+                      type="text"
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={newPartnerAddress} 
-                      onChange={(e) => setNewPartnerAddress(e.target.value)} 
+                      value={newPartnerAddress}
+                      onChange={(e) => setNewPartnerAddress(e.target.value)}
                     />
                   </div>
 
                   {/* Category Selector */}
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Category</label>
-                    <select 
-                      className="ad-modal-input" 
+                    <select
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
-                      value={newPartnerCategory} 
+                      value={newPartnerCategory}
                       onChange={(e) => {
                         const val = e.target.value;
                         setNewPartnerCategory(val);
@@ -1897,10 +1901,10 @@ export default function AdminDashboard() {
                   {newPartnerCategory !== 'single_two_boy' && (
                     <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                       <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Delivery Scope</label>
-                      <select 
-                        className="ad-modal-input" 
+                      <select
+                        className="ad-modal-input"
                         style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
-                        value={newPartnerDeliveryScope} 
+                        value={newPartnerDeliveryScope}
                         onChange={(e) => {
                           const val = e.target.value;
                           setNewPartnerDeliveryScope(val);
@@ -1921,7 +1925,7 @@ export default function AdminDashboard() {
                       {newPartnerCategory === 'single_two_boy' ? 'Service State' : 'Service States (Select Multiple)'}
                     </label>
                     {newPartnerCategory === 'single_two_boy' ? (
-                      <select 
+                      <select
                         className="ad-modal-input"
                         style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
                         value={newPartnerServiceAreaState}
@@ -1936,7 +1940,7 @@ export default function AdminDashboard() {
                         ))}
                       </select>
                     ) : (
-                      <select 
+                      <select
                         className="ad-modal-input"
                         style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
                         value=""
@@ -1954,14 +1958,14 @@ export default function AdminDashboard() {
                         ))}
                       </select>
                     )}
-                    
+
                     {newPartnerCategory !== 'single_two_boy' && newPartnerSelectedStates.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
                         {newPartnerSelectedStates.map((st) => (
                           <span key={st} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#3f3f46', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
                             {st}
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               onClick={() => {
                                 const updated = newPartnerSelectedStates.filter(s => s !== st);
                                 setNewPartnerSelectedStates(updated);
@@ -1984,7 +1988,7 @@ export default function AdminDashboard() {
                       {newPartnerCategory === 'single_two_boy' ? 'Service City' : 'Covered Cities'}
                     </label>
                     {newPartnerCategory === 'single_two_boy' ? (
-                      <select 
+                      <select
                         className="ad-modal-input"
                         style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
                         value={newPartnerCoveredCities[0] || ""}
@@ -2004,23 +2008,23 @@ export default function AdminDashboard() {
                         ))}
                       </select>
                     ) : (
-                      <select 
+                      <select
                         className="ad-modal-input"
                         style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
                         value=""
                         onChange={(e) => {
                           const selectedCity = e.target.value;
                           if (!selectedCity) return;
-                          
+
                           if (newPartnerDeliveryScope === 'local' && newPartnerCoveredCities.length >= 2) {
                             alert('Local Delivery Partners can select a maximum of 2 cities.');
                             return;
                           }
-                          
+
                           if (newPartnerCoveredCities.includes(selectedCity)) {
                             return;
                           }
-                          
+
                           setNewPartnerCoveredCities([...newPartnerCoveredCities, selectedCity]);
                         }}
                         disabled={newPartnerSelectedStates.length === 0}
@@ -2033,14 +2037,14 @@ export default function AdminDashboard() {
                         }
                       </select>
                     )}
-                    
+
                     {newPartnerCategory !== 'single_two_boy' && newPartnerCoveredCities.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
                         {newPartnerCoveredCities.map((city) => (
                           <span key={city} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#0d9488', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
                             {city}
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               onClick={() => setNewPartnerCoveredCities(newPartnerCoveredCities.filter(c => c !== city))}
                               style={{ border: 'none', background: 'transparent', color: '#f87171', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
                             >
@@ -2055,74 +2059,74 @@ export default function AdminDashboard() {
                   {/* Rate per Kilometer */}
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Rate Per KM (₹)</label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       required
-                      className="ad-modal-input" 
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={newPartnerPerKmRate} 
-                      onChange={(e) => setNewPartnerPerKmRate(e.target.value)} 
+                      value={newPartnerPerKmRate}
+                      onChange={(e) => setNewPartnerPerKmRate(e.target.value)}
                     />
                   </div>
                 </div>
 
                 <div className="ad-detail-info-section">
                   <h4>Service Territory Hierarchy</h4>
-                  
+
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Country</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      className="ad-modal-input" 
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={newPartnerServiceAreaCountry} 
-                      onChange={(e) => setNewPartnerServiceAreaCountry(e.target.value)} 
+                      value={newPartnerServiceAreaCountry}
+                      onChange={(e) => setNewPartnerServiceAreaCountry(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Region</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      className="ad-modal-input" 
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={newPartnerServiceAreaRegion} 
-                      onChange={(e) => setNewPartnerServiceAreaRegion(e.target.value)} 
+                      value={newPartnerServiceAreaRegion}
+                      onChange={(e) => setNewPartnerServiceAreaRegion(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>District</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      className="ad-modal-input" 
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={newPartnerServiceAreaDistrict} 
-                      onChange={(e) => setNewPartnerServiceAreaDistrict(e.target.value)} 
+                      value={newPartnerServiceAreaDistrict}
+                      onChange={(e) => setNewPartnerServiceAreaDistrict(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>State</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      className="ad-modal-input" 
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={newPartnerServiceAreaState} 
-                      onChange={(e) => setNewPartnerServiceAreaState(e.target.value)} 
+                      value={newPartnerServiceAreaState}
+                      onChange={(e) => setNewPartnerServiceAreaState(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>City</label>
-                    <select 
-                      className="ad-modal-input" 
+                    <select
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
-                      value={newPartnerServiceAreaCity} 
+                      value={newPartnerServiceAreaCity}
                       onChange={(e) => setNewPartnerServiceAreaCity(e.target.value)}
                     >
                       <option value="">Select City</option>
@@ -2147,10 +2151,10 @@ export default function AdminDashboard() {
                 >
                   {newPartnerLoading ? 'Adding Partner...' : 'Create Partner Account'}
                 </button>
-                <button 
+                <button
                   type="button"
-                  className="ad-btn-sec" 
-                  style={{ height: '42px', padding: '0 20px', fontSize: '0.9rem' }} 
+                  className="ad-btn-sec"
+                  style={{ height: '42px', padding: '0 20px', fontSize: '0.9rem' }}
                   onClick={() => setIsAddPartnerOpen(false)}
                 >
                   Cancel
@@ -2167,8 +2171,8 @@ export default function AdminDashboard() {
           <div className="ad-modal">
             <h3 className="ad-modal-title">
               {feedbackDecision === 'request_changes' ? 'Request Listing Changes' :
-               feedbackDecision === 'more_info_requested' ? 'Request More Information' :
-               'Provide Rejection Reason'}
+                feedbackDecision === 'more_info_requested' ? 'Request More Information' :
+                  'Provide Rejection Reason'}
             </h3>
             <p className="ad-modal-desc">Please enter feedback or instructions for the seller:</p>
             <textarea
@@ -2187,12 +2191,12 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-            {/* Premium Delivery Partner Detail Drawer/Modal */}
+      {/* Premium Delivery Partner Detail Drawer/Modal */}
       {selectedDetailPartner && (
         <div className="ad-modal-overlay" onClick={() => setSelectedDetailPartner(null)}>
           <div className="ad-detail-modal" onClick={(e) => e.stopPropagation()}>
             <button className="ad-detail-close" onClick={() => setSelectedDetailPartner(null)}>✕</button>
-            
+
             <div className="ad-detail-header-block">
               <div className="ad-detail-title-section">
                 <h3 className="ad-detail-store-name">{selectedDetailPartner.name || 'Delivery Partner'}</h3>
@@ -2235,14 +2239,14 @@ export default function AdminDashboard() {
               <div className="ad-detail-info-grid">
                 <div className="ad-detail-info-section">
                   <h4>Edit Fleet Parameters</h4>
-                  
+
                   {/* Category Selector */}
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Category</label>
-                    <select 
-                      className="ad-modal-input" 
+                    <select
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
-                      value={editPartnerCategory} 
+                      value={editPartnerCategory}
                       onChange={(e) => {
                         const val = e.target.value;
                         setEditPartnerCategory(val);
@@ -2263,10 +2267,10 @@ export default function AdminDashboard() {
                   {editPartnerCategory !== 'single_two_boy' && (
                     <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                       <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Delivery Scope</label>
-                      <select 
-                        className="ad-modal-input" 
+                      <select
+                        className="ad-modal-input"
                         style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
-                        value={editPartnerDeliveryScope} 
+                        value={editPartnerDeliveryScope}
                         onChange={(e) => {
                           const val = e.target.value;
                           setEditPartnerDeliveryScope(val);
@@ -2287,7 +2291,7 @@ export default function AdminDashboard() {
                       {editPartnerCategory === 'single_two_boy' ? 'Service State' : 'Service States (Select Multiple)'}
                     </label>
                     {editPartnerCategory === 'single_two_boy' ? (
-                      <select 
+                      <select
                         className="ad-modal-input"
                         style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
                         value={editPartnerServiceAreaState}
@@ -2302,7 +2306,7 @@ export default function AdminDashboard() {
                         ))}
                       </select>
                     ) : (
-                      <select 
+                      <select
                         className="ad-modal-input"
                         style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
                         value=""
@@ -2320,14 +2324,14 @@ export default function AdminDashboard() {
                         ))}
                       </select>
                     )}
-                    
+
                     {editPartnerCategory !== 'single_two_boy' && editPartnerSelectedStates.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
                         {editPartnerSelectedStates.map((st) => (
                           <span key={st} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#3f3f46', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
                             {st}
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               onClick={() => {
                                 const updated = editPartnerSelectedStates.filter(s => s !== st);
                                 setEditPartnerSelectedStates(updated);
@@ -2350,7 +2354,7 @@ export default function AdminDashboard() {
                       {editPartnerCategory === 'single_two_boy' ? 'Service City' : 'Covered Cities'}
                     </label>
                     {editPartnerCategory === 'single_two_boy' ? (
-                      <select 
+                      <select
                         className="ad-modal-input"
                         style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
                         value={editPartnerCoveredCities[0] || ""}
@@ -2370,23 +2374,23 @@ export default function AdminDashboard() {
                         ))}
                       </select>
                     ) : (
-                      <select 
+                      <select
                         className="ad-modal-input"
                         style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
                         value=""
                         onChange={(e) => {
                           const selectedCity = e.target.value;
                           if (!selectedCity) return;
-                          
+
                           if (editPartnerDeliveryScope === 'local' && editPartnerCoveredCities.length >= 2) {
                             alert('Local Delivery Partners can select a maximum of 2 cities.');
                             return;
                           }
-                          
+
                           if (editPartnerCoveredCities.includes(selectedCity)) {
                             return;
                           }
-                          
+
                           setEditPartnerCoveredCities([...editPartnerCoveredCities, selectedCity]);
                         }}
                         disabled={editPartnerSelectedStates.length === 0}
@@ -2399,14 +2403,14 @@ export default function AdminDashboard() {
                         }
                       </select>
                     )}
-                    
+
                     {editPartnerCategory !== 'single_two_boy' && editPartnerCoveredCities.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
                         {editPartnerCoveredCities.map((city) => (
                           <span key={city} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#0d9488', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
                             {city}
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               onClick={() => setEditPartnerCoveredCities(editPartnerCoveredCities.filter(c => c !== city))}
                               style={{ border: 'none', background: 'transparent', color: '#f87171', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
                             >
@@ -2421,102 +2425,102 @@ export default function AdminDashboard() {
                   {/* Rate per Kilometer */}
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Rate Per KM (₹)</label>
-                    <input 
-                      type="number" 
-                      className="ad-modal-input" 
+                    <input
+                      type="number"
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerPerKmRate} 
-                      onChange={(e) => setEditPartnerPerKmRate(e.target.value)} 
+                      value={editPartnerPerKmRate}
+                      onChange={(e) => setEditPartnerPerKmRate(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Operating Location / City Hub</label>
-                    <input 
-                      type="text" 
-                      className="ad-modal-input" 
+                    <input
+                      type="text"
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerOperatingLocation} 
-                      onChange={(e) => setEditPartnerOperatingLocation(e.target.value)} 
+                      value={editPartnerOperatingLocation}
+                      onChange={(e) => setEditPartnerOperatingLocation(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Salary Requirement</label>
-                    <input 
-                      type="text" 
-                      className="ad-modal-input" 
+                    <input
+                      type="text"
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerSalaryRequirement} 
-                      onChange={(e) => setEditPartnerSalaryRequirement(e.target.value)} 
+                      value={editPartnerSalaryRequirement}
+                      onChange={(e) => setEditPartnerSalaryRequirement(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Street Address</label>
-                    <input 
-                      type="text" 
-                      className="ad-modal-input" 
+                    <input
+                      type="text"
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerAddress} 
-                      onChange={(e) => setEditPartnerAddress(e.target.value)} 
+                      value={editPartnerAddress}
+                      onChange={(e) => setEditPartnerAddress(e.target.value)}
                     />
                   </div>
                 </div>
 
                 <div className="ad-detail-info-section">
                   <h4>Edit Service Territory Hierarchy</h4>
-                  
+
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Country</label>
-                    <input 
-                      type="text" 
-                      className="ad-modal-input" 
+                    <input
+                      type="text"
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerServiceAreaCountry} 
-                      onChange={(e) => setEditPartnerServiceAreaCountry(e.target.value)} 
+                      value={editPartnerServiceAreaCountry}
+                      onChange={(e) => setEditPartnerServiceAreaCountry(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>Region</label>
-                    <input 
-                      type="text" 
-                      className="ad-modal-input" 
+                    <input
+                      type="text"
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerServiceAreaRegion} 
-                      onChange={(e) => setEditPartnerServiceAreaRegion(e.target.value)} 
+                      value={editPartnerServiceAreaRegion}
+                      onChange={(e) => setEditPartnerServiceAreaRegion(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>District</label>
-                    <input 
-                      type="text" 
-                      className="ad-modal-input" 
+                    <input
+                      type="text"
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerServiceAreaDistrict} 
-                      onChange={(e) => setEditPartnerServiceAreaDistrict(e.target.value)} 
+                      value={editPartnerServiceAreaDistrict}
+                      onChange={(e) => setEditPartnerServiceAreaDistrict(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>State</label>
-                    <input 
-                      type="text" 
-                      className="ad-modal-input" 
+                    <input
+                      type="text"
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem' }}
-                      value={editPartnerServiceAreaState} 
-                      onChange={(e) => setEditPartnerServiceAreaState(e.target.value)} 
+                      value={editPartnerServiceAreaState}
+                      onChange={(e) => setEditPartnerServiceAreaState(e.target.value)}
                     />
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
                     <label style={{ fontSize: '0.75rem', color: 'var(--color-admin-muted)' }}>City</label>
-                    <select 
-                      className="ad-modal-input" 
+                    <select
+                      className="ad-modal-input"
                       style={{ margin: 0, height: '36px', fontSize: '0.85rem', backgroundColor: '#18181b', color: '#fff' }}
-                      value={editPartnerServiceAreaCity} 
+                      value={editPartnerServiceAreaCity}
                       onChange={(e) => setEditPartnerServiceAreaCity(e.target.value)}
                     >
                       <option value="Ahmedabad">Ahmedabad</option>
@@ -2530,11 +2534,11 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="ad-detail-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px' }}>
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       id="editPartnerIsActive"
-                      checked={editPartnerIsActive} 
-                      onChange={(e) => setEditPartnerIsActive(e.target.checked)} 
+                      checked={editPartnerIsActive}
+                      onChange={(e) => setEditPartnerIsActive(e.target.checked)}
                     />
                     <label htmlFor="editPartnerIsActive" style={{ fontSize: '0.85rem', color: '#fff', cursor: 'pointer' }}>
                       Carrier Active & Available for Orders
@@ -2621,7 +2625,7 @@ export default function AdminDashboard() {
         <div className="ad-modal-overlay" onClick={() => setSelectedDetailSeller(null)}>
           <div className="ad-detail-modal" onClick={(e) => e.stopPropagation()}>
             <button className="ad-detail-close" onClick={() => setSelectedDetailSeller(null)}>✕</button>
-            
+
             <div className="ad-detail-header-block">
               <div className="ad-detail-title-section">
                 <h3 className="ad-detail-store-name">{selectedDetailSeller.storeName || 'Merchant Profile'}</h3>
@@ -2637,19 +2641,19 @@ export default function AdminDashboard() {
             </div>
 
             <div className="ad-detail-tabs-nav">
-              <button 
+              <button
                 className={`ad-detail-tab-trigger ${detailTab === 'profile' ? 'active' : ''}`}
                 onClick={() => setDetailTab('profile')}
               >
                 Business Profile
               </button>
-              <button 
+              <button
                 className={`ad-detail-tab-trigger ${detailTab === 'payout' ? 'active' : ''}`}
                 onClick={() => setDetailTab('payout')}
               >
                 Payout Accounts
               </button>
-              <button 
+              <button
                 className={`ad-detail-tab-trigger ${detailTab === 'kyc' ? 'active' : ''}`}
                 onClick={() => {
                   setDetailTab('kyc');
@@ -2658,13 +2662,13 @@ export default function AdminDashboard() {
               >
                 Documents Compliance
               </button>
-              <button 
+              <button
                 className={`ad-detail-tab-trigger ${detailTab === 'performance' ? 'active' : ''}`}
                 onClick={() => setDetailTab('performance')}
               >
                 Store Analytics
               </button>
-              <button 
+              <button
                 className={`ad-detail-tab-trigger ${detailTab === 'settlement' ? 'active' : ''}`}
                 onClick={() => {
                   setDetailTab('settlement');
@@ -2693,7 +2697,7 @@ export default function AdminDashboard() {
                       <span className="ad-detail-row-val">{selectedDetailSeller.createdAt ? new Date(selectedDetailSeller.createdAt).toLocaleDateString('en-IN') : 'N/A'}</span>
                     </div>
                   </div>
-                  
+
                   <div className="ad-detail-info-section">
                     <h4>Contact Directory</h4>
                     <div className="ad-detail-row">
@@ -2757,7 +2761,7 @@ export default function AdminDashboard() {
                       </>
                     )}
                   </div>
-                  
+
                   {/* Documents Section directly on profile tab for immediate approval */}
                   <div className="ad-detail-info-section" style={{ marginTop: '24px' }}>
                     <h4 style={{ marginBottom: '14px' }}>Uploaded Compliance Documents (Immediate Audit)</h4>
@@ -2771,44 +2775,44 @@ export default function AdminDashboard() {
                           <div key={doc._id} className="ad-detail-doc-item">
                             <div className="ad-detail-doc-info">
                               <span className="ad-detail-doc-title">{doc.documentType?.replace(/_/g, ' ')}</span>
-                              <a 
-                                href="#" 
-                                onClick={(e) => { e.preventDefault(); openDocInNewTab(doc.fileUrl); }} 
-                                className="ad-detail-doc-link" 
+                              <a
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); openDocInNewTab(doc.fileUrl); }}
+                                className="ad-detail-doc-link"
                                 style={{ display: 'inline-block', marginBottom: '8px' }}
                               >
                                 🔗 Open Document File Reference
                               </a>
                               {isRealImage(doc.fileUrl) ? (
-                                <div style={{ 
-                                  marginTop: '8px', 
-                                  borderRadius: '8px', 
-                                  overflow: 'hidden', 
-                                  border: '1px solid var(--color-admin-border)', 
-                                  maxWidth: '100%', 
+                                <div style={{
+                                  marginTop: '8px',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  border: '1px solid var(--color-admin-border)',
+                                  maxWidth: '100%',
                                   maxHeight: '240px',
                                   background: 'rgba(0,0,0,0.2)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center'
                                 }}>
-                                  <img 
-                                    src={cleanImageUrl(doc.fileUrl)} 
-                                    alt={doc.documentType} 
+                                  <img
+                                    src={cleanImageUrl(doc.fileUrl)}
+                                    alt={doc.documentType}
                                     style={{ maxWidth: '100%', maxHeight: '240px', objectFit: 'contain', cursor: 'pointer' }}
                                     onClick={() => openDocInNewTab(cleanImageUrl(doc.fileUrl))}
                                   />
                                 </div>
                               ) : doc.fileUrl && doc.fileUrl.toLowerCase().endsWith('.pdf') ? (
-                                <div style={{ 
-                                  marginTop: '8px', 
-                                  padding: '12px', 
-                                  borderRadius: '8px', 
-                                  background: 'rgba(255,255,255,0.02)', 
-                                  border: '1px solid var(--color-admin-border)', 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  gap: '10px' 
+                                <div style={{
+                                  marginTop: '8px',
+                                  padding: '12px',
+                                  borderRadius: '8px',
+                                  background: 'rgba(255,255,255,0.02)',
+                                  border: '1px solid var(--color-admin-border)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '10px'
                                 }}>
                                   <span style={{ fontSize: '1.8rem' }}>📄</span>
                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -2827,7 +2831,7 @@ export default function AdminDashboard() {
                                 </div>
                               )}
                             </div>
-                            
+
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               {doc.status === 'approved' && (
                                 <span style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
@@ -2918,14 +2922,14 @@ export default function AdminDashboard() {
                     <div className="ad-detail-row" style={{ borderTop: '1px dashed rgba(255, 255, 255, 0.04)', paddingTop: '10px', marginTop: '10px' }}>
                       <span className="ad-detail-row-label">Bank Settlement Status</span>
                       <span className="ad-detail-row-val" style={{
-                        color: selectedDetailSeller.status === 'approved' ? '#10b981' : 
-                               (selectedDetailSeller.status === 'suspended' || selectedDetailSeller.status === 'blocked') ? '#ef4444' :
-                               selectedDetailSeller.status === 'rejected' ? '#ef4444' : '#f59e0b',
+                        color: selectedDetailSeller.status === 'approved' ? '#10b981' :
+                          (selectedDetailSeller.status === 'suspended' || selectedDetailSeller.status === 'blocked') ? '#ef4444' :
+                            selectedDetailSeller.status === 'rejected' ? '#ef4444' : '#f59e0b',
                         fontWeight: 'bold'
                       }}>
-                        {selectedDetailSeller.status === 'approved' ? 'Active' : 
-                         (selectedDetailSeller.status === 'suspended' || selectedDetailSeller.status === 'blocked') ? 'Suspended' :
-                         selectedDetailSeller.status === 'rejected' ? 'Rejected' : 'Pending Verification'}
+                        {selectedDetailSeller.status === 'approved' ? 'Active' :
+                          (selectedDetailSeller.status === 'suspended' || selectedDetailSeller.status === 'blocked') ? 'Suspended' :
+                            selectedDetailSeller.status === 'rejected' ? 'Rejected' : 'Pending Verification'}
                       </span>
                     </div>
                   </div>
@@ -2946,7 +2950,7 @@ export default function AdminDashboard() {
                         <span className="ad-detail-row-val" style={{ fontFamily: 'monospace' }}>{selectedDetailSeller.kycNumber || 'Not Provided'}</span>
                       </div>
                     </div>
-                    
+
                     <div className="ad-detail-info-section">
                       <h4>Compliance Standing</h4>
                       <div className="ad-detail-row">
@@ -2972,44 +2976,44 @@ export default function AdminDashboard() {
                           <div key={doc._id} className="ad-detail-doc-item">
                             <div className="ad-detail-doc-info">
                               <span className="ad-detail-doc-title">{doc.documentType?.replace(/_/g, ' ')}</span>
-                              <a 
-                                href="#" 
-                                onClick={(e) => { e.preventDefault(); openDocInNewTab(doc.fileUrl); }} 
-                                className="ad-detail-doc-link" 
+                              <a
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); openDocInNewTab(doc.fileUrl); }}
+                                className="ad-detail-doc-link"
                                 style={{ display: 'inline-block', marginBottom: '8px' }}
                               >
                                 🔗 Open Document File Reference
                               </a>
                               {isRealImage(doc.fileUrl) ? (
-                                <div style={{ 
-                                  marginTop: '8px', 
-                                  borderRadius: '8px', 
-                                  overflow: 'hidden', 
-                                  border: '1px solid var(--color-admin-border)', 
-                                  maxWidth: '100%', 
+                                <div style={{
+                                  marginTop: '8px',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  border: '1px solid var(--color-admin-border)',
+                                  maxWidth: '100%',
                                   maxHeight: '240px',
                                   background: 'rgba(0,0,0,0.2)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center'
                                 }}>
-                                  <img 
-                                    src={cleanImageUrl(doc.fileUrl)} 
-                                    alt={doc.documentType} 
+                                  <img
+                                    src={cleanImageUrl(doc.fileUrl)}
+                                    alt={doc.documentType}
                                     style={{ maxWidth: '100%', maxHeight: '240px', objectFit: 'contain', cursor: 'pointer' }}
                                     onClick={() => openDocInNewTab(cleanImageUrl(doc.fileUrl))}
                                   />
                                 </div>
                               ) : doc.fileUrl && doc.fileUrl.toLowerCase().endsWith('.pdf') ? (
-                                <div style={{ 
-                                  marginTop: '8px', 
-                                  padding: '12px', 
-                                  borderRadius: '8px', 
-                                  background: 'rgba(255,255,255,0.02)', 
-                                  border: '1px solid var(--color-admin-border)', 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  gap: '10px' 
+                                <div style={{
+                                  marginTop: '8px',
+                                  padding: '12px',
+                                  borderRadius: '8px',
+                                  background: 'rgba(255,255,255,0.02)',
+                                  border: '1px solid var(--color-admin-border)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '10px'
                                 }}>
                                   <span style={{ fontSize: '1.8rem' }}>📄</span>
                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -3028,7 +3032,7 @@ export default function AdminDashboard() {
                                 </div>
                               )}
                             </div>
-                            
+
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               {doc.status === 'approved' && (
                                 <span style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
@@ -3106,7 +3110,7 @@ export default function AdminDashboard() {
                       <h4>₹{(selectedDetailSeller.totalRevenue || 0).toLocaleString('en-IN')}</h4>
                     </div>
                   </div>
-                  
+
                   <div className="ad-detail-info-section">
                     <h4>Merchant Performance Standing</h4>
                     <div className="ad-detail-row">
@@ -3196,7 +3200,7 @@ export default function AdminDashboard() {
                         <span style={{ fontWeight: '800', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981' }}>
                           <span>✓</span> Payout Settlement Bill Generated Successfully
                         </span>
-                        <button 
+                        <button
                           onClick={() => setReleasedReceipt(null)}
                           style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', width: '26px', height: '26px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}
                         >
@@ -3247,7 +3251,7 @@ export default function AdminDashboard() {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      
+
                       {/* SECTION 1: DELIVERED - READY FOR RELEASE */}
                       <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--color-admin-border)', borderRadius: '12px', padding: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '8px' }}>
@@ -3301,7 +3305,7 @@ export default function AdminDashboard() {
                                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
                                     <div style={{ flex: '1 1 120px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                       <label style={{ fontSize: '0.7rem', color: '#64748b' }}>Penalty Amount (₹)</label>
-                                      <input 
+                                      <input
                                         type="number"
                                         placeholder="Optional Penalty (e.g. 50)"
                                         value={penalty.amount}
@@ -3314,7 +3318,7 @@ export default function AdminDashboard() {
                                     </div>
                                     <div style={{ flex: '2 1 200px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                       <label style={{ fontSize: '0.7rem', color: '#64748b' }}>Reason for Penalty</label>
-                                      <input 
+                                      <input
                                         type="text"
                                         placeholder="Optional Reason (e.g. late delivery)"
                                         value={penalty.reason}
@@ -3336,22 +3340,25 @@ export default function AdminDashboard() {
                                     </div>
 
                                     <button
-                                      onClick={() => handleReleasePayment(order.orderId, penalty.amount, penalty.reason)}
+                                      onClick={() => {
+                                        setReleasePanel({ order, seller: selectedDetailSeller, penalty });
+                                        setReleasePanelStep('bank');
+                                      }}
                                       disabled={releasingOrderId === order.orderId}
                                       style={{
                                         padding: '7px 16px',
                                         fontSize: '0.78rem',
-                                        background: '#10b981',
+                                        background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
                                         color: '#fff',
                                         border: 'none',
                                         borderRadius: '6px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
                                         opacity: releasingOrderId === order.orderId ? 0.6 : 1,
-                                        boxShadow: '0 2px 6px rgba(16,185,129,0.2)'
+                                        boxShadow: '0 2px 8px rgba(99,102,241,0.3)'
                                       }}
                                     >
-                                      {releasingOrderId === order.orderId ? '⌛ Settling...' : '💰 Release Payout'}
+                                      {releasingOrderId === order.orderId ? '⌛ Settling...' : '💰 Release Fund'}
                                     </button>
                                   </div>
                                 </div>
@@ -3421,7 +3428,7 @@ export default function AdminDashboard() {
                                   <div>
                                     <div style={{ fontWeight: '700', color: '#fff', fontSize: '0.82rem' }}>Order #{order.orderId}</div>
                                     <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '2px' }}>
-                                      Reason/Feedback: <strong style={{ color: '#fca5a5' }}>{order.rejectionReason || 'Escrow dispute raised / Admin Hold'}</strong>
+                                      Reason/Feedback: <strong style={{ color: '#fca5a5' }}>{order.rejectionReason || 'Emahu dispute raised / Admin Hold'}</strong>
                                     </div>
                                   </div>
                                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -3548,7 +3555,7 @@ export default function AdminDashboard() {
         <div className="ad-modal-overlay" onClick={() => setSelectedDetailProduct(null)}>
           <div className="ad-detail-modal" onClick={(e) => e.stopPropagation()}>
             <button className="ad-detail-close" onClick={() => setSelectedDetailProduct(null)}>✕</button>
-            
+
             <div className="ad-detail-header-block">
               <div className="ad-detail-title-section">
                 <h3 className="ad-detail-store-name">{selectedDetailProduct.name || 'Product Details'}</h3>
@@ -3564,19 +3571,19 @@ export default function AdminDashboard() {
             </div>
 
             <div className="ad-detail-tabs-nav">
-              <button 
+              <button
                 className={`ad-detail-tab-trigger ${productDetailTab === 'info' ? 'active' : ''}`}
                 onClick={() => setProductDetailTab('info')}
               >
                 General Info
               </button>
-              <button 
+              <button
                 className={`ad-detail-tab-trigger ${productDetailTab === 'pricing' ? 'active' : ''}`}
                 onClick={() => setProductDetailTab('pricing')}
               >
                 Pricing &amp; Inventory
               </button>
-              <button 
+              <button
                 className={`ad-detail-tab-trigger ${productDetailTab === 'seller' ? 'active' : ''}`}
                 onClick={() => setProductDetailTab('seller')}
               >
@@ -3610,12 +3617,12 @@ export default function AdminDashboard() {
                     {selectedDetailProduct.sizes && selectedDetailProduct.sizes.length > 0 && (
                       <div className="ad-detail-row">
                         <span className="ad-detail-row-label">
-                          {['Apparel & Fashion','Fashion & Apparel'].includes(selectedDetailProduct.category) ? '👕 Sizes' :
-                           selectedDetailProduct.category === 'Electronics & Tech' ? '💾 Specs/Storage' :
-                           ['Kitchen & Dining','Lifestyle & Home','Home & Kitchen'].includes(selectedDetailProduct.category) ? '📐 Dimensions' :
-                           selectedDetailProduct.category === 'Beauty & Cosmetics' ? '🧴 Volume/Finish' :
-                           selectedDetailProduct.category === 'Sports & Fitness' ? '🏋️ Weight' :
-                           '📦 Sizes/Variants'}
+                          {['Apparel & Fashion', 'Fashion & Apparel'].includes(selectedDetailProduct.category) ? '👕 Sizes' :
+                            selectedDetailProduct.category === 'Electronics & Tech' ? '💾 Specs/Storage' :
+                              ['Kitchen & Dining', 'Lifestyle & Home', 'Home & Kitchen'].includes(selectedDetailProduct.category) ? '📐 Dimensions' :
+                                selectedDetailProduct.category === 'Beauty & Cosmetics' ? '🧴 Volume/Finish' :
+                                  selectedDetailProduct.category === 'Sports & Fitness' ? '🏋️ Weight' :
+                                    '📦 Sizes/Variants'}
                         </span>
                         <span className="ad-detail-row-val" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'flex-end' }}>
                           {selectedDetailProduct.sizes.map(sz => (
@@ -3843,7 +3850,7 @@ export default function AdminDashboard() {
         <div className="ad-modal-overlay" onClick={() => setSelectedDetailOrder(null)}>
           <div className="ad-detail-modal" style={{ width: '950px' }} onClick={(e) => e.stopPropagation()}>
             <button className="ad-detail-close" onClick={() => setSelectedDetailOrder(null)}>✕</button>
-            
+
             <div className="ad-detail-header-block">
               <div className="ad-detail-title-section">
                 <h3 className="ad-detail-store-name">Order #{selectedDetailOrder.orderId}</h3>
@@ -3853,10 +3860,9 @@ export default function AdminDashboard() {
                   <span>👤 Buyer: {selectedDetailOrder.deliveryAddress?.fullName}</span>
                 </div>
               </div>
-              <span className={`ad-status-badge ${
-                selectedDetailOrder.status === 'PENDING_APPROVAL' ? 'pending' : 
-                ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(selectedDetailOrder.status) ? 'rejected' : 'approved'
-              }`} style={{ fontSize: '0.85rem', padding: '6px 14px' }}>
+              <span className={`ad-status-badge ${selectedDetailOrder.status === 'PENDING_APPROVAL' ? 'pending' :
+                  ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(selectedDetailOrder.status) ? 'rejected' : 'approved'
+                }`} style={{ fontSize: '0.85rem', padding: '6px 14px' }}>
                 {selectedDetailOrder.status?.replace(/_/g, ' ')?.toUpperCase()}
               </span>
             </div>
@@ -3864,7 +3870,7 @@ export default function AdminDashboard() {
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', flex: 1, minHeight: '350px' }}>
               {/* LEFT COLUMN: Shipping info, Items checklist, Visual timeline */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto', maxHeight: '55vh', paddingRight: '10px' }}>
-                
+
                 {/* Shipping & Contact Info */}
                 <div className="ad-detail-info-section">
                   <h4>Delivery Address Details</h4>
@@ -3969,7 +3975,7 @@ export default function AdminDashboard() {
                 <div className="ad-detail-info-section">
                   <h4>Total Value Summary</h4>
                   <div className="ad-detail-row">
-                    <span className="ad-detail-row-label">Escrow Lockup Total</span>
+                    <span className="ad-detail-row-label">Emahu Lockup Total</span>
                     <span className="ad-detail-row-val" style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.05rem' }}>
                       ₹{selectedDetailOrder.total?.toLocaleString('en-IN')}
                     </span>
@@ -3981,8 +3987,8 @@ export default function AdminDashboard() {
                     </div>
                   )}
                   <div className="ad-detail-row">
-                    <span className="ad-detail-row-label">Escrow Release Method</span>
-                    <span className="ad-detail-row-val">{selectedDetailOrder.escrowMethod || 'Standard Escrow Vault'}</span>
+                    <span className="ad-detail-row-label">Emahu Release Method</span>
+                    <span className="ad-detail-row-val">{selectedDetailOrder.EmahuMethod || 'Standard Emahu Vault'}</span>
                   </div>
 
                   {/* Merchant Payout Bill Breakdown */}
@@ -4001,7 +4007,7 @@ export default function AdminDashboard() {
                             🪙 MERCHANT PAYOUT BILL ({feePercent}% Commission)
                           </span>
                           <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: isReleased ? 'rgba(16,185,129,0.1)' : 'rgba(129,140,248,0.1)', color: isReleased ? '#10b981' : '#818cf8' }}>
-                            {isReleased ? 'Released' : 'Escrow Locked'}
+                            {isReleased ? 'Released' : 'Emahu Locked'}
                           </span>
                         </div>
                         <div style={{ background: 'rgba(99,102,241,0.02)', border: '1px solid rgba(99,102,241,0.08)', borderRadius: '6px', padding: '10px' }}>
@@ -4046,13 +4052,13 @@ export default function AdminDashboard() {
                       <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                         <span style={{ fontSize: '1rem', marginTop: '2px' }}>
                           {tl.status === 'PENDING_APPROVAL' ? '⏳' :
-                           tl.status === 'DELIVERY_ASSIGNED' ? '🚚' :
-                           tl.status === 'LABEL_GENERATED' ? '📄' :
-                           tl.status === 'READY_FOR_PICKUP' ? '📦' :
-                           tl.status === 'PICKED_UP' ? '🚀' :
-                           tl.status === 'IN_TRANSIT' ? '🚛' :
-                           tl.status === 'OUT_FOR_DELIVERY' ? '🛵' :
-                           tl.status === 'DELIVERED' ? '✅' : '⚙️'}
+                            tl.status === 'DELIVERY_ASSIGNED' ? '🚚' :
+                              tl.status === 'LABEL_GENERATED' ? '📄' :
+                                tl.status === 'READY_FOR_PICKUP' ? '📦' :
+                                  tl.status === 'PICKED_UP' ? '🚀' :
+                                    tl.status === 'IN_TRANSIT' ? '🚛' :
+                                      tl.status === 'OUT_FOR_DELIVERY' ? '🛵' :
+                                        tl.status === 'DELIVERED' ? '✅' : '⚙️'}
                         </span>
                         <div>
                           <div className="ad-bold" style={{ fontSize: '0.85rem' }}>{tl.label}</div>
@@ -4074,7 +4080,7 @@ export default function AdminDashboard() {
               {/* RIGHT COLUMN: FULFILLMENT MANAGEMENT CONTROLS */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--color-admin-border)', borderRadius: '12px', padding: '20px', overflowY: 'auto', maxHeight: '55vh' }}>
                 <h4>Fulfillment &amp; Courier Console</h4>
-                
+
                 {selectedDetailOrder.status === 'PENDING_APPROVAL' ? (
                   <div style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '8px', padding: '16px', color: '#f59e0b', fontSize: '0.85rem', lineHeight: '1.5' }}>
                     ⏳ <strong>Waiting for Seller Approval:</strong><br />
@@ -4092,7 +4098,7 @@ export default function AdminDashboard() {
                       <p style={{ margin: '0 0 10px 0', fontSize: '0.74rem', color: 'var(--color-admin-muted)', fontStyle: 'italic' }}>
                         * Logistics are managed directly by the merchant seller.
                       </p>
-                      
+
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.8rem' }}>
                         <div>
                           <label style={{ fontSize: '0.72rem', color: 'var(--color-admin-muted)', display: 'block', marginBottom: '2px' }}>Logistics Carrier</label>
@@ -4137,9 +4143,9 @@ export default function AdminDashboard() {
                                 Date: {selectedDetailOrder.transactionDate ? new Date(selectedDetailOrder.transactionDate).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}
                               </div>
                               {selectedDetailOrder.transactionFile && (
-                                <a 
-                                  href={selectedDetailOrder.transactionFile} 
-                                  download={`receipt_${selectedDetailOrder.orderId}.png`} 
+                                <a
+                                  href={selectedDetailOrder.transactionFile}
+                                  download={`receipt_${selectedDetailOrder.orderId}.png`}
                                   style={{ color: '#38bdf8', textDecoration: 'underline', fontWeight: '500', display: 'inline-block', marginTop: '4px' }}
                                 >
                                   📄 View Attached Receipt File
@@ -4159,7 +4165,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 )}
-                
+
                 <button
                   className="ad-btn-sec"
                   style={{ height: '40px', width: '100%', marginTop: 'auto' }}
@@ -4175,6 +4181,286 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* ── RELEASE FUND PANEL (Multi-Step: Bank → Payment → Confirm) ── */}
+      {releasePanel && (() => {
+        const { order, seller, penalty } = releasePanel;
+        const productVal = order.productAmount || order.total || 0;
+        const platformFee = parseFloat(((productVal * platformFeePercent) / 100).toFixed(2));
+        const penaltyVal = parseFloat(penalty?.amount) || 0;
+        const netPayout = parseFloat((productVal - platformFee - penaltyVal).toFixed(2));
+
+        const steps = ['bank', 'payment', 'confirm'];
+        const stepIndex = steps.indexOf(releasePanelStep);
+
+        const stepLabel = (s) => ({ bank: 'Bank Details', payment: 'Payment Data', confirm: 'Confirm Release' }[s]);
+
+        return (
+          <div
+            style={{
+              position: 'fixed', inset: 0, zIndex: 10000,
+              background: 'rgba(0,0,0,0.65)',
+              backdropFilter: 'blur(6px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '20px'
+            }}
+            onClick={() => setReleasePanel(null)}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
+                border: '1px solid rgba(99,102,241,0.3)',
+                borderRadius: '20px',
+                width: '100%', maxWidth: '520px',
+                boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)',
+                overflow: 'hidden'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Panel Header */}
+              <div style={{
+                background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                padding: '20px 24px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ color: '#fff', fontWeight: '800', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    💰 Release Fund — Order #{order.orderId}
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', marginTop: '2px' }}>
+                    {seller?.storeName || 'Merchant Settlement'} • ₹{netPayout.toLocaleString('en-IN')} Net Payout
+                  </div>
+                </div>
+                <button
+                  onClick={() => setReleasePanel(null)}
+                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', padding: '6px 10px', fontSize: '1rem', lineHeight: 1 }}
+                >✕</button>
+              </div>
+
+              {/* Step Progress Bar */}
+              <div style={{ display: 'flex', alignItems: 'center', padding: '14px 24px', borderBottom: '1px solid rgba(255,255,255,0.06)', gap: '8px' }}>
+                {steps.map((s, i) => (
+                  <div key={s} style={{ display: 'flex', alignItems: 'center', flex: i < steps.length - 1 ? 1 : 0 }}>
+                    <div style={{
+                      width: '28px', height: '28px', borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.72rem', fontWeight: '700', flexShrink: 0,
+                      background: i < stepIndex ? '#10b981' : i === stepIndex ? '#6366f1' : 'rgba(255,255,255,0.08)',
+                      color: i <= stepIndex ? '#fff' : '#64748b',
+                      border: i === stepIndex ? '2px solid rgba(99,102,241,0.5)' : '2px solid transparent',
+                      boxShadow: i === stepIndex ? '0 0 12px rgba(99,102,241,0.4)' : 'none',
+                      transition: 'all 0.3s'
+                    }}>
+                      {i < stepIndex ? '✓' : i + 1}
+                    </div>
+                    <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: i === stepIndex ? '#c7d2fe' : i < stepIndex ? '#34d399' : '#64748b', fontWeight: i === stepIndex ? '700' : '500', whiteSpace: 'nowrap' }}>
+                      {stepLabel(s)}
+                    </span>
+                    {i < steps.length - 1 && (
+                      <div style={{ flex: 1, height: '1px', background: i < stepIndex ? '#10b981' : 'rgba(255,255,255,0.08)', margin: '0 8px', transition: 'all 0.3s' }} />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Step Content */}
+              <div style={{ padding: '24px' }}>
+
+                {/* STEP 1: BANK DETAILS */}
+                {releasePanelStep === 'bank' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                      Verify the merchant's registered payout account before proceeding with settlement.
+                    </p>
+
+                    {/* Bank Card */}
+                    <div style={{
+                      background: 'linear-gradient(135deg, #1e40af 0%, #1d4ed8 50%, #2563eb 100%)',
+                      borderRadius: '14px', padding: '20px 22px',
+                      boxShadow: '0 8px 24px rgba(37,99,235,0.3)',
+                      position: 'relative', overflow: 'hidden'
+                    }}>
+                      <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
+                      <div style={{ position: 'absolute', bottom: '-30px', left: '-10px', width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', position: 'relative' }}>
+                        <div style={{ color: '#fff', fontWeight: '800', fontSize: '0.9rem' }}>🏦 {seller?.bankName || 'Settlement Bank'}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.12)', padding: '3px 8px', borderRadius: '6px', fontWeight: '700' }}>PAYOUT ACCOUNT</div>
+                      </div>
+                      <div style={{ fontFamily: 'monospace', fontSize: '1.3rem', letterSpacing: '3px', color: '#fff', fontWeight: '700', margin: '12px 0', position: 'relative' }}>
+                        {seller?.accountNumber ? seller.accountNumber.replace(/.(?=.{4})/g, '•') : '•••• •••• •••• ••••'}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', marginTop: '8px' }}>
+                        <div>
+                          <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Account Holder</div>
+                          <div style={{ color: '#fff', fontWeight: '700', fontSize: '0.85rem', marginTop: '2px' }}>{seller?.bankHolder || 'N/A'}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>IFSC Code</div>
+                          <div style={{ color: '#fff', fontWeight: '700', fontFamily: 'monospace', fontSize: '0.85rem', marginTop: '2px' }}>{seller?.ifscCode || 'N/A'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bank detail rows */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {[
+                        { label: 'Merchant Store', value: seller?.storeName || 'N/A' },
+                        { label: 'Bank Name', value: seller?.bankName || 'Not configured' },
+                        { label: 'Account Number', value: seller?.accountNumber || 'Not configured' },
+                        { label: 'IFSC Code', value: seller?.ifscCode || 'Not configured' },
+                        { label: 'Account Holder', value: seller?.bankHolder || 'Not configured' },
+                      ].map(({ label, value }) => (
+                        <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <span style={{ fontSize: '0.76rem', color: '#64748b' }}>{label}</span>
+                          <span style={{ fontSize: '0.82rem', color: value === 'Not configured' ? '#ef4444' : '#e2e8f0', fontWeight: '600', fontFamily: ['Account Number', 'IFSC Code'].includes(label) ? 'monospace' : 'inherit' }}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {(!seller?.accountNumber || !seller?.ifscCode) && (
+                      <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '10px 14px', color: '#f87171', fontSize: '0.78rem' }}>
+                        ⚠️ Merchant has not configured complete bank details. Proceed with caution.
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => setReleasePanelStep('payment')}
+                      style={{ padding: '12px', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                      Bank Details Verified — View Payment Data →
+                    </button>
+                  </div>
+                )}
+
+                {/* STEP 2: PAYMENT DATA */}
+                {releasePanelStep === 'payment' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                      Review the payment breakdown before confirming the fund release.
+                    </p>
+
+                    {/* Amount breakdown card */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '18px' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#818cf8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>Payment Settlement Summary</div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>Product Amount</span>
+                          <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#fff' }}>₹{productVal.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>Platform Commission ({platformFeePercent}%)</span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#f87171' }}>− ₹{platformFee.toLocaleString('en-IN')}</span>
+                        </div>
+                        {penaltyVal > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>Merchant Penalty ({penalty?.reason || 'Admin deduction'})</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#f87171' }}>− ₹{penaltyVal.toLocaleString('en-IN')}</span>
+                          </div>
+                        )}
+                        <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#fff' }}>Net Payout (Released)</span>
+                          <span style={{ fontSize: '1.2rem', fontWeight: '800', color: '#10b981' }}>₹{netPayout.toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Order info */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {[
+                        { label: 'Order ID', value: `#${order.orderId}` },
+                        { label: 'Buyer', value: order.deliveryAddress?.fullName || 'N/A' },
+                        { label: 'Order Date', value: order.date || (order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN') : 'N/A') },
+                        { label: 'Delivery Status', value: order.status },
+                      ].map(({ label, value }) => (
+                        <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{label}</span>
+                          <span style={{ fontSize: '0.78rem', color: '#cbd5e1', fontWeight: '600' }}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <button
+                        onClick={() => setReleasePanelStep('bank')}
+                        style={{ flex: 1, padding: '11px', background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer' }}
+                      >
+                        ← Back
+                      </button>
+                      <button
+                        onClick={() => setReleasePanelStep('confirm')}
+                        style={{ flex: 2, padding: '11px', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}
+                      >
+                        Confirm Payment Data →
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3: CONFIRM RELEASE */}
+                {releasePanelStep === 'confirm' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                      <div style={{ fontSize: '3rem', marginBottom: '8px' }}>💸</div>
+                      <div style={{ fontWeight: '800', fontSize: '1.1rem', color: '#fff' }}>Confirm Fund Release</div>
+                      <p style={{ margin: '8px 0 0 0', fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                        You are about to release <strong style={{ color: '#10b981' }}>₹{netPayout.toLocaleString('en-IN')}</strong> to <strong style={{ color: '#c7d2fe' }}>{seller?.storeName || 'this merchant'}</strong>.
+                        This action is irreversible.
+                      </p>
+                    </div>
+
+                    {/* Final summary */}
+                    <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '12px', padding: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Destination Account</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#e2e8f0', fontFamily: 'monospace' }}>{seller?.accountNumber ? `••••${seller.accountNumber.slice(-4)}` : 'N/A'}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>IFSC</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#e2e8f0', fontFamily: 'monospace' }}>{seller?.ifscCode || 'N/A'}</span>
+                      </div>
+                      <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#fff' }}>Net Released</span>
+                        <span style={{ fontSize: '1.3rem', fontWeight: '800', color: '#10b981' }}>₹{netPayout.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <button
+                        onClick={() => setReleasePanelStep('payment')}
+                        style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer' }}
+                      >
+                        ← Back
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setReleasePanel(null);
+                          await handleReleasePayment(order.orderId, penalty?.amount, penalty?.reason);
+                        }}
+                        disabled={releasingOrderId === order.orderId}
+                        style={{
+                          flex: 2, padding: '12px',
+                          background: releasingOrderId === order.orderId ? 'rgba(16,185,129,0.4)' : 'linear-gradient(135deg, #10b981, #059669)',
+                          color: '#fff', border: 'none', borderRadius: '10px',
+                          fontWeight: '800', fontSize: '0.9rem',
+                          cursor: releasingOrderId === order.orderId ? 'not-allowed' : 'pointer',
+                          boxShadow: '0 4px 16px rgba(16,185,129,0.35)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                        }}
+                      >
+                        {releasingOrderId === order.orderId ? '⌛ Releasing...' : '✓ Confirm & Release Funds'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Mobile sidebar backdrop */}
       {mobileSidebarOpen && (
         <div className="ad-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} aria-hidden="true" />
@@ -4185,12 +4471,11 @@ export default function AdminDashboard() {
         <Link href="/" className="ad-sidebar-brand">
           <div className="ad-sidebar-logo">
             <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="8" fill="#6366f1" />
-              <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+              <rect width="32" height="32" rx="8" fill="#4169e1" />
+              <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
             </svg>
           </div>
           <span className="ad-sidebar-title">EMAHU</span>
-          <span className="ad-sidebar-title-tag">Admin</span>
         </Link>
 
         <ul className="ad-sidebar-menu">
@@ -4287,7 +4572,7 @@ export default function AdminDashboard() {
         </header>
 
         <main className="ad-view-container">
-          
+
           {/* TAB: DELIVERY PARTNERS MANAGEMENT */}
           {activeTab === 'delivery-partners' && (
             <div>
@@ -4296,8 +4581,8 @@ export default function AdminDashboard() {
                   <h3>Central Central central central Logistics Carrier Management</h3>
                   <p>Verify fleet registrations, custom per-kilometer rates, and active territories to dispatch order shipments.</p>
                 </div>
-                <button 
-                  className="ad-btn-action approve" 
+                <button
+                  className="ad-btn-action approve"
                   style={{ height: '40px', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
                   onClick={() => setIsAddPartnerOpen(true)}
                 >
@@ -4856,8 +5141,8 @@ export default function AdminDashboard() {
                                   onClick={() => setSelectedRejectedCategory(cat)}
                                   style={{ padding: '10px 16px', fontSize: '0.85rem' }}
                                 >
-                                  {cat} <span style={{ 
-                                    marginLeft: '6px', 
+                                  {cat} <span style={{
+                                    marginLeft: '6px',
                                     background: selectedRejectedCategory === cat ? 'var(--color-admin-primary)' : 'rgba(255,255,255,0.08)',
                                     color: '#fff',
                                     padding: '2px 6px',
@@ -4982,7 +5267,7 @@ export default function AdminDashboard() {
                 <div className="ad-loading">Loading transaction records...</div>
               ) : (() => {
                 const filteredOrders = orders.filter(order => {
-                  const matchesSearch = 
+                  const matchesSearch =
                     order.orderId.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
                     (order.deliveryAddress?.fullName || '').toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
                     (order.deliveryAddress?.email || '').toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
@@ -5034,7 +5319,7 @@ export default function AdminDashboard() {
                           onChange={(e) => setOrderSearchQuery(e.target.value)}
                         />
                         {orderSearchQuery && (
-                          <button 
+                          <button
                             onClick={() => setOrderSearchQuery('')}
                             style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
                           >✕</button>
@@ -5060,7 +5345,7 @@ export default function AdminDashboard() {
                             const isPending = order.status === 'PENDING_APPROVAL';
                             const isDisputed = ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(order.status);
                             const isCompleted = ['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].includes(order.status);
-                            
+
                             return (
                               <tr key={order._id || order.orderId}>
                                 <td>
@@ -5087,11 +5372,10 @@ export default function AdminDashboard() {
                                 </td>
                                 <td>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-                                    <span className={`ad-status-badge ${
-                                      isPending ? 'pending' : 
-                                      isDisputed ? 'rejected' : 
-                                      isCompleted ? 'approved' : 'changes_requested'
-                                    }`} style={{ fontSize: '0.7rem' }}>
+                                    <span className={`ad-status-badge ${isPending ? 'pending' :
+                                        isDisputed ? 'rejected' :
+                                          isCompleted ? 'approved' : 'changes_requested'
+                                      }`} style={{ fontSize: '0.7rem' }}>
                                       {order.status?.replace(/_/g, ' ')}
                                     </span>
                                     {order.paymentReleased && (
@@ -5264,7 +5548,7 @@ export default function AdminDashboard() {
                   <h3>Category &amp; Attribute Hub</h3>
                   <p>Define product categories structure, allowed brands, specifications templates, and dynamic seller attributes.</p>
                 </div>
-                <button 
+                <button
                   className="ad-btn-action approve"
                   style={{ margin: 0, height: '40px', padding: '0 20px', fontWeight: '600' }}
                   onClick={() => handleCreateCategoryInit('')}
@@ -5303,7 +5587,7 @@ export default function AdminDashboard() {
                         onChange={(e) => setCategoryHubSearchQuery(e.target.value)}
                       />
                     </div>
-                    
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {adminCategories.length > 0 ? (
                         (() => {
@@ -5311,15 +5595,15 @@ export default function AdminDashboard() {
                             return nodes.map((node) => {
                               const isSelected = selectedAdminCategory && (selectedAdminCategory._id === node._id || selectedAdminCategory.id === node._id);
                               const hasChildren = node.children && node.children.length > 0;
-                              
+
                               const matchesSearch = node.name.toLowerCase().includes(categoryHubSearchQuery.toLowerCase()) ||
                                 (node.children && node.children.some(child => child.name.toLowerCase().includes(categoryHubSearchQuery.toLowerCase())));
-                                
+
                               if (categoryHubSearchQuery && !matchesSearch) return null;
 
                               return (
                                 <div key={node._id} style={{ marginLeft: `${depth * 16}px`, marginBottom: '4px' }}>
-                                  <div 
+                                  <div
                                     onClick={() => handleSelectCategory(node)}
                                     style={{
                                       display: 'flex',
@@ -5334,8 +5618,8 @@ export default function AdminDashboard() {
                                       color: isSelected ? '#fff' : '#e4e4e7',
                                       gap: '8px'
                                     }}
-                                    onMouseEnter={(e) => { if(!isSelected) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)' }}
-                                    onMouseLeave={(e) => { if(!isSelected) e.currentTarget.style.backgroundColor = 'transparent' }}
+                                    onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)' }}
+                                    onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent' }}
                                   >
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
                                       <span style={{ fontSize: '1rem' }}>{node.icon || (depth === 0 ? '📁' : depth === 1 ? '📂' : '📄')}</span>
@@ -5348,16 +5632,16 @@ export default function AdminDashboard() {
                                         </span>
                                       )}
                                     </div>
-                                    
+
                                     <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
-                                      <button 
+                                      <button
                                         title="Add Subcategory under this"
                                         onClick={() => handleCreateCategoryInit(node._id)}
                                         style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', fontSize: '0.9rem', padding: '2px' }}
                                       >
                                         ➕
                                       </button>
-                                      <button 
+                                      <button
                                         title="Delete Category"
                                         onClick={() => handleDeleteCategory(node._id)}
                                         style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.9rem', padding: '2px' }}
@@ -5366,7 +5650,7 @@ export default function AdminDashboard() {
                                       </button>
                                     </div>
                                   </div>
-                                  
+
                                   {hasChildren && (
                                     <div style={{ marginTop: '4px' }}>
                                       {renderCategoryTreeNodes(node.children, depth + 1)}
@@ -5517,7 +5801,7 @@ export default function AdminDashboard() {
                               ➕ Add Attribute
                             </button>
                           </div>
-                          
+
                           {catFormAttributes.length > 0 ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                               {catFormAttributes.map((attr, index) => (
@@ -5603,7 +5887,7 @@ export default function AdminDashboard() {
                               ➕ Add Spec Field
                             </button>
                           </div>
-                          
+
                           {catFormSpecifications.length > 0 ? (
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                               {catFormSpecifications.map((spec, index) => (
@@ -5665,7 +5949,7 @@ export default function AdminDashboard() {
                                 onChange={(e) => setCatFormValidationRules({ ...catFormValidationRules, minImages: Number(e.target.value) })}
                               />
                             </div>
-                            
+
                             <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
                               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', paddingBottom: '10px' }}>
                                 <input
@@ -5768,7 +6052,7 @@ export default function AdminDashboard() {
                       />
                       <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa', fontWeight: '600' }}>%</span>
                     </div>
-                    
+
                     <button
                       className="ad-btn-action approve"
                       style={{ height: '40px', padding: '0 24px', whiteSpace: 'nowrap', fontWeight: '600', margin: 0 }}

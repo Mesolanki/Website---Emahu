@@ -6,14 +6,16 @@
   position: relative;
   width: 100%;
   min-height: 100vh;
-  background: #030712; /* Premium pitch-black/dark navy background */
+  background: #030712;
+  /* Premium pitch-black/dark navy background */
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   padding: 160px 24px 100px 24px;
   font-family: 'Inter', sans-serif;
-  opacity: 1; /* Show instantly to prevent layout flashes and hydration delays */
+  opacity: 1;
+  /* Show instantly to prevent layout flashes and hydration delays */
 }
 
 /* ==========================================================================
@@ -36,12 +38,14 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(3, 7, 18, 0.98) 0%,      /* Near pitch-black blend on the left for maximum text contrast */
-    rgba(3, 7, 18, 0.90) 50%,     /* Deeper intermediate dark layer */
-    rgba(3, 7, 18, 0.85) 100%     /* Elegant dark glow on the right letting the abstract visual blend in */
-  );
+  background: linear-gradient(135deg,
+      rgba(3, 7, 18, 0.98) 0%,
+      /* Near pitch-black blend on the left for maximum text contrast */
+      rgba(3, 7, 18, 0.90) 50%,
+      /* Deeper intermediate dark layer */
+      rgba(3, 7, 18, 0.85) 100%
+      /* Elegant dark glow on the right letting the abstract visual blend in */
+    );
   z-index: 1;
 }
 
@@ -85,8 +89,15 @@
 }
 
 @keyframes glowPulse {
-  0% { opacity: 0.6; transform: translate(0, 0) scale(0.95); }
-  100% { opacity: 1; transform: translate(20px, -20px) scale(1.1); }
+  0% {
+    opacity: 0.6;
+    transform: translate(0, 0) scale(0.95);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(20px, -20px) scale(1.1);
+  }
 }
 
 
@@ -173,14 +184,20 @@
 }
 
 @keyframes shineGradient {
-  0% { background-position: 0% center; }
-  100% { background-position: 200% center; }
+  0% {
+    background-position: 0% center;
+  }
+
+  100% {
+    background-position: 200% center;
+  }
 }
 
 /* Body description text */
 .sh-hero__desc {
   font-size: 17px;
-  color: #94a3b8; /* Reading friendly soft gray */
+  color: #94a3b8;
+  /* Reading friendly soft gray */
   line-height: 1.65;
   margin-bottom: 40px;
   max-width: 580px;
@@ -294,7 +311,7 @@
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
-  box-shadow: 
+  box-shadow:
     0 30px 60px -15px rgba(0, 0, 0, 0.8),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -399,31 +416,35 @@
 }
 
 @keyframes drawLine {
-  to { stroke-dashoffset: 0; }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 @keyframes drawDot {
-  to { opacity: 1; }
+  to {
+    opacity: 1;
+  }
 }
 
-/* Card 2: Payout Escrow Verified Badge */
-.sh-widget--escrow {
+/* Card 2: Payout Emahu Verified Badge */
+.sh-widget--Emahu {
   width: 280px;
   bottom: 40px;
   left: -40px;
   z-index: 3;
   padding: 16px;
   transform: translateZ(30px) rotateX(8deg) rotateY(-8deg);
-  animation: floatWidgetEscrow 5s ease-in-out infinite alternate 1s;
+  animation: floatWidgetEmahu 5s ease-in-out infinite alternate 1s;
 }
 
-.sh-escrow-badge {
+.sh-Emahu-badge {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.sh-escrow-badge__circle {
+.sh-Emahu-badge__circle {
   width: 32px;
   height: 32px;
   background: rgba(16, 185, 129, 0.08);
@@ -437,21 +458,21 @@
   box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
 }
 
-.sh-escrow-badge__txt {
+.sh-Emahu-badge__txt {
   display: flex;
   flex-direction: column;
   gap: 2px;
   text-align: left;
 }
 
-.sh-escrow-badge__title {
+.sh-Emahu-badge__title {
   font-size: 10px;
   font-weight: 850;
   color: #10b981;
   letter-spacing: 0.5px;
 }
 
-.sh-escrow-badge__sub {
+.sh-Emahu-badge__sub {
   font-size: 9.5px;
   color: #94a3b8;
   font-weight: 600;
@@ -506,29 +527,62 @@
 
 /* Float Animations for Widgets Stack */
 @keyframes floatWidgetRevenue {
-  0% { transform: rotateX(8deg) rotateY(-8deg) rotateZ(1deg) translateY(0); }
-  100% { transform: rotateX(9deg) rotateY(-6deg) rotateZ(1deg) translateY(-8px); }
+  0% {
+    transform: rotateX(8deg) rotateY(-8deg) rotateZ(1deg) translateY(0);
+  }
+
+  100% {
+    transform: rotateX(9deg) rotateY(-6deg) rotateZ(1deg) translateY(-8px);
+  }
 }
 
-@keyframes floatWidgetEscrow {
-  0% { transform: translateZ(30px) rotateX(8deg) rotateY(-8deg) translateY(0); }
-  100% { transform: translateZ(30px) rotateX(7deg) rotateY(-10deg) translateY(-6px); }
+@keyframes floatWidgetEmahu {
+  0% {
+    transform: translateZ(30px) rotateX(8deg) rotateY(-8deg) translateY(0);
+  }
+
+  100% {
+    transform: translateZ(30px) rotateX(7deg) rotateY(-10deg) translateY(-6px);
+  }
 }
 
 @keyframes floatWidgetDelivery {
-  0% { transform: translateZ(50px) rotateX(8deg) rotateY(-8deg) translateY(0); }
-  100% { transform: translateZ(50px) rotateX(9deg) rotateY(-6deg) translateY(-10px); }
+  0% {
+    transform: translateZ(50px) rotateX(8deg) rotateY(-8deg) translateY(0);
+  }
+
+  100% {
+    transform: translateZ(50px) rotateX(9deg) rotateY(-6deg) translateY(-10px);
+  }
 }
 
 @keyframes beaconPulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.4); opacity: 0.4; }
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.4);
+    opacity: 0.4;
+  }
 }
 
 /* Entrance Animations */
 @keyframes slideInDown {
-  from { opacity: 0; transform: translateY(-24px); filter: blur(8px); }
-  to { opacity: 1; transform: translateY(0); filter: blur(0px); }
+  from {
+    opacity: 0;
+    transform: translateY(-24px);
+    filter: blur(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0px);
+  }
 }
 
 
@@ -540,13 +594,13 @@
   .sh-hero {
     padding-top: 140px;
   }
-  
+
   .sh-hero__grid {
     grid-template-columns: 1fr;
     gap: 64px;
     text-align: center;
   }
-  
+
   .sh-hero__left {
     align-items: center;
     text-align: center;
@@ -556,7 +610,7 @@
     margin-left: auto;
     margin-right: auto;
   }
-  
+
   .sh-hero__actions {
     justify-content: center;
   }
@@ -629,7 +683,7 @@
     font-size: 24px;
   }
 
-  .sh-widget--escrow {
+  .sh-widget--Emahu {
     width: 240px;
     bottom: 30px;
     left: -20px;
@@ -693,27 +747,27 @@
     font-size: 20px;
   }
 
-  .sh-widget--escrow {
+  .sh-widget--Emahu {
     width: 210px;
     bottom: 20px;
     left: -10px;
     padding: 10px;
   }
 
-  .sh-escrow-badge {
+  .sh-Emahu-badge {
     gap: 8px;
   }
 
-  .sh-escrow-badge__circle {
+  .sh-Emahu-badge__circle {
     width: 26px;
     height: 26px;
   }
 
-  .sh-escrow-badge__title {
+  .sh-Emahu-badge__title {
     font-size: 8.5px;
   }
 
-  .sh-escrow-badge__sub {
+  .sh-Emahu-badge__sub {
     font-size: 8px;
   }
 

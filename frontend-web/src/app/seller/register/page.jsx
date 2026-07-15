@@ -81,6 +81,7 @@ export default function SellerRegister() {
   });
 
   const [errors, setErrors] = useState({});
+  const [hasOpenedTerms, setHasOpenedTerms] = useState(false);
 
   // Email OTP States
   const [isOtpVerifying, setIsOtpVerifying] = useState(false);
@@ -213,7 +214,7 @@ export default function SellerRegister() {
     } catch (err) {
       console.error('Send OTP Error:', err);
       setOtpError(err.message || 'Failed to send verification code. Please try again.');
-      
+
       // Fallback
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setMockOtpCode(code);
@@ -292,7 +293,7 @@ export default function SellerRegister() {
     const newErrors = {};
     if (!formData.storeName.trim()) newErrors.storeName = 'Store name is required';
     if (!formData.ownerName.trim()) newErrors.ownerName = 'Owner name is required';
-    
+
     // Email required for all registrations
     if (!formData.email.trim()) {
       newErrors.email = 'Email address is required';
@@ -353,7 +354,7 @@ export default function SellerRegister() {
       newErrors.ifscCode = 'Enter a valid 11-digit IFSC code (e.g. SBIN0001234)';
     }
     if (!formData.bankName.trim()) newErrors.bankName = 'Bank name is required';
-    
+
     // Optional GSTIN Validation (if field is filled)
     if (formData.gstNumber.trim() && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gstNumber.toUpperCase().trim())) {
       newErrors.gstNumber = 'Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5)';
@@ -406,7 +407,7 @@ export default function SellerRegister() {
         });
 
         setRegSuccessData(data);
-        
+
         // Automatically submit documents upon registration
         if (data.accessToken) {
           const docUrl = API_BASE + '/api/auth/kyc_document.jpg';
@@ -462,19 +463,19 @@ export default function SellerRegister() {
       <div className="sr-ambient-blob sr-ambient-blob--2" />
 
       <div className="sr-container">
-        
+
         {/* Step Indicator Panel */}
         <div className="sr-progress-panel">
           <Link href="/" className="sr-logo">
             <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="10" fill="white" />
-              <path d="M8 12h16M8 16h12M8 20h14" stroke="#2b4594" strokeWidth="2.2" strokeLinecap="round" />
+              <rect width="32" height="32" rx="10" fill="#4169e1" />
+              <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
             </svg>
             <span className="sr-logo__text">EMAHU</span>
           </Link>
 
           <div className="sr-steps-list">
-            
+
             {/* Step 1 indicator */}
             <div className={`sr-step-item ${step === 1 ? 'sr-step-item--active' : ''} ${step > 1 ? 'sr-step-item--completed' : ''}`}>
               <div className="sr-step-item__number">
@@ -541,13 +542,13 @@ export default function SellerRegister() {
 
         {/* Right side form card */}
         <div className="sr-form-card">
-          
+
           {errors.general && (
             <div style={{ color: '#f87171', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)', fontSize: '0.85rem', marginBottom: '16px' }}>
               {errors.general}
             </div>
           )}
-          
+
           {step === 1 && (
             <div className="sr-step-content">
               <div className="sr-form-card__header">
@@ -659,34 +660,42 @@ export default function SellerRegister() {
                 </div>
               </div>
 
-                  {/* Terms & Conditions Checkbox */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '20px 0 12px 0', padding: '0 4px' }}>
-                    <input 
-                      id="agree-portal-terms"
-                      type="checkbox" 
-                      checked={agreeTerms}
-                      onChange={(e) => setAgreeTerms(e.target.checked)}
-                      style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
-                    />
-                    <label htmlFor="agree-portal-terms" style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
-                      I agree to the <a href="#" onClick={(e) => { e.preventDefault(); alert("EMAHU Seller Terms & Partner Conditions: By signing up as a merchant, you agree to list genuine verified products, fulfill shipments within standard delivery periods, and process returns in compliance with our safety protocol."); }} style={{ color: '#60a5fa', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
-                    </label>
-                  </div>
+              {/* Terms & Conditions Checkbox */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '20px 0 12px 0', padding: '0 4px' }}>
+                <input
+                  id="agree-portal-terms"
+                  type="checkbox"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  disabled={!hasOpenedTerms}
+                  style={{ width: '16px', height: '16px', marginTop: '2px', cursor: hasOpenedTerms ? 'pointer' : 'not-allowed' }}
+                />
+                <label htmlFor="agree-portal-terms" style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', cursor: hasOpenedTerms ? 'pointer' : 'not-allowed', userSelect: 'none' }}>
+                  <span style={{ color: hasOpenedTerms ? '#cbd5e1' : '#a0aec0' }}>
+                    I agree to the <a href="#" onClick={(e) => { e.preventDefault(); setHasOpenedTerms(true); alert("EMAHU Seller Agreement & Liability Disclaimer:\n\n1. PLATFORM ROLE: EMAHU acts solely as a matching portal and technology facilitator connecting sellers, buyers, and delivery partners. We do not own, inspect, handle, or guarantee any merchant listings or physical transactions.\n2. NO LIABILITY: Under no circumstances shall EMAHU, its owners, or developers be liable for direct, indirect, or consequential damages, loss of business, payment disputes, chargebacks, or inventory damage.\n3. LEGAL COMPLIANCE: Sellers are independent businesses and solely responsible for local taxes, product safety, licensing, and compliance. Any illegal, prohibited, or out-of-stock items listed will lead to permanent termination and forfeit of pending Emahubalances to buyers.\n4. EmahuRELEASES: Payments are held in secure Emahuand released to you only after successful delivery OTP validation by the courier. Emahudisputes will be handled by the team, and our decision is final and binding."); }} style={{ color: '#60a5fa', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+                  </span>
+                  {!hasOpenedTerms && (
+                    <span style={{ color: '#f87171', display: 'block', fontSize: '0.72rem', marginTop: '4px', fontWeight: '600' }}>
+                      ⚠️ Please click and read the Terms link first to unlock this checkbox.
+                    </span>
+                  )}
+                </label>
+              </div>
 
-                  <div className="sr-form-actions">
-                    <button 
-                      type="button" 
-                      className="sr-btn sr-btn--primary" 
-                      onClick={handleNext}
-                      disabled={!agreeTerms}
-                      style={!agreeTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#4b5563' } : {}}
-                    >
-                      <span>Continue</span>
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  </div>
+              <div className="sr-form-actions">
+                <button
+                  type="button"
+                  className="sr-btn sr-btn--primary"
+                  onClick={handleNext}
+                  disabled={!agreeTerms}
+                  style={!agreeTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#4b5563' } : {}}
+                >
+                  <span>Continue</span>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
 
 
 
@@ -963,15 +972,15 @@ export default function SellerRegister() {
               margin: '0 auto 20px'
             }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
             </div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0f172a', marginBottom: '8px' }}>
               {otpSending ? 'Sending Verification Code...' : 'Confirm Your Mobile Number'}
             </h3>
             <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: '1.5', marginBottom: '24px' }}>
-              {otpSending 
-                ? 'We are generating and sending a secure verification code...' 
+              {otpSending
+                ? 'We are generating and sending a secure verification code...'
                 : <>We sent a 6-digit verification code to <strong style={{ color: '#0f172a' }}>{formData.phone}</strong>. Please enter it below.</>
               }
             </p>

@@ -114,7 +114,7 @@ $newBlock = @'
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
                       {[['Order ID', <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#0f172a' }}>{selectedDetailedOrder.orderId}</span>],
                         ['Date', selectedDetailedOrder.date],
-                        ['Payment', <span style={{ color: '#16a34a', fontWeight: '600' }}>\ud83d\udd12 Secured in Escrow</span>],
+                        ['Payment', <span style={{ color: '#16a34a', fontWeight: '600' }}>\ud83d\udd12 Secured in Emahu</span>],
                       ].map(([label, val], i) => (
                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: i < 2 ? '1px solid #f0f0f0' : 'none', paddingBottom: i < 2 ? '8px' : '0' }}>
                           <span style={{ color: '#64748b' }}>{label}</span>
@@ -336,7 +336,7 @@ $newBlock = @'
                               <strong>Reason:</strong> {selectedDetailedOrder.rejectionReason}
                             </div>
                           )}
-                          <p style={{ fontSize: '0.77rem', color: '#94a3b8', marginTop: '10px', marginBottom: 0 }}>Escrow funds will be automatically returned to the buyer.</p>
+                          <p style={{ fontSize: '0.77rem', color: '#94a3b8', marginTop: '10px', marginBottom: 0 }}>Emahu funds will be automatically returned to the buyer.</p>
                         </div>
                       )}
 

@@ -11,25 +11,25 @@ import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 const ALL_PRODUCTS = STATIC_PRODUCTS;
 
 const REVIEWS = [
-  { id:1, name:'Rahul M.',   rating:5, date:'May 2025', text:'Absolutely premium quality! Packaging was immaculate and delivery was super fast. EMAHU verification seal was intact. 100% legit product.', tags:['Fast Delivery','Authentic'], color:'#4169e1', verified:true },
-  { id:2, name:'Priya S.',   rating:4, date:'Apr 2025', text:'Great product, looks exactly like the images. Slightly delayed shipping but customer support was very helpful. Would recommend.', tags:['Good Quality','Helpful Support'], color:'#12b7b2', verified:true },
-  { id:3, name:'Arjun K.',   rating:5, date:'Apr 2025', text:'Best deal I\'ve ever got! The EMAHU quality inspection report gave me full confidence. No compromise on quality whatsoever.', tags:['Best Deal','Quality Checked'], color:'#f59e0b', verified:false },
-  { id:4, name:'Sneha R.',   rating:5, date:'Mar 2025', text:'I was skeptical at first but the verified badge and inspection scores convinced me. Zero regrets — perfect purchase!', tags:['Trusted Platform','Premium Feel'], color:'#10b981', verified:true },
+  { id: 1, name: 'Rahul M.', rating: 5, date: 'May 2025', text: 'Absolutely premium quality! Packaging was immaculate and delivery was super fast. EMAHU verification seal was intact. 100% legit product.', tags: ['Fast Delivery', 'Authentic'], color: '#4169e1', verified: true },
+  { id: 2, name: 'Priya S.', rating: 4, date: 'Apr 2025', text: 'Great product, looks exactly like the images. Slightly delayed shipping but customer support was very helpful. Would recommend.', tags: ['Good Quality', 'Helpful Support'], color: '#12b7b2', verified: true },
+  { id: 3, name: 'Arjun K.', rating: 5, date: 'Apr 2025', text: 'Best deal I\'ve ever got! The EMAHU quality inspection report gave me full confidence. No compromise on quality whatsoever.', tags: ['Best Deal', 'Quality Checked'], color: '#f59e0b', verified: false },
+  { id: 4, name: 'Sneha R.', rating: 5, date: 'Mar 2025', text: 'I was skeptical at first but the verified badge and inspection scores convinced me. Zero regrets — perfect purchase!', tags: ['Trusted Platform', 'Premium Feel'], color: '#10b981', verified: true },
 ];
 
 const STATIC_RELATED = [
-  { id:3,  name:'Sony WH-1000XM5',      brand:'Sony',    price:26999, img:'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=400&q=80' },
-  { id:4,  name:'MacBook Air M3',        brand:'Apple',   price:114999, img:'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&q=80' },
-  { id:14, name:'Samsung 55" QLED 4K',   brand:'Samsung', price:69999, img:'https://images.unsplash.com/photo-1593359677879-a4bb92f829e1?w=400&q=80' },
-  { id:6,  name:'Adidas Ultraboost 22',  brand:'Adidas',  price:12499, img:'https://images.unsplash.com/photo-1608231387042-66d1773070a5?w=400&q=80' },
+  { id: 3, name: 'Sony WH-1000XM5', brand: 'Sony', price: 26999, img: 'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=400&q=80' },
+  { id: 4, name: 'MacBook Air M3', brand: 'Apple', price: 114999, img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&q=80' },
+  { id: 14, name: 'Samsung 55" QLED 4K', brand: 'Samsung', price: 69999, img: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829e1?w=400&q=80' },
+  { id: 6, name: 'Adidas Ultraboost 22', brand: 'Adidas', price: 12499, img: 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?w=400&q=80' },
 ];
 
 function Stars({ rating, size = 14 }) {
   return (
     <div className="pd-stars">
-      {[1,2,3,4,5].map(s => (
+      {[1, 2, 3, 4, 5].map(s => (
         <svg key={s} width={size} height={size} className={`pd-star ${s <= Math.round(rating) ? '' : 'pd-star--empty'}`} viewBox="0 0 24 24">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
         </svg>
       ))}
     </div>
@@ -37,8 +37,8 @@ function Stars({ rating, size = 14 }) {
 }
 
 const RATING_DIST = [
-  { label:'5★', pct:72 }, { label:'4★', pct:16 }, { label:'3★', pct:7 },
-  { label:'2★', pct:3  }, { label:'1★', pct:2  },
+  { label: '5★', pct: 72 }, { label: '4★', pct: 16 }, { label: '3★', pct: 7 },
+  { label: '2★', pct: 3 }, { label: '1★', pct: 2 },
 ];
 
 const cleanImageUrl = (img) => {
@@ -75,13 +75,13 @@ export default function ProductDetailPage() {
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeImg,   setActiveImg]   = useState(0);
+  const [activeImg, setActiveImg] = useState(0);
   const [activeColor, setActiveColor] = useState(0);
-    const [activeSize,  setActiveSize]  = useState('');
-  const [qty,         setQty]         = useState(1);
+  const [activeSize, setActiveSize] = useState('');
+  const [qty, setQty] = useState(1);
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
 
-    const currentPrice = useMemo(() => {
+  const currentPrice = useMemo(() => {
     if (product && product.variants && product.variants[activeVariantIndex] && product.variants[activeVariantIndex].price) {
       return product.variants[activeVariantIndex].price;
     }
@@ -153,10 +153,11 @@ export default function ProductDetailPage() {
   useEffect(() => {
     setActiveImg(0);
   }, [activeVariantIndex]);
-  const [wishlist,    setWishlist]    = useState(false);
-  const [added,       setAdded]       = useState(false);
-  const [activeTab,   setActiveTab]   = useState('desc');
+  const [wishlist, setWishlist] = useState(false);
+  const [added, setAdded] = useState(false);
+  const [activeTab, setActiveTab] = useState('desc');
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [selectedCity, setSelectedCity] = useState('Ahmedabad');
 
   // Load related products dynamically from database/static fallback
   useEffect(() => {
@@ -167,7 +168,7 @@ export default function ProductDetailPage() {
         const data = await res.json();
         if (data.success && data.products) {
           const productCategory = product.category;
-          
+
           // Helper to normalize category name comparison
           const getNormCat = (c) => {
             const clean = String(c || '').toLowerCase();
@@ -187,9 +188,9 @@ export default function ProductDetailPage() {
 
           // Filter products in the same category, excluding current product, delivering to selectedCity
           let matched = data.products.filter(p => {
-            return getNormCat(p.category) === prodCatNorm && 
-                   String(p._id || p.id) !== String(product.id) &&
-                   sellerServesLocation(p.seller, selectedCity);
+            return getNormCat(p.category) === prodCatNorm &&
+              String(p._id || p.id) !== String(product.id) &&
+              sellerServesLocation(p.seller, selectedCity);
           });
 
           // Fallback if not enough category items
@@ -228,14 +229,14 @@ export default function ProductDetailPage() {
   }, [product, selectedCity]);
 
   // ── Review system state ──
-  const [hasPurchased,   setHasPurchased]   = useState(false);
-  const [userReviews,    setUserReviews]    = useState([]);
+  const [hasPurchased, setHasPurchased] = useState(false);
+  const [userReviews, setUserReviews] = useState([]);
   const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewRating,   setReviewRating]   = useState(5);
-  const [reviewHover,    setReviewHover]    = useState(0);
-  const [reviewText,     setReviewText]     = useState('');
-  const [reviewSubmitted,setReviewSubmitted]= useState(false);
-  const [reviewError,    setReviewError]    = useState('');
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewHover, setReviewHover] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewError, setReviewError] = useState('');
 
   // Check buyer login session
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
@@ -243,8 +244,7 @@ export default function ProductDetailPage() {
     setIsUserLoggedIn(!!localStorage.getItem('emahu_buyer_token'));
   }, []);
 
-  // Selected buyer city for delivery validation
-  const [selectedCity, setSelectedCity] = useState('Ahmedabad');
+
 
   useEffect(() => {
     const syncCity = () => {
@@ -259,7 +259,7 @@ export default function ProductDetailPage() {
             if (parsed.city) {
               setSelectedCity(parsed.city);
             }
-          } catch (_) {}
+          } catch (_) { }
         }
       }
     };
@@ -287,18 +287,18 @@ export default function ProductDetailPage() {
         const bLon = parseFloat(coords.longitude);
         const sLat = parseFloat(seller.latitude);
         const sLon = parseFloat(seller.longitude);
-        
+
         if (!isNaN(bLat) && !isNaN(bLon) && !isNaN(sLat) && !isNaN(sLon)) {
           const R = 6371; // km
           const dLat = (sLat - bLat) * Math.PI / 180;
           const dLon = (sLon - bLon) * Math.PI / 180;
-          const a = 
+          const a =
             Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) * 
+            Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) *
             Math.sin(dLon / 2) * Math.sin(dLon / 2);
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
           const distance = R * c;
-          
+
           if (distance <= 30) {
             return true;
           }
@@ -309,7 +309,7 @@ export default function ProductDetailPage() {
     }
 
     const sellerCity = (seller.city || seller.currentCity || seller.location || seller.address || '').toLowerCase().trim();
-    
+
     // Check if seller delivers to All India/India (coveredCities has All India)
     const coveredCities = Array.isArray(seller.coveredCities)
       ? seller.coveredCities.map(c => c.toLowerCase().trim())
@@ -382,7 +382,7 @@ export default function ProductDetailPage() {
         let buyerUserId = '';
         const buyerUserStr = localStorage.getItem('emahu_buyer_user');
         if (buyerUserStr) {
-          try { buyerUserId = JSON.parse(buyerUserStr).id || JSON.parse(buyerUserStr)._id || ''; } catch (_) {}
+          try { buyerUserId = JSON.parse(buyerUserStr).id || JSON.parse(buyerUserStr)._id || ''; } catch (_) { }
         }
         if (!buyerUserId) buyerUserId = localStorage.getItem('emahu_guest_id') || '';
 
@@ -393,7 +393,7 @@ export default function ProductDetailPage() {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${buyerUserId}`);
             const data = await res.json();
             if (data.success && data.orders) orders = data.orders;
-          } catch (_) {}
+          } catch (_) { }
         }
 
         // Fallback to localStorage
@@ -434,14 +434,14 @@ export default function ProductDetailPage() {
   const handleSubmitReview = (e) => {
     e.preventDefault();
     if (!reviewText.trim()) { setReviewError('Please write your review text.'); return; }
-    if (reviewRating < 1)   { setReviewError('Please select a star rating.');  return; }
+    if (reviewRating < 1) { setReviewError('Please select a star rating.'); return; }
 
     // Build review buyer name
     let buyerName = 'Verified Buyer';
     try {
       const u = JSON.parse(localStorage.getItem('emahu_buyer_user') || '{}');
       if (u.name) buyerName = u.name.split(' ')[0] + ' ' + (u.name.split(' ')[1]?.[0] || '') + '.';
-    } catch (_) {}
+    } catch (_) { }
 
     const newReview = {
       id: Date.now(),
@@ -496,7 +496,7 @@ export default function ProductDetailPage() {
             reviews: p.reviews || 84,
             imgs: (p.images && p.images.length > 0) ? p.images.map(img => cleanImageUrl(img)).filter(Boolean) : (p.image && isRealImage(p.image)) ? [cleanImageUrl(p.image)] : [],
             imageEmoji: (!p.image || !isRealImage(p.image)) ? p.image : null,
-                        colors: p.colors || [],
+            colors: p.colors || [],
             sizes: p.sizes || [],
             variants: p.variants || [],
             sku: p.sku || '',
@@ -565,7 +565,7 @@ export default function ProductDetailPage() {
             reviews: staticProd.reviews || 84,
             imgs: (staticProd.images && staticProd.images.length > 0) ? staticProd.images.map(img => cleanImageUrl(img)).filter(Boolean) : (staticProd.image && isRealImage(staticProd.image)) ? [cleanImageUrl(staticProd.image)] : [],
             imageEmoji: (!staticProd.image || !isRealImage(staticProd.image)) ? staticProd.image : null,
-                        colors: [],
+            colors: [],
             sizes: [],
             variants: [],
             sku: staticProd.sku || '',
@@ -598,7 +598,7 @@ export default function ProductDetailPage() {
     fetchDbProduct();
   }, [id]);
 
-    const handleAddCart = () => {
+  const handleAddCart = () => {
     if (!isUserLoggedIn) {
       router.push('/buyer/login');
       return;
@@ -606,14 +606,14 @@ export default function ProductDetailPage() {
     try {
       const storedCartStr = localStorage.getItem('emahu_cart') || '[]';
       const storedCart = JSON.parse(storedCartStr);
-      
+
       const selectedVariant = product.variants && product.variants[activeVariantIndex]
         ? product.variants[activeVariantIndex]
         : null;
       const sizeValue = selectedVariant ? selectedVariant.name : 'Default';
 
-      const existingItemIndex = storedCart.findIndex(x => 
-        (typeof x === 'object' ? x.id : x) === product.id && 
+      const existingItemIndex = storedCart.findIndex(x =>
+        (typeof x === 'object' ? x.id : x) === product.id &&
         (typeof x === 'object' ? x.size === sizeValue : sizeValue === 'Default')
       );
 
@@ -627,7 +627,7 @@ export default function ProductDetailPage() {
           size: sizeValue
         });
       }
-      
+
       localStorage.setItem('emahu_cart', JSON.stringify(storedCart));
       window.dispatchEvent(new Event('storage'));
 
@@ -653,14 +653,14 @@ export default function ProductDetailPage() {
     try {
       const storedCartStr = localStorage.getItem('emahu_cart') || '[]';
       const storedCart = JSON.parse(storedCartStr);
-      
+
       const selectedVariant = product.variants && product.variants[activeVariantIndex]
         ? product.variants[activeVariantIndex]
         : null;
       const sizeValue = selectedVariant ? selectedVariant.name : 'Default';
 
-      const existingItemIndex = storedCart.findIndex(x => 
-        (typeof x === 'object' ? x.id : x) === product.id && 
+      const existingItemIndex = storedCart.findIndex(x =>
+        (typeof x === 'object' ? x.id : x) === product.id &&
         (typeof x === 'object' ? x.size === sizeValue : sizeValue === 'Default')
       );
 
@@ -674,7 +674,7 @@ export default function ProductDetailPage() {
           size: sizeValue
         });
       }
-      
+
       localStorage.setItem('emahu_cart', JSON.stringify(storedCart));
       window.dispatchEvent(new Event('storage'));
 
@@ -711,13 +711,13 @@ export default function ProductDetailPage() {
         });
         localStorage.setItem('emahu_cart', JSON.stringify(storedCart));
         window.dispatchEvent(new Event('storage'));
-        
+
         logAnalyticsEvent({
           type: 'add_to_cart',
           productId: prodId,
           sellerId: relatedProd.seller?._id || relatedProd.seller?.id || relatedProd.seller
         });
-        
+
         alert(`🛒 Added "${relatedProd.name}" to your cart!`);
       } else {
         alert(`🛒 "${relatedProd.name}" is already in your cart!`);
@@ -770,7 +770,7 @@ export default function ProductDetailPage() {
         <Link href="/">Home</Link> <span>/</span>
         <Link href="/buyer/products">Buyer</Link> <span>/</span>
         <Link href="/buyer/products">Collection</Link> <span>/</span>
-        <span style={{ color:'#0d0d0d' }}>{product.name}</span>
+        <span style={{ color: '#0d0d0d' }}>{product.name}</span>
       </nav>
 
       {/* Main layout: gallery + info */}
@@ -787,7 +787,7 @@ export default function ProductDetailPage() {
             ) : (
               currentImages.map((img, i) => (
                 <button key={i} className={`pd-thumb ${activeImg === i ? 'pd-thumb--active' : ''}`} onClick={() => setActiveImg(i)}>
-                  <img src={img} alt={`View ${i+1}`} />
+                  <img src={img} alt={`View ${i + 1}`} />
                 </button>
               ))
             )}
@@ -802,16 +802,16 @@ export default function ProductDetailPage() {
             ) : (
               <img src={currentImages[activeImg]} alt={product.name} className="pd-main-img" />
             )}
-            
+
             {/* Badges */}
             <div className="pd-img-badges">
               {product.verified && <span className="pd-img-badge pd-img-badge--verified">✓ EMAHU Verified</span>}
-              {product.onSale   && <span className="pd-img-badge pd-img-badge--sale">−{product.discount}% OFF</span>}
-              {product.isHot    && <span className="pd-img-badge pd-img-badge--hot">🔥 Hot Deal</span>}
+              {product.onSale && <span className="pd-img-badge pd-img-badge--sale">−{product.discount}% OFF</span>}
+              {product.isHot && <span className="pd-img-badge pd-img-badge--hot">🔥 Hot Deal</span>}
             </div>
 
             <div className="pd-zoom-hint">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" /></svg>
               Hover to zoom
             </div>
           </div>
@@ -847,13 +847,13 @@ export default function ProductDetailPage() {
             <span className="pd-rating-count">{product.reviews.toLocaleString()} reviews</span>
             {product.verified && (
               <span className="pd-verified-tag">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#12b7b2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#12b7b2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 EMAHU Verified
               </span>
             )}
           </div>
 
-                    {/* Price */}
+          {/* Price */}
           <div className="pd-price-block">
             <span className="pd-price">₹{currentPrice.toLocaleString('en-IN')}</span>
             {currentComparePrice && currentComparePrice > currentPrice && <>
@@ -865,7 +865,7 @@ export default function ProductDetailPage() {
 
           <div className="pd-divider" />
 
-                    {/* Variants Selector */}
+          {/* Variants Selector */}
           {product.variants && product.variants.length > 0 && (
             <div style={{ marginBottom: '20px' }}>
               <p className="pd-selector-label" style={{ marginBottom: '8px', color: '#475569', fontWeight: '700', fontSize: '0.8rem' }}>🎨 Select Option / Variant</p>
@@ -903,10 +903,10 @@ export default function ProductDetailPage() {
 
           {/* Original Colors & Sizes (if any exist independently of variants) */}
           {product.colors.length > 0 && <>
-            <p className="pd-selector-label">Color — <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,color:'#6b7280'}}>Option {activeColor+1}</span></p>
+            <p className="pd-selector-label">Color — <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: '#6b7280' }}>Option {activeColor + 1}</span></p>
             <div className="pd-colors">
               {product.colors.map((c, i) => (
-                <div key={i} className={`pd-color-dot ${activeColor===i?'pd-color-dot--active':''}`}
+                <div key={i} className={`pd-color-dot ${activeColor === i ? 'pd-color-dot--active' : ''}`}
                   style={{ background: c }} onClick={() => setActiveColor(i)} title={c} />
               ))}
             </div>
@@ -916,25 +916,25 @@ export default function ProductDetailPage() {
             <p className="pd-selector-label">Size</p>
             <div className="pd-sizes">
               {product.sizes.map(s => (
-                <button key={s} className={`pd-size-btn ${activeSize===s?'pd-size-btn--active':''}`}
+                <button key={s} className={`pd-size-btn ${activeSize === s ? 'pd-size-btn--active' : ''}`}
                   onClick={() => setActiveSize(s)}>{s}</button>
               ))}
             </div>
             <button className="pd-size-guide">Size guide →</button>
           </>}
 
-                    {/* Qty */}
+          {/* Qty */}
           <div className="pd-qty-row">
             <span className="pd-qty-label">Qty</span>
             <div className="pd-qty-ctrl">
-              <button className="pd-qty-btn" onClick={() => setQty(q => Math.max(1, q-1))} disabled={currentStock <= 0}>−</button>
+              <button className="pd-qty-btn" onClick={() => setQty(q => Math.max(1, q - 1))} disabled={currentStock <= 0}>−</button>
               <span className="pd-qty-val">{currentStock <= 0 ? 0 : qty}</span>
-              <button className="pd-qty-btn" onClick={() => setQty(q => Math.min(currentStock, q+1))} disabled={currentStock <= 0 || qty >= currentStock}>+</button>
+              <button className="pd-qty-btn" onClick={() => setQty(q => Math.min(currentStock, q + 1))} disabled={currentStock <= 0 || qty >= currentStock}>+</button>
             </div>
             {currentStock > 0 ? (
-              <span style={{fontSize:'0.78rem',color:'#16a34a',fontWeight:600}}>✓ In Stock</span>
+              <span style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: 600 }}>✓ In Stock</span>
             ) : (
-              <span style={{fontSize:'0.78rem',color:'#dc2626',fontWeight:600}}>✕ Out of Stock</span>
+              <span style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 600 }}>✕ Out of Stock</span>
             )}
           </div>
 
@@ -966,7 +966,7 @@ export default function ProductDetailPage() {
           {/* CTAs */}
           <div className="pd-cta-row">
             <button
-              className={`pd-btn-cart ${added?'pd-btn-cart--added':''}`}
+              className={`pd-btn-cart ${added ? 'pd-btn-cart--added' : ''}`}
               onClick={handleAddCart}
               disabled={currentStock <= 0 || !isDeliverable}
               style={currentStock <= 0 || !isDeliverable ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#4b5563' } : {}}
@@ -976,9 +976,9 @@ export default function ProductDetailPage() {
               ) : !isDeliverable ? (
                 'Delivery Unavailable'
               ) : added ? (
-                <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Added!</>
+                <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Added!</>
               ) : (
-                <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg> Add to Cart</>
+                <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" /></svg> Add to Cart</>
               )}
             </button>
             <button
@@ -987,12 +987,12 @@ export default function ProductDetailPage() {
               disabled={currentStock <= 0 || !isDeliverable}
               style={currentStock <= 0 || !isDeliverable ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#374151' } : {}}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5l7 7-7 7" /></svg>
               {currentStock <= 0 ? 'Out of Stock' : !isDeliverable ? 'Delivery Unavailable' : 'Buy Now'}
             </button>
-            <button className={`pd-btn-wishlist ${wishlist?'pd-btn-wishlist--active':''}`} onClick={handleToggleWishlist} aria-label="Wishlist">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill={wishlist?'#ef4444':'none'} stroke={wishlist?'#ef4444':'#374151'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            <button className={`pd-btn-wishlist ${wishlist ? 'pd-btn-wishlist--active' : ''}`} onClick={handleToggleWishlist} aria-label="Wishlist">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill={wishlist ? '#ef4444' : 'none'} stroke={wishlist ? '#ef4444' : '#374151'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
               </svg>
             </button>
           </div>
@@ -1003,13 +1003,13 @@ export default function ProductDetailPage() {
           {/* Delivery info */}
           <div className="pd-delivery-cards">
             {[
-              { icon:'🚚', title:'Express Delivery', sub:'Estimated by Tomorrow, 10 AM', tag:null },
-              { icon:'✅', title:'EMAHU Quality Checked', sub:'Physical inspection completed. Seal verified.', tag:null },
-              { icon:'🔄', title:'30-Day Easy Returns', sub:'No questions asked return policy', tag:null },
-              { icon:'🔒', title:'Secure Escrow Payment', sub:'Money released only after you confirm receipt', tag:null },
+              { icon: '🚚', title: 'Express Delivery', sub: 'Estimated by Tomorrow, 10 AM', tag: null },
+              { icon: '✅', title: 'EMAHU Quality Checked', sub: 'Physical inspection completed. Seal verified.', tag: null },
+              { icon: '🔄', title: '30-Day Easy Returns', sub: 'No questions asked return policy', tag: null },
+              { icon: '🔒', title: 'Secure Emahu Payment', sub: 'Money released only after you confirm receipt', tag: null },
             ].map((item, i) => (
               <div key={i} className="pd-delivery-card">
-                <div className="pd-delivery-icon" style={{fontSize:'1.1rem'}}>{item.icon}</div>
+                <div className="pd-delivery-icon" style={{ fontSize: '1.1rem' }}>{item.icon}</div>
                 <div className="pd-delivery-info">
                   <div className="pd-delivery-title">{item.title}</div>
                   <div className="pd-delivery-sub">{item.sub}</div>
@@ -1023,7 +1023,7 @@ export default function ProductDetailPage() {
           <div className="pd-trust-row">
             {['100% Authentic', 'Secure Checkout', 'EMAHU Protected', '24/7 Support'].map(t => (
               <span key={t} className="pd-trust-badge">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#12b7b2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#12b7b2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 {t}
               </span>
             ))}
@@ -1034,8 +1034,8 @@ export default function ProductDetailPage() {
       {/* ── Tabs: Description / Specs / Reviews ── */}
       <section className="pd-tabs-section">
         <div className="pd-tabs">
-          {[['desc','Description'],['specs','Specifications'],['reviews','Reviews']].map(([k,l]) => (
-            <button key={k} className={`pd-tab ${activeTab===k?'pd-tab--active':''}`} onClick={() => setActiveTab(k)}>{l}</button>
+          {[['desc', 'Description'], ['specs', 'Specifications'], ['reviews', 'Reviews']].map(([k, l]) => (
+            <button key={k} className={`pd-tab ${activeTab === k ? 'pd-tab--active' : ''}`} onClick={() => setActiveTab(k)}>{l}</button>
           ))}
         </div>
 
@@ -1045,10 +1045,10 @@ export default function ProductDetailPage() {
             <p>Every EMAHU-listed product undergoes rigorous 47-point physical inspection at one of our secure hub facilities before reaching your doorstep. Your satisfaction is guaranteed.</p>
             <div className="pd-features-grid">
               {[
-                {icon:'🛡️', title:'Quality Assured', sub:'47-point physical inspection'},
-                {icon:'📦', title:'Premium Packaging', sub:'Tamper-proof EMAHU seal'},
-                {icon:'⚡', title:'Express Delivery', sub:'Next-day delivery available'},
-                {icon:'💎', title:'Authentic Product', sub:'Manufacturer warranty included'},
+                { icon: '🛡️', title: 'Quality Assured', sub: '47-point physical inspection' },
+                { icon: '📦', title: 'Premium Packaging', sub: 'Tamper-proof EMAHU seal' },
+                { icon: '⚡', title: 'Express Delivery', sub: 'Next-day delivery available' },
+                { icon: '💎', title: 'Authentic Product', sub: 'Manufacturer warranty included' },
               ].map(f => (
                 <div key={f.title} className="pd-feature-item">
                   <div className="pd-feature-icon">{f.icon}</div>
@@ -1066,7 +1066,7 @@ export default function ProductDetailPage() {
           <div className="pd-specs">
             <table className="pd-specs-table">
               <tbody>
-                {currentSpecs.map(([k,v]) => (
+                {currentSpecs.map(([k, v]) => (
                   <tr key={k}><td>{k}</td><td>{v}</td></tr>
                 ))}
               </tbody>
@@ -1079,14 +1079,14 @@ export default function ProductDetailPage() {
             <div className="pd-reviews-summary">
               <div>
                 <div className="pd-reviews-big-score">{product.rating}</div>
-                <div><Stars rating={product.rating} size={16}/></div>
+                <div><Stars rating={product.rating} size={16} /></div>
                 <div className="pd-reviews-big-label">{(product.reviews + userReviews.length).toLocaleString()} reviews</div>
               </div>
               <div className="pd-bar-rows">
                 {RATING_DIST.map(r => (
                   <div key={r.label} className="pd-bar-row">
                     <span className="pd-bar-label">{r.label}</span>
-                    <div className="pd-bar-track"><div className="pd-bar-fill" style={{width:`${r.pct}%`}} /></div>
+                    <div className="pd-bar-track"><div className="pd-bar-fill" style={{ width: `${r.pct}%` }} /></div>
                     <span className="pd-bar-pct">{r.pct}%</span>
                   </div>
                 ))}
@@ -1099,7 +1099,7 @@ export default function ProductDetailPage() {
                 <>
                   {reviewSubmitted && (
                     <span style={{ fontSize: '0.82rem', color: '#10b981', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
                       Review submitted! Thank you.
                     </span>
                   )}
@@ -1115,14 +1115,14 @@ export default function ProductDetailPage() {
                     }}
                   >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                      <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                     </svg>
                     {showReviewForm ? 'Cancel' : 'Write a Review'}
                   </button>
                 </>
               ) : (
                 <span style={{ fontSize: '0.82rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '6px', background: '#f9fafb', padding: '8px 16px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                   Purchase this product to leave a review
                 </span>
               )}
@@ -1140,7 +1140,7 @@ export default function ProductDetailPage() {
                 <div style={{ marginBottom: '16px' }}>
                   <p style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>Your Rating</p>
                   <div style={{ display: 'flex', gap: '6px' }}>
-                    {[1,2,3,4,5].map(s => (
+                    {[1, 2, 3, 4, 5].map(s => (
                       <button
                         key={s} type="button"
                         onMouseEnter={() => setReviewHover(s)}
@@ -1218,7 +1218,7 @@ export default function ProductDetailPage() {
               {[...userReviews, ...REVIEWS].map((r, idx) => (
                 <div key={r.id || idx} className="pd-review-card" style={r.userSubmitted ? { border: '1.5px solid #12b7b2', background: 'rgba(18,183,178,0.02)' } : {}}>
                   <div className="pd-review-head">
-                    <div className="pd-review-avatar" style={{background: r.color || '#4169e1'}}>{r.name[0]}</div>
+                    <div className="pd-review-avatar" style={{ background: r.color || '#4169e1' }}>{r.name[0]}</div>
                     <div>
                       <div className="pd-review-name">{r.name}</div>
                       <div className="pd-review-date">{r.date}</div>
@@ -1226,12 +1226,12 @@ export default function ProductDetailPage() {
                     {r.verified && <span className="pd-review-verified">✓ Verified Purchase</span>}
                   </div>
                   <div className="pd-review-stars">
-                    {[1,2,3,4,5].map(s=>(
-                      <svg key={s} className="pd-review-rs" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={s<=r.rating?'#f59e0b':'#e5e7eb'}/></svg>
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <svg key={s} className="pd-review-rs" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={s <= r.rating ? '#f59e0b' : '#e5e7eb'} /></svg>
                     ))}
                   </div>
                   <p className="pd-review-text">{r.text}</p>
-                  <div className="pd-review-tags">{r.tags.map(t=><span key={t} className="pd-review-tag">{t}</span>)}</div>
+                  <div className="pd-review-tags">{r.tags.map(t => <span key={t} className="pd-review-tag">{t}</span>)}</div>
                 </div>
               ))}
             </div>

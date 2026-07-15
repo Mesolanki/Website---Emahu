@@ -8,18 +8,18 @@ import './orders.css';
 
 function parseOrderDate(ord) {
   if (!ord) return new Date(0);
-  
+
   // 1. Try ord.createdAt (Mongoose ISO date string or Date object)
   if (ord.createdAt) {
     const d = new Date(ord.createdAt);
     if (!isNaN(d.getTime())) return d;
   }
-  
+
   // 2. Try ord.date (custom date string)
   if (ord.date) {
     const d = new Date(ord.date);
     if (!isNaN(d.getTime())) return d;
-    
+
     // Attempt custom format matching (DD/MM/YYYY or DD-MM-YYYY)
     const match = String(ord.date).match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
     if (match) {
@@ -32,7 +32,7 @@ function parseOrderDate(ord) {
       }
     }
   }
-  
+
   return new Date(0);
 }
 
@@ -54,8 +54,8 @@ export default function OrdersPage() {
     }
 
     // Add items from rejected sub-orders back to cart
-    const subOrdersToRetry = group.rejectedSubOrders && group.rejectedSubOrders.length > 0 
-      ? group.rejectedSubOrders 
+    const subOrdersToRetry = group.rejectedSubOrders && group.rejectedSubOrders.length > 0
+      ? group.rejectedSubOrders
       : group.ordersList;
 
     subOrdersToRetry.forEach((order) => {
@@ -98,7 +98,7 @@ export default function OrdersPage() {
         if (buyerUserStr) {
           try {
             buyerUserId = JSON.parse(buyerUserStr).id || JSON.parse(buyerUserStr)._id || '';
-          } catch (e) {}
+          } catch (e) { }
         }
         if (!buyerUserId) {
           let guestId = localStorage.getItem('emahu_guest_id');
@@ -108,7 +108,7 @@ export default function OrdersPage() {
           }
           buyerUserId = guestId;
         }
-        
+
         let storedOrders = '[]';
         try {
           const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${buyerUserId}`;
@@ -127,8 +127,8 @@ export default function OrdersPage() {
 
         let parsedOrders = JSON.parse(storedOrders);
 
-        const disableMockData = 
-          process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' || 
+        const disableMockData =
+          process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' ||
           process.env.NODE_ENV === 'production';
 
         if (parsedOrders.length === 0 && !disableMockData) {
@@ -155,9 +155,9 @@ export default function OrdersPage() {
                 }
               ],
               total: 31958, // Price + Tax + Shipping
-              status: '🔒 ESCROW VAULT SECURED',
+              status: '🔒 Emahu VAULT SECURED',
               shippingSpeed: 'standard',
-              escrowMethod: 'wallet',
+              EmahuMethod: 'wallet',
               deliveryAddress: {
                 fullName: 'Rahul Sharma',
                 phone: '+91 98765 43210',
@@ -176,7 +176,7 @@ export default function OrdersPage() {
         // 1. Filter out orders older than 1 month (30 days)
         const oneMonthAgo = new Date();
         oneMonthAgo.setDate(oneMonthAgo.getDate() - 30);
-        
+
         const filtered = parsedOrders.filter(ord => {
           const orderDate = parseOrderDate(ord);
           return orderDate >= oneMonthAgo;
@@ -201,7 +201,7 @@ export default function OrdersPage() {
               createdAt: ord.createdAt,
               deliveryAddress: ord.deliveryAddress,
               shippingSpeed: ord.shippingSpeed,
-              escrowMethod: ord.escrowMethod,
+              EmahuMethod: ord.EmahuMethod,
               status: ord.status,
               items: [],
               total: 0,
@@ -239,7 +239,7 @@ export default function OrdersPage() {
 
           const rejectedSubOrders = group.ordersList.filter(o => isOrderRejected(o));
 
-          let overallStatus = '🔒 ESCROW VAULT SECURED';
+          let overallStatus = '🔒 Emahu VAULT SECURED';
           if (hasDisputed) {
             overallStatus = '⚠️ VAULT DISPUTED / FROZEN';
           } else if (allReleased) {
@@ -367,13 +367,13 @@ export default function OrdersPage() {
     }
   };
 
-  // Action: Release funds from Escrow Vault directly to Merchant
+  // Action: Release funds from Emahu Vault directly to Merchant
   const handleReleaseFunds = async (billId, ordersList) => {
-    const confirmation = window.confirm("Are you absolutely sure the package has arrived safely and is in perfect condition? Releasing the escrow locks will transfer funds directly to the merchant. This action CANNOT be reversed!");
+    const confirmation = window.confirm("Are you absolutely sure the package has arrived safely and is in perfect condition? Releasing the Emahu locks will transfer funds directly to the merchant. This action CANNOT be reversed!");
     if (!confirmation) return;
 
     setReleasedOrdersList(prev => [...prev, billId]);
-    
+
     // Update local React state status
     const updated = orders.map(ord => {
       if (ord.billId === billId) {
@@ -382,7 +382,7 @@ export default function OrdersPage() {
       return ord;
     });
     setOrders(updated);
-    
+
     for (const o of ordersList) {
       await syncOrderStatus(o.orderId, '🔓 FUNDS RELEASED');
     }
@@ -392,9 +392,9 @@ export default function OrdersPage() {
   const handleRaiseDispute = async (e) => {
     e.preventDefault();
     if (!disputeReason) return;
-    
+
     setDisputedOrdersList(prev => [...prev, disputedOrderId]);
-    
+
     // Update local React state status
     const updated = orders.map(ord => {
       if (ord.billId === disputedOrderId) {
@@ -403,7 +403,7 @@ export default function OrdersPage() {
       return ord;
     });
     setOrders(updated);
-    
+
     const targetBillId = disputedOrderId;
     const group = orders.find(g => g.billId === targetBillId);
     setDisputedOrderId(null);
@@ -433,9 +433,9 @@ export default function OrdersPage() {
       <main className="orders-container">
         <div className="orders-header-row">
           <div>
-            <h1 className="orders-title">Escrow Vault Transactions</h1>
+            <h1 className="orders-title">Emahu Vault Transactions</h1>
             <p className="orders-subtitle">
-              Monitor and control your active escrow transactions. Capital is safely frozen inside military-grade vault holdings and will only be released to the merchant once you physically inspect and approve delivery status.
+              Monitor and control your active Emahu transactions. Capital is safely frozen inside military-grade vault holdings and will only be released to the merchant once you physically inspect and approve delivery status.
             </p>
           </div>
           <div className="orders-vault-stats-card">
@@ -468,7 +468,7 @@ export default function OrdersPage() {
               </svg>
             </div>
             <h2>No Transaction History Found</h2>
-            <p>{"You haven't initiated any locked escrow orders yet. Fill your shopping cart with certified products and check out to start."}</p>
+            <p>{"You haven't initiated any locked Emahu orders yet. Fill your shopping cart with certified products and check out to start."}</p>
             <Link href="/buyer/products" className="orders-explore-btn">
               Start Shopping
             </Link>
@@ -481,18 +481,18 @@ export default function OrdersPage() {
               const isReleased = releasedOrdersList.includes(ord.billId) || ord.status.includes('RELEASED');
               const isLocked = !isDisputed && !isReleased;
               const isArrived = (ord.hasDelivered || ord.hasArrived) && !isReleased && !isDisputed;
-              
+
               return (
-                <div 
-                  key={ord.billId} 
+                <div
+                  key={ord.billId}
                   className={`order-card ${isDisputed ? 'order-card--disputed' : ''} ${isReleased ? 'order-card--released' : ''} ${isLocked ? 'order-card--locked' : ''}`}
                   style={{}}
                 >
-                  
+
                   {/* Card Header summary */}
                   <div className="order-card-header">
                     <div>
-                      <span className="order-card-label">ESCROW LOCK BILL ID</span>
+                      <span className="order-card-label">Emahu LOCK BILL ID</span>
                       <Link href={`/buyer/track?id=${ord.billId}`} className="order-card-val" style={{ color: '#4169e1', textDecoration: 'underline' }}>
                         {ord.billId}
                       </Link>
@@ -519,42 +519,42 @@ export default function OrdersPage() {
                       {ord.items.map((item, idx) => {
                         const isItemRejected = item._sellerRejected || (item._status && (item._status.includes('REJECTED') || item._status === '❌ Order Rejected by Seller'));
                         const isItemPending = !item._status || item._status === 'PENDING_APPROVAL';
-                        const isItemConfirmed = !isItemRejected && item._status && ['APPROVED','DELIVERY_ASSIGNED','LABEL_GENERATED','READY_FOR_PICKUP','PICKED_UP','IN_TRANSIT','OUT_FOR_DELIVERY','DELIVERED','COMPLETED','✓ Delivery Confirmed by Seller','🔓 FUNDS RELEASED'].some(s => item._status.includes(s));
+                        const isItemConfirmed = !isItemRejected && item._status && ['APPROVED', 'DELIVERY_ASSIGNED', 'LABEL_GENERATED', 'READY_FOR_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', '✓ Delivery Confirmed by Seller', '🔓 FUNDS RELEASED'].some(s => item._status.includes(s));
                         return (
-                        <div key={idx} className="order-item-row" style={isItemRejected ? { opacity: 0.75, background: 'rgba(239,68,68,0.04)', borderRadius: '10px', padding: '2px 6px' } : {}}>
-                          <img src={item.img} alt={item.name} className="order-item-img" style={isItemRejected ? { filter: 'grayscale(0.5)' } : {}} />
-                          <div className="order-item-details">
-                            <span className="order-item-brand">{item.brand}</span>
-                            <h4 className="order-item-name">{item.name}</h4>
-                            <span className="order-item-qty">Qty: <strong>{item.quantity}</strong></span>
-                            {/* Per-item delivery status badge */}
-                            {isItemRejected && (
-                              <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.73rem', fontWeight: '700', color: '#ef4444', background: 'rgba(239,68,68,0.1)', borderRadius: '6px', padding: '3px 8px', width: 'fit-content' }}>
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                                  Item Not Deliverable
+                          <div key={idx} className="order-item-row" style={isItemRejected ? { opacity: 0.75, background: 'rgba(239,68,68,0.04)', borderRadius: '10px', padding: '2px 6px' } : {}}>
+                            <img src={item.img} alt={item.name} className="order-item-img" style={isItemRejected ? { filter: 'grayscale(0.5)' } : {}} />
+                            <div className="order-item-details">
+                              <span className="order-item-brand">{item.brand}</span>
+                              <h4 className="order-item-name">{item.name}</h4>
+                              <span className="order-item-qty">Qty: <strong>{item.quantity}</strong></span>
+                              {/* Per-item delivery status badge */}
+                              {isItemRejected && (
+                                <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.73rem', fontWeight: '700', color: '#ef4444', background: 'rgba(239,68,68,0.1)', borderRadius: '6px', padding: '3px 8px', width: 'fit-content' }}>
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                    Item Not Deliverable
+                                  </span>
+                                  {item._rejectionReason && (
+                                    <span style={{ fontSize: '0.71rem', color: '#94a3b8', paddingLeft: '4px' }}>Reason: {item._rejectionReason}</span>
+                                  )}
+                                </div>
+                              )}
+                              {isItemPending && !isItemRejected && (
+                                <span style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.73rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', borderRadius: '6px', padding: '3px 8px', width: 'fit-content' }}>
+                                  ⏳ Awaiting Seller Approval
                                 </span>
-                                {item._rejectionReason && (
-                                  <span style={{ fontSize: '0.71rem', color: '#94a3b8', paddingLeft: '4px' }}>Reason: {item._rejectionReason}</span>
-                                )}
-                              </div>
-                            )}
-                            {isItemPending && !isItemRejected && (
-                              <span style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.73rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', borderRadius: '6px', padding: '3px 8px', width: 'fit-content' }}>
-                                ⏳ Awaiting Seller Approval
-                              </span>
-                            )}
-                            {isItemConfirmed && (
-                              <span style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.73rem', fontWeight: '700', color: '#10b981', background: 'rgba(16,185,129,0.1)', borderRadius: '6px', padding: '3px 8px', width: 'fit-content' }}>
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-                                Confirmed for Delivery
-                              </span>
-                            )}
+                              )}
+                              {isItemConfirmed && (
+                                <span style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.73rem', fontWeight: '700', color: '#10b981', background: 'rgba(16,185,129,0.1)', borderRadius: '6px', padding: '3px 8px', width: 'fit-content' }}>
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                                  Confirmed for Delivery
+                                </span>
+                              )}
+                            </div>
+                            <div className="order-item-price">
+                              ₹{(item.price * item.quantity).toLocaleString('en-IN')}
+                            </div>
                           </div>
-                          <div className="order-item-price">
-                            ₹{(item.price * item.quantity).toLocaleString('en-IN')}
-                          </div>
-                        </div>
                         );
                       })}
                     </div>
@@ -596,100 +596,100 @@ export default function OrdersPage() {
                       );
                     })()}
 
-                        <div className="delivery-info-grid" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1' }}>
-                          <div className="grid-full-width">
-                            <span>Handling Merchant(s)</span>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
-                              {Array.from(new Map(ord.items.map(item => {
-                                const seller = item.seller || { name: item.brand || 'Emahu Seller', email: 'support@emahu.com', phone: '+91 99999 99999' };
-                                return [seller.name + seller.phone, seller];
-                              })).values()).map((seller, sIdx) => (
-                                <div key={sIdx} style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px', alignItems: 'center', fontSize: '0.85rem' }}>
-                                  <span style={{ color: '#0f172a', fontWeight: '600' }}>🚚 Your delivery is handled by this seller: {seller.name}</span>
-                                  <span style={{ color: '#475569' }}>(Email: {seller.email})</span>
-                                </div>
-                              ))}
+                    <div className="delivery-info-grid" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1' }}>
+                      <div className="grid-full-width">
+                        <span>Handling Merchant(s)</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                          {Array.from(new Map(ord.items.map(item => {
+                            const seller = item.seller || { name: item.brand || 'Emahu Seller', email: 'support@emahu.com', phone: '+91 99999 99999' };
+                            return [seller.name + seller.phone, seller];
+                          })).values()).map((seller, sIdx) => (
+                            <div key={sIdx} style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px', alignItems: 'center', fontSize: '0.85rem' }}>
+                              <span style={{ color: '#0f172a', fontWeight: '600' }}>🚚 Your delivery is handled by this seller: {seller.name}</span>
+                              <span style={{ color: '#475569' }}>(Email: {seller.email})</span>
                             </div>
-                          </div>
+                          ))}
+                        </div>
                       </div>
-                      
-                      {/* Delivery Partner Assignment Section */}
-                      {ord.ordersList.map((subOrd) => {
-                        const hasPartner = subOrd.deliveryPartnerId || subOrd.carrier;
-                        if (!hasPartner) return null;
+                    </div>
 
-                        const partner = subOrd.deliveryPartnerId;
-                        const partnerName = partner?.name || subOrd.carrier;
-                        const partnerPhone = partner?.phone || subOrd.carrierPhone;
-                        const partnerCategory = partner?.category || 'carrier';
-                        const vehicleType = partner?.vehicleType || subOrd.vehicleType;
-                        const isDelivered = ['delivered', 'completed'].includes(subOrd.deliveryStatus?.toLowerCase()) || ['delivered', 'completed'].includes(subOrd.status?.toLowerCase());
+                    {/* Delivery Partner Assignment Section */}
+                    {ord.ordersList.map((subOrd) => {
+                      const hasPartner = subOrd.deliveryPartnerId || subOrd.carrier;
+                      if (!hasPartner) return null;
 
-                        // Privacy rule: Hide personal details for individual delivery boy category before completion
-                        const isSingleTwoBoy = partnerCategory === 'single_two_boy' || partnerCategory === 'delivery_boy';
-                        const hideDetails = isSingleTwoBoy && !isDelivered;
-                        const displayName = hideDetails ? 'Emahu EV Delivery Partner' : partnerName;
-                        const displayPhone = hideDetails ? null : partnerPhone;
+                      const partner = subOrd.deliveryPartnerId;
+                      const partnerName = partner?.name || subOrd.carrier;
+                      const partnerPhone = partner?.phone || subOrd.carrierPhone;
+                      const partnerCategory = partner?.category || 'carrier';
+                      const vehicleType = partner?.vehicleType || subOrd.vehicleType;
+                      const isDelivered = ['delivered', 'completed'].includes(subOrd.deliveryStatus?.toLowerCase()) || ['delivered', 'completed'].includes(subOrd.status?.toLowerCase());
 
-                        return (
-                          <div key={`partner-${subOrd.orderId}`} style={{ marginTop: '12px', padding: '12px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.03)', border: '1px solid rgba(59, 130, 246, 0.12)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                              <div>
-                                <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>
-                                  Assigned Courier Partner (Order #{subOrd.orderId})
-                                </span>
-                                <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>
-                                  🏍️ {displayName}
-                                </strong>
+                      // Privacy rule: Hide personal details for individual delivery boy category before completion
+                      const isSingleTwoBoy = partnerCategory === 'single_two_boy' || partnerCategory === 'delivery_boy';
+                      const hideDetails = isSingleTwoBoy && !isDelivered;
+                      const displayName = hideDetails ? 'Emahu EV Delivery Partner' : partnerName;
+                      const displayPhone = hideDetails ? null : partnerPhone;
 
-                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
-                                  Category: <span style={{ textTransform: 'capitalize' }}>{partnerCategory.replace(/_/g, ' ')}</span> 
-                                  {vehicleType && ` • Vehicle: ${vehicleType.toUpperCase()}`}
-                                </div>
-                              </div>
-                              
-                              <div style={{ textAlign: 'right' }}>
-                                <span style={{
-                                  padding: '4px 10px',
-                                  borderRadius: '12px',
-                                  fontSize: '0.72rem',
-                                  fontWeight: '700',
-                                  backgroundColor: isDelivered ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
-                                  color: isDelivered ? '#10b981' : '#d97706',
-                                  textTransform: 'capitalize'
-                                }}>
-                                  {isDelivered ? '✓ Delivered' : subOrd.deliveryStatus || 'Assigned'}
-                                </span>
-                                {subOrd.deliveredAt && (
-                                  <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>
-                                    Delivered: {new Date(subOrd.deliveredAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                  </div>
-                                )}
+                      return (
+                        <div key={`partner-${subOrd.orderId}`} style={{ marginTop: '12px', padding: '12px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.03)', border: '1px solid rgba(59, 130, 246, 0.12)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <div>
+                              <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>
+                                Assigned Courier Partner (Order #{subOrd.orderId})
+                              </span>
+                              <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>
+                                🏍️ {displayName}
+                              </strong>
+
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
+                                Category: <span style={{ textTransform: 'capitalize' }}>{partnerCategory.replace(/_/g, ' ')}</span>
+                                {vehicleType && ` • Vehicle: ${vehicleType.toUpperCase()}`}
                               </div>
                             </div>
 
-                            {/* Show Proof of Delivery Photo if delivered */}
-                            {isDelivered && subOrd.deliveryPhoto && (
-                              <div style={{ marginTop: '10px', borderTop: '1px dashed rgba(0,0,0,0.06)', paddingTop: '10px' }}>
-                                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
-                                  📸 Proof of Delivery Package Receipt
-                                </span>
-                                <div style={{ borderRadius: '6px', overflow: 'hidden', border: '1px solid #e2e8f0', maxWidth: '200px', background: '#f8fafc' }}>
-                                  <img 
-                                    src={subOrd.deliveryPhoto} 
-                                    alt="Delivery Proof" 
-                                    style={{ width: '100%', height: 'auto', display: 'block', cursor: 'pointer' }}
-                                    onClick={() => window.open(subOrd.deliveryPhoto, '_blank')}
-                                  />
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                fontSize: '0.72rem',
+                                fontWeight: '700',
+                                backgroundColor: isDelivered ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                                color: isDelivered ? '#10b981' : '#d97706',
+                                textTransform: 'capitalize'
+                              }}>
+                                {isDelivered ? '✓ Delivered' : subOrd.deliveryStatus || 'Assigned'}
+                              </span>
+                              {subOrd.deliveredAt && (
+                                <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>
+                                  Delivered: {new Date(subOrd.deliveredAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                 </div>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
-                        );
-                      })}
+
+                          {/* Show Proof of Delivery Photo if delivered */}
+                          {isDelivered && subOrd.deliveryPhoto && (
+                            <div style={{ marginTop: '10px', borderTop: '1px dashed rgba(0,0,0,0.06)', paddingTop: '10px' }}>
+                              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+                                📸 Proof of Delivery Package Receipt
+                              </span>
+                              <div style={{ borderRadius: '6px', overflow: 'hidden', border: '1px solid #e2e8f0', maxWidth: '200px', background: '#f8fafc' }}>
+                                <img
+                                  src={subOrd.deliveryPhoto}
+                                  alt="Delivery Proof"
+                                  style={{ width: '100%', height: 'auto', display: 'block', cursor: 'pointer' }}
+                                  onClick={() => window.open(subOrd.deliveryPhoto, '_blank')}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  {/* Escrow assurance operations */}
+                  {/* Emahu assurance operations */}
                   <div className="order-card-footer">
                     <div className="order-vault-info">
                       {isReleased ? (
@@ -737,7 +737,7 @@ export default function OrdersPage() {
                             <span style={{ color: '#991b1b', fontWeight: '800', fontSize: '0.9rem' }}>Order Rejected by Seller</span>
                           </div>
                           <div style={{ fontSize: '0.78rem', color: '#7f1d1d' }}>
-                            All items in this order group were rejected. The escrow funds will be automatically returned to your wallet.
+                            All items in this order group were rejected. The Emahu funds will be automatically returned to your wallet.
                           </div>
                           {ord.rejectedSubOrders?.[0]?.rejectionReason && (
                             <div style={{ fontSize: '0.75rem', color: '#7f1d1d', background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
@@ -823,7 +823,7 @@ export default function OrdersPage() {
                             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                           </svg>
                           <span style={{ fontSize: '0.8rem', color: '#475569' }}>
-                            Escrow Protected: Money remains inside safety vault. Share the secure OTP with the courier partner to complete delivery and release funds.
+                            Emahu Protected: Money remains inside safety vault. Share the secure OTP with the courier partner to complete delivery and release funds.
                           </span>
                         </div>
                       )}
@@ -834,7 +834,7 @@ export default function OrdersPage() {
                       const isDelivered = ['delivered', 'completed'].includes(subOrd.deliveryStatus?.toLowerCase()) || ['delivered', 'completed'].includes(subOrd.status?.toLowerCase());
                       const showOtp = (!!subOrd.deliveryOtp || ['out_for_delivery', 'arrived'].includes(subOrd.deliveryStatus?.toLowerCase()) || ['out_for_delivery', 'arrived'].includes(subOrd.status?.toLowerCase())) && !isDelivered;
                       const showArrivalConfirm = (subOrd.status === 'ARRIVED' || subOrd.deliveryStatus === 'arrived') && !isDelivered;
-                      
+
                       return (
                         <div key={subOrd.orderId} style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '8px 0' }}>
                           {showOtp && (
@@ -846,7 +846,7 @@ export default function OrdersPage() {
                               textAlign: 'left'
                             }}>
                               <strong style={{ color: '#0f172a', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                🔑 Secure Delivery OTP for Order #{subOrd.orderId}: 
+                                🔑 Secure Delivery OTP for Order #{subOrd.orderId}:
                                 <span style={{ fontFamily: 'monospace', letterSpacing: '2px', background: '#f8fafc', padding: '2px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '1.1rem', color: '#000000', fontWeight: 'bold' }}>
                                   {subOrd.deliveryOtp || 'Not generated'}
                                 </span>
@@ -897,14 +897,14 @@ export default function OrdersPage() {
                 </svg>
               </div>
               <h2>Raise Quality Dispute / Reject Delivery</h2>
-              <p>Locked order funds will be frozen inside the secure Escrow vault. Emahu arbitrates dispute verification, and the merchant will not receive payment until the product has been retrieved, evaluated, or replaced.</p>
-              
+              <p>Locked order funds will be frozen inside the secure Emahu vault. Emahu arbitrates dispute verification, and the merchant will not receive payment until the product has been retrieved, evaluated, or replaced.</p>
+
               <form onSubmit={handleRaiseDispute}>
                 <div className="dispute-form-group">
                   <label>Select Dispute Reason</label>
-                  <select 
-                    value={disputeReason} 
-                    onChange={(e) => setDisputeReason(e.target.value)} 
+                  <select
+                    value={disputeReason}
+                    onChange={(e) => setDisputeReason(e.target.value)}
                     required
                   >
                     <option value="">-- Select reason for quality rejection --</option>

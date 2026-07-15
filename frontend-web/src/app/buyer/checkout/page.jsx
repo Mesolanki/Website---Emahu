@@ -68,7 +68,7 @@ const sellerServesLocation = (seller, city) => {
     const bLat = parseFloat(seller.latitude);
     const bLon = parseFloat(seller.longitude);
     // distance logic can be computed if coordinate inputs are available, otherwise fall back to string parsing
-  } catch (_) {}
+  } catch (_) { }
 
   const sellerCity = (seller.city || seller.currentCity || seller.location || seller.address || '').toLowerCase().trim();
   const sellerState = (seller.state || seller.serviceAreaState || seller.address || '').toLowerCase().trim();
@@ -84,12 +84,12 @@ const sellerServesLocation = (seller, city) => {
   // City to State Map for state level coverage matching
   const cityToStateMap = {
     // Gujarat
-    'ahmedabad': 'gujarat', 'surat': 'gujarat', 'vadodara': 'gujarat', 'rajkot': 'gujarat', 
-    'gandhinagar': 'gujarat', 'bhavnagar': 'gujarat', 'jamnagar': 'gujarat', 'junagadh': 'gujarat', 
+    'ahmedabad': 'gujarat', 'surat': 'gujarat', 'vadodara': 'gujarat', 'rajkot': 'gujarat',
+    'gandhinagar': 'gujarat', 'bhavnagar': 'gujarat', 'jamnagar': 'gujarat', 'junagadh': 'gujarat',
     'anand': 'gujarat', 'mehsana': 'gujarat', 'nadiad': 'gujarat', 'morbi': 'gujarat',
     // Maharashtra
-    'mumbai': 'maharashtra', 'pune': 'maharashtra', 'nagpur': 'maharashtra', 'nashik': 'maharashtra', 
-    'aurangabad': 'maharashtra', 'thane': 'maharashtra', 'navi mumbai': 'maharashtra', 
+    'mumbai': 'maharashtra', 'pune': 'maharashtra', 'nagpur': 'maharashtra', 'nashik': 'maharashtra',
+    'aurangabad': 'maharashtra', 'thane': 'maharashtra', 'navi mumbai': 'maharashtra',
     'solapur': 'maharashtra', 'kolhapur': 'maharashtra', 'amravati': 'maharashtra',
     // Delhi NCR
     'delhi': 'delhi', 'noida': 'uttar pradesh', 'gurugram': 'haryana', 'faridabad': 'haryana', 'ghaziabad': 'uttar pradesh',
@@ -151,13 +151,71 @@ const sellerServesLocation = (seller, city) => {
   return false;
 };
 
+// Known Indian cities and states for validation
+const KNOWN_CITIES = [
+  'ahmedabad','surat','rajkot','vadodara','gandhinagar','bhavnagar','jamnagar','junagadh','anand','mehsana','morbi',
+  'mumbai','pune','nagpur','nashik','aurangabad','thane','solapur','kolhapur','amravati',
+  'delhi','noida','gurugram','faridabad','ghaziabad',
+  'bangalore','bengaluru','mysore','mangalore','hubli','belgaum',
+  'chennai','coimbatore','madurai','salem','tiruchirappalli',
+  'hyderabad','warangal','nizamabad','secunderabad',
+  'kolkata','howrah','siliguri','asansol','durgapur',
+  'jaipur','jodhpur','udaipur','kota','ajmer',
+  'lucknow','kanpur','agra','varanasi','allahabad','meerut',
+  'chandigarh','ludhiana','amritsar','jalandhar','ambala',
+  'bhopal','indore','gwalior','jabalpur',
+  'patna','gaya','bhubaneswar','cuttack','visakhapatnam','vijayawada'
+];
+
+const KNOWN_STATES = [
+  'gujarat','maharashtra','delhi','karnataka','tamil nadu','telangana',
+  'west bengal','rajasthan','uttar pradesh','punjab','haryana','madhya pradesh',
+  'bihar','odisha','andhra pradesh','kerala','jharkhand','assam','uttarakhand',
+  'himachal pradesh','chhattisgarh','goa','tripura','meghalaya','manipur',
+  'nagaland','arunachal pradesh','mizoram','sikkim'
+];
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0));
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+    dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  }
+  return dp[m][n];
+}
+
+function getClosestMatch(input, list) {
+  if (!input || input.length < 2) return null;
+  const lower = input.toLowerCase().trim();
+  if (list.includes(lower)) return null; // exact match, no hint needed
+  let best = null, bestDist = Infinity;
+  for (const item of list) {
+    const d = levenshtein(lower, item);
+    if (d < bestDist && d <= 3) { best = item; bestDist = d; }
+  }
+  return best ? best.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : null;
+}
+
 export default function CheckoutPage() {
   const [cartItems, setCartItems] = useState([]);
   const [shippingSpeed, setShippingSpeed] = useState('standard'); // standard | express
-  const [escrowMethod, setEscrowMethod] = useState('wallet'); // wallet | card | upi
+  const [EmahuMethod, setEmahuMethod] = useState('wallet'); // wallet | card | upi
   const [checkoutStep, setCheckoutStep] = useState('idle'); // idle | securing | success
   const [generatedOrderId, setGeneratedOrderId] = useState('');
   const [orderSellers, setOrderSellers] = useState([]);
+  const [placedOrderObjects, setPlacedOrderObjects] = useState([]);
+
+  // ── LOCATION GATE ── (must confirm location before checkout)
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
+  const [locationMode, setLocationMode] = useState(null); // null | 'gps' | 'manual'
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState('');
+
+  // Address field errors & hints
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [cityHint, setCityHint] = useState('');
+  const [stateHint, setStateHint] = useState('');
+  const [manualConfirmed, setManualConfirmed] = useState(false);
 
   // Form fields
   const [fullName, setFullName] = useState('');
@@ -229,35 +287,7 @@ export default function CheckoutPage() {
   // ── Block checkout if buyer has an unconfirmed arrived order ──
   useEffect(() => {
     const checkDeliveredOrders = async () => {
-      // Removed per request - no longer blocking checkout for arrived orders
-      /*
-      let buyerUserId = '';
-      const buyerUserStr = localStorage.getItem('emahu_buyer_user');
-      if (buyerUserStr) {
-        try {
-          buyerUserId = JSON.parse(buyerUserStr).id || JSON.parse(buyerUserStr)._id || '';
-        } catch (e) {}
-      }
-      if (!buyerUserId) {
-        buyerUserId = localStorage.getItem('emahu_guest_id') || '';
-      }
-      if (!buyerUserId) return;
-
-      try {
-        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${buyerUserId}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data.success && data.orders) {
-          const unconfirmed = data.orders.find(o => o.status === 'DELIVERED');
-          if (unconfirmed) {
-            alert(`Checkout Blocked: You must inspect and confirm delivery of your arrived order #${unconfirmed.orderId} before placing a new order.`);
-            window.location.href = '/buyer/orders';
-          }
-        }
-      } catch (err) {
-        console.warn('Error checking delivered orders in checkout page:', err);
-      }
-      */
+      /* Removed per request */
     };
     checkDeliveredOrders();
   }, []);
@@ -424,7 +454,8 @@ export default function CheckoutPage() {
     }
   }, [leafletLoaded, buyerCoordinates.latitude, buyerCoordinates.longitude, cartItems]);
 
-  const handleGPSDetect = () => {
+  const handleGPSDetect = async (fromGate = false) => {
+    if (fromGate) { setGpsLoading(true); setGpsError(''); }
     if (typeof window !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -451,12 +482,8 @@ export default function CheckoutPage() {
 
               const parts = [road, suburb, cityVal, stateVal].filter(Boolean);
               let fullAddr = parts.join(', ');
-              if (postcodeVal) {
-                fullAddr += ` - ${postcodeVal}`;
-              }
-              if (!fullAddr) {
-                fullAddr = data.display_name;
-              }
+              if (postcodeVal) fullAddr += ` - ${postcodeVal}`;
+              if (!fullAddr) fullAddr = data.display_name;
 
               setAddress(fullAddr);
               setCity(cityVal);
@@ -467,14 +494,57 @@ export default function CheckoutPage() {
           } catch (geocodingErr) {
             console.error('Reverse geocoding failed:', geocodingErr);
           }
+
+          if (fromGate) {
+            setGpsLoading(false);
+            setLocationMode('gps');
+            setLocationConfirmed(true);
+          }
         },
         (error) => {
           console.error(error);
-          alert('GPS Geolocation request failed. Please input your coordinates manually.');
-        }
+          if (fromGate) {
+            setGpsLoading(false);
+            setGpsError(error.code === 1
+              ? 'Location permission denied. Please allow location access in your browser settings or enter your address manually.'
+              : 'Unable to detect GPS location. Please try again or enter address manually.');
+          }
+        },
+        { timeout: 10000, maximumAge: 60000 }
       );
     } else {
-      alert('Geolocation is not supported by your browser.');
+      if (fromGate) {
+        setGpsLoading(false);
+        setGpsError('Your browser does not support GPS location. Please enter your address manually.');
+      }
+    }
+  };
+
+  const validateManualAddress = () => {
+    const errors = {};
+    if (!fullName.trim() || fullName.trim().length < 2) errors.fullName = 'Full name is required (min 2 characters)';
+    if (!phone.trim() || !/^[+]?[0-9]{10,13}$/.test(phone.replace(/\s/g, ''))) errors.phone = 'Enter a valid 10-digit mobile number';
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Enter a valid email address';
+    if (!address.trim() || address.trim().length < 10) errors.address = 'Street address must be at least 10 characters';
+    if (!city.trim() || city.trim().length < 2) errors.city = 'Enter your city name';
+    if (!stateName.trim() || stateName.trim().length < 2) errors.stateName = 'Enter your state name';
+    if (!pincode.trim() || !/^\d{6}$/.test(pincode.trim())) errors.pincode = 'Pincode must be exactly 6 digits';
+
+    const cityMatch = getClosestMatch(city, KNOWN_CITIES);
+    const stateMatch = getClosestMatch(stateName, KNOWN_STATES);
+    setCityHint(cityMatch && !KNOWN_CITIES.includes(city.toLowerCase().trim()) ? cityMatch : '');
+    setStateHint(stateMatch && !KNOWN_STATES.includes(stateName.toLowerCase().trim()) ? stateMatch : '');
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleConfirmManualAddress = () => {
+    if (validateManualAddress()) {
+      setManualConfirmed(true);
+      setLocationMode('manual');
+      setLocationConfirmed(true);
+      setAddressType('manual');
     }
   };
 
@@ -720,7 +790,7 @@ export default function CheckoutPage() {
   };
 
   const shippingFee = (subtotal === 0 || subtotal > 150) ? 0 : deliveryCharge;
-  const taxAmount = Math.round(subtotal * 0.18); // 18% Escrow Tax
+  const taxAmount = Math.round(subtotal * 0.18); // 18% Emahu Tax
   const cgstAmount = Math.round(taxAmount / 2);
   const sgstAmount = taxAmount - cgstAmount;
   const grandTotal = subtotal + shippingFee + taxAmount;
@@ -738,9 +808,6 @@ export default function CheckoutPage() {
       alert('Checkout Blocked: Some items in your cart cannot be delivered to your delivery location. Please remove them or update your delivery address.');
       return;
     }
-
-
-
 
     // Validate fields based on addressType selected
     if (addressType === 'manual') {
@@ -773,7 +840,7 @@ export default function CheckoutPage() {
     const unique = Array.from(new Map(sellers.map(s => [s.email + s.name, s])).values());
     setOrderSellers(unique);
 
-    // Dynamic order payload generation (needed for signature verification on verify endpoint)
+    // Dynamic order payload generation
     let buyerUserId = '';
     const buyerUserStr = localStorage.getItem('emahu_buyer_user');
     if (buyerUserStr) {
@@ -872,7 +939,7 @@ export default function CheckoutPage() {
           pincode: addressType === 'saved' ? (address.match(/\b\d{6}\b/)?.[0] || '380001') : pincode
         },
         shippingSpeed,
-        escrowMethod,
+        EmahuMethod,
         deliveryPartnerId: STATES_WITH_PARTNERS.some(s => s.toLowerCase() === (addressType === 'saved' ? (detectCityAndState(address).state || 'Gujarat') : stateName).toLowerCase().trim()) ? '' : 'sd',
         carrier: STATES_WITH_PARTNERS.some(s => s.toLowerCase() === (addressType === 'saved' ? (detectCityAndState(address).state || 'Gujarat') : stateName).toLowerCase().trim()) ? '' : 'Self-Delivery (sd)',
         buyerLocation: {
@@ -894,7 +961,6 @@ export default function CheckoutPage() {
 
       orderObjects.push(newOrderPayload);
 
-      // Push Notifications to display
       notifications.unshift({
         id: `notif_${Date.now()}_buyer_${orderId}_${index}`,
         title: 'Payment Success',
@@ -913,14 +979,12 @@ export default function CheckoutPage() {
       });
     });
 
-    // Step 1: Load Razorpay standard script
     const scriptLoaded = await loadRazorpayScript();
     if (!scriptLoaded) {
       alert('Razorpay Checkout SDK failed to load. Please verify your connection.');
       return;
     }
 
-    // Step 2: Request backend to generate Razorpay order
     try {
       const initOrderRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/razorpay-order`, {
         method: 'POST',
@@ -937,19 +1001,16 @@ export default function CheckoutPage() {
 
       const rzpOrder = orderInitData.order;
 
-      // Step 3: Launch Razorpay standard checkout dialog
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_TCxKJiam0vUNgJ',
         amount: rzpOrder.amount,
         currency: rzpOrder.currency,
         name: 'Emahu Marketplace',
-        description: 'Securing Escrow Payment',
+        description: 'Securing Emahu Payment',
         order_id: rzpOrder.id,
         handler: async function (response) {
-          // Change state to show the Escrow Locking Animation
           setCheckoutStep('securing');
 
-          // Send payment signature details and order creation payloads to verification endpoint
           try {
             const verifyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/razorpay-verify`, {
               method: 'POST',
@@ -966,7 +1027,6 @@ export default function CheckoutPage() {
 
             const verifyData = await verifyRes.json();
             if (verifyData.success) {
-              // Sync to local storage
               const storedOrdersStr = localStorage.getItem('emahu_orders') || '[]';
               const storedOrders = JSON.parse(storedOrdersStr);
 
@@ -978,20 +1038,19 @@ export default function CheckoutPage() {
               });
 
               setGeneratedOrderId(placedOrderIds.join(', '));
+              setPlacedOrderObjects([...orderObjects]);
               localStorage.setItem('emahu_orders', JSON.stringify(storedOrders));
               localStorage.setItem('emahu_notifications', JSON.stringify(notifications));
 
-              // Clear Cart
               setCartItems([]);
               localStorage.setItem('emahu_cart', JSON.stringify([]));
               window.dispatchEvent(new Event('storage'));
 
-              // Move to success step with a slight delay for locking animation
               setTimeout(() => {
                 setCheckoutStep('success');
               }, 2000);
             } else {
-              alert('Escrow payment verification failed: ' + verifyData.error);
+              alert('Emahu payment verification failed: ' + verifyData.error);
               setCheckoutStep('idle');
             }
           } catch (dbErr) {
@@ -1012,7 +1071,7 @@ export default function CheckoutPage() {
 
       const razorpayInstance = new window.Razorpay(options);
       razorpayInstance.on('payment.failed', function (paymentFailResponse) {
-        alert('Escrow transaction failed: ' + paymentFailResponse.error.description);
+        alert('Emahu transaction failed: ' + paymentFailResponse.error.description);
       });
       razorpayInstance.open();
     } catch (checkoutErr) {
@@ -1039,144 +1098,270 @@ export default function CheckoutPage() {
 
       <main className="co-container">
         {checkoutStep === 'success' ? (
-          /* ESCROW SUCCESSFUL GUARANTEE SCREEN */
-          <div className="co-success-card">
-            <div className="co-success-badge-pulse">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                <path d="M12 15v3" />
-                <circle cx="12" cy="15" r="1" />
-              </svg>
+          <div className="co-success-card" style={{ maxWidth: '780px', textAlign: 'left' }}>
+            <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+              <div className="co-success-badge-pulse" style={{ margin: '0 auto 20px' }}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+              </div>
+              <h2 style={{ fontSize: '1.7rem', fontWeight: '800', margin: '0 0 8px 0', color: '#0f172a' }}>Payment Secured Successfully! 🔒</h2>
+              <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>Transaction ID: <strong style={{ color: '#4169e1' }}>{generatedOrderId}</strong></p>
             </div>
-            <h2>Payment Secured with Emahu Team Successfully!</h2>
-            <p className="co-success-desc">
-              Transaction ID <strong>{generatedOrderId}</strong> has been secured with Emahu Team.
-              The merchant will be notified to package and route your products via our EV Transit grid.
-              Your payment remains protected with Emahu Team until you physically inspect and approve delivery!
-            </p>
 
-            <div className="co-success-summary-box">
-              <div className="co-summary-box-row">
-                <span>Buyer Account:</span>
-                <strong>{fullName}</strong>
+            {/* Delivery Address Receipt */}
+            <div style={{ background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)', border: '1.5px solid #bae6fd', borderRadius: '14px', padding: '20px', marginBottom: '20px' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>📍 Delivery Address</div>
+              <div style={{ fontWeight: '700', fontSize: '1rem', color: '#0f172a', marginBottom: '4px' }}>{fullName}</div>
+              <div style={{ color: '#475569', fontSize: '0.85rem', marginBottom: '4px' }}>📞 {phone} &nbsp;·&nbsp; ✉ {email}</div>
+              <div style={{ color: '#334155', fontSize: '0.88rem', marginTop: '8px', lineHeight: 1.5 }}>
+                {address}<br />
+                {city}{stateName ? `, ${stateName}` : ''}{pincode ? ` - ${pincode}` : ''}
               </div>
-              <div className="co-summary-box-row">
-                <span>Shipping Priority:</span>
-                <strong style={{ textTransform: 'uppercase' }}>{shippingSpeed} Delivery</strong>
-              </div>
-              <div className="co-summary-box-row">
-                <span>Locked Amount:</span>
-                <strong style={{ color: '#4169e1', fontSize: '1.1rem' }}>₹{grandTotal.toLocaleString('en-IN')}</strong>
-              </div>
+              {locationMode === 'gps' && (
+                <div style={{ marginTop: '8px', display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(16,185,129,0.1)', color: '#059669', fontSize: '0.72rem', fontWeight: '700', padding: '3px 8px', borderRadius: '6px' }}>
+                  📡 GPS Verified Location
+                </div>
+              )}
+            </div>
 
-              {orderSellers.map((seller, sIdx) => (
-                <div key={sIdx} className="co-seller-info-block" style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '12px', marginTop: '12px', textAlign: 'left' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: '600', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.9rem' }}>🚚 Your delivery is handled by:</span>
-                    <strong style={{ color: '#4169e1' }}>{seller.name || 'Emahu Seller'}</strong>
+            {/* Items Receipt */}
+            {placedOrderObjects.length > 0 && (
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', overflow: 'hidden', marginBottom: '20px' }}>
+                <div style={{ background: '#f8fafc', padding: '12px 18px', borderBottom: '1px solid #e2e8f0', fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🛍️ Items Ordered</div>
+                {placedOrderObjects.flatMap((o) => o.items).map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', borderBottom: idx < placedOrderObjects.flatMap(o => o.items).length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                    {item.img && item.img.startsWith('http') ? (
+                      <img src={item.img} alt={item.name} style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: '48px', height: '48px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>{item.img || '📦'}</div>
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#0f172a' }}>{item.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>{item.brand} · Qty: {item.quantity}</div>
+                    </div>
+                    <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#0f172a', textAlign: 'right' }}>₹{(item.price * item.quantity).toLocaleString('en-IN')}</div>
                   </div>
-                  <div style={{ color: '#475569', fontSize: '0.85rem', paddingLeft: '4px' }}>
-                    <span>Email: <strong>{seller.email || 'N/A'}</strong></span>
-                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Price Breakdown */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px', marginBottom: '20px' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>💰 Payment Breakdown</div>
+              {[
+                { label: 'Products Subtotal', val: `₹${subtotal.toLocaleString('en-IN')}` },
+                { label: 'Delivery Charges', val: shippingFee === 0 ? 'FREE' : `₹${shippingFee}` },
+                { label: `GST (CGST 9% + SGST 9%)`, val: `₹${taxAmount.toLocaleString('en-IN')}` },
+              ].map(({ label, val }) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b', marginBottom: '8px' }}>
+                  <span>{label}</span><strong style={{ color: '#334155' }}>{val}</strong>
                 </div>
               ))}
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '1.05rem', fontWeight: '800', color: '#0f172a' }}>
+                <span>Total Paid</span>
+                <span style={{ color: '#4169e1' }}>₹{grandTotal.toLocaleString('en-IN')}</span>
+              </div>
             </div>
 
-            <div className="co-success-actions">
-              <Link href="/buyer/products" className="co-btn-outline">
-                Continue Shopping
-              </Link>
+            {/* Seller Info */}
+            {orderSellers.map((seller, sIdx) => (
+              <div key={sIdx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', background: 'rgba(65,105,225,0.04)', border: '1px solid rgba(65,105,225,0.12)', borderRadius: '10px', marginBottom: '12px' }}>
+                <div style={{ width: '36px', height: '36px', background: 'rgba(65,105,225,0.1)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>🚚</div>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#0f172a' }}>Handled by: {seller.storeName || seller.name || 'Emahu Partner Seller'}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>✉ {seller.email || 'support@emahu.com'} {seller.phone ? `· 📞 ${seller.phone}` : ''}</div>
+                </div>
+              </div>
+            ))}
+
+            <div className="co-success-actions" style={{ justifyContent: 'center', marginTop: '24px', gap: '12px' }}>
+              <Link href="/buyer/orders" className="co-btn-solid">View My Orders</Link>
+              <Link href="/buyer/products" className="co-btn-outline">Continue Shopping</Link>
             </div>
           </div>
         ) : (
-          /* CHECKOUT FORM AND SUMMARY GRID */
           <div className="co-grid">
-
-            {/* Left: Secure checkout inputs form */}
+            {/* Left Portion */}
             <div className="co-form-section">
               <h1 className="co-section-title">Secure Payment with Emahu</h1>
 
-              {/* GPS Verification Status Banner */}
-              {(!buyerCoordinates.latitude || !buyerCoordinates.longitude) ? (
-                <div style={{
-                  background: 'rgba(239, 68, 68, 0.08)',
-                  border: '1.5px solid rgba(239, 68, 68, 0.25)',
-                  borderRadius: '12px',
-                  padding: '16px 20px',
-                  marginBottom: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: '800', fontSize: '0.95rem' }}>
-                    <span>⚠️ Share GPS Location (Optional)</span>
+              {/* ── MANDATORY LOCATION GATE ── */}
+              {!locationConfirmed ? (
+                <div className="co-loc-gate">
+                  <div className="co-loc-gate-header">
+                    <div style={{ fontSize: '2rem', marginBottom: '6px' }}>📍</div>
+                    <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800', color: '#0f172a' }}>Confirm Your Delivery Location</h2>
+                    <p style={{ margin: '6px 0 0', fontSize: '0.83rem', color: '#64748b', lineHeight: 1.5 }}>
+                      We need your location to calculate delivery charges and verify deliverability.
+                      Choose how you want to confirm your address:
+                    </p>
                   </div>
-                  <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, lineHeight: 1.5 }}>
-                    Please share your GPS location to automatically calculate dynamic delivery fees based on distance. Otherwise, a standard flat rate will be applied.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleGPSDetect}
-                    className="co-btn-outline"
-                    style={{
-                      width: 'max-content',
-                      padding: '8px 14px',
-                      fontSize: '0.82rem',
-                      fontWeight: '800',
-                      borderColor: '#dc2626',
-                      color: '#dc2626',
-                      background: 'white'
-                    }}
-                  >
-                    📡 Share Current GPS Location
-                  </button>
+
+                  <div className="co-loc-choice-row">
+                    {/* Option 1: GPS */}
+                    <div
+                      className={`co-loc-choice-card ${locationMode === 'gps' ? 'co-loc-choice-card--selected' : ''}`}
+                      onClick={() => { if (!gpsLoading) setLocationMode('gps'); }}
+                    >
+                      <div className="co-loc-choice-icon">📡</div>
+                      <div>
+                        <div style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a' }}>Use GPS Location</div>
+                        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>Auto-detect your location instantly</div>
+                      </div>
+                      <div className={`co-loc-choice-radio ${locationMode === 'gps' ? 'co-loc-choice-radio--selected' : ''}`} />
+                    </div>
+
+                    {/* Option 2: Manual */}
+                    <div
+                      className={`co-loc-choice-card ${locationMode === 'manual' ? 'co-loc-choice-card--selected' : ''}`}
+                      onClick={() => { setLocationMode('manual'); setGpsError(''); }}
+                    >
+                      <div className="co-loc-choice-icon">✍️</div>
+                      <div>
+                        <div style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a' }}>Enter Address Manually</div>
+                        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>Type your full delivery address</div>
+                      </div>
+                      <div className={`co-loc-choice-radio ${locationMode === 'manual' ? 'co-loc-choice-radio--selected' : ''}`} />
+                    </div>
+                  </div>
+
+                  {/* GPS Flow */}
+                  {locationMode === 'gps' && (
+                    <div style={{ marginTop: '16px' }}>
+                      {gpsError && (
+                        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '10px 14px', color: '#dc2626', fontSize: '0.82rem', marginBottom: '12px', lineHeight: 1.5 }}>
+                          ⚠️ {gpsError}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleGPSDetect(true)}
+                        disabled={gpsLoading}
+                        style={{
+                          width: '100%', padding: '14px',
+                          background: gpsLoading ? '#94a3b8' : 'linear-gradient(135deg, #4169e1, #3b5acd)',
+                          color: '#fff', border: 'none', borderRadius: '10px',
+                          fontWeight: '800', fontSize: '0.9rem', cursor: gpsLoading ? 'not-allowed' : 'pointer',
+                          boxShadow: '0 4px 14px rgba(65,105,225,0.3)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {gpsLoading ? (
+                          <><span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spinRing 0.8s linear infinite' }} /> Detecting GPS Location...</>
+                        ) : '📡 Detect My GPS Location'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Manual Entry Flow */}
+                  {locationMode === 'manual' && !manualConfirmed && (
+                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        {/* Full Name */}
+                        <div className="co-input-group" style={{ marginBottom: 0 }}>
+                          <label>Full Name *</label>
+                          <input type="text" placeholder="e.g. Rahul Sharma" value={fullName} onChange={e => { setFullName(e.target.value); setFieldErrors(prev => ({ ...prev, fullName: '' })); }} style={fieldErrors.fullName ? { borderColor: '#ef4444' } : {}} />
+                          {fieldErrors.fullName && <span className="co-field-error">{fieldErrors.fullName}</span>}
+                        </div>
+                        {/* Phone */}
+                        <div className="co-input-group" style={{ marginBottom: 0 }}>
+                          <label>Mobile Number *</label>
+                          <input type="tel" placeholder="e.g. 9876543210" value={phone} onChange={e => { setPhone(e.target.value); setFieldErrors(prev => ({ ...prev, phone: '' })); }} style={fieldErrors.phone ? { borderColor: '#ef4444' } : {}} />
+                          {fieldErrors.phone && <span className="co-field-error">{fieldErrors.phone}</span>}
+                        </div>
+                      </div>
+
+                      {/* Email */}
+                      <div className="co-input-group" style={{ marginBottom: 0 }}>
+                        <label>Email Address *</label>
+                        <input type="email" placeholder="e.g. rahul@example.com" value={email} onChange={e => { setEmail(e.target.value); setFieldErrors(prev => ({ ...prev, email: '' })); }} style={fieldErrors.email ? { borderColor: '#ef4444' } : {}} />
+                        {fieldErrors.email && <span className="co-field-error">{fieldErrors.email}</span>}
+                      </div>
+
+                      {/* Street Address */}
+                      <div className="co-input-group" style={{ marginBottom: 0 }}>
+                        <label>Street Address, Building, Colony *</label>
+                        <input type="text" placeholder="House No, Block, Sector, Colony..." value={address} onChange={e => { setAddress(e.target.value); setFieldErrors(prev => ({ ...prev, address: '' })); }} style={fieldErrors.address ? { borderColor: '#ef4444' } : {}} />
+                        {fieldErrors.address && <span className="co-field-error">{fieldErrors.address}</span>}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '12px' }}>
+                        {/* City */}
+                        <div className="co-input-group" style={{ marginBottom: 0 }}>
+                          <label>City *</label>
+                          <input type="text" placeholder="e.g. Mumbai" value={city} onChange={e => { setCity(e.target.value); setCityHint(''); setFieldErrors(prev => ({ ...prev, city: '' })); }} style={fieldErrors.city ? { borderColor: '#ef4444' } : {}} />
+                          {fieldErrors.city && <span className="co-field-error">{fieldErrors.city}</span>}
+                          {cityHint && !fieldErrors.city && <span className="co-field-hint">💡 Did you mean <strong style={{ cursor: 'pointer', color: '#4169e1' }} onClick={() => { setCity(cityHint); setCityHint(''); }}>{cityHint}</strong>?</span>}
+                        </div>
+                        {/* State */}
+                        <div className="co-input-group" style={{ marginBottom: 0 }}>
+                          <label>State *</label>
+                          <input type="text" placeholder="e.g. Maharashtra" value={stateName} onChange={e => { setStateName(e.target.value); setStateHint(''); setFieldErrors(prev => ({ ...prev, stateName: '' })); }} style={fieldErrors.stateName ? { borderColor: '#ef4444' } : {}} />
+                          {fieldErrors.stateName && <span className="co-field-error">{fieldErrors.stateName}</span>}
+                          {stateHint && !fieldErrors.stateName && <span className="co-field-hint">💡 Did you mean <strong style={{ cursor: 'pointer', color: '#4169e1' }} onClick={() => { setStateName(stateHint); setStateHint(''); }}>{stateHint}</strong>?</span>}
+                        </div>
+                        {/* Pincode */}
+                        <div className="co-input-group" style={{ marginBottom: 0 }}>
+                          <label>Pincode *</label>
+                          <input type="text" placeholder="6 digits" maxLength={6} value={pincode} onChange={e => { setPincode(e.target.value.replace(/\D/g, '')); setFieldErrors(prev => ({ ...prev, pincode: '' })); }} style={fieldErrors.pincode ? { borderColor: '#ef4444' } : {}} />
+                          {fieldErrors.pincode && <span className="co-field-error">{fieldErrors.pincode}</span>}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleConfirmManualAddress}
+                        style={{
+                          padding: '13px', background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+                          color: '#fff', border: 'none', borderRadius: '10px',
+                          fontWeight: '800', fontSize: '0.9rem', cursor: 'pointer',
+                          boxShadow: '0 4px 14px rgba(15,23,42,0.2)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                        }}
+                      >
+                        ✓ Confirm My Delivery Address
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div style={{
-                  background: 'rgba(16, 185, 129, 0.08)',
-                  border: '1.5px solid rgba(16, 185, 129, 0.25)',
-                  borderRadius: '12px',
-                  padding: '12px 18px',
-                  marginBottom: '20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '12px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', fontWeight: '750', fontSize: '0.88rem' }}>
-                    <span>✓ GPS Location Verified</span>
+                /* Location confirmed — show badge */
+                <div style={{ background: 'rgba(16,185,129,0.07)', border: '1.5px solid rgba(16,185,129,0.25)', borderRadius: '12px', padding: '12px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.3rem' }}>{locationMode === 'gps' ? '📡' : '✅'}</span>
+                    <div>
+                      <div style={{ fontWeight: '800', fontSize: '0.88rem', color: '#059669' }}>
+                        {locationMode === 'gps' ? 'GPS Location Verified' : 'Address Confirmed'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                        {city || address.split(',')[0]}{stateName ? `, ${stateName}` : ''}{pincode ? ` - ${pincode}` : ''}
+                      </div>
+                    </div>
                   </div>
                   <button
                     type="button"
-                    onClick={handleGPSDetect}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#059669',
-                      textDecoration: 'underline',
-                      fontSize: '0.8rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      padding: 0
-                    }}
+                    onClick={() => { setLocationConfirmed(false); setManualConfirmed(false); setGpsError(''); setFieldErrors({}); }}
+                    style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#64748b', cursor: 'pointer', padding: '5px 10px', fontSize: '0.75rem', fontWeight: '700' }}
                   >
-                    Update Location
+                    Edit
                   </button>
                 </div>
               )}
 
-              {/* Show live route map if coordinates exist */}
-              {buyerCoordinates.latitude && buyerCoordinates.longitude && (
+              {/* Show map only after location is confirmed with GPS */}
+              {locationConfirmed && locationMode === 'gps' && buyerCoordinates.latitude && buyerCoordinates.longitude && (
                 <div style={{ marginBottom: '20px' }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '6px' }}>Live Transit Route Map</span>
                   <div id="checkout-route-map" style={{ height: '240px', width: '100%', borderRadius: '12px', border: '1px solid #cbd5e1', zIndex: 1 }} />
                 </div>
               )}
 
+              {locationConfirmed && (
               <form onSubmit={handlePlaceOrder} className="co-form">
                 {addressType === 'saved' ? (
-                  /* Option A: Saved Profile Address Summary Card */
                   <div className="co-form-bento">
                     <div className="co-bento-header">
                       <span className="co-bento-num">01</span>
@@ -1202,9 +1387,7 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                 ) : (
-                  /* Option B: Manual Input Address Form */
                   <>
-                    {/* Section 1: Contact Details */}
                     <div className="co-form-bento">
                       <div className="co-bento-header">
                         <span className="co-bento-num">01</span>
@@ -1254,7 +1437,6 @@ export default function CheckoutPage() {
                       </div>
                     </div>
 
-                    {/* Section 2: Delivery Destination */}
                     <div className="co-form-bento">
                       <div className="co-bento-header">
                         <span className="co-bento-num">02</span>
@@ -1325,8 +1507,7 @@ export default function CheckoutPage() {
                   </>
                 )}
 
-
-                {/* Terms & Conditions Checkbox */}
+                {/* Mobile View Terms Checklist */}
                 <div className="co-terms-wrap-mobile" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '16px 0 16px 0', padding: '0 4px' }}>
                   <input
                     id="agree-to-terms-chk-mobile"
@@ -1336,11 +1517,10 @@ export default function CheckoutPage() {
                     style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
                   />
                   <label htmlFor="agree-to-terms-chk-mobile" style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
-                    I agree to the <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('terms'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Terms of Service</a>, <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('privacy'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Privacy Policy</a>, and <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('escrow'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Emahu Team return/refund conditions</a> of Emahu Marketplace.
+                    I agree to the <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('terms'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Terms of Service</a>, <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('privacy'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Privacy Policy</a>, and <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('Emahu'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Emahu Team return/refund conditions</a> of Emahu Marketplace.
                   </label>
                 </div>
 
-                {/* Submit button inside mobile viewport, else hidden */}
                 <button
                   type="submit"
                   className="co-btn-submit-mobile"
@@ -1349,18 +1529,14 @@ export default function CheckoutPage() {
                 >
                   {!agreeToTerms ? 'Accept Terms to Buy' : `Buy Now (₹${grandTotal.toLocaleString('en-IN')})`}
                 </button>
-
               </form>
             </div>
 
-            {/* Right Side: Sticky Checkout Cart Summary */}
+            {/* Right Portion */}
             <div className="co-summary-section">
               <div className="co-summary-sticky-card">
                 <h2 className="co-summary-title">Payment Details</h2>
 
-
-
-                {/* Cart items listing */}
                 <div className="co-items-list">
                   {cartItems.length === 0 ? (
                     <div className="co-empty-cart-summary">
@@ -1374,7 +1550,7 @@ export default function CheckoutPage() {
                           {isRealImage(p.img) ? (
                             <img src={p.img} alt={p.name} />
                           ) : (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', background: '#f4f4f5', fontSize: '1.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'center', width: '100%', height: '100%', background: '#f4f4f5', fontSize: '1.5rem' }}>
                               {p.img || '📦'}
                             </div>
                           )}
@@ -1396,14 +1572,9 @@ export default function CheckoutPage() {
                   )}
                 </div>
 
-
-
                 <div className="co-summary-divider" />
 
-                {/* Final Breakdown */}
                 <div className="co-breakdown">
-
-                  {/* Multi-seller notice — shown when there are 2+ sellers in cart */}
                   {deliveryBreakdown.length > 1 && (
                     <div style={{
                       background: '#eff6ff',
@@ -1444,7 +1615,6 @@ export default function CheckoutPage() {
                     <strong>{shippingFee === 0 ? <span style={{ color: '#16a34a', fontWeight: '700' }}>FREE</span> : `₹${Number(shippingFee).toFixed(2)}`}</strong>
                   </div>
 
-                  {/* Per-seller delivery breakdown — always shown when multiple sellers */}
                   {deliveryBreakdown.length > 0 && (
                     <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 12px', marginTop: '-4px', marginBottom: '4px' }}>
                       <p style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
@@ -1505,7 +1675,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Deliverability Warning Notice inside Checkout */}
                 {undeliverableItems.length > 0 && (
                   <div className="co-delivery-warning" style={{
                     backgroundColor: '#fef2f2',
@@ -1528,13 +1697,13 @@ export default function CheckoutPage() {
                         </li>
                       ))}
                     </ul>
-                    <p style={{ fontSize: '0.7rem', color: '#991b1b', margin: '8px 0 0 0', fontStyle: 'italic' }}>
+                    <p style={{ fontSize: '0.7 fiction', color: '#991b1b', margin: '8px 0 0 0', fontStyle: 'italic' }}>
                       Please remove these items or change your delivery address to complete checkout.
                     </p>
                   </div>
                 )}
 
-                {/* Terms & Conditions Checkbox */}
+                {/* Desktop View Terms Checklist */}
                 <div className="co-terms-wrap-desktop" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '16px 0 12px 0', padding: '0 4px' }}>
                   <input
                     id="agree-to-terms-chk"
@@ -1544,15 +1713,14 @@ export default function CheckoutPage() {
                     style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
                   />
                   <label htmlFor="agree-to-terms-chk" style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
-                    I agree to the <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('terms'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Terms of Service</a>, <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('privacy'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Privacy Policy</a>, and <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('escrow'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Emahu Team return/refund conditions</a> of Emahu Marketplace.
+                    I agree to the <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('terms'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Terms of Service</a>, <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('privacy'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Privacy Policy</a>, and <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('Emahu'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Emahu Team return/refund conditions</a> of Emahu Marketplace.
                   </label>
                 </div>
 
-                {/* Big checkout action */}
                 {cartItems.length > 0 && (
                   <button
                     onClick={handlePlaceOrder}
-                    className="co-btn-lock-escrow"
+                    className="co-btn-lock-Emahu"
                     disabled={!agreeToTerms || undeliverableItems.length > 0}
                     style={!agreeToTerms || undeliverableItems.length > 0 ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8', boxShadow: 'none' } : {}}
                   >
@@ -1563,15 +1731,13 @@ export default function CheckoutPage() {
                     <span>{!agreeToTerms ? 'Accept Terms to Buy' : undeliverableItems.length > 0 ? 'Delivery Unavailable' : 'Buy Now'}</span>
                   </button>
                 )}
-
               </div>
             </div>
-
           </div>
         )}
       </main>
 
-      {/* ─── SECURE ESCROW CHECKOUT MODAL OVERLAY ─── */}
+      {/* ─── SECURE EMAHU CHECKOUT MODAL OVERLAY ─── */}
       {checkoutStep === 'securing' && (
         <div className="co-modal-overlay">
           <div className="co-modal">
@@ -1584,7 +1750,7 @@ export default function CheckoutPage() {
                 </svg>
               </div>
               <h2>Securing Vault Lock Pipeline...</h2>
-              <p>Transferring payment of <strong>₹{grandTotal.toLocaleString('en-IN')}</strong> safely into military-grade escrow holdings vault.</p>
+              <p>Transferring payment of <strong>₹{grandTotal.toLocaleString('en-IN')}</strong> safely into military-grade Emahu holdings vault.</p>
               <div className="co-progress-bar">
                 <div className="co-progress-fill" />
               </div>
@@ -1597,14 +1763,13 @@ export default function CheckoutPage() {
       {isTermsModalOpen && (
         <div className="co-modal-overlay" style={{ zIndex: 10000, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
           <div style={{ background: '#ffffff', borderRadius: '16px', width: '90%', maxWidth: '560px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', overflow: 'hidden', maxHeight: '80vh' }}>
-
             {/* Header */}
             <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#0f172a' }}>
                   {termsModalContent === 'terms' && '📜 Terms of Service'}
                   {termsModalContent === 'privacy' && '🔒 Privacy Policy'}
-                  {termsModalContent === 'escrow' && '🤝 Emahu Team Return & Refund Conditions'}
+                  {termsModalContent === 'Emahu' && '🤝 Emahu Team Return & Refund Conditions'}
                 </h3>
                 <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>EMAHU Marketplace Official Document</p>
               </div>
@@ -1613,16 +1778,14 @@ export default function CheckoutPage() {
               </button>
             </div>
 
-            {/* Scrollable Document Text */}
+            {/* Content */}
             <div style={{ padding: '22px', overflowY: 'auto', fontSize: '0.85rem', color: '#334155', lineHeight: '1.6' }}>
               {termsModalContent === 'terms' && (
                 <div>
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>1. Acceptance of Terms</h4>
                   <p style={{ margin: '0 0 16px 0' }}>By checking the agreement box and placing an order on EMAHU, you agree to follow and be bound by these Terms of Service. If you do not accept, you may not complete purchase transactions.</p>
-
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>2. Role of the Platform</h4>
                   <p style={{ margin: '0 0 16px 0' }}>EMAHU operates as a multi-seller marketplace linking independent vendors with buyers. Delivery services are managed either through platform logistics (third-party courier partners) or via Self-Delivery managed directly by the merchant seller.</p>
-
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>3. Order Acceptance and Pricing</h4>
                   <p style={{ margin: '0 0 16px 0' }}>Orders submitted on the platform are subject to verification and merchant acceptance. Delivery charges are calculated dynamically based on real-time distances between vendor shops and buyer delivery addresses.</p>
                 </div>
@@ -1632,23 +1795,19 @@ export default function CheckoutPage() {
                 <div>
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>1. Information Collection</h4>
                   <p style={{ margin: '0 0 16px 0' }}>We collect personal contact details (Full Name, Phone Number, Email, and Address) supplied during checkout to handle secure product delivery. GPS location coordinates are requested only to offer accurate distance-based delivery calculations.</p>
-
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>2. Information Sharing</h4>
                   <p style={{ margin: '0 0 16px 0' }}>Recipient address details and coordinates are shared solely with the assigned vendor and the logistics dispatch rider executing the shipment handover. We do not sell or lease your address records to third parties.</p>
-
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>3. Data Storage and Security</h4>
                   <p style={{ margin: '0 0 16px 0' }}>All transactions, order details, and verification files are stored behind encrypted server firewalls. Your transaction session token is stored locally to maintain order security.</p>
                 </div>
               )}
 
-              {termsModalContent === 'escrow' && (
+              {termsModalContent === 'Emahu' && (
                 <div>
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>1. Safe Payment Protection</h4>
                   <p style={{ margin: '0 0 16px 0' }}>All product purchase amounts are initially held securely by the EMAHU Team. The merchant does not receive the payment immediately upon dispatch.</p>
-
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>2. Delivery OTP and Funds Release</h4>
                   <p style={{ margin: '0 0 16px 0' }}>Upon arrival of the shipment at the buyer's destination, the buyer must share the secure 6-digit Delivery OTP with the delivery partner or merchant. Correct entry of this verification code confirms successful handover and releases the payment to the merchant.</p>
-
                   <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontWeight: '700' }}>3. Return & Refund Window</h4>
                   <p style={{ margin: '0 0 16px 0' }}>If a buyer identifies issues, damage, or discrepancy during inspect-on-delivery, they must reject the handover and notify platform support. Once the OTP is shared and entered, the delivery is permanently finalized and payment is settled.</p>
                 </div>
@@ -1676,11 +1835,9 @@ export default function CheckoutPage() {
                 Close Document
               </button>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 }

@@ -78,8 +78,8 @@ export default function AdminLogin() {
           <div className="al-brand-card__content">
             <Link href="/" className="al-logo">
               <svg width="40" height="40" viewBox="0 0 32 32" fill="none">
-                <rect width="32" height="32" rx="10" fill="white" />
-                <path d="M8 12h16M8 16h12M8 20h14" stroke="#6366f1" strokeWidth="2.2" strokeLinecap="round" />
+                <rect width="32" height="32" rx="10" fill="#4169e1" />
+                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
               </svg>
               <span className="al-logo__text">EMAHU</span>
             </Link>

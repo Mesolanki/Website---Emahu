@@ -307,9 +307,9 @@ export default function BuyerHeader() {
           {/* Left Side: Logo */}
           <Link href="/buyer/products" className="bh-logo" onClick={closeMobileMenu}>
             <div className="bh-logo__icon-wrap">
-              <svg className="bh-logo__svg" width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <circle cx="14" cy="14" r="11" stroke="currentColor" strokeWidth="2.8" />
-                <path d="M9 14l3.5 3.5 6.5-6.5" stroke="#12b7b2" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+              <svg className="bh-logo__svg" width="28" height="28" viewBox="0 0 32 32" fill="none">
+                <rect width="32" height="32" rx="10" fill="#4169e1" />
+                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
               </svg>
             </div>
             <span className="bh-logo__text">EMAHU</span>
@@ -517,9 +517,9 @@ export default function BuyerHeader() {
         <div className="bh-mobile-drawer__header">
           <Link href="/buyer/products" className="bh-logo" onClick={closeMobileMenu}>
             <div className="bh-logo__icon-wrap">
-              <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
-                <circle cx="14" cy="14" r="11" stroke="currentColor" strokeWidth="2.8" />
-                <path d="M9 14l3.5 3.5 6.5-6.5" stroke="#12b7b2" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+              <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+                <rect width="32" height="32" rx="10" fill="#4169e1" />
+                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
               </svg>
             </div>
             <span className="bh-logo__text">EMAHU</span>

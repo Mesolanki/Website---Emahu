@@ -3,6 +3,7 @@ import "./globals.css";
 import "@/animations/animations.css";
 import LenisProvider from "@/animations/LenisProvider";
 import LoadingScreen from "@/animations/LoadingScreen";
+import CustomAlertProvider from "@/components/CustomAlertProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,9 +26,11 @@ export default function RootLayout({ children }) {
       <body>
         <LenisProvider>
           <LoadingScreen />
-          <main>
-            {children}
-          </main>
+          <CustomAlertProvider>
+            <main>
+              {children}
+            </main>
+          </CustomAlertProvider>
         </LenisProvider>
       </body>
     </html>

@@ -1,4 +1,4 @@
-import RoleSelector from "./selector/page";
+import RoleSelector from "./selector/RoleSelector";
 
 export const metadata = {
   title: "EMAHU | Welcome",

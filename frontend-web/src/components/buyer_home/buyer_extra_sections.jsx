@@ -21,7 +21,7 @@ const stepsData = [
   {
     num: 'STEP 02',
     title: 'Payment Lock',
-    desc: 'Checkout securely. Your transaction amount is locked in a military-grade secure escrow vault, protecting your payment.',
+    desc: 'Checkout securely. Your transaction amount is locked in a military-grade secure Emahu vault, protecting your payment.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -65,7 +65,7 @@ const reviewsData = [
   },
   {
     stars: 5,
-    quote: "The escrow payment option gave me complete peace of mind. Knowing my money was locked securely until I approved the delivery is a game-changer!",
+    quote: "The Emahu payment option gave me complete peace of mind. Knowing my money was locked securely until I approved the delivery is a game-changer!",
     name: "Vikram R.",
     role: "Verified Buyer",
     tag: "Electronics"
@@ -85,8 +85,8 @@ const faqsData = [
     answer: "Every order placed is physically routed from the merchant through our localized inspection hubs. Our certified quality experts inspect the item, verify its structural integrity, ensure it is original and genuine, and then pack it with a specialized certified seal tag before direct dispatch to you."
   },
   {
-    question: "What is an Escrow Payment Vault?",
-    answer: "EMAHU’s Escrow Vault is a secure digital vault where your checkout payments are held. The seller only receives payment when you receive your order in perfect condition and click 'Confirm Delivery' on your dashboard, completely eliminating purchase risks."
+    question: "What is an Emahu Payment Vault?",
+    answer: "EMAHU’s Emahu Vault is a secure digital vault where your checkout payments are held. The seller only receives payment when you receive your order in perfect condition and click 'Confirm Delivery' on your dashboard, completely eliminating purchase risks."
   },
   {
     question: "How do returns work and how fast is the refund?",
@@ -105,7 +105,7 @@ export function BuyerHowWeWork() {
   return (
     <section className="bx-section bx-section--light-slate" id="how-it-works">
       <div className="bx-container">
-        
+
         {/* Section Header */}
         <div className="bx-header">
           <span className="bx-header__badge">The Emahu Pipeline</span>
@@ -141,13 +141,13 @@ export function BuyerReviews() {
   return (
     <section className="bx-section" id="customer-reviews">
       <div className="bx-container">
-        
+
         {/* Section Header */}
         <div className="bx-header">
           <span className="bx-header__badge">Customer Stories</span>
           <h2 className="bx-header__title">Loved by Thousands of Buyers</h2>
           <p className="bx-header__desc">
-            Discover why smart buyers choose EMAHU for premium electronics, secure escrows, and lightning-fast logistics.
+            Discover why smart buyers choose EMAHU for premium electronics, secure Emahus, and lightning-fast logistics.
           </p>
         </div>
 
@@ -197,7 +197,7 @@ export function BuyerFaqs() {
   return (
     <section className="bx-section bx-section--light-slate" id="buyer-faqs">
       <div className="bx-container">
-        
+
         {/* Section Header */}
         <div className="bx-header">
           <span className="bx-header__badge">Got Questions?</span>
@@ -213,8 +213,8 @@ export function BuyerFaqs() {
             const isActive = openIdx === idx;
             return (
               <div key={idx} className={`bx-faq-item ${isActive ? 'bx-faq-item--active' : ''}`}>
-                <button 
-                  className="bx-faq-header" 
+                <button
+                  className="bx-faq-header"
                   onClick={() => toggleFaq(idx)}
                   aria-expanded={isActive}
                 >
@@ -226,8 +226,8 @@ export function BuyerFaqs() {
                   </div>
                 </button>
 
-                <div 
-                  className="bx-faq-body" 
+                <div
+                  className="bx-faq-body"
                   style={{ maxHeight: isActive ? '200px' : '0px' }}
                 >
                   <div className="bx-faq-content">
@@ -252,7 +252,7 @@ export function BuyerStartBuying() {
       <div className="bx-cta-container">
         <h2 className="bx-cta-title">Ready to Start Buying Premium Drops?</h2>
         <p className="bx-cta-desc">
-          Shop verified tech, minimalist apparel, and sustainable kitchenware with full buyer protection and secure escrow vaults.
+          Shop verified tech, minimalist apparel, and sustainable kitchenware with full buyer protection and secure Emahu vaults.
         </p>
         <div className="bx-cta-actions">
           <a href="#categories" className="bx-cta-btn">
@@ -271,7 +271,7 @@ export function BuyerStartBuying() {
           </div>
           <div className="bx-cta-badge-item">
             <span className="bx-cta-badge-dot" />
-            <span>Protected Escrow Checkout</span>
+            <span>Protected Emahu Checkout</span>
           </div>
           <div className="bx-cta-badge-item">
             <span className="bx-cta-badge-dot" />
@@ -283,123 +283,123 @@ export function BuyerStartBuying() {
   );
 }
 
-export function BuyerEscrowAssurance() {
+export function BuyerEmahuAssurance() {
   const [activeStep, setActiveStep] = useState(0);
 
   const steps = [
-    { label: 'Payment Escrow Locked', status: '🔒 SECURED', desc: 'Transaction amount is locked in a military-grade secure vault. The merchant cannot touch it.' },
+    { label: 'Payment Emahu Locked', status: '🔒 SECURED', desc: 'Transaction amount is locked in a military-grade secure vault. The merchant cannot touch it.' },
     { label: 'Physical Quality Check Passed', status: '🛡️ CERTIFIED', desc: 'Expert inspection hub physically verifies packaging, authenticity, structural integrity, and seals the package.' },
     { label: 'Dispatch and Carbon-Neutral Transit', status: '🚚 IN TRANSIT', desc: 'Order dispatched via localized zero-carbon EV fleet, delivering straight to your door in under 48 hours.' },
     { label: 'Vault Released to Seller', status: '🔓 RELEASED', desc: 'You confirm delivery, verify product excellence, and release the funds to the merchant.' }
   ];
 
   return (
-    <section className="bx-section bx-escrow-section" id="escrow-assurance">
+    <section className="bx-section bx-Emahu-section" id="Emahu-assurance">
       <div className="bx-container">
-        
+
         {/* Section Header */}
         <div className="bx-header">
-          <span className="bx-header__badge" style={{ backgroundColor: 'rgba(65, 105, 225, 0.1)', color: '#4169e1' }}>Escrow Guarantee</span>
-          <h2 className="bx-header__title">Complete Authentic Escrow Safety</h2>
+          <span className="bx-header__badge" style={{ backgroundColor: 'rgba(65, 105, 225, 0.1)', color: '#4169e1' }}>Emahu Guarantee</span>
+          <h2 className="bx-header__title">Complete Authentic Emahu Safety</h2>
           <p className="bx-header__desc">
             Your money stays completely safe in our secure vault system. The merchant is paid only when you receive and confirm your order in perfect condition.
           </p>
         </div>
 
         {/* 2-Column Bento grid */}
-        <div className="bx-escrow-grid">
-          
-          {/* Left Column: Escrow Interactive Visual Simulator */}
-          <div className="bx-escrow-visual">
-            <div className="bx-escrow-badge">
+        <div className="bx-Emahu-grid">
+
+          {/* Left Column: Emahu Interactive Visual Simulator */}
+          <div className="bx-Emahu-visual">
+            <div className="bx-Emahu-badge">
               <span className="bx-cta-badge-dot" style={{ backgroundColor: '#12b7b2' }} />
-              <span>Escrow Simulator</span>
+              <span>Emahu Simulator</span>
             </div>
 
-            <div className="bx-escrow-shield">
+            <div className="bx-Emahu-shield">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
             </div>
 
-            <div className="bx-escrow-amount">
-              <div className="bx-escrow-amount__num">
+            <div className="bx-Emahu-amount">
+              <div className="bx-Emahu-amount__num">
                 {activeStep === 3 ? '₹0.00' : '₹14,500.00'}
               </div>
-              <div className="bx-escrow-amount__label">
-                {activeStep === 3 ? 'VAULT RELEASED TO MERCHANT' : 'LOCKED IN ESCROW VAULT'}
+              <div className="bx-Emahu-amount__label">
+                {activeStep === 3 ? 'VAULT RELEASED TO MERCHANT' : 'LOCKED IN Emahu VAULT'}
               </div>
             </div>
 
             {/* Interactive Pipeline Steps */}
-            <div className="bx-escrow-pipeline">
+            <div className="bx-Emahu-pipeline">
               {steps.map((step, idx) => (
-                <div 
+                <div
                   key={idx}
-                  className={`bx-escrow-step ${activeStep === idx ? 'bx-escrow-step--active' : ''}`}
+                  className={`bx-Emahu-step ${activeStep === idx ? 'bx-Emahu-step--active' : ''}`}
                   onClick={() => setActiveStep(idx)}
                 >
-                  <div className="bx-escrow-step__icon">
+                  <div className="bx-Emahu-step__icon">
                     {idx + 1}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div className="bx-escrow-step__label">{step.label}</div>
+                    <div className="bx-Emahu-step__label">{step.label}</div>
                     {activeStep === idx && (
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '6px', lineHeight: '1.4' }}>
                         {step.desc}
                       </div>
                     )}
                   </div>
-                  <span className="bx-escrow-step__status">{step.status}</span>
+                  <span className="bx-Emahu-step__status">{step.status}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Right Column: Three Big Pillars of Trust */}
-          <div className="bx-escrow-pillars">
-            
-            <div className="bx-escrow-pillar">
-              <div className="bx-escrow-pillar__icon-wrap">
+          <div className="bx-Emahu-pillars">
+
+            <div className="bx-Emahu-pillar">
+              <div className="bx-Emahu-pillar__icon-wrap">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
               <div>
-                <h3 className="bx-escrow-pillar__title">Buyer Escrow Vault</h3>
-                <p className="bx-escrow-pillar__desc">
-                  {"Every order checkouts into a secure bank-grade escrow. The seller cannot withdraw the transaction amount until you inspect the delivery at your door and click 'Verify Delivery'."}
+                <h3 className="bx-Emahu-pillar__title">Buyer Emahu Vault</h3>
+                <p className="bx-Emahu-pillar__desc">
+                  {"Every order checkouts into a secure bank-grade Emahu. The seller cannot withdraw the transaction amount until you inspect the delivery at your door and click 'Verify Delivery'."}
                 </p>
               </div>
             </div>
 
-            <div className="bx-escrow-pillar">
-              <div className="bx-escrow-pillar__icon-wrap" style={{ color: '#12b7b2' }}>
+            <div className="bx-Emahu-pillar">
+              <div className="bx-Emahu-pillar__icon-wrap" style={{ color: '#12b7b2' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                   <polyline points="22 4 12 14.01 9 11.01" />
                 </svg>
               </div>
               <div>
-                <h3 className="bx-escrow-pillar__title">Expert Certified Verification</h3>
-                <p className="bx-escrow-pillar__desc">
+                <h3 className="bx-Emahu-pillar__title">Expert Certified Verification</h3>
+                <p className="bx-Emahu-pillar__desc">
                   We route products from physical stores straight through our authorized hubs. Certified inspectors inspect packaging, authenticity, structural parts, and issue a digital check report seal.
                 </p>
               </div>
             </div>
 
-            <div className="bx-escrow-pillar">
-              <div className="bx-escrow-pillar__icon-wrap" style={{ color: '#ff6b6b' }}>
+            <div className="bx-Emahu-pillar">
+              <div className="bx-Emahu-pillar__icon-wrap" style={{ color: '#ff6b6b' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="23 4 12 15 3 6" />
                   <polyline points="23 9 12 20 3 11" />
                 </svg>
               </div>
               <div>
-                <h3 className="bx-escrow-pillar__title">Zero-Wait Doorstep Refund</h3>
-                <p className="bx-escrow-pillar__desc">
-                  Returns are verified in seconds. Once our EV courier courier scans the pickup barcode at your home, the escrow system immediately credits your wallet balance without any merchant delays.
+                <h3 className="bx-Emahu-pillar__title">Zero-Wait Doorstep Refund</h3>
+                <p className="bx-Emahu-pillar__desc">
+                  Returns are verified in seconds. Once our EV courier courier scans the pickup barcode at your home, the Emahu system immediately credits your wallet balance without any merchant delays.
                 </p>
               </div>
             </div>

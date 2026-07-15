@@ -17,7 +17,7 @@ export default function SellerHero() {
       <div className="sh-hero__bg-container">
         {/* Sleek corporate grid lines */}
         <div className="sh-hero__bg-grid" />
-        
+
         {/* Dynamic mesh gradients */}
         <div className="sh-hero__bg-glow sh-hero__bg-glow--top" />
         <div className="sh-hero__bg-glow sh-hero__bg-glow--center" />
@@ -27,7 +27,7 @@ export default function SellerHero() {
       {/* Main Responsive Grid Container */}
       <div className="sh-hero__container">
         <div className="sh-hero__grid">
-          
+
           {/* ==========================================
              LEFT COLUMN: VALUE PROPOSITION & ACTIONS
              ========================================== */}
@@ -46,12 +46,12 @@ export default function SellerHero() {
 
             {/* Body Copy */}
             <p className="sh-hero__desc">
-              Emahu provides the ultimate high-performance infrastructure for modern digital commerce. Experience 0% commission deductions, secure escrow settlement cycles, and hyper-speed doorstep logistics in one unified platform.
+              Emahu provides the ultimate high-performance infrastructure for modern digital commerce. Experience 0% commission deductions, secure Emahu settlement cycles, and hyper-speed doorstep logistics in one unified platform.
             </p>
 
             {/* Action Buttons */}
             <div className="sh-hero__actions">
-              <button 
+              <button
                 onClick={() => {
                   const isRegistered = localStorage.getItem('emahu_seller_registered');
                   if (isRegistered === 'true') {
@@ -59,14 +59,14 @@ export default function SellerHero() {
                   } else {
                     window.location.href = '/seller/register';
                   }
-                }} 
+                }}
                 className="sh-btn sh-btn--primary"
               >
                 Start Selling
               </button>
-              
-              <button 
-                onClick={() => window.location.href = '/contact'} 
+
+              <button
+                onClick={() => window.location.href = '/contact'}
                 className="sh-btn sh-btn--secondary"
               >
                 Contact Us
@@ -95,7 +95,7 @@ export default function SellerHero() {
              ========================================== */}
           <div className="sh-hero__right">
             <div className="sh-mockup-stack">
-              
+
               {/* Card 1: Sales Analytics Widget */}
               <div className="sh-widget sh-widget--revenue">
                 <div className="sh-widget__header">
@@ -105,7 +105,7 @@ export default function SellerHero() {
                   </div>
                   <span className="sh-widget__trend">+14.2% Growth</span>
                 </div>
-                
+
                 <div className="sh-widget__body">
                   <div className="sh-widget__metric">
                     <span className="sh-widget__amt">₹1,82,450.00</span>
@@ -133,17 +133,17 @@ export default function SellerHero() {
               </div>
 
               {/* Card 2: Payout Verification Alert */}
-              <div className="sh-widget sh-widget--escrow">
-                <div className="sh-escrow-badge">
-                  <div className="sh-escrow-badge__circle">
+              <div className="sh-widget sh-widget--Emahu">
+                <div className="sh-Emahu-badge">
+                  <div className="sh-Emahu-badge__circle">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
                   </div>
-                  <div className="sh-escrow-badge__txt">
-                    <span className="sh-escrow-badge__title">FRIDAY SETTLEMENT LOCKED</span>
-                    <span className="sh-escrow-badge__sub">Direct Transfer to HDFC Bank Secure</span>
+                  <div className="sh-Emahu-badge__txt">
+                    <span className="sh-Emahu-badge__title">FRIDAY SETTLEMENT LOCKED</span>
+                    <span className="sh-Emahu-badge__sub">Direct Transfer to HDFC Bank Secure</span>
                   </div>
                 </div>
               </div>
