@@ -661,7 +661,10 @@ exports.adminDecision = async (req, res) => {
 // @access  Private (Admin only)
 exports.getAdminProducts = async (req, res) => {
   try {
-    const products = await Product.find().populate('seller', 'name email phone storeName status');
+    const products = await Product.find()
+      .select('name brand category price stock sku approvalStatus adminCode rejectionReason approvalAttempts createdAt seller')
+      .populate('seller', 'name email phone storeName status')
+      .lean();
     res.status(200).json({
       success: true,
       products

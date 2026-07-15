@@ -851,13 +851,13 @@ exports.getSellers = async (req, res) => {
 
     const sellers = await User.find({ role: 'seller' }).lean();
 
-    // Fetch all products, count orders, and get all seller documents in parallel
+    // Fetch products (basic summary fields only), count orders, and get all seller documents in parallel
     const [allProducts, orderCounts, allDocs] = await Promise.all([
-      Product.find({}).lean(),
+      Product.find({}).select('name brand price sales stock image approvalStatus seller').lean(),
       Order.aggregate([
         { $group: { _id: "$sellerId", count: { $sum: 1 } } }
       ]),
-      SellerDocument.find({}).lean()
+      SellerDocument.find({}).select('seller documentType status fileUrl feedback').lean()
     ]);
 
     // Create maps for fast lookup

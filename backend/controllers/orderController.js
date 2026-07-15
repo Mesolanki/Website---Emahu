@@ -397,7 +397,10 @@ exports.updateOrder = async (req, res) => {
 // @access  Private (Admin only)
 exports.getAdminOrders = async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 });
+    const orders = await Order.find()
+      .select('orderId date deliveryAddress sellerEmail sellerId total items status paymentReleased sellerNetPayout carrier trackingId createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
     res.status(200).json({
       success: true,
       orders

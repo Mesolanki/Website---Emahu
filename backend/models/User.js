@@ -243,6 +243,9 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+// Define compound unique index on the schema directly for performance
+userSchema.index({ email: 1, role: 1 }, { unique: true });
+
 // Encrypt password using bcrypt before saving user
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) {
@@ -258,15 +261,5 @@ userSchema.methods.comparePassword = async function (enteredPassword) {
 };
 
 const User = mongoose.model('User', userSchema);
-
-// Drop legacy single-field unique index and replace with compound unique index
-mongoose.connection.once('open', async () => {
-  try {
-    await mongoose.connection.db.collection('users').dropIndex('email_1');
-  } catch (err) {}
-  try {
-    await mongoose.connection.db.collection('users').createIndex({ email: 1, role: 1 }, { unique: true });
-  } catch (err) {}
-});
 
 module.exports = User;
