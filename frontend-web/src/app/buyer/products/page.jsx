@@ -998,6 +998,33 @@ export default function ProductsPage() {
                     height: 10px;
                     width: 50%;
                   }
+
+                  /* Responsive skeleton adjustments */
+                  @media (max-width: 576px) {
+                    .bp-grid {
+                      grid-template-columns: 1fr !important;
+                      gap: 16px;
+                    }
+                    .sk-thumb {
+                      aspect-ratio: 16/9;
+                    }
+                  }
+
+                  /* List view skeleton alignment */
+                  .bp-grid--list .sk-card {
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 16px;
+                  }
+                  .bp-grid--list .sk-thumb {
+                    width: 120px;
+                    height: 120px;
+                    aspect-ratio: 1;
+                    flex-shrink: 0;
+                  }
+                  .bp-grid--list .sk-row {
+                    flex: 1;
+                  }
                 `}</style>
                 {[1, 2, 3, 4, 5, 6].map((n) => (
                   <div key={n} className="sk-card">
