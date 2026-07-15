@@ -105,6 +105,9 @@ export default function AdminDashboard() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [activeTab, setActiveTab] = useState('sellers');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  // Track which tabs have already been fetched to avoid redundant API calls
+  const [fetchedTabs, setFetchedTabs] = useState(new Set());
+  const [serverWaking, setServerWaking] = useState(false);
 
   // Restore active tab from localStorage on mount (client-side only to avoid hydration mismatches)
   useEffect(() => {
@@ -1387,46 +1390,133 @@ export default function AdminDashboard() {
     }
   };
 
-  // Hydrate all resource lists in parallel immediately upon dashboard load
+  // Lazy tab-based data loading — only fetch what's needed for the current tab.
+  // Uses fetchedTabs Set to avoid redundant re-fetches on tab re-visits.
   useEffect(() => {
     if (!isAuthorized) return;
-    setTimeout(() => {
-      fetchNotifications();
-      fetchDeliveryPartners();
-      fetchOrders();
-      fetchSellers();
-      fetchProducts();
-      fetchCategories();
-      fetchDeliverySettings();
-      fetchPlatformSettings();
-    }, 0);
+
+    // Pre-warm the Render backend to avoid cold-start delay
+    let wakeTimer = setTimeout(() => setServerWaking(true), 1500);
+
+    const doFetch = async (tab) => {
+      // Always fetch notifications (lightweight, needed everywhere)
+      if (!fetchedTabs.has('notifications')) {
+        fetchNotifications();
+      }
+
+      if (tab === 'sellers' || tab === 'new-sellers') {
+        if (!fetchedTabs.has('sellers')) {
+          await fetchSellers();
+        }
+      } else if (tab === 'products-hub') {
+        if (!fetchedTabs.has('products')) {
+          await fetchProducts();
+        }
+      } else if (tab === 'stats') {
+        const promises = [];
+        if (!fetchedTabs.has('sellers')) promises.push(fetchSellers());
+        if (!fetchedTabs.has('products')) promises.push(fetchProducts());
+        if (!fetchedTabs.has('orders')) promises.push(fetchOrders());
+        if (promises.length) await Promise.all(promises);
+      } else if (tab === 'orders') {
+        if (!fetchedTabs.has('orders')) {
+          await fetchOrders();
+        }
+      } else if (tab === 'delivery-partners') {
+        if (!fetchedTabs.has('delivery')) {
+          await fetchDeliveryPartners();
+        }
+      } else if (tab === 'settings') {
+        if (!fetchedTabs.has('settings')) {
+          fetchDeliverySettings();
+          fetchPlatformSettings();
+        }
+      } else if (tab === 'categories-hub') {
+        if (!fetchedTabs.has('categories')) {
+          await fetchCategories();
+        }
+      }
+
+      // Mark this tab group as fetched
+      setFetchedTabs(prev => {
+        const next = new Set(prev);
+        next.add('notifications');
+        if (tab === 'sellers' || tab === 'new-sellers') next.add('sellers');
+        else if (tab === 'products-hub') next.add('products');
+        else if (tab === 'stats') { next.add('sellers'); next.add('products'); next.add('orders'); }
+        else if (tab === 'orders') next.add('orders');
+        else if (tab === 'delivery-partners') next.add('delivery');
+        else if (tab === 'settings') next.add('settings');
+        else if (tab === 'categories-hub') next.add('categories');
+        return next;
+      });
+
+      clearTimeout(wakeTimer);
+      setServerWaking(false);
+    };
+
+    doFetch(activeTab);
+
+    return () => clearTimeout(wakeTimer);
   }, [isAuthorized]);
 
-  // Refresh tab data when changing tabs
+  // Refresh tab data when changing tabs (lazy: only fetch if not yet cached)
   useEffect(() => {
     if (!isAuthorized) return;
-    if (activeTab === 'sellers' || activeTab === 'new-sellers') {
-      setTimeout(() => fetchSellers(), 0);
-    } else if (activeTab === 'products-hub') {
-      setTimeout(() => fetchProducts(), 0);
-    } else if (activeTab === 'stats') {
-      setTimeout(() => {
-        fetchSellers();
-        fetchProducts();
-        fetchOrders();
-      }, 0);
-    } else if (activeTab === 'orders') {
-      setTimeout(() => fetchOrders(), 0);
-    } else if (activeTab === 'delivery-partners') {
-      setTimeout(() => fetchDeliveryPartners(), 0);
-    } else if (activeTab === 'settings') {
-      setTimeout(() => fetchDeliverySettings(), 0);
-      setTimeout(() => fetchPlatformSettings(), 0);
-    } else if (activeTab === 'notifications') {
-      setTimeout(() => fetchNotifications(), 0);
-    } else if (activeTab === 'categories-hub') {
-      setTimeout(() => fetchCategories(), 0);
-    }
+    const tab = activeTab;
+
+    const fetchIfNeeded = async () => {
+      if (tab === 'sellers' || tab === 'new-sellers') {
+        if (!fetchedTabs.has('sellers')) {
+          await fetchSellers();
+          setFetchedTabs(prev => { const n = new Set(prev); n.add('sellers'); return n; });
+        } else {
+          // Always refresh sellers list when switching to it (ensures fresh data)
+          fetchSellers();
+        }
+      } else if (tab === 'products-hub') {
+        if (!fetchedTabs.has('products')) {
+          await fetchProducts();
+          setFetchedTabs(prev => { const n = new Set(prev); n.add('products'); return n; });
+        }
+      } else if (tab === 'stats') {
+        const promises = [];
+        if (!fetchedTabs.has('sellers')) { promises.push(fetchSellers()); }
+        if (!fetchedTabs.has('products')) { promises.push(fetchProducts()); }
+        if (!fetchedTabs.has('orders')) { promises.push(fetchOrders()); }
+        if (promises.length) {
+          await Promise.all(promises);
+          setFetchedTabs(prev => { const n = new Set(prev); n.add('sellers'); n.add('products'); n.add('orders'); return n; });
+        }
+      } else if (tab === 'orders') {
+        if (!fetchedTabs.has('orders')) {
+          await fetchOrders();
+          setFetchedTabs(prev => { const n = new Set(prev); n.add('orders'); return n; });
+        } else {
+          fetchOrders();
+        }
+      } else if (tab === 'delivery-partners') {
+        if (!fetchedTabs.has('delivery')) {
+          await fetchDeliveryPartners();
+          setFetchedTabs(prev => { const n = new Set(prev); n.add('delivery'); return n; });
+        }
+      } else if (tab === 'settings') {
+        if (!fetchedTabs.has('settings')) {
+          fetchDeliverySettings();
+          fetchPlatformSettings();
+          setFetchedTabs(prev => { const n = new Set(prev); n.add('settings'); return n; });
+        }
+      } else if (tab === 'notifications') {
+        fetchNotifications();
+      } else if (tab === 'categories-hub') {
+        if (!fetchedTabs.has('categories')) {
+          await fetchCategories();
+          setFetchedTabs(prev => { const n = new Set(prev); n.add('categories'); return n; });
+        }
+      }
+    };
+
+    fetchIfNeeded();
   }, [activeTab]);
 
   useEffect(() => {
@@ -1839,6 +1929,25 @@ export default function AdminDashboard() {
 
   return (
     <div className="ad-layout">
+      {/* Server wake-up banner — shows only during Render cold start */}
+      {serverWaking && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999,
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '10px 20px',
+          background: 'linear-gradient(90deg, #1e1b4b, #1e3a5f)',
+          borderBottom: '1px solid rgba(99,102,241,0.3)',
+          fontSize: '0.82rem', color: '#c7d2fe', fontWeight: 500,
+        }} role="status" aria-live="polite">
+          <span style={{
+            width: 14, height: 14, borderRadius: '50%',
+            border: '2px solid rgba(99,102,241,0.3)', borderTopColor: '#818cf8',
+            animation: 'spin 0.8s linear infinite', display: 'inline-block', flexShrink: 0
+          }} />
+          <span>Connecting to server… warming up (first load may take a few seconds)</span>
+        </div>
+      )}
+
       {/* Toast Notifications */}
       <div className="ad-toast-container">
         {toasts.map((toast) => (
