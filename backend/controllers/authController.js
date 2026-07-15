@@ -850,32 +850,53 @@ exports.getSellers = async (req, res) => {
     const SellerDocument = require('../models/SellerDocument');
 
     const sellers = await User.find({ role: 'seller' }).lean();
+    const sellerIds = sellers.map(s => s._id);
 
-    // Fetch products (basic summary fields only), count orders, and get all seller documents in parallel
-    const [allProducts, orderCounts, allDocs] = await Promise.all([
-      Product.find({}).select('name brand price sales stock image approvalStatus seller').lean(),
+    // Fetch products statistics, count orders, and get documents ONLY for the active sellers in parallel
+    const [productStats, orderCounts, allDocs] = await Promise.all([
+      Product.aggregate([
+        { $match: { seller: { $in: sellerIds } } },
+        {
+          $group: {
+            _id: "$seller",
+            totalProducts: { $sum: 1 },
+            totalSales: { $sum: { $ifNull: ["$sales", 0] } },
+            totalRevenue: { $sum: { $multiply: ["$price", { $ifNull: ["$sales", 0] }] } },
+            products: {
+              $push: {
+                id: "$_id",
+                _id: "$_id",
+                name: "$name",
+                brand: "$brand",
+                price: "$price",
+                sales: "$sales",
+                stock: "$stock",
+                image: "$image",
+                approvalStatus: "$approvalStatus"
+              }
+            }
+          }
+        }
+      ]),
       Order.aggregate([
+        { $match: { sellerId: { $in: sellerIds.map(id => id.toString()) } } },
         { $group: { _id: "$sellerId", count: { $sum: 1 } } }
       ]),
-      SellerDocument.find({}).select('seller documentType status fileUrl feedback').lean()
+      SellerDocument.find({ seller: { $in: sellerIds } }).select('seller documentType status fileUrl feedback').lean()
     ]);
 
     // Create maps for fast lookup
+    const statsMap = {};
+    productStats.forEach(item => {
+      if (item._id) {
+        statsMap[item._id.toString()] = item;
+      }
+    });
+
     const orderCountMap = {};
     orderCounts.forEach(item => {
       if (item._id) {
         orderCountMap[item._id.toString()] = item.count;
-      }
-    });
-
-    const sellerProductsMap = {};
-    allProducts.forEach(p => {
-      if (p.seller) {
-        const sId = p.seller.toString();
-        if (!sellerProductsMap[sId]) {
-          sellerProductsMap[sId] = [];
-        }
-        sellerProductsMap[sId].push(p);
       }
     });
 
@@ -892,13 +913,13 @@ exports.getSellers = async (req, res) => {
 
     for (let i = 0; i < sellers.length; i++) {
       const sellerIdStr = sellers[i]._id.toString();
-      const productsList = sellerProductsMap[sellerIdStr] || [];
+      const stats = statsMap[sellerIdStr] || { totalProducts: 0, totalSales: 0, totalRevenue: 0, products: [] };
 
-      sellers[i].totalProducts = productsList.length;
-      sellers[i].totalSales = productsList.reduce((acc, p) => acc + (p.sales || 0), 0);
-      sellers[i].totalRevenue = productsList.reduce((acc, p) => acc + (p.price * (p.sales || 0)), 0);
+      sellers[i].totalProducts = stats.totalProducts || 0;
+      sellers[i].totalSales = stats.totalSales || 0;
+      sellers[i].totalRevenue = Math.round(stats.totalRevenue || 0);
       sellers[i].totalOrders = orderCountMap[sellerIdStr] || 0;
-      sellers[i].products = productsList;
+      sellers[i].products = stats.products || [];
       sellers[i].documents = sellerDocsMap[sellerIdStr] || [];
     }
 
