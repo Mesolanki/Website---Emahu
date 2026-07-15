@@ -1019,19 +1019,24 @@ export default function AdminDashboard() {
   };
 
   // Mark all notifications read
+  // Mark all notifications read in parallel
   const markAllNotificationsRead = async () => {
     try {
       const token = localStorage.getItem('emahu_admin_token');
       const unread = notifications.filter(n => !n.isRead);
-      for (const n of unread) {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications/${n._id}/read`, {
+      const promises = unread.map(n =>
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications/${n._id}/read`, {
           method: 'PUT',
           headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.status === 401) {
-          handleSessionExpired();
-          return;
-        }
+        }).then(res => {
+          if (res.status === 401) {
+            handleSessionExpired();
+            throw new Error('session_expired');
+          }
+        })
+      );
+      if (unread.length > 0) {
+        await Promise.all(promises);
       }
       fetchNotifications();
     } catch (err) {
@@ -1382,7 +1387,22 @@ export default function AdminDashboard() {
     }
   };
 
-  // Load active tab data
+  // Hydrate all resource lists in parallel immediately upon dashboard load
+  useEffect(() => {
+    if (!isAuthorized) return;
+    setTimeout(() => {
+      fetchNotifications();
+      fetchDeliveryPartners();
+      fetchOrders();
+      fetchSellers();
+      fetchProducts();
+      fetchCategories();
+      fetchDeliverySettings();
+      fetchPlatformSettings();
+    }, 0);
+  }, [isAuthorized]);
+
+  // Refresh tab data when changing tabs
   useEffect(() => {
     if (!isAuthorized) return;
     if (activeTab === 'sellers' || activeTab === 'new-sellers') {
@@ -1407,7 +1427,7 @@ export default function AdminDashboard() {
     } else if (activeTab === 'categories-hub') {
       setTimeout(() => fetchCategories(), 0);
     }
-  }, [isAuthorized, activeTab]);
+  }, [activeTab]);
 
   useEffect(() => {
     setTimeout(() => {
