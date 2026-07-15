@@ -28,6 +28,12 @@ export default function BuyerLogin() {
     }
   }, [router]);
 
+  useEffect(() => {
+    // Background warm-up call to minimize Render cold start delay
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    fetch(apiUrl).catch(() => {});
+  }, []);
+
   const onGoogleSuccess = useCallback(async ({ email, name, idToken }) => {
     setLoading(true);
     setErrors({});

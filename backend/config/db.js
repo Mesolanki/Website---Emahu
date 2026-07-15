@@ -16,7 +16,7 @@ const connectDB = async () => {
   try {
     const opts = {
       maxPoolSize: 10,                 // Keep connection count low on serverless instances
-      serverSelectionTimeoutMS: 5000,  // Fail fast instead of waiting 30 seconds
+      serverSelectionTimeoutMS: 15000, // Allow more time (15s) for database server cold starts
       socketTimeoutMS: 45000,          // Close inactive sockets after 45s
     };
 
@@ -26,7 +26,8 @@ const connectDB = async () => {
     return conn;
   } catch (error) {
     console.error(`MongoDB Connection Error: ${error.message}`);
-    process.exit(1);
+    // Reset cached connection so next request can try again
+    cachedConnection = null;
   }
 };
 

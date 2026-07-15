@@ -59,6 +59,17 @@ app.get('/', (req, res) => {
   });
 });
 
+// Ensure database connection is active on every request
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('Database connection middleware error:', err);
+    return res.status(500).json({ success: false, error: 'Database connection failed. Please retry.' });
+  }
+});
+
 // Register API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
