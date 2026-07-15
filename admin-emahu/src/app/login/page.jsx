@@ -30,7 +30,7 @@ export default function AdminLogin() {
 
   useEffect(() => {
     // Background warm-up call to minimize Render cold start delay
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const apiUrl = '';
     fetch(apiUrl).catch(() => {});
   }, []);
 
