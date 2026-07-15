@@ -23,8 +23,8 @@ export default function LoadingScreen() {
       return;
     }
 
-    // Show loader for 1.2s then fade out
-    const timer = setTimeout(() => setVisible(false), 1200);
+    // Show loader for 0.8s then fade out
+    const timer = setTimeout(() => setVisible(false), 800);
     return () => clearTimeout(timer);
   }, []);
 

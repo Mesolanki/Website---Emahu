@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
+import { wakeupServer } from '@/utils/serverWakeup';
 import './products.css';
 
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
@@ -146,6 +147,7 @@ export default function ProductsPage() {
   const [page, setPage]                   = useState(1);
   const [dbProducts, setDbProducts]       = useState([]);
   const [loading, setLoading]             = useState(true);
+  const [serverWaking, setServerWaking]   = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [categoryTiles, setCategoryTiles] = useState(FALLBACK_CATEGORY_TILES);
   const [categoryParentMap, setCategoryParentMap] = useState({});
@@ -270,6 +272,18 @@ export default function ProductsPage() {
       }
     };
     fetchCategories();
+  }, []);
+
+  // Pre-warm the Render backend (free-tier cold start workaround)
+  useEffect(() => {
+    let wakeTimeout;
+    // Only show the waking banner if server takes more than 1.5s to respond
+    wakeTimeout = setTimeout(() => setServerWaking(true), 1500);
+    wakeupServer().then(() => {
+      clearTimeout(wakeTimeout);
+      setServerWaking(false);
+    });
+    return () => clearTimeout(wakeTimeout);
   }, []);
 
   // Fetch products from database
@@ -694,6 +708,14 @@ export default function ProductsPage() {
   return (
     <div className="bp-page">
       <BuyerHeader />
+
+      {/* Server wake-up banner — only shown during Render cold start */}
+      {serverWaking && (
+        <div className="bp-server-wakeup-banner" role="status" aria-live="polite">
+          <span className="bp-server-wakeup-banner__spinner" />
+          <span>Connecting to server… this may take a few seconds on first load.</span>
+        </div>
+      )}
 
       {/* Breadcrumb */}
       <nav className="bp-breadcrumb">
