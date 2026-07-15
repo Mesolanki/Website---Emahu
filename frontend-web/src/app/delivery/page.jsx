@@ -390,17 +390,25 @@ export default function DeliveryPortal() {
 
     // Ask for location permission
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          setLatitude(String(position.coords.latitude.toFixed(6)));
-          setLongitude(String(position.coords.longitude.toFixed(6)));
-          await proceedToLogin();
-        },
-        async (error) => {
-          setPendingAction('login');
-          setShowLocationTermsModal(true);
-        }
-      );
+      const getPosLogin = () => {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            setLatitude(String(position.coords.latitude.toFixed(6)));
+            setLongitude(String(position.coords.longitude.toFixed(6)));
+            await proceedToLogin();
+          },
+          async (error) => {
+            console.warn('Geolocation failed during login:', error);
+            if (confirm("Location permission is required to access the Delivery Portal. Try again?")) {
+              getPosLogin();
+            } else {
+              setPendingAction('login');
+              setShowLocationTermsModal(true);
+            }
+          }
+        );
+      };
+      getPosLogin();
     } else {
       setPendingAction('login');
       setShowLocationTermsModal(true);
@@ -721,21 +729,29 @@ export default function DeliveryPortal() {
 
     // Ask for location permission
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          setLatitude(String(position.coords.latitude.toFixed(6)));
-          setLongitude(String(position.coords.longitude.toFixed(6)));
-          if (!isEmailVerified) {
-            await handleSendEmailOtp();
-          } else {
-            await proceedToRegister();
+      const getPosRegister = () => {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            setLatitude(String(position.coords.latitude.toFixed(6)));
+            setLongitude(String(position.coords.longitude.toFixed(6)));
+            if (!isEmailVerified) {
+              await handleSendEmailOtp();
+            } else {
+              await proceedToRegister();
+            }
+          },
+          async (error) => {
+            console.warn('Geolocation failed during register:', error);
+            if (confirm("Location permission is required to onboard as a Delivery Partner. Try again?")) {
+              getPosRegister();
+            } else {
+              setPendingAction('register');
+              setShowLocationTermsModal(true);
+            }
           }
-        },
-        async (error) => {
-          setPendingAction('register');
-          setShowLocationTermsModal(true);
-        }
-      );
+        );
+      };
+      getPosRegister();
     } else {
       setPendingAction('register');
       setShowLocationTermsModal(true);

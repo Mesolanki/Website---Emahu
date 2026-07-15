@@ -474,49 +474,55 @@ export default function CartPage() {
       return;
     }
     setGpsLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        const coords = { latitude: lat.toFixed(6), longitude: lon.toFixed(6) };
-        setBuyerCoordinates(coords);
-        localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
-        setGpsLoading(false);
-        // Reverse geocode to get city, state, pincode name
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-          const data = await res.json();
-          if (data && data.address) {
-            const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || '';
-            const stateVal = data.address.state || '';
-            const postcodeVal = data.address.postcode || data.address.postal || '';
+    const getPosCart = () => {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          const coords = { latitude: lat.toFixed(6), longitude: lon.toFixed(6) };
+          setBuyerCoordinates(coords);
+          localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
+          setGpsLoading(false);
+          // Reverse geocode to get city, state, pincode name
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+            const data = await res.json();
+            if (data && data.address) {
+              const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || '';
+              const stateVal = data.address.state || '';
+              const postcodeVal = data.address.postcode || data.address.postal || '';
 
-            const road = data.address.road || '';
-            const suburb = data.address.suburb || data.address.neighbourhood || '';
-            const parts = [road, suburb, cityVal, stateVal].filter(Boolean);
-            let fullAddr = parts.join(', ');
-            if (postcodeVal) {
-              fullAddr += ` - ${postcodeVal}`;
-            }
-            if (!fullAddr) {
-              fullAddr = data.display_name;
-            }
+              const road = data.address.road || '';
+              const suburb = data.address.suburb || data.address.neighbourhood || '';
+              const parts = [road, suburb, cityVal, stateVal].filter(Boolean);
+              let fullAddr = parts.join(', ');
+              if (postcodeVal) {
+                fullAddr += ` - ${postcodeVal}`;
+              }
+              if (!fullAddr) {
+                fullAddr = data.display_name;
+              }
 
-            setBuyerCity(cityVal);
-            localStorage.setItem('emahu_buyer_city', cityVal);
-            localStorage.setItem('emahu_buyer_state', stateVal);
-            localStorage.setItem('emahu_buyer_pincode', postcodeVal);
-            localStorage.setItem('emahu_buyer_full_address', fullAddr);
+              setBuyerCity(cityVal);
+              localStorage.setItem('emahu_buyer_city', cityVal);
+              localStorage.setItem('emahu_buyer_state', stateVal);
+              localStorage.setItem('emahu_buyer_pincode', postcodeVal);
+              localStorage.setItem('emahu_buyer_full_address', fullAddr);
+            }
+          } catch (_) { }
+        },
+        (err) => {
+          console.error('GPS error:', err);
+          if (confirm("Location access is denied. EMAHU needs your location to calculate accurate delivery charges. Try again?")) {
+            getPosCart();
+          } else {
+            setGpsLoading(false);
           }
-        } catch (_) { }
-      },
-      (err) => {
-        console.error('GPS error:', err);
-        setGpsLoading(false);
-        alert('Location access denied. Please allow browser location permission and try again.');
-      },
-      { timeout: 10000 }
-    );
+        },
+        { timeout: 10000 }
+      );
+    };
+    getPosCart();
   };
 
   // ── Recalculate delivery charge when location or cart changes ──

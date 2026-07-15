@@ -457,61 +457,70 @@ export default function CheckoutPage() {
   const handleGPSDetect = async (fromGate = false) => {
     if (fromGate) { setGpsLoading(true); setGpsError(''); }
     if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
+      const getPosCheckout = () => {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
 
-          const coords = {
-            latitude: lat.toFixed(6),
-            longitude: lon.toFixed(6)
-          };
-          setBuyerCoordinates(coords);
-          localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
+            const coords = {
+              latitude: lat.toFixed(6),
+              longitude: lon.toFixed(6)
+            };
+            setBuyerCoordinates(coords);
+            localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
 
-          // Nominatim reverse-geocoding
-          try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-            const data = await res.json();
-            if (data && data.address) {
-              const road = data.address.road || '';
-              const suburb = data.address.suburb || data.address.neighbourhood || '';
-              const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || '';
-              const stateVal = data.address.state || '';
-              const postcodeVal = data.address.postcode || data.address.postal || '';
+            // Nominatim reverse-geocoding
+            try {
+              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+              const data = await res.json();
+              if (data && data.address) {
+                const road = data.address.road || '';
+                const suburb = data.address.suburb || data.address.neighbourhood || '';
+                const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || '';
+                const stateVal = data.address.state || '';
+                const postcodeVal = data.address.postcode || data.address.postal || '';
 
-              const parts = [road, suburb, cityVal, stateVal].filter(Boolean);
-              let fullAddr = parts.join(', ');
-              if (postcodeVal) fullAddr += ` - ${postcodeVal}`;
-              if (!fullAddr) fullAddr = data.display_name;
+                const parts = [road, suburb, cityVal, stateVal].filter(Boolean);
+                let fullAddr = parts.join(', ');
+                if (postcodeVal) fullAddr += ` - ${postcodeVal}`;
+                if (!fullAddr) fullAddr = data.display_name;
 
-              setAddress(fullAddr);
-              setCity(cityVal);
-              setStateName(stateVal);
-              setPincode(postcodeVal);
-              setAddressType('manual');
+                setAddress(fullAddr);
+                setCity(cityVal);
+                setStateName(stateVal);
+                setPincode(postcodeVal);
+                setAddressType('manual');
+              }
+            } catch (geocodingErr) {
+              console.error('Reverse geocoding failed:', geocodingErr);
             }
-          } catch (geocodingErr) {
-            console.error('Reverse geocoding failed:', geocodingErr);
-          }
 
-          if (fromGate) {
-            setGpsLoading(false);
-            setLocationMode('gps');
-            setLocationConfirmed(true);
-          }
-        },
-        (error) => {
-          console.error(error);
-          if (fromGate) {
-            setGpsLoading(false);
-            setGpsError(error.code === 1
-              ? 'Location permission denied. Please allow location access in your browser settings or enter your address manually.'
-              : 'Unable to detect GPS location. Please try again or enter address manually.');
-          }
-        },
-        { timeout: 10000, maximumAge: 60000 }
-      );
+            if (fromGate) {
+              setGpsLoading(false);
+              setLocationMode('gps');
+              setLocationConfirmed(true);
+            }
+          },
+          (error) => {
+            console.error(error);
+            if (fromGate) {
+              if (error.code === 1) {
+                if (confirm("Location permission is denied. EMAHU requires location access to find local products. Try again?")) {
+                  getPosCheckout();
+                  return;
+                }
+              }
+              setGpsLoading(false);
+              setGpsError(error.code === 1
+                ? 'Location permission denied. Please allow location access in your browser settings or enter your address manually.'
+                : 'Unable to detect GPS location. Please try again or enter address manually.');
+            }
+          },
+          { timeout: 10000, maximumAge: 60000 }
+        );
+      };
+      getPosCheckout();
     } else {
       if (fromGate) {
         setGpsLoading(false);

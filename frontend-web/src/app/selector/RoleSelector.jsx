@@ -352,33 +352,39 @@ export default function RoleSelector() {
           }
 
           if (typeof window !== 'undefined' && navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              async (position) => {
-                try {
-                  const lat = position.coords.latitude;
-                  const lon = position.coords.longitude;
-                  const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                  const data = await res.json();
-                  if (data && data.address) {
-                    const cityVal = data.address.city || data.address.town || data.address.village || data.address.state_district || '';
-                    if (cityVal) {
-                      const cleanCity = cityVal.replace(/District|Corporation/gi, '').trim();
-                      const capitalized = cleanCity.charAt(0).toUpperCase() + cleanCity.slice(1);
-                      setSelectedCity(capitalized);
-                      localStorage.setItem('emahu_buyer_city', capitalized);
-                      setHasLocationPermission(true);
-                      window.dispatchEvent(new Event('storage'));
+            const getPosSelector = () => {
+              navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                  try {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                    const data = await res.json();
+                    if (data && data.address) {
+                      const cityVal = data.address.city || data.address.town || data.address.village || data.address.state_district || '';
+                      if (cityVal) {
+                        const cleanCity = cityVal.replace(/District|Corporation/gi, '').trim();
+                        const capitalized = cleanCity.charAt(0).toUpperCase() + cleanCity.slice(1);
+                        setSelectedCity(capitalized);
+                        localStorage.setItem('emahu_buyer_city', capitalized);
+                        setHasLocationPermission(true);
+                        window.dispatchEvent(new Event('storage'));
+                      }
                     }
+                  } catch (err) {
+                    console.warn('Geolocation reverse lookup failed:', err);
                   }
-                } catch (err) {
-                  console.warn('Geolocation reverse lookup failed:', err);
+                },
+                (err) => {
+                  console.warn('Geolocation permission denied:', err);
+                  setHasLocationPermission(false);
+                  if (confirm("Location permission is required for EMAHU to show products near you. Would you like to grant location access?")) {
+                    getPosSelector();
+                  }
                 }
-              },
-              (err) => {
-                console.warn('Geolocation permission denied:', err);
-                setHasLocationPermission(false);
-              }
-            );
+              );
+            };
+            getPosSelector();
           }
         }
       } catch (e) {

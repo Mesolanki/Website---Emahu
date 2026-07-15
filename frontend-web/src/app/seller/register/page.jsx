@@ -408,10 +408,10 @@ export default function SellerRegister() {
 
         setRegSuccessData(data);
 
-        // Automatically submit documents upon registration
+        // Automatically submit documents in parallel without blocking the register completion flow
         if (data.accessToken) {
           const docUrl = API_BASE + '/api/auth/kyc_document.jpg';
-          await fetch(API_BASE + '/api/auth/seller/documents', {
+          const p1 = fetch(API_BASE + '/api/auth/seller/documents', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -423,7 +423,7 @@ export default function SellerRegister() {
             })
           });
 
-          await fetch(API_BASE + '/api/auth/seller/documents', {
+          const p2 = fetch(API_BASE + '/api/auth/seller/documents', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -434,6 +434,8 @@ export default function SellerRegister() {
               fileUrl: API_BASE + '/api/auth/gst_certificate_stub.pdf'
             })
           });
+
+          Promise.all([p1, p2]).catch(err => console.error("Initial parallel document submission failed:", err));
         }
 
         setLoading(false);

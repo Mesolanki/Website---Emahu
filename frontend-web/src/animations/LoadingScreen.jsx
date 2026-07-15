@@ -68,7 +68,7 @@ export default function LoadingScreen() {
               <motion.path
                 d="M8 12h16M8 16h12M8 20h14"
                 stroke="white"
-                strokeWidth="2.2"
+                strokeWidth="3"
                 strokeLinecap="round"
                 initial={{ pathLength: 0, opacity: 0 }}
                 animate={{ pathLength: 1, opacity: 1 }}

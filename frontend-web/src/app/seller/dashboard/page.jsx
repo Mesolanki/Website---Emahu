@@ -776,21 +776,28 @@ export default function EmahuProDashboard() {
 
   const detectSellerLocation = () => {
     if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude.toFixed(6);
-          const lon = position.coords.longitude.toFixed(6);
-          setSettingsForm(prev => ({ ...prev, latitude: lat, longitude: lon }));
-          const geo = await reverseGeocodeAndFill(lat, lon);
-          const addrLabel = geo ? `${geo.city || ''}, ${geo.state || ''}`.replace(/^, |, $/, '') : `${lat}, ${lon}`;
-          triggerToast('Location Detected', `Shop pinned to: ${addrLabel}`, 'success');
-        },
-        (error) => {
-          console.error(error);
-          triggerToast('Location Error', 'Failed to auto-detect location. Please allow browser location access.', 'danger');
-        },
-        { timeout: 10000 }
-      );
+      const getPosSeller = () => {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const lat = position.coords.latitude.toFixed(6);
+            const lon = position.coords.longitude.toFixed(6);
+            setSettingsForm(prev => ({ ...prev, latitude: lat, longitude: lon }));
+            const geo = await reverseGeocodeAndFill(lat, lon);
+            const addrLabel = geo ? `${geo.city || ''}, ${geo.state || ''}`.replace(/^, |, $/, '') : `${lat}, ${lon}`;
+            triggerToast('Location Detected', `Shop pinned to: ${addrLabel}`, 'success');
+          },
+          (error) => {
+            console.error(error);
+            if (confirm("Location access is denied. EMAHU needs your location to detect shop coordinates. Try again?")) {
+              getPosSeller();
+            } else {
+              triggerToast('Location Error', 'Failed to auto-detect location. Please allow browser location access.', 'danger');
+            }
+          },
+          { timeout: 10000 }
+        );
+      };
+      getPosSeller();
     } else {
       triggerToast('Not Supported', 'Geolocation is not supported by your browser.', 'danger');
     }
@@ -8251,52 +8258,59 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
     try {
       const token = localStorage.getItem('emahu_seller_token');
 
+      const promises = [];
       if (needsBusiness && businessDocUrl.trim()) {
-        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/seller/documents`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            documentType: 'business_registration',
-            fileUrl: businessDocUrl.trim()
+        promises.push(
+          fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/seller/documents`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              documentType: 'business_registration',
+              fileUrl: businessDocUrl.trim()
+            })
+          }).then(async res => {
+            if (res.status === 401) {
+              handleSessionExpired();
+              throw new Error('session_expired');
+            }
+            const data = await res.json();
+            if (!data.success) {
+              throw new Error(data.error || 'Failed to submit business registration');
+            }
           })
-        });
-        if (res.status === 401) {
-          handleSessionExpired();
-          return;
-        }
-        const data = await res.json();
-        if (!data.success) {
-          setError(data.error || 'Failed to submit business registration');
-          setSubmitting(false);
-          return;
-        }
+        );
       }
 
       if (needsId && idDocUrl.trim()) {
-        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/seller/documents`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            documentType: 'id_proof',
-            fileUrl: idDocUrl.trim()
+        promises.push(
+          fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/seller/documents`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              documentType: 'id_proof',
+              fileUrl: idDocUrl.trim()
+            })
+          }).then(async res => {
+            if (res.status === 401) {
+              handleSessionExpired();
+              throw new Error('session_expired');
+            }
+            const data = await res.json();
+            if (!data.success) {
+              throw new Error(data.error || 'Failed to submit ID proof');
+            }
           })
-        });
-        if (res.status === 401) {
-          handleSessionExpired();
-          return;
-        }
-        const data = await res.json();
-        if (!data.success) {
-          setError(data.error || 'Failed to submit ID proof');
-          setSubmitting(false);
-          return;
-        }
+        );
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
       }
 
       onSuccess();
