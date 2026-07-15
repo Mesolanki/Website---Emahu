@@ -418,8 +418,8 @@ export default function AdminDashboard() {
     router.replace('/login?expired=true');
   };
 
-  // Fetch Sellers List
-  const fetchSellers = async () => {
+  // Fetch Sellers List with Auto-Retry for Render Cold Starts
+  const fetchSellers = async (retryCount = 0) => {
     setLoadingSellers(true);
     setSellersError(false);
     try {
@@ -449,20 +449,32 @@ export default function AdminDashboard() {
         setSellers(sortedSellers);
         setSellersError(false);
       } else {
-        setSellersError(true);
-        triggerToast('Error', data.error || 'Failed to fetch sellers list.', 'danger');
+        if (retryCount < 3) {
+          console.warn(`Sellers fetch failed, retrying in 3s... (attempt ${retryCount + 1})`);
+          setTimeout(() => fetchSellers(retryCount + 1), 3000);
+        } else {
+          setSellersError(true);
+          triggerToast('Error', data.error || 'Failed to fetch sellers list.', 'danger');
+        }
       }
     } catch (err) {
       console.error(err);
-      setSellersError(true);
-      triggerToast('Error', 'Network error fetching sellers.', 'danger');
+      if (retryCount < 3) {
+        console.warn(`Sellers fetch error, retrying in 3s... (attempt ${retryCount + 1})`);
+        setTimeout(() => fetchSellers(retryCount + 1), 3000);
+      } else {
+        setSellersError(true);
+        triggerToast('Error', 'Network error fetching sellers.', 'danger');
+      }
     } finally {
-      setLoadingSellers(false);
+      if (retryCount === 0 || retryCount >= 3) {
+        setLoadingSellers(false);
+      }
     }
   };
 
-  // Fetch Products List
-  const fetchProducts = async () => {
+  // Fetch Products List with Auto-Retry for Render Cold Starts
+  const fetchProducts = async (retryCount = 0) => {
     setLoadingProducts(true);
     setProductsError(false);
     try {
@@ -491,15 +503,27 @@ export default function AdminDashboard() {
         setProducts(sortedProducts);
         setProductsError(false);
       } else {
-        setProductsError(true);
-        triggerToast('Error', data.error || 'Failed to fetch products list.', 'danger');
+        if (retryCount < 3) {
+          console.warn(`Products fetch failed, retrying in 3s... (attempt ${retryCount + 1})`);
+          setTimeout(() => fetchProducts(retryCount + 1), 3000);
+        } else {
+          setProductsError(true);
+          triggerToast('Error', data.error || 'Failed to fetch products list.', 'danger');
+        }
       }
     } catch (err) {
       console.error(err);
-      setProductsError(true);
-      triggerToast('Error', 'Network error fetching products.', 'danger');
+      if (retryCount < 3) {
+        console.warn(`Products fetch error, retrying in 3s... (attempt ${retryCount + 1})`);
+        setTimeout(() => fetchProducts(retryCount + 1), 3000);
+      } else {
+        setProductsError(true);
+        triggerToast('Error', 'Network error fetching products.', 'danger');
+      }
     } finally {
-      setLoadingProducts(false);
+      if (retryCount === 0 || retryCount >= 3) {
+        setLoadingProducts(false);
+      }
     }
   };
 
@@ -660,8 +684,8 @@ export default function AdminDashboard() {
     }
   };
 
-  // Fetch Orders List
-  const fetchOrders = async () => {
+  // Fetch Orders List with Auto-Retry for Render Cold Starts
+  const fetchOrders = async (retryCount = 0) => {
     setLoadingOrders(true);
     setOrdersError(false);
     try {
@@ -682,15 +706,27 @@ export default function AdminDashboard() {
         setOrders(data.orders || []);
         setOrdersError(false);
       } else {
-        setOrdersError(true);
-        triggerToast('Error', data.error || 'Failed to fetch orders list.', 'danger');
+        if (retryCount < 3) {
+          console.warn(`Orders fetch failed, retrying in 3s... (attempt ${retryCount + 1})`);
+          setTimeout(() => fetchOrders(retryCount + 1), 3000);
+        } else {
+          setOrdersError(true);
+          triggerToast('Error', data.error || 'Failed to fetch orders list.', 'danger');
+        }
       }
     } catch (err) {
       console.error(err);
-      setOrdersError(true);
-      triggerToast('Error', 'Network error fetching orders.', 'danger');
+      if (retryCount < 3) {
+        console.warn(`Orders fetch error, retrying in 3s... (attempt ${retryCount + 1})`);
+        setTimeout(() => fetchOrders(retryCount + 1), 3000);
+      } else {
+        setOrdersError(true);
+        triggerToast('Error', 'Network error fetching orders.', 'danger');
+      }
     } finally {
-      setLoadingOrders(false);
+      if (retryCount === 0 || retryCount >= 3) {
+        setLoadingOrders(false);
+      }
     }
   };
 
@@ -5566,17 +5602,9 @@ export default function AdminDashboard() {
               ) : loadingAdminCategories ? (
                 <div className="ad-loading">Loading categories tree...</div>
               ) : (
-                <div style={{ display: 'flex', gap: '24px', marginTop: '24px', alignItems: 'flex-start' }}>
+                <div className="ad-cat-hub-container">
                   {/* Left Panel: Category Tree View */}
-                  <div style={{
-                    width: '35%',
-                    background: '#18181b',
-                    border: '1.5px solid #27272a',
-                    borderRadius: '16px',
-                    padding: '20px',
-                    maxHeight: '75vh',
-                    overflowY: 'auto'
-                  }}>
+                  <div className="ad-cat-hub-tree">
                     <div style={{ marginBottom: '16px' }}>
                       <input
                         type="text"
@@ -5669,7 +5697,7 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Right Panel: Category Config Details Editor */}
-                  <div style={{ width: '65%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div className="ad-cat-hub-editor">
                     {selectedAdminCategory ? (
                       <form onSubmit={handleSaveCategory} style={{
                         background: '#18181b',
