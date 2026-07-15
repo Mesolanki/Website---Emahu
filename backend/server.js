@@ -62,11 +62,18 @@ app.get('/', (req, res) => {
 // Ensure database connection is active on every request
 app.use(async (req, res, next) => {
   try {
-    await connectDB();
+    const mongoose = require('mongoose');
+    const conn = await connectDB();
+    if (!conn || mongoose.connection.readyState !== 1) {
+      throw new Error('Database is in a disconnected or connecting state');
+    }
     next();
   } catch (err) {
     console.error('Database connection middleware error:', err);
-    return res.status(500).json({ success: false, error: 'Database connection failed. Please retry.' });
+    return res.status(503).json({ 
+      success: false, 
+      error: 'Database connection failed. The database server may be waking up from standby/sleep. Please retry in a few seconds.' 
+    });
   }
 });
 

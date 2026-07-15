@@ -28,6 +28,7 @@ const connectDB = async () => {
     console.error(`MongoDB Connection Error: ${error.message}`);
     // Reset cached connection so next request can try again
     cachedConnection = null;
+    throw error;
   }
 };
 
