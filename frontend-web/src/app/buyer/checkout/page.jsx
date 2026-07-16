@@ -1536,9 +1536,10 @@ export default function CheckoutPage() {
                   disabled={!agreeToTerms}
                   style={!agreeToTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8' } : {}}
                 >
-                  {!agreeToTerms ? 'Accept Terms to Buy' : `Buy Now (₹${grandTotal.toLocaleString('en-IN')})`}
+                  {!agreeToTerms ? 'Accept Terms to Buy' : ('Buy Now (\u20B9' + grandTotal.toLocaleString('en-IN') + ')')}
                 </button>
               </form>
+              )}
             </div>
 
             {/* Right Portion */}
