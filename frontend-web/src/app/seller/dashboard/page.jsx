@@ -5202,13 +5202,24 @@ export default function EmahuProDashboard() {
                               )}
 
                               {order.status === 'DELIVERY_ASSIGNED' && (
-                                <button
-                                  className="order-action-btn label"
-                                  onClick={() => handleGenerateLabel(order.id)}
-                                  disabled={orderLoading[order.id]}
-                                >
-                                  {orderLoading[order.id] ? 'Processing...' : '🏷️ Gen. Label'}
-                                </button>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  <button
+                                    className="order-action-btn label"
+                                    onClick={() => handleGenerateLabel(order.id)}
+                                    disabled={orderLoading[order.id]}
+                                  >
+                                    {orderLoading[order.id] ? 'Processing...' : '🏷️ Gen. Label'}
+                                  </button>
+                                  <button
+                                    className="order-action-btn carrier"
+                                    onClick={() => { setSelectedOrderId(order.id); setIsDeliveryModalOpen(true); }}
+                                    disabled={orderLoading[order.id]}
+                                    style={{ background: '#f59e0b', color: '#fff' }}
+                                    title="Reassign Courier"
+                                  >
+                                    🔄 Reassign
+                                  </button>
+                                </div>
                               )}
 
                               {order.status === 'LABEL_GENERATED' && (
@@ -7671,6 +7682,82 @@ export default function EmahuProDashboard() {
                       {selectedDetailedOrder.status !== 'PENDING_APPROVAL' && selectedDetailedOrder.status !== 'REJECTED' && !selectedDetailedOrder.sellerRejected && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
 
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.01)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>COURIER CORRIDOR TRACKING PROVISIONS</span>
+                            
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Logistics Carrier</label>
+                                <select 
+                                  className="select-filter" 
+                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
+                                  value={carrier}
+                                  onChange={(e) => handleCarrierChange(e.target.value)}
+                                >
+                                  <option value="Delhivery">Delhivery Logistics</option>
+                                  <option value="Blue Dart">Blue Dart Premium</option>
+                                  <option value="EmahuXpress">Emahu Xpress Direct</option>
+                                  <option value="FedEx">FedEx International</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Tracking Identifier</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. EMH-TRK-983"
+                                  className="form-input"
+                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
+                                  value={trackingId}
+                                  onChange={(e) => setTrackingId(e.target.value)}
+                                />
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Package Weight</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 0.8 kg"
+                                  className="form-input"
+                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
+                                  value={packageWeight}
+                                  onChange={(e) => setPackageWeight(e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Ship Cost (₹)</label>
+                                <input
+                                  type="number"
+                                  placeholder="80"
+                                  className="form-input"
+                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
+                                  value={deliveryCost}
+                                  onChange={(e) => setDeliveryCost(e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Transit Time</label>
+                                <input
+                                  type="text"
+                                  placeholder="2-4 Days"
+                                  className="form-input"
+                                  style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
+                                  value={estDays}
+                                  onChange={(e) => setEstDays(e.target.value)}
+                                />
+                              </div>
+                            </div>
+
+                            <button
+                              className="btn-secondary"
+                              style={{ height: '34px', fontSize: '0.78rem', display: 'flex', alignSelf: 'flex-end', padding: '0 16px', marginTop: '10px' }}
+                              onClick={() => handleSaveTrackingDetails(selectedDetailedOrder.orderId)}
+                              disabled={orderLoading[selectedDetailedOrder.orderId]}
+                            >
+                              {orderLoading[selectedDetailedOrder.orderId] ? 'Saving...' : '💾 Save Tracking Details'}
+                            </button>
+                          </div>
 
                           {/* Progress Shipping State buttons */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
