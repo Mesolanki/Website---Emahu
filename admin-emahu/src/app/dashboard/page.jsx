@@ -1399,60 +1399,64 @@ export default function AdminDashboard() {
     let wakeTimer = setTimeout(() => setServerWaking(true), 1500);
 
     const doFetch = async (tab) => {
-      // Always fetch notifications (lightweight, needed everywhere)
-      if (!fetchedTabs.has('notifications')) {
-        fetchNotifications();
+      try {
+        // Always fetch notifications (lightweight, needed everywhere)
+        if (!fetchedTabs.has('notifications')) {
+          fetchNotifications();
+        }
+
+        if (tab === 'sellers' || tab === 'new-sellers') {
+          if (!fetchedTabs.has('sellers')) {
+            await fetchSellers();
+          }
+        } else if (tab === 'products-hub') {
+          if (!fetchedTabs.has('products')) {
+            await fetchProducts();
+          }
+        } else if (tab === 'stats') {
+          const promises = [];
+          if (!fetchedTabs.has('sellers')) promises.push(fetchSellers());
+          if (!fetchedTabs.has('products')) promises.push(fetchProducts());
+          if (!fetchedTabs.has('orders')) promises.push(fetchOrders());
+          if (promises.length) await Promise.all(promises);
+        } else if (tab === 'orders') {
+          if (!fetchedTabs.has('orders')) {
+            await fetchOrders();
+          }
+        } else if (tab === 'delivery-partners') {
+          if (!fetchedTabs.has('delivery')) {
+            await fetchDeliveryPartners();
+          }
+        } else if (tab === 'settings') {
+          if (!fetchedTabs.has('settings')) {
+            fetchDeliverySettings();
+            fetchPlatformSettings();
+          }
+        } else if (tab === 'categories-hub') {
+          if (!fetchedTabs.has('categories')) {
+            await fetchCategories();
+          }
+        }
+
+        // Mark this tab group as fetched
+        setFetchedTabs(prev => {
+          const next = new Set(prev);
+          next.add('notifications');
+          if (tab === 'sellers' || tab === 'new-sellers') next.add('sellers');
+          else if (tab === 'products-hub') next.add('products');
+          else if (tab === 'stats') { next.add('sellers'); next.add('products'); next.add('orders'); }
+          else if (tab === 'orders') next.add('orders');
+          else if (tab === 'delivery-partners') next.add('delivery');
+          else if (tab === 'settings') next.add('settings');
+          else if (tab === 'categories-hub') next.add('categories');
+          return next;
+        });
+      } catch (err) {
+        console.error('Error during admin tab data pre-warming:', err);
+      } finally {
+        clearTimeout(wakeTimer);
+        setServerWaking(false);
       }
-
-      if (tab === 'sellers' || tab === 'new-sellers') {
-        if (!fetchedTabs.has('sellers')) {
-          await fetchSellers();
-        }
-      } else if (tab === 'products-hub') {
-        if (!fetchedTabs.has('products')) {
-          await fetchProducts();
-        }
-      } else if (tab === 'stats') {
-        const promises = [];
-        if (!fetchedTabs.has('sellers')) promises.push(fetchSellers());
-        if (!fetchedTabs.has('products')) promises.push(fetchProducts());
-        if (!fetchedTabs.has('orders')) promises.push(fetchOrders());
-        if (promises.length) await Promise.all(promises);
-      } else if (tab === 'orders') {
-        if (!fetchedTabs.has('orders')) {
-          await fetchOrders();
-        }
-      } else if (tab === 'delivery-partners') {
-        if (!fetchedTabs.has('delivery')) {
-          await fetchDeliveryPartners();
-        }
-      } else if (tab === 'settings') {
-        if (!fetchedTabs.has('settings')) {
-          fetchDeliverySettings();
-          fetchPlatformSettings();
-        }
-      } else if (tab === 'categories-hub') {
-        if (!fetchedTabs.has('categories')) {
-          await fetchCategories();
-        }
-      }
-
-      // Mark this tab group as fetched
-      setFetchedTabs(prev => {
-        const next = new Set(prev);
-        next.add('notifications');
-        if (tab === 'sellers' || tab === 'new-sellers') next.add('sellers');
-        else if (tab === 'products-hub') next.add('products');
-        else if (tab === 'stats') { next.add('sellers'); next.add('products'); next.add('orders'); }
-        else if (tab === 'orders') next.add('orders');
-        else if (tab === 'delivery-partners') next.add('delivery');
-        else if (tab === 'settings') next.add('settings');
-        else if (tab === 'categories-hub') next.add('categories');
-        return next;
-      });
-
-      clearTimeout(wakeTimer);
-      setServerWaking(false);
     };
 
     doFetch(activeTab);

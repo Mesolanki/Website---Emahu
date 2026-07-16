@@ -384,7 +384,7 @@ export default function DeliveryPortal() {
     e.preventDefault();
     setLoginError('');
     if (!loginEmail.trim() || !loginPassword) {
-      setLoginError('Please enter both email and password');
+      setLoginError('Please enter both email/phone and password');
       return;
     }
 
@@ -1585,17 +1585,72 @@ export default function DeliveryPortal() {
                           {regCategory === 'single_two_boy' ? 'Mobile Number' :
                             regCategory === 'agency' ? 'Contact Mobile Number' : 'Corporate Mobile Number'}
                         </label>
-                        <input
-                          type="text"
-                          id="phoneNumber"
-                          className={`form-input ${errors.phoneNumber ? 'form-input--error' : ''}`}
-                          placeholder="e.g. 9898989898"
-                          value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                          readOnly={isEmailVerified}
-                          required
-                        />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            type="text"
+                            id="phoneNumber"
+                            className={`form-input ${errors.phoneNumber ? 'form-input--error' : ''}`}
+                            placeholder="e.g. 9898989898"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                            readOnly={isEmailVerified}
+                            required
+                            style={{ flex: 1 }}
+                          />
+                          {!isEmailVerified && (
+                            <button
+                              type="button"
+                              className="form-btn"
+                              style={{ padding: '0 12px', height: '40px', fontSize: '0.78rem', background: '#319795', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap', width: 'auto', margin: 0 }}
+                              onClick={handleSendEmailOtp}
+                              disabled={otpLoading}
+                            >
+                              {otpLoading ? '...' : isEmailOtpSent ? 'Resend' : 'Send Code'}
+                            </button>
+                          )}
+                        </div>
                         {errors.phoneNumber && <span className="form-error">{errors.phoneNumber}</span>}
+
+                        {/* OTP Input UI */}
+                        {isEmailOtpSent && !isEmailVerified && (
+                          <div style={{ marginTop: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', padding: '10px', borderRadius: '8px' }}>
+                            <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>Verification Code</label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Enter 6-digit OTP"
+                                value={emailOtp}
+                                onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                style={{ flex: 1, height: '36px', fontSize: '0.85rem' }}
+                              />
+                              <button
+                                type="button"
+                                className="form-btn"
+                                style={{ padding: '0 12px', height: '36px', fontSize: '0.78rem', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', width: 'auto', margin: 0 }}
+                                onClick={handleVerifyEmailOtp}
+                                disabled={otpLoading}
+                              >
+                                Verify
+                              </button>
+                            </div>
+                            {errors.otp && <span className="form-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
+
+                            {devOtp && (
+                              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '8px' }}>
+                                <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>📱 Code also shown here:</div>
+                                <div
+                                  style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#fff', background: 'rgba(0,0,0,0.25)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
+                                  onClick={() => setEmailOtp(devOtp)}
+                                  title="Click to auto-fill"
+                                >
+                                  {devOtp}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {isEmailVerified && (
                           <div style={{ color: '#10b981', fontSize: '0.75rem', marginTop: '6px', fontWeight: 'bold' }}>
@@ -1631,6 +1686,18 @@ export default function DeliveryPortal() {
                           onChange={(e) => setPassword(e.target.value)}
                         />
                         {errors.password && <span className="form-error">{errors.password}</span>}
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="email">Email Address (Optional)</label>
+                        <input
+                          type="email"
+                          id="email"
+                          className="form-input"
+                          placeholder="e.g. partner@emahu.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
                       </div>
 
                       <div className="form-group form-group--full">
@@ -1982,12 +2049,12 @@ export default function DeliveryPortal() {
                 )}
 
                 <div className="form-group" style={{ marginBottom: '20px' }}>
-                  <label className="form-label" htmlFor="loginEmail" style={{ color: '#334155', fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Email Address</label>
+                  <label className="form-label" htmlFor="loginEmail" style={{ color: '#334155', fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Email Address or Mobile Number</label>
                   <input
-                    type="email"
+                    type="text"
                     id="loginEmail"
                     className="form-input"
-                    placeholder="partner@emahu.com"
+                    placeholder="e.g. 9898989898 or partner@emahu.com"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     required

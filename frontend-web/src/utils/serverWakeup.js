@@ -13,7 +13,7 @@ const BACKEND_URL = (() => {
     .replace(/\/$/, '');
 })();
 
-const PING_ENDPOINT = `${BACKEND_URL}/api/health`;
+const PING_ENDPOINT = `${BACKEND_URL}/`;
 
 let wakeupPromise = null; // singleton — only one ping at a time
 

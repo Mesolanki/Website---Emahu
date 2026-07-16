@@ -893,6 +893,35 @@ exports.getPartnerOrders = async (req, res) => {
       assignmentMap[a.orderId] = a.currentStatus;
     });
 
+    // Helper to filter/sanitize order details for delivery partners
+    const sanitizeDeliveryOrder = (o, sellerUser, assignmentStatus) => {
+      return {
+        _id: o._id,
+        orderId: o.orderId,
+        status: o.status,
+        deliveryStatus: o.deliveryStatus,
+        assignmentStatus,
+        assignedDate: o.createdAt,
+        createdAt: o.createdAt,
+        distanceKm: o.distanceKm,
+        deliveryCharge: o.deliveryCharge,
+        deliveryCost: o.deliveryCost,
+        deliveryAddress: {
+          fullName: o.deliveryAddress?.fullName,
+          address: o.deliveryAddress?.address,
+          city: o.deliveryAddress?.city,
+          pincode: o.deliveryAddress?.pincode,
+          phone: o.deliveryAddress?.phone
+        },
+        buyerLocation: o.buyerLocation,
+        sellerLocation: o.sellerLocation,
+        sellerPhone: sellerUser ? sellerUser.phone : '',
+        sellerName: sellerUser ? (sellerUser.storeName || sellerUser.name) : '',
+        carrier: o.carrier,
+        trackingId: o.trackingId
+      };
+    };
+
     // Get assigned orders
     const assignedOrderIds = assignments.map(a => a.orderId);
     const assignedOrders = await Order.find({ orderId: { $in: assignedOrderIds } }).lean();
@@ -905,13 +934,7 @@ exports.getPartnerOrders = async (req, res) => {
       if (status !== 'rejected') {
         // Find seller user to get phone number
         const sellerUser = mongoose.Types.ObjectId.isValid(o.sellerId) ? await User.findById(o.sellerId) : null;
-        orders.push({
-          ...o,
-          assignmentStatus: status,
-          assignedDate: o.createdAt,
-          sellerPhone: sellerUser ? sellerUser.phone : '',
-          sellerName: sellerUser ? (sellerUser.storeName || sellerUser.name) : ''
-        });
+        orders.push(sanitizeDeliveryOrder(o, sellerUser, status));
       }
     }
 
@@ -934,13 +957,7 @@ exports.getPartnerOrders = async (req, res) => {
       const oCity = (o.deliveryAddress?.city || '').trim().toLowerCase();
       if (pCities.includes(oCity)) {
         const sellerUser = mongoose.Types.ObjectId.isValid(o.sellerId) ? await User.findById(o.sellerId) : null;
-        availableOrders.push({
-          ...o,
-          assignmentStatus: 'unassigned',
-          assignedDate: o.createdAt,
-          sellerPhone: sellerUser ? sellerUser.phone : '',
-          sellerName: sellerUser ? (sellerUser.storeName || sellerUser.name) : ''
-        });
+        availableOrders.push(sanitizeDeliveryOrder(o, sellerUser, 'unassigned'));
       }
     }
     availableOrders.sort((a, b) => String(b.orderId).localeCompare(String(a.orderId)));
