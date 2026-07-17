@@ -37,8 +37,10 @@ export default function RootLayout({ children }) {
             if (input.includes('127.0.0.1:5000') || input.includes('localhost:5000')) {
               if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
                 input = input
-                  .replace('127.0.0.1:5000', hostname + ':5000')
-                  .replace('localhost:5000', hostname + ':5000');
+                  .replace('http://127.0.0.1:5000', '')
+                  .replace('http://localhost:5000', '')
+                  .replace('https://127.0.0.1:5000', '')
+                  .replace('https://localhost:5000', '');
               }
             }
           }
@@ -52,8 +54,10 @@ export default function RootLayout({ children }) {
             if (url.includes('127.0.0.1:5000') || url.includes('localhost:5000')) {
               if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
                 url = url
-                  .replace('127.0.0.1:5000', hostname + ':5000')
-                  .replace('localhost:5000', hostname + ':5000');
+                  .replace('http://127.0.0.1:5000', '')
+                  .replace('http://localhost:5000', '')
+                  .replace('https://127.0.0.1:5000', '')
+                  .replace('https://localhost:5000', '');
               }
             }
           }

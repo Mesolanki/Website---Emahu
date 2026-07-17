@@ -9,6 +9,28 @@ import './delivery.css';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '@/utils/firebase';
 
+let localApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://website-emahu.onrender.com';
+
+if (typeof window !== 'undefined') {
+  let url = localApiUrl || 'https://website-emahu.onrender.com';
+  url = url.trim();
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    localApiUrl = 'http://127.0.0.1:5000';
+  } else {
+    localApiUrl = url.replace('localhost', hostname).replace('127.0.0.1', hostname);
+  }
+}
+
+const getDynamicApiUrl = () => {
+  let base = localApiUrl || '';
+  base = base.trim();
+  if (!base || base.includes('localhost') || base.includes('127.0.0.1')) {
+    return '';
+  }
+  return base;
+};
+
 function getHaversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the Earth in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -304,7 +326,7 @@ export default function DeliveryPortal() {
     if (!userToken) return;
     setDashLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/my-orders`, {
+      const res = await fetch(`${getDynamicApiUrl()}/api/delivery/my-orders`, {
         headers: {
           'Authorization': `Bearer ${userToken}`
         }
@@ -342,16 +364,8 @@ export default function DeliveryPortal() {
     if (!token) return;
     fetchDashboardData(token);
 
-    // Connect to websocket
     const getSocketUrl = () => {
-      let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      if (typeof window !== 'undefined') {
-        const hostname = window.location.hostname;
-        if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-          url = url.replace('127.0.0.1:5000', hostname + ':5000').replace('localhost:5000', hostname + ':5000');
-        }
-      }
-      return url;
+      return localApiUrl;
     };
     const socket = io(getSocketUrl());
     socket.on('connect', () => {
@@ -436,7 +450,7 @@ export default function DeliveryPortal() {
   const handleDevApprove = async () => {
     if (!user || !user._id) return;
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiBase = getDynamicApiUrl();
       const res = await fetch(`${apiBase}/api/auth/delivery-partners/dev-approve/${user._id}`, {
         method: 'PUT',
         headers: {
@@ -477,7 +491,7 @@ export default function DeliveryPortal() {
         cleanPhone = cleanPhone.slice(2);
       }
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiBase = getDynamicApiUrl();
       const res = await fetch(`${apiBase}/api/auth/send-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -586,7 +600,7 @@ export default function DeliveryPortal() {
         cleanPhone = cleanPhone.slice(2);
       }
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiBase = getDynamicApiUrl();
       const res = await fetch(`${apiBase}/api/auth/verify-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -798,7 +812,7 @@ export default function DeliveryPortal() {
   const handleUpdateJobStatus = async (orderId, newStatus) => {
     if (!token) return;
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/status`, {
+      const res = await fetch(`${getDynamicApiUrl()}/api/delivery/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -827,7 +841,7 @@ export default function DeliveryPortal() {
     e.preventDefault();
     setProfileSuccessMsg('');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/profile`, {
+      const res = await fetch(`${getDynamicApiUrl()}/api/delivery/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -870,7 +884,7 @@ export default function DeliveryPortal() {
     if (!token || !user) return;
     const newActiveState = !user.isActivePartner;
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/profile`, {
+      const res = await fetch(`${getDynamicApiUrl()}/api/delivery/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1055,7 +1069,7 @@ export default function DeliveryPortal() {
   const sendLiveLocationUpdate = async (lat, lon, orderId) => {
     if (!token) return;
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/location`, {
+      await fetch(`${getDynamicApiUrl()}/api/delivery/location`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1111,7 +1125,7 @@ export default function DeliveryPortal() {
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/otp/send`, {
+      const res = await fetch(`${getDynamicApiUrl()}/api/delivery/otp/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1164,7 +1178,7 @@ export default function DeliveryPortal() {
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/otp/verify`, {
+      const res = await fetch(`${getDynamicApiUrl()}/api/delivery/otp/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1224,7 +1238,7 @@ export default function DeliveryPortal() {
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/photo/upload`, {
+      const res = await fetch(`${getDynamicApiUrl()}/api/delivery/photo/upload`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
