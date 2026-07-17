@@ -343,7 +343,17 @@ export default function DeliveryPortal() {
     fetchDashboardData(token);
 
     // Connect to websocket
-    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+    const getSocketUrl = () => {
+      let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+          url = url.replace('127.0.0.1:5000', hostname + ':5000').replace('localhost:5000', hostname + ':5000');
+        }
+      }
+      return url;
+    };
+    const socket = io(getSocketUrl());
     socket.on('connect', () => {
       console.log('Connected to logistics socket grid');
     });

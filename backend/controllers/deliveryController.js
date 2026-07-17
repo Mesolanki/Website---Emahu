@@ -95,8 +95,13 @@ async function getGoogleMapsDistance(originLat, originLon, destLat, destLon) {
     return null;
   }
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1000); // 1 second timeout limit
+
     const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${originLat},${originLon}&destinations=${destLat},${destLon}&key=${apiKey}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     const data = await res.json();
     if (data.rows && data.rows[0] && data.rows[0].elements && data.rows[0].elements[0]) {
       const el = data.rows[0].elements[0];

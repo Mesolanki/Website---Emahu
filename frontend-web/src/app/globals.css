@@ -45,3 +45,76 @@ body::before {
 .animate-slide {
   animation: slideUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ==========================================================================
+   ULTRA-RESPONSIVE VIEWPORT FIXES FOR SCREENS LESS THAN 320PX
+   ========================================================================== */
+@media (max-width: 320px) {
+  html, body {
+    min-width: 240px;
+    font-size: 13px !important;
+  }
+
+  /* Wrap all overflowing text and content */
+  * {
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    max-width: 100% !important;
+  }
+
+  /* Force stack elements that normally stand side-by-side */
+  .flex-row, .flex, [style*="display: flex"], [style*="display:flex"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  
+  /* Flex items with specific direction override */
+  .row, .theme-search-bar, .bp-metabar, .bp-card, .bp-breadcrumb {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  /* Shrink containers & cards padding */
+  .container, .page, .section, .card, .bp-page, .bp-hero, .bp-metabar, .bp-breadcrumb, .theme-search-container, .bp-card, .req-card, .modal-content {
+    padding: 8px !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    border-radius: 8px !important;
+  }
+
+  /* Forms adjustments for compact layouts */
+  input, select, textarea, button, .form-input, .form-control, .theme-search-input, .theme-search-submit-btn, .req-submit-btn, .company-portal-btn {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    height: auto !important;
+    min-height: 36px !important;
+  }
+
+  /* Grid layout overrides: single column only */
+  .grid, .bp-grid, .products-grid, [style*="display: grid"], [style*="display:grid"] {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  /* Header adjustments */
+  .buyer-header, .header, .navbar {
+    padding: 6px 8px !important;
+  }
+  
+  .buyer-header__logo {
+    font-size: 1.2rem !important;
+  }
+
+  .buyer-header__actions {
+    gap: 8px !important;
+  }
+
+  /* Modal content responsiveness */
+  .modal, .modal-overlay, .modal-content {
+    width: 96% !important;
+    margin: 2% auto !important;
+    padding: 10px !important;
+    max-height: 96vh !important;
+  }
+}
