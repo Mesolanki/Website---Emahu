@@ -1661,6 +1661,14 @@ exports.sendPhoneOtp = async (req, res) => {
       return res.status(400).json({ success: false, error: 'A user with this phone number already exists' });
     }
 
+    // Generate local fallback/simulated OTP code
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes validity
+
+    const Otp = require('../models/Otp');
+    await Otp.deleteMany({ phone: cleanPhone });
+    await Otp.create({ phone: cleanPhone, otp: otpCode, expiresAt });
+
     const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID ? process.env.TWILIO_VERIFY_SERVICE_SID.trim() : '';
     const accountSid = process.env.TWILIO_ACCOUNT_SID ? process.env.TWILIO_ACCOUNT_SID.trim() : '';
     const authToken = process.env.TWILIO_AUTH_TOKEN ? process.env.TWILIO_AUTH_TOKEN.trim() : '';
@@ -1677,37 +1685,22 @@ exports.sendPhoneOtp = async (req, res) => {
 
         return res.status(200).json({
           success: true,
-          message: `OTP verification code sent to ${cleanPhone} via Twilio Verify.`
+          message: `OTP verification code sent to ${cleanPhone} via Twilio Verify.`,
+          devOtp: otpCode
         });
       } catch (twilioErr) {
         console.error('Twilio Verify Send Error:', twilioErr);
-        // Fallback for development if Twilio fails (like Authenticate or trial account issues)
-        if (process.env.NODE_ENV === 'development') {
-          const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-          const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-          const Otp = require('../models/Otp');
-          await Otp.deleteMany({ phone: cleanPhone });
-          await Otp.create({ phone: cleanPhone, otp: otpCode, expiresAt });
-
-          console.log(`⚠️ Twilio Verify failed. Falling back to simulated verification code for development.`);
-          return res.status(200).json({
-            success: true,
-            message: `OTP verification simulated. (Twilio error: ${twilioErr.message})`,
-            devOtp: otpCode
-          });
-        }
-        return res.status(500).json({ success: false, error: `Twilio Verify error: ${twilioErr.message}` });
+        // Fallback to simulated/local code if Twilio fails
+        console.log(`⚠️ Twilio Verify failed. Falling back to simulated verification code.`);
+        return res.status(200).json({
+          success: true,
+          message: `OTP verification simulated. (Twilio error: ${twilioErr.message})`,
+          devOtp: otpCode
+        });
       }
     }
 
-    // Default SMS sending logic (falls back to simulated if TWILIO_PHONE_NUMBER isn't set)
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes validity
-
-    const Otp = require('../models/Otp');
-    await Otp.deleteMany({ phone: cleanPhone });
-    await Otp.create({ phone: cleanPhone, otp: otpCode, expiresAt });
-
+    // Default SMS sending logic
     const sendSms = require('../utils/sendSms');
     const smsResult = await sendSms({
       to: cleanPhone,
@@ -1715,21 +1708,18 @@ exports.sendPhoneOtp = async (req, res) => {
     });
 
     if (!smsResult.success && !smsResult.simulated) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`⚠️ Twilio API failed with error: "${smsResult.error}". Falling back to simulated verification code for development.`);
-        return res.status(200).json({
-          success: true,
-          message: `OTP verification simulated. (Twilio error: ${smsResult.error})`,
-          devOtp: otpCode
-        });
-      }
-      return res.status(500).json({ success: false, error: `Failed to send phone OTP: ${smsResult.error}` });
+      console.log(`⚠️ Twilio API failed with error: "${smsResult.error}". Falling back to simulated verification code.`);
+      return res.status(200).json({
+        success: true,
+        message: `OTP verification simulated. (Twilio error: ${smsResult.error})`,
+        devOtp: otpCode
+      });
     }
 
     res.status(200).json({
       success: true,
       message: `OTP verification SMS sent successfully to ${cleanPhone}.`,
-      ...(process.env.NODE_ENV === 'development' || smsResult.simulated ? { devOtp: otpCode } : {})
+      devOtp: otpCode
     });
   } catch (error) {
     console.error('Send Phone OTP Error:', error);
