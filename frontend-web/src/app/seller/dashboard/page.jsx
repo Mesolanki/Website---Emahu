@@ -2851,19 +2851,56 @@ export default function EmahuProDashboard() {
   };
 
   const renderMultiImageSelector = () => {
+    const uploadImageFile = async (file) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const token = localStorage.getItem('emahu_seller_token');
+      const baseUrl = localApiUrl || 'http://localhost:5000';
+      const res = await fetch(`${baseUrl}/api/products/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      if (!res.ok) {
+        throw new Error('Image upload failed');
+      }
+      
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Image upload failed');
+      }
+      return data.url;
+    };
+
     const handleFileSelect = (e) => {
       const files = Array.from(e.target.files);
       processFiles(files);
     };
 
     const processFiles = (files) => {
-      files.forEach(file => {
+      files.forEach(async (file) => {
         if (!file.type.startsWith('image/')) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setNewProductImages(prev => [...prev, e.target.result]);
-        };
-        reader.readAsDataURL(file);
+        
+        const tempId = Math.random().toString();
+        setNewProductImages(prev => [...prev, `uploading-${tempId}`]);
+
+        try {
+          const url = await uploadImageFile(file);
+          setNewProductImages(prev => prev.map(img => {
+            if (img === `uploading-${tempId}`) {
+              return url;
+            }
+            return img;
+          }));
+        } catch (err) {
+          console.error(err);
+          setNewProductImages(prev => prev.filter(img => img !== `uploading-${tempId}`));
+          triggerToast('Upload Error', 'Failed to upload image.', 'danger');
+        }
       });
     };
 
@@ -2989,51 +3026,60 @@ export default function EmahuProDashboard() {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <img
-                  src={img}
-                  alt={`Product img ${idx + 1}`}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={(e) => { e.target.src = 'https://placehold.co/60x60?text=Error'; }}
-                />
-                <button
-                  type="button"
-                  onClick={() => removeImage(idx)}
-                  style={{
-                    position: 'absolute',
-                    top: '2px',
-                    right: '2px',
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-                    color: '#fff',
-                    border: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '10px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    padding: 0
-                  }}
-                >
-                  ✕
-                </button>
-                {idx === 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    backgroundColor: 'var(--color-primary)',
-                    color: '#0f172a',
-                    fontSize: '8px',
-                    fontWeight: 'bold',
-                    textAlign: 'center',
-                    padding: '1px 0'
-                  }}>
-                    MAIN
+                {img.startsWith('uploading-') ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', backgroundColor: 'var(--bg-surface)' }}>
+                    <span style={{ fontSize: '1rem', animation: 'dotBlink 1.4s infinite both' }}>⏳</span>
+                    <span style={{ fontSize: '0.55rem', color: 'var(--text-secondary)' }}>Uploading</span>
                   </div>
+                ) : (
+                  <>
+                    <img
+                      src={img}
+                      alt={`Product img ${idx + 1}`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => { e.target.src = 'https://placehold.co/60x60?text=Error'; }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(idx)}
+                      style={{
+                        position: 'absolute',
+                        top: '2px',
+                        right: '2px',
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                        color: '#fff',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '10px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        padding: 0
+                      }}
+                    >
+                      ✕
+                    </button>
+                    {idx === 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        backgroundColor: 'var(--color-primary)',
+                        color: '#0f172a',
+                        fontSize: '8px',
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                        padding: '1px 0'
+                      }}>
+                        MAIN
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ))}
@@ -4826,7 +4872,7 @@ export default function EmahuProDashboard() {
                         <button
                           type="submit"
                           className="req-submit-btn"
-                          disabled={isSubmittingProduct}
+                          disabled={isSubmittingProduct || newProductImages.some(img => img.startsWith('uploading-'))}
                         >
                           {isSubmittingProduct ? (
                             <>

@@ -100,17 +100,18 @@ exports.createProduct = async (req, res) => {
       specifications: req.body.specifications || {}
     });
 
-    // Notify all admins
+    // Notify all admins in bulk
     const User = require('../models/User');
     const Notification = require('../models/Notification');
-    const admins = await User.find({ role: 'admin' });
-    for (const admin of admins) {
-      await Notification.create({
+    const admins = await User.find({ role: 'admin' }).select('_id');
+    if (admins.length > 0) {
+      const notifications = admins.map(admin => ({
         recipient: admin._id,
         title: 'New Product Pending Review',
         message: `Product "${product.name}" has been listed by "${req.user.name}" and is pending review.`,
         type: 'info'
-      });
+      }));
+      await Notification.insertMany(notifications);
     }
 
     res.status(201).json({

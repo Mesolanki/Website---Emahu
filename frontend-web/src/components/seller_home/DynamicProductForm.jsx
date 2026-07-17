@@ -506,6 +506,31 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     return { score, color: score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444' };
   }, [name, description, images, seoTitle, metaDescription]);
 
+  const uploadImageFile = async (file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    const token = localStorage.getItem('emahu_seller_token');
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const res = await fetch(`${baseUrl}/api/products/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+    
+    if (!res.ok) {
+      throw new Error('Image upload failed');
+    }
+    
+    const data = await res.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Image upload failed');
+    }
+    return data.url;
+  };
+
   // Process selected file uploads
   const processFiles = (files) => {
     files.forEach((file) => {
@@ -514,18 +539,41 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
         const dataUrl = event.target.result;
         const img = new Image();
         img.src = dataUrl;
-        img.onload = () => {
+        img.onload = async () => {
           const isHighRes = img.width >= 800 && img.height >= 800;
           const isSquare = Math.abs(img.width - img.height) < 50;
           let qualityStatus = 'High Quality (Square)';
           if (!isHighRes) qualityStatus = 'Warning: Low Resolution';
           else if (!isSquare) qualityStatus = 'Warning: Not Square Aspect';
 
+          const tempId = Math.random().toString();
           setImages(prev => [...prev, {
-            url: dataUrl,
-            quality: qualityStatus,
-            isWarning: !isHighRes || !isSquare
+            url: '',
+            tempId,
+            quality: 'Uploading...',
+            isWarning: !isHighRes || !isSquare,
+            loading: true
           }]);
+
+          try {
+            const url = await uploadImageFile(file);
+            setImages(prev => prev.map(item => {
+              if (item.tempId === tempId) {
+                return {
+                  ...item,
+                  url,
+                  quality: qualityStatus,
+                  loading: false
+                };
+              }
+              return item;
+            }));
+            setThumbnail(prev => prev ? prev : url);
+          } catch (err) {
+            console.error('File upload error:', err);
+            setImages(prev => prev.filter(item => item.tempId !== tempId));
+            setFormError('Failed to upload image. Please try again.');
+          }
         };
       };
       reader.readAsDataURL(file);
@@ -893,17 +941,26 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                     <span style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 'bold' }}>Uploaded Images:</span>
                     <div className="gallery-grid">
                       {images.map((img, idx) => (
-                        <div key={idx} className="gallery-thumb-container" style={{ border: thumbnail === img.url ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.1)' }}>
-                          <img src={img.url} alt="gallery" className="gallery-thumb" />
-                          <button type="button" className="remove-thumb-btn" onClick={() => setImages(images.filter((_, i) => i !== idx))}>×</button>
-                          <span className={`quality-badge ${img.isWarning ? 'warning' : ''}`}>{img.quality}</span>
-                          <button 
-                            type="button" 
-                            onClick={() => setThumbnail(img.url)}
-                            style={{ position: 'absolute', bottom: '4px', right: '4px', fontSize: '0.65rem', background: '#000', border: 'none', color: '#fff', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px' }}
-                          >
-                            {thumbnail === img.url ? 'Featured' : 'Feature'}
-                          </button>
+                        <div key={idx} className="gallery-thumb-container" style={{ border: thumbnail === img.url ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {img.loading ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '8px', textAlign: 'center' }}>
+                              <div style={{ fontSize: '1.2rem', animation: 'dotBlink 1.4s infinite both' }}>⏳</div>
+                              <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Uploading...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <img src={img.url} alt="gallery" className="gallery-thumb" />
+                              <button type="button" className="remove-thumb-btn" onClick={() => setImages(images.filter((_, i) => i !== idx))}>×</button>
+                              <span className={`quality-badge ${img.isWarning ? 'warning' : ''}`}>{img.quality}</span>
+                              <button 
+                                type="button" 
+                                onClick={() => setThumbnail(img.url)}
+                                style={{ position: 'absolute', bottom: '4px', right: '4px', fontSize: '0.65rem', background: '#000', border: 'none', color: '#fff', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px' }}
+                              >
+                                {thumbnail === img.url ? 'Featured' : 'Feature'}
+                              </button>
+                            </>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1538,6 +1595,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
               <button 
                 type="button" 
                 className="footer-btn next"
+                disabled={currentStep === 2 && images.some(img => img.loading)}
                 onClick={() => {
                   if (currentStep === 1) {
                     if (!name.trim()) { setFormError('Product Name is required.'); return; }
@@ -1604,7 +1662,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                 type="button" 
                 className="footer-btn submit"
                 onClick={handleFormSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || images.some(img => img.loading)}
               >
                 {isSubmitting ? 'Submitting Request...' : 'Publish Listing Request'}
               </button>

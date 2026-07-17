@@ -187,15 +187,61 @@
 }
 
 @media (max-width: 768px) {
+  .dynamic-form-card {
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    max-height: 100vh !important;
+  }
+  
+  .dynamic-form-header {
+    padding: 12px 16px !important;
+  }
+  
+  .dynamic-form-header h2 {
+    font-size: 1.1rem !important;
+  }
+
+  .dynamic-form-header p {
+    font-size: 0.72rem !important;
+  }
+  
+  .stepper-container {
+    padding: 8px 12px !important;
+    gap: 8px !important;
+    overflow-x: auto;
+  }
+  
+  .step-text {
+    display: none !important;
+  }
+  
+  .step-item.active .step-text {
+    display: block !important;
+    font-size: 0.72rem !important;
+  }
+  
   .form-grid-2 {
     grid-template-columns: 1fr;
   }
+  
   .form-workspace {
     flex-direction: column;
+    overflow-y: auto;
   }
+  
+  .form-fields-column {
+    padding: 16px !important;
+    overflow-y: visible !important;
+    flex: none !important;
+  }
+  
   .preview-column {
-    border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: none !important;
+  }
+  
+  .dynamic-form-footer {
+    padding: 12px 16px !important;
   }
 }
 

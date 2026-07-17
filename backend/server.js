@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
@@ -27,6 +28,9 @@ connectDB();
 app.use(express.json({ limit: '10mb' })); // Parse JSON requests up to 10mb
 app.use(express.urlencoded({ limit: '10mb', extended: true })); // Parse url-encoded requests up to 10mb
 app.use(cookieParser()); // Parse cookies from headers
+
+// Serve uploaded product files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // CORS configuration (allow requests from frontend ports like 3000, 5173, etc. or allow all for development)
 app.use(
