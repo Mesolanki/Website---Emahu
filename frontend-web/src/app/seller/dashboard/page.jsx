@@ -2453,7 +2453,7 @@ export default function EmahuProDashboard() {
   const [newProductImages, setNewProductImages] = useState([]);
   const [newProductSizes, setNewProductSizes] = useState([]);
   const [newProductColors, setNewProductColors] = useState([]);
-  const [newProductVariants, setNewProductVariants] = useState([{ name: '', sku: '', description: '', price: '', stock: '', linkedProductId: '', image: '', searchQuery: '', images: [] }]);
+  const [newProductVariants, setNewProductVariants] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [manualUrlInput, setManualUrlInput] = useState('');
   const [sellerReviews, setSellerReviews] = useState([]);
@@ -2655,7 +2655,7 @@ export default function EmahuProDashboard() {
     setNewProductImages([]);
     setNewProductSizes([]);
     setNewProductColors([]);
-    setNewProductVariants([{ name: '', sku: '', description: '', price: '', stock: '', linkedProductId: '', image: '', searchQuery: '', images: [] }]);
+    setNewProductVariants([]);
     setManualUrlInput('');
     setFormError('');
     setResubmitProductId(null);
@@ -2735,7 +2735,7 @@ export default function EmahuProDashboard() {
         searchQuery: ''
       })));
     } else {
-      setNewProductVariants([{ name: '', sku: '', description: '', price: '', stock: '', linkedProductId: '', image: '', searchQuery: '', images: [] }]);
+      setNewProductVariants([]);
     }
     setIsAddModalOpen(true);
   };
@@ -4600,263 +4600,281 @@ export default function EmahuProDashboard() {
                             placeholder="20"
                             value={newProductStock}
                             onChange={(e) => setNewProductStock(e.target.value)}
-                            required
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          {renderMultiImageSelector()}
-                        </div>
-
-
-                        {/* Variations & Options */}
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginTop: '4px', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e293b', display: 'block', marginBottom: '12px', letterSpacing: '-0.01em' }}>🎨 Variations &amp; Options</span>
-
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {newProductVariants.map((variant, index) => (
-                              <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', position: 'relative' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.72rem', fontWeight: '600', color: '#64748b' }}>Variant #{index + 1} Details</span>
-                                  {newProductVariants.length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setNewProductVariants(newProductVariants.filter((_, i) => i !== index))}
-                                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.72rem', fontWeight: '600', padding: 0 }}
-                                    >
-                                      Remove
-                                    </button>
-                                  )}
-                                </div>
-
-                                <div className="form-group" style={{ margin: 0, position: 'relative' }}>
-                                   {!variant.linkedProductId ? (
-                                     <>
-                                       <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>🔗 Link to Existing Product (Search...)</label>
-                                       <input
-                                         type="text"
-                                         className="form-input"
-                                         style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px', marginBottom: '4px' }}
-                                         placeholder="Search by product name to link..."
-                                         value={variant.searchQuery || ''}
-                                         onChange={(e) => {
-                                           const updated = [...newProductVariants];
-                                           updated[index].searchQuery = e.target.value;
-                                           setNewProductVariants(updated);
-                                         }}
-                                       />
-                                       {variant.searchQuery && (
-                                         <div style={{
-                                           position: 'absolute',
-                                           top: '100%',
-                                           left: 0,
-                                           right: 0,
-                                           background: '#ffffff',
-                                           border: '1px solid #cbd5e1',
-                                           borderRadius: '8px',
-                                           boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                                           zIndex: 100,
-                                           maxHeight: '160px',
-                                           overflowY: 'auto'
-                                         }}>
-                                           {products
-                                             .filter(p =>
-                                               p.name.toLowerCase().includes(variant.searchQuery.toLowerCase()) &&
-                                               String(p.id || p._id) !== String(resubmitProductId)
-                                             )
-                                             .map(p => (
-                                               <div
-                                                 key={p.id || p._id}
-                                                 onClick={() => {
-                                                   const updated = [...newProductVariants];
-                                                   updated[index].linkedProductId = p.id || p._id;
-                                                   updated[index].name = p.name;
-                                                   updated[index].sku = p.sku || '';
-                                                   updated[index].description = p.description || '';
-                                                   updated[index].price = p.price.toString();
-                                                   updated[index].stock = p.stock.toString();
-                                                   updated[index].image = p.image || '';
-                                                   updated[index].images = p.images || (p.image ? [p.image] : []);
-                                                   updated[index].searchQuery = '';
-                                                   setNewProductVariants(updated);
-                                                 }}
-                                                 style={{
-                                                   display: 'flex',
-                                                   alignItems: 'center',
-                                                   gap: '8px',
-                                                   padding: '8px',
-                                                   cursor: 'pointer',
-                                                   borderBottom: '1px solid #f1f5f9',
-                                                   fontSize: '0.78rem'
-                                                 }}
-                                                 onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                                                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                               >
-                                                 <div style={{ width: '24px', height: '24px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
-                                                   {p.image && (p.image.startsWith('http') || p.image.startsWith('data:')) ? (
-                                                     <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                   ) : (
-                                                     <span>{p.image || '📦'}</span>
-                                                   )}
-                                                 </div>
-                                                 <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                   <strong>{p.name}</strong> <span style={{ color: '#64748b' }}>(₹{p.price})</span>
-                                                 </div>
-                                               </div>
-                                             ))}
-                                         </div>
-                                       )}
-                                     </>
-                                   ) : (
-                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '6px', marginBottom: '8px' }}>
-                                       <div style={{ width: '28px', height: '28px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
-                                         {variant.image && (variant.image.startsWith('http') || variant.image.startsWith('data:')) ? (
-                                           <img src={variant.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                         ) : (
-                                           <span>{variant.image || '📦'}</span>
-                                         )}
-                                       </div>
-                                       <div style={{ flex: 1, fontSize: '0.72rem', color: '#4f46e5', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                         🔗 Linked: {variant.name}
-                                       </div>
-                                       <button
-                                         type="button"
-                                         onClick={() => {
-                                           const updated = [...newProductVariants];
-                                           updated[index].linkedProductId = '';
-                                           updated[index].image = '';
-                                           updated[index].images = [];
-                                           updated[index].searchQuery = '';
-                                           setNewProductVariants(updated);
-                                         }}
-                                         style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.72rem', padding: 0 }}
-                                       >
-                                         Unlink
-                                       </button>
-                                     </div>
-                                   )}
-                                 </div>
-
-                                <div className="form-grid-2-col" style={{ display: 'grid', gap: '10px' }}>
-                                  <div className="form-group" style={{ margin: 0 }}>
-                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Variant Name / Description *</label>
-                                    <input
-                                      type="text"
-                                      className="form-input"
-                                      style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
-                                      placeholder="e.g. Small / Red or 128GB Storage"
-                                      value={variant.name}
-                                      onChange={(e) => {
-                                        const updated = [...newProductVariants];
-                                        updated[index].name = e.target.value;
-                                        setNewProductVariants(updated);
-                                      }}
-                                      required
-                                    />
-                                  </div>
-                                  <div className="form-group" style={{ margin: 0 }}>
-                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>SKU *</label>
-                                    <input
-                                      type="text"
-                                      className="form-input"
-                                      style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
-                                      placeholder="e.g. EARBUD-SMALL-RED"
-                                      value={variant.sku || ''}
-                                      onChange={(e) => {
-                                        const updated = [...newProductVariants];
-                                        updated[index].sku = e.target.value;
-                                        setNewProductVariants(updated);
-                                      }}
-                                      required
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="form-group" style={{ margin: 0 }}>
-                                  <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Description *</label>
-                                  <textarea
-                                    className="form-input"
-                                    style={{ height: '50px', fontSize: '0.8rem', padding: '6px', resize: 'none' }}
-                                    placeholder="Variant specific description..."
-                                    value={variant.description || ''}
-                                    onChange={(e) => {
-                                      const updated = [...newProductVariants];
-                                      updated[index].description = e.target.value;
-                                      setNewProductVariants(updated);
-                                    }}
-                                    required
-                                  />
-                                </div>
-
-                                <div className="form-grid-2-col" style={{ display: 'grid', gap: '10px' }}>
-                                  <div className="form-group" style={{ margin: 0 }}>
-                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Price (INR) *</label>
-                                    <input
-                                      type="number"
-                                      className="form-input"
-                                      style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
-                                      placeholder="e.g. 999"
-                                      value={variant.price}
-                                      onChange={(e) => {
-                                        const updated = [...newProductVariants];
-                                        updated[index].price = e.target.value;
-                                        setNewProductVariants(updated);
-                                      }}
-                                      required
-                                    />
-                                  </div>
-                                  <div className="form-group" style={{ margin: 0 }}>
-                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Stock *</label>
-                                    <input
-                                      type="number"
-                                      className="form-input"
-                                      style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
-                                      placeholder="e.g. 50"
-                                      value={variant.stock}
-                                      onChange={(e) => {
-                                        const updated = [...newProductVariants];
-                                        updated[index].stock = e.target.value;
-                                        setNewProductVariants(updated);
-                                      }}
-                                      required
-                                    />
-                                  </div>
-                                </div>
-
-                                {renderVariantImageSelector(index)}
-                              </div>
-                            ))}
-
+                             {/* Variations & Options */}
+                        {newProductVariants.length === 0 ? (
+                          <div style={{ marginTop: '4px', marginBottom: '8px' }}>
                             <button
                               type="button"
-                              onClick={() => setNewProductVariants([...newProductVariants, { name: '', sku: '', description: '', price: '', stock: '', linkedProductId: '', image: '', searchQuery: '', images: [] }])}
+                              onClick={() => setNewProductVariants([{ name: '', sku: '', description: '', price: '', stock: '', linkedProductId: '', image: '', searchQuery: '', images: [] }])}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '6px',
                                 width: '100%',
-                                height: '36px',
+                                height: '40px',
                                 borderRadius: '8px',
-                                border: '1px dashed #6366f1',
-                                background: 'rgba(99, 102, 241, 0.04)',
-                                color: '#6366f1',
+                                border: '1.5px dashed #3b82f6',
+                                background: 'rgba(59, 130, 246, 0.05)',
+                                color: '#3b82f6',
                                 fontSize: '0.8rem',
                                 fontWeight: '600',
                                 cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.04)';
+                                transition: 'all 0.2s ease'
                               }}
                             >
-                              ➕ Add Variant
+                              🎨 Configure Product Variations &amp; Options (Add Variant)
                             </button>
                           </div>
-                        </div>
+                        ) : (
+                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginTop: '4px', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e293b', display: 'block', marginBottom: '12px', letterSpacing: '-0.01em' }}>🎨 Variations &amp; Options</span>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {newProductVariants.map((variant, index) => (
+                                <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', position: 'relative' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: '600', color: '#64748b' }}>Variant #{index + 1} Details</span>
+                                    {newProductVariants.length >= 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setNewProductVariants(newProductVariants.filter((_, i) => i !== index))}
+                                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.72rem', fontWeight: '600', padding: 0 }}
+                                      >
+                                        Remove
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <div className="form-group" style={{ margin: 0, position: 'relative' }}>
+                                     {!variant.linkedProductId ? (
+                                       <>
+                                         <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>🔗 Link to Existing Product (Search...)</label>
+                                         <input
+                                           type="text"
+                                           className="form-input"
+                                           style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px', marginBottom: '4px' }}
+                                           placeholder="Search by product name to link..."
+                                           value={variant.searchQuery || ''}
+                                           onChange={(e) => {
+                                             const updated = [...newProductVariants];
+                                             updated[index].searchQuery = e.target.value;
+                                             setNewProductVariants(updated);
+                                           }}
+                                         />
+                                         {variant.searchQuery && (
+                                           <div style={{
+                                             position: 'absolute',
+                                             top: '100%',
+                                             left: 0,
+                                             right: 0,
+                                             background: '#ffffff',
+                                             border: '1px solid #cbd5e1',
+                                             borderRadius: '8px',
+                                             boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                             zIndex: 100,
+                                             maxHeight: '160px',
+                                             overflowY: 'auto'
+                                           }}>
+                                             {products
+                                               .filter(p =>
+                                                 p.name.toLowerCase().includes(variant.searchQuery.toLowerCase()) &&
+                                                 String(p.id || p._id) !== String(resubmitProductId)
+                                               )
+                                               .map(p => (
+                                                 <div
+                                                   key={p.id || p._id}
+                                                   onClick={() => {
+                                                     const updated = [...newProductVariants];
+                                                     updated[index].linkedProductId = p.id || p._id;
+                                                     updated[index].name = p.name;
+                                                     updated[index].sku = p.sku || '';
+                                                     updated[index].description = p.description || '';
+                                                     updated[index].price = p.price.toString();
+                                                     updated[index].stock = p.stock.toString();
+                                                     updated[index].image = p.image || '';
+                                                     updated[index].images = p.images || (p.image ? [p.image] : []);
+                                                     updated[index].searchQuery = '';
+                                                     setNewProductVariants(updated);
+                                                   }}
+                                                   style={{
+                                                     display: 'flex',
+                                                     alignItems: 'center',
+                                                     gap: '8px',
+                                                     padding: '8px',
+                                                     cursor: 'pointer',
+                                                     borderBottom: '1px solid #f1f5f9',
+                                                     fontSize: '0.78rem'
+                                                   }}
+                                                   onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                                                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                                 >
+                                                   <div style={{ width: '24px', height: '24px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
+                                                     {p.image && (p.image.startsWith('http') || p.image.startsWith('data:')) ? (
+                                                       <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                     ) : (
+                                                       <span>{p.image || '📦'}</span>
+                                                     )}
+                                                   </div>
+                                                   <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                     <strong>{p.name}</strong> <span style={{ color: '#64748b' }}>(₹{p.price})</span>
+                                                   </div>
+                                                 </div>
+                                               ))}
+                                           </div>
+                                         )}
+                                       </>
+                                     ) : (
+                                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '6px', marginBottom: '8px' }}>
+                                         <div style={{ width: '28px', height: '28px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
+                                           {variant.image && (variant.image.startsWith('http') || variant.image.startsWith('data:')) ? (
+                                             <img src={variant.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                           ) : (
+                                             <span>{variant.image || '📦'}</span>
+                                           )}
+                                         </div>
+                                         <div style={{ flex: 1, fontSize: '0.72rem', color: '#4f46e5', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                           🔗 Linked: {variant.name}
+                                         </div>
+                                         <button
+                                           type="button"
+                                           onClick={() => {
+                                             const updated = [...newProductVariants];
+                                             updated[index].linkedProductId = '';
+                                             updated[index].image = '';
+                                             updated[index].images = [];
+                                             updated[index].searchQuery = '';
+                                             setNewProductVariants(updated);
+                                           }}
+                                           style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.72rem', padding: 0 }}
+                                         >
+                                           Unlink
+                                         </button>
+                                       </div>
+                                     )}
+                                   </div>
+
+                                  <div className="form-grid-2-col" style={{ display: 'grid', gap: '10px' }}>
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                      <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Variant Name / Description *</label>
+                                      <input
+                                        type="text"
+                                        className="form-input"
+                                        style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
+                                        placeholder="e.g. Small / Red or 128GB Storage"
+                                        value={variant.name}
+                                        onChange={(e) => {
+                                          const updated = [...newProductVariants];
+                                          updated[index].name = e.target.value;
+                                          setNewProductVariants(updated);
+                                        }}
+                                        required
+                                      />
+                                    </div>
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                      <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>SKU *</label>
+                                      <input
+                                        type="text"
+                                        className="form-input"
+                                        style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
+                                        placeholder="e.g. EARBUD-SMALL-RED"
+                                        value={variant.sku || ''}
+                                        onChange={(e) => {
+                                          const updated = [...newProductVariants];
+                                          updated[index].sku = e.target.value;
+                                          setNewProductVariants(updated);
+                                        }}
+                                        required
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="form-group" style={{ margin: 0 }}>
+                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Description *</label>
+                                    <textarea
+                                      className="form-input"
+                                      style={{ height: '50px', fontSize: '0.8rem', padding: '6px', resize: 'none' }}
+                                      placeholder="Variant specific description..."
+                                      value={variant.description || ''}
+                                      onChange={(e) => {
+                                        const updated = [...newProductVariants];
+                                        updated[index].description = e.target.value;
+                                        setNewProductVariants(updated);
+                                      }}
+                                      required
+                                    />
+                                  </div>
+
+                                  <div className="form-grid-2-col" style={{ display: 'grid', gap: '10px' }}>
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                      <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Price (INR) *</label>
+                                      <input
+                                        type="number"
+                                        className="form-input"
+                                        style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
+                                        placeholder="e.g. 999"
+                                        value={variant.price}
+                                        onChange={(e) => {
+                                          const updated = [...newProductVariants];
+                                          updated[index].price = e.target.value;
+                                          setNewProductVariants(updated);
+                                        }}
+                                        required
+                                      />
+                                    </div>
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                      <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Stock *</label>
+                                      <input
+                                        type="number"
+                                        className="form-input"
+                                        style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
+                                        placeholder="e.g. 50"
+                                        value={variant.stock}
+                                        onChange={(e) => {
+                                          const updated = [...newProductVariants];
+                                          updated[index].stock = e.target.value;
+                                          setNewProductVariants(updated);
+                                        }}
+                                        required
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {renderVariantImageSelector(index)}
+                                </div>
+                              ))}
+
+                              <button
+                                type="button"
+                                onClick={() => setNewProductVariants([...newProductVariants, { name: '', sku: '', description: '', price: '', stock: '', linkedProductId: '', image: '', searchQuery: '', images: [] }])}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  width: '100%',
+                                  height: '36px',
+                                  borderRadius: '8px',
+                                  border: '1px dashed #6366f1',
+                                  background: 'rgba(99, 102, 241, 0.04)',
+                                  color: '#6366f1',
+                                  fontSize: '0.8rem',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'rgba(99, 102, 241, 0.04)';
+                                }}
+                              >
+                                ➕ Add Variant
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
                         <div className="form-group">
                           <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Description *</label>
