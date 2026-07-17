@@ -954,7 +954,12 @@ exports.getPartnerOrders = async (req, res) => {
 
     const unassignedOrders = await Order.find({
       deliveryStatus: 'unassigned',
-      status: { $in: ['APPROVED', 'READY_FOR_PICKUP'] }
+      status: { $in: ['APPROVED', 'READY_FOR_PICKUP'] },
+      $or: [
+        { carrier: { $exists: false } },
+        { carrier: null },
+        { carrier: '' }
+      ]
     }).lean();
 
     const availableOrders = [];
@@ -2133,8 +2138,8 @@ async function autoAssignOrderInternal(order) {
   try {
     if (!order) return null;
     console.log(`[AutoAssign Debug] Order ID: ${order.orderId}, status: ${order.status}, deliveryStatus: ${order.deliveryStatus}, deliveryPartnerId: ${order.deliveryPartnerId}`);
-    if (order.deliveryPartnerId || order.deliveryStatus !== 'unassigned') {
-      console.log(`[AutoAssign Debug] Skipping because partner already set or deliveryStatus is not unassigned`);
+    if (order.deliveryPartnerId || order.carrier || order.deliveryStatus !== 'unassigned') {
+      console.log(`[AutoAssign Debug] Skipping because partner/carrier already set or deliveryStatus is not unassigned`);
       return null;
     }
 
@@ -2304,7 +2309,12 @@ async function autoAssignPendingOrdersToPartner(partner) {
 
     const unassignedOrders = await Order.find({
       deliveryStatus: 'unassigned',
-      status: { $in: ['APPROVED', 'READY_FOR_PICKUP'] }
+      status: { $in: ['APPROVED', 'READY_FOR_PICKUP'] },
+      $or: [
+        { carrier: { $exists: false } },
+        { carrier: null },
+        { carrier: '' }
+      ]
     });
 
     for (const order of unassignedOrders) {

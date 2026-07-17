@@ -1217,9 +1217,9 @@ export default function CheckoutPage() {
               {!locationConfirmed ? (
                 <div className="co-loc-gate">
                   <div className="co-loc-gate-header">
-                    <div style={{ fontSize: '2rem', marginBottom: '6px' }}>📍</div>
-                    <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800', color: '#0f172a' }}>Confirm Your Delivery Location</h2>
-                    <p style={{ margin: '6px 0 0', fontSize: '0.83rem', color: '#64748b', lineHeight: 1.5 }}>
+                    <div className="co-loc-pin-icon">📍</div>
+                    <h2>Confirm Your Delivery Location</h2>
+                    <p>
                       We need your location to calculate delivery charges and verify deliverability.
                       Choose how you want to confirm your address:
                     </p>
