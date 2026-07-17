@@ -31,7 +31,8 @@ const {
   resetPassword,
   getGstCertificateStub,
   getKycDocumentStub,
-  changeRole
+  changeRole,
+  devApproveDeliveryPartner
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -55,6 +56,7 @@ router.get('/:filename.png', getKycDocumentStub);
 router.get('/:filename.jpg', getKycDocumentStub);
 router.get('/:filename.jpeg', getKycDocumentStub);
 router.get('/:filename.pdf', getGstCertificateStub);
+router.put('/delivery-partners/dev-approve/:id', devApproveDeliveryPartner);
 
 // Protected endpoints (requires valid JWT token in Authorization header)
 router.get('/me', protect, getMe);

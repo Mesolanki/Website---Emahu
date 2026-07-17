@@ -113,14 +113,25 @@
 }
 
 .lp-nav {
-  display: none;
+  display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 20px;
 }
 
-@media (min-width: 768px) {
+@media (max-width: 600px) {
   .lp-nav {
-    display: flex;
+    gap: 8px;
+  }
+  .lp-nav-user {
+    display: none !important;
+  }
+  .lp-nav-link-btn {
+    font-size: 12px !important;
+    padding: 6px 8px !important;
+  }
+  .lp-logout-btn {
+    font-size: 12px !important;
+    padding: 6px 10px !important;
   }
 }
 

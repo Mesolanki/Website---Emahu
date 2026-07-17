@@ -2261,3 +2261,27 @@ exports.changeRole = async (req, res) => {
   }
 };
 
+// @desc    Self-approve delivery partner for dev testing
+// @route   PUT /api/auth/delivery-partners/dev-approve/:id
+// @access  Public (Dev/Testing simulation)
+exports.devApproveDeliveryPartner = async (req, res) => {
+  try {
+    const partner = await User.findById(req.params.id);
+    if (!partner) {
+      return res.status(404).json({ success: false, error: 'Partner not found' });
+    }
+    partner.status = 'approved';
+    partner.isActivePartner = true;
+    partner.verificationFeedback = '';
+    await partner.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Delivery partner approved via developer simulation',
+      deliveryPartner: partner
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+

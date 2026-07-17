@@ -972,8 +972,8 @@ export default function CheckoutPage() {
 
       notifications.unshift({
         id: `notif_${Date.now()}_buyer_${orderId}_${index}`,
-        title: 'Payment Success',
-        message: `Your payment of ₹${itemGrandTotal.toLocaleString('en-IN')} has been locked. Waiting for seller approval for Order #${orderId}.`,
+        title: 'Order Placed',
+        message: `Your order of ₹${itemGrandTotal.toLocaleString('en-IN')} is placed. Waiting for seller approval for Order #${orderId}.`,
         role: 'buyer',
         date: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
         read: false
@@ -1115,22 +1115,22 @@ export default function CheckoutPage() {
                   <polyline points="22 4 12 14.01 9 11.01" />
                 </svg>
               </div>
-              <h2 style={{ fontSize: '1.7rem', fontWeight: '800', margin: '0 0 8px 0', color: '#0f172a' }}>Payment Secured Successfully! 🔒</h2>
+              <h2 style={{ fontSize: '1.7rem', fontWeight: '800', margin: '0 0 8px 0', color: '#0f172a' }}>Order Placed Successfully!</h2>
               <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>Transaction ID: <strong style={{ color: '#4169e1' }}>{generatedOrderId}</strong></p>
             </div>
 
             {/* Delivery Address Receipt */}
             <div style={{ background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)', border: '1.5px solid #bae6fd', borderRadius: '14px', padding: '20px', marginBottom: '20px' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>📍 Delivery Address</div>
+              <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Delivery Address</div>
               <div style={{ fontWeight: '700', fontSize: '1rem', color: '#0f172a', marginBottom: '4px' }}>{fullName}</div>
-              <div style={{ color: '#475569', fontSize: '0.85rem', marginBottom: '4px' }}>📞 {phone} &nbsp;·&nbsp; ✉ {email}</div>
+              <div style={{ color: '#475569', fontSize: '0.85rem', marginBottom: '4px' }}>Phone: {phone} &nbsp;·&nbsp; Email: {email}</div>
               <div style={{ color: '#334155', fontSize: '0.88rem', marginTop: '8px', lineHeight: 1.5 }}>
                 {address}<br />
                 {city}{stateName ? `, ${stateName}` : ''}{pincode ? ` - ${pincode}` : ''}
               </div>
               {locationMode === 'gps' && (
                 <div style={{ marginTop: '8px', display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(16,185,129,0.1)', color: '#059669', fontSize: '0.72rem', fontWeight: '700', padding: '3px 8px', borderRadius: '6px' }}>
-                  📡 GPS Verified Location
+                  GPS Verified Location
                 </div>
               )}
             </div>
@@ -1138,13 +1138,19 @@ export default function CheckoutPage() {
             {/* Items Receipt */}
             {placedOrderObjects.length > 0 && (
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', overflow: 'hidden', marginBottom: '20px' }}>
-                <div style={{ background: '#f8fafc', padding: '12px 18px', borderBottom: '1px solid #e2e8f0', fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🛍️ Items Ordered</div>
+                <div style={{ background: '#f8fafc', padding: '12px 18px', borderBottom: '1px solid #e2e8f0', fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Items Ordered</div>
                 {placedOrderObjects.flatMap((o) => o.items).map((item, idx) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', borderBottom: idx < placedOrderObjects.flatMap(o => o.items).length - 1 ? '1px solid #f1f5f9' : 'none' }}>
                     {item.img && item.img.startsWith('http') ? (
                       <img src={item.img} alt={item.name} style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }} />
                     ) : (
-                      <div style={{ width: '48px', height: '48px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>{item.img || '📦'}</div>
+                      <div style={{ width: '48px', height: '48px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+                          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                          <line x1="12" y1="22.08" x2="12" y2="12" />
+                        </svg>
+                      </div>
                     )}
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#0f172a' }}>{item.name}</div>
@@ -1158,7 +1164,7 @@ export default function CheckoutPage() {
 
             {/* Price Breakdown */}
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px', marginBottom: '20px' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>💰 Payment Breakdown</div>
+              <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Payment Breakdown</div>
               {[
                 { label: 'Products Subtotal', val: `₹${subtotal.toLocaleString('en-IN')}` },
                 { label: 'Delivery Charges', val: shippingFee === 0 ? 'FREE' : `₹${shippingFee}` },
@@ -1177,10 +1183,21 @@ export default function CheckoutPage() {
             {/* Seller Info */}
             {orderSellers.map((seller, sIdx) => (
               <div key={sIdx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', background: 'rgba(65,105,225,0.04)', border: '1px solid rgba(65,105,225,0.12)', borderRadius: '10px', marginBottom: '12px' }}>
-                <div style={{ width: '36px', height: '36px', background: 'rgba(65,105,225,0.1)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>🚚</div>
+                <div style={{ width: '36px', height: '36px', background: 'rgba(65,105,225,0.1)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4169e1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                </div>
                 <div>
-                  <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#0f172a' }}>Handled by: {seller.storeName || seller.name || 'Emahu Partner Seller'}</div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>✉ {seller.email || 'support@emahu.com'} {seller.phone ? `· 📞 ${seller.phone}` : ''}</div>
+                  <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#0f172a' }}>{seller.storeName || seller.name || 'Emahu Partner Seller'}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                    {seller.email || 'support@emahu.com'}
+                  </div>
                 </div>
               </div>
             ))}
@@ -1194,7 +1211,7 @@ export default function CheckoutPage() {
           <div className="co-grid">
             {/* Left Portion */}
             <div className="co-form-section">
-              <h1 className="co-section-title">Secure Payment with Emahu</h1>
+              <h1 className="co-section-title">Payment with Emahu</h1>
 
               {/* ── MANDATORY LOCATION GATE ── */}
               {!locationConfirmed ? (
@@ -1550,7 +1567,7 @@ export default function CheckoutPage() {
                 <div className="co-items-list">
                   {cartItems.length === 0 ? (
                     <div className="co-empty-cart-summary">
-                      <p>Your cart is empty. Go add some items to lock!</p>
+                      <p>Your cart is empty. Go add some items to checkout!</p>
                       <Link href="/buyer/products" className="co-explore-link">Go to Products</Link>
                     </div>
                   ) : (
@@ -1759,8 +1776,8 @@ export default function CheckoutPage() {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h2>Securing Vault Lock Pipeline...</h2>
-              <p>Transferring payment of <strong>₹{grandTotal.toLocaleString('en-IN')}</strong> safely into military-grade Emahu holdings vault.</p>
+              <h2>Processing Payment...</h2>
+              <p>Processing payment of <strong>₹{grandTotal.toLocaleString('en-IN')}</strong> safely for your order.</p>
               <div className="co-progress-bar">
                 <div className="co-progress-fill" />
               </div>

@@ -2462,6 +2462,7 @@ export default function EmahuProDashboard() {
   const [formError, setFormError] = useState('');
   const [verifyCodes, setVerifyCodes] = useState({});
   const [resubmitProductId, setResubmitProductId] = useState(null);
+  const [addVariantOfProductId, setAddVariantOfProductId] = useState(null);
   const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
   const [selectedDetailedProduct, setSelectedDetailedProduct] = useState(null);
 
@@ -5002,6 +5003,25 @@ export default function EmahuProDashboard() {
                                         Details
                                       </button>
 
+                                      <button
+                                        className="company-portal-btn"
+                                        style={{
+                                          height: '24px',
+                                          fontSize: '0.7rem',
+                                          padding: '0 8px',
+                                          background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+                                          color: '#ffffff',
+                                          border: 'none',
+                                          cursor: 'pointer'
+                                        }}
+                                        onClick={() => {
+                                          setAddVariantOfProductId(product.id || product._id);
+                                          setIsAddModalOpen(true);
+                                        }}
+                                      >
+                                        Add Variant
+                                      </button>
+
                                       {isPending && product.adminCode && (
                                         <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
                                           <input
@@ -6615,8 +6635,10 @@ export default function EmahuProDashboard() {
         onClose={() => {
           setIsAddModalOpen(false);
           setResubmitProductId(null);
+          setAddVariantOfProductId(null);
         }}
         resubmitProductId={resubmitProductId}
+        addVariantOfProductId={addVariantOfProductId}
         sellerUser={sellerUser}
         products={products}
         onSuccess={(newOrUpdatedProd) => {

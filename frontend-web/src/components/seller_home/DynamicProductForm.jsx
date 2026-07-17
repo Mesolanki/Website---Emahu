@@ -7,7 +7,7 @@ import './DynamicProductForm.css';
 // Popular fallback suggestions if API config has no brands
 const FALLBACK_BRANDS = ['Generic', 'Apple', 'Samsung', 'Nike', 'Adidas', 'Puma', 'Prestige', 'IKEA', 'L\'Oreal', 'Custom'];
 
-export default function DynamicProductForm({ isOpen, onClose, resubmitProductId, onSuccess, sellerUser, products = [] }) {
+export default function DynamicProductForm({ isOpen, onClose, resubmitProductId, addVariantOfProductId, onSuccess, sellerUser, products = [] }) {
   // Stepper state (10 steps)
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 10;
@@ -270,14 +270,16 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
 
   // Dynamic variants generators (Cartesian matrix helper)
   useEffect(() => {
-    if (!enableVariants || !selectedCategoryConfig || !selectedCategoryConfig.attributes) {
+    if (!enableVariants) {
       setVariantsList([]);
+      return;
+    }
+    if (!selectedCategoryConfig || !selectedCategoryConfig.attributes) {
       return;
     }
 
     const variantAttrs = selectedCategoryConfig.attributes.filter(a => a.isVariant);
     if (variantAttrs.length === 0) {
-      setVariantsList([]);
       return;
     }
 
@@ -351,10 +353,11 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     return '0';
   }, [price, costPrice]);
 
-  // Load product if editing
+  // Load product if editing or cloning as a variant
   useEffect(() => {
-    if (resubmitProductId && products.length > 0) {
-      const prod = products.find(p => (p.id || p._id) === resubmitProductId);
+    const targetId = resubmitProductId || addVariantOfProductId;
+    if (targetId && products.length > 0) {
+      const prod = products.find(p => (p.id || p._id) === targetId);
       if (prod) {
         setTimeout(() => {
           setName(prod.name || '');
@@ -368,8 +371,18 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
           setImages(prod.images ? prod.images.map(img => typeof img === 'string' ? { url: img, quality: 'High Quality', isWarning: false } : img) : []);
           setShortTitle(prod.shortTitle || '');
           setModelNumber(prod.modelNumber || '');
-          setSku(prod.sku || '');
-          setBarcode(prod.barcode || '');
+          if (resubmitProductId) {
+            setSku(prod.sku || '');
+            setBarcode(prod.barcode || '');
+            setVariantsList(prod.variants || []);
+            setEnableVariants(prod.variants && prod.variants.length > 0);
+          } else {
+            // For new variant of this product
+            setSku(`EM-VAR-${Math.floor(1000 + Math.random() * 9000)}`);
+            setBarcode('');
+            setVariantsList([]);
+            setEnableVariants(true); // default variants panel to open
+          }
           setTax(prod.tax !== undefined ? String(prod.tax) : '18');
           setHsnCode(prod.hsnCode || '');
           setMoq(prod.moq !== undefined ? String(prod.moq) : '1');
@@ -392,17 +405,15 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
           setMetaDescription(prod.metaDescription || '');
           setMetaKeywords(prod.metaKeywords ? prod.metaKeywords.join(', ') : '');
           setCanonicalUrl(prod.canonicalUrl || '');
-          setEnableVariants(prod.variants && prod.variants.length > 0);
-          setVariantsList(prod.variants || []);
           setSpecifications(prod.specifications || {});
         }, 0);
       }
     }
-  }, [resubmitProductId, products]);
+  }, [resubmitProductId, addVariantOfProductId, products]);
 
   // Draft auto saving
   useEffect(() => {
-    if (resubmitProductId) return;
+    if (resubmitProductId || addVariantOfProductId) return;
 
     const savedDraft = localStorage.getItem('emahu_product_wizard_draft');
     if (savedDraft) {
@@ -428,8 +439,53 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     shortTitle, modelNumber, sku, barcode, tax, hsnCode, moq, maxOrderQty, lowStockAlert,
     backorderAllowed, warehouse, images360, videoUrl, altText, weight, length, width, height,
     shippingCharges, freeShipping, deliveryTime, dynamicAttributes, seoTitle, metaDescription,
-    metaKeywords, canonicalUrl, enableVariants, variantsList, specifications, resubmitProductId
+    metaKeywords, canonicalUrl, enableVariants, variantsList, specifications, resubmitProductId, addVariantOfProductId
   ]);
+
+  // Reset fields to empty when opening a blank form (not editing, not adding variant)
+  useEffect(() => {
+    if (isOpen && !resubmitProductId && !addVariantOfProductId) {
+      setName('');
+      setBrand('');
+      setCategory('Electronics & Tech');
+      setSubcategory('General');
+      setPrice('');
+      setComparePrice('');
+      setStock('');
+      setDescription('');
+      setImages([]);
+      setShortTitle('');
+      setModelNumber('');
+      setSku('');
+      setBarcode('');
+      setTax('18');
+      setHsnCode('');
+      setMoq('1');
+      setMaxOrderQty('');
+      setLowStockAlert('10');
+      setBackorderAllowed(false);
+      setWarehouse('Main Hub - Delhi');
+      setImages360([]);
+      setVideoUrl('');
+      setAltText('');
+      setWeight('');
+      setLength('');
+      setWidth('');
+      setHeight('');
+      setShippingCharges('0');
+      setFreeShipping(false);
+      setDeliveryTime('3-5 Days');
+      setDynamicAttributes({});
+      setSeoTitle('');
+      setMetaDescription('');
+      setMetaKeywords('');
+      setCanonicalUrl('');
+      setEnableVariants(false);
+      setVariantsList([]);
+      setSpecifications({});
+      setCurrentStep(1);
+    }
+  }, [isOpen, resubmitProductId, addVariantOfProductId]);
 
   const handleRestoreDraft = () => {
     try {
@@ -720,7 +776,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
         {/* Header */}
         <div className="dynamic-form-header">
           <div>
-            <h2>{resubmitProductId ? '🔄 Edit Listing' : '🚀 Add Category-Driven Product Listing'}</h2>
+            <h2>{resubmitProductId ? '🔄 Edit Listing' : addVariantOfProductId ? '➕ Add Variant of Product' : '🚀 Add Category-Driven Product Listing'}</h2>
             <p>Onboarding wizard adapted dynamically to the {category} database schemas.</p>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -1064,8 +1120,42 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                         })}
                       </div>
                     ) : (
-                      <div style={{ background: 'rgba(239, 68, 68, 0.05)', color: '#f87171', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.8rem', border: '1px solid rgba(239,68,68,0.1)' }}>
-                        ⚠️ Warning: No variant-generating attributes are defined for this category. Admin must tag attributes with &apos;isVariant = true&apos; to generate combinations.
+                      <div style={{ marginBottom: '16px' }}>
+                        <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.8rem', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
+                          No pre-configured variant attributes found for this category. You can add combinations manually using the button below.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newVar = {
+                              variantName: '',
+                              sku: `EM-MAN-${Math.floor(1000 + Math.random() * 9000)}`,
+                              mrp: comparePrice ? parseFloat(comparePrice) : parseFloat(price) || 0,
+                              price: parseFloat(price) || 0,
+                              stock: parseInt(stock) || 10,
+                              weight: parseFloat(weight) || 0.5,
+                              image: thumbnail || (images[0] ? images[0].url : '📦'),
+                              status: 'in-stock'
+                            };
+                            setVariantsList([...variantsList, newVar]);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            marginBottom: '16px'
+                          }}
+                        >
+                          ➕ Add Custom Variant Combination
+                        </button>
                       </div>
                     )}
 
@@ -1080,12 +1170,30 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                               <th style={{ padding: '10px', textAlign: 'left' }}>Price (₹)</th>
                               <th style={{ padding: '10px', textAlign: 'left' }}>Stock</th>
                               <th style={{ padding: '10px', textAlign: 'left' }}>Weight (kg)</th>
+                              <th style={{ padding: '10px', textAlign: 'left' }}>Action</th>
                             </tr>
                           </thead>
                           <tbody>
                             {variantsList.map((v, i) => (
                               <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                                <td style={{ padding: '10px', fontWeight: 'bold' }}>{v.variantName}</td>
+                                <td style={{ padding: '10px' }}>
+                                  {selectedCategoryConfig && selectedCategoryConfig.attributes && selectedCategoryConfig.attributes.filter(a => a.isVariant).length > 0 ? (
+                                    <span style={{ fontWeight: 'bold' }}>{v.variantName}</span>
+                                  ) : (
+                                    <input 
+                                      type="text" 
+                                      className="form-input" 
+                                      placeholder="e.g. Red - XL"
+                                      style={{ margin: 0, height: '28px', padding: '2px 6px', fontSize: '0.78rem', minWidth: '110px' }}
+                                      value={v.variantName}
+                                      onChange={(e) => {
+                                        const copy = [...variantsList];
+                                        copy[i].variantName = e.target.value;
+                                        setVariantsList(copy);
+                                      }}
+                                    />
+                                  )}
+                                </td>
                                 <td style={{ padding: '10px' }}>
                                   <input 
                                     type="text" 
@@ -1150,6 +1258,24 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                                       setVariantsList(copy);
                                     }}
                                   />
+                                </td>
+                                <td style={{ padding: '10px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setVariantsList(variantsList.filter((_, idx) => idx !== i));
+                                    }}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#ef4444',
+                                      cursor: 'pointer',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '600'
+                                    }}
+                                  >
+                                    Remove
+                                  </button>
                                 </td>
                               </tr>
                             ))}
