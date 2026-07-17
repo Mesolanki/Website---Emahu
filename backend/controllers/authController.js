@@ -861,20 +861,7 @@ exports.getSellers = async (req, res) => {
             _id: "$seller",
             totalProducts: { $sum: 1 },
             totalSales: { $sum: { $ifNull: ["$sales", 0] } },
-            totalRevenue: { $sum: { $multiply: ["$price", { $ifNull: ["$sales", 0] }] } },
-            products: {
-              $push: {
-                id: "$_id",
-                _id: "$_id",
-                name: "$name",
-                brand: "$brand",
-                price: "$price",
-                sales: "$sales",
-                stock: "$stock",
-                image: "$image",
-                approvalStatus: "$approvalStatus"
-              }
-            }
+            totalRevenue: { $sum: { $multiply: ["$price", { $ifNull: ["$sales", 0] }] } }
           }
         }
       ]),
@@ -913,13 +900,13 @@ exports.getSellers = async (req, res) => {
 
     for (let i = 0; i < sellers.length; i++) {
       const sellerIdStr = sellers[i]._id.toString();
-      const stats = statsMap[sellerIdStr] || { totalProducts: 0, totalSales: 0, totalRevenue: 0, products: [] };
+      const stats = statsMap[sellerIdStr] || { totalProducts: 0, totalSales: 0, totalRevenue: 0 };
 
       sellers[i].totalProducts = stats.totalProducts || 0;
       sellers[i].totalSales = stats.totalSales || 0;
       sellers[i].totalRevenue = Math.round(stats.totalRevenue || 0);
       sellers[i].totalOrders = orderCountMap[sellerIdStr] || 0;
-      sellers[i].products = stats.products || [];
+      sellers[i].products = [];
       sellers[i].documents = sellerDocsMap[sellerIdStr] || [];
     }
 
