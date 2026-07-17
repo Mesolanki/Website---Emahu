@@ -1096,6 +1096,11 @@ body {
   margin-bottom: 16px;
 }
 
+.form-grid-2-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
@@ -1790,6 +1795,31 @@ body {
   .inline-search, .select-filter, .add-product-btn {
     width: 100% !important;
   }
+
+  /* Prevent flexbox container stretching */
+  .main-wrapper, .view-container, .table-wrapper, .requests-grid-container, .card {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Force single-column form grid layouts on mobile */
+  .form-grid-2-col {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Compact form card padding */
+  .requests-form-card {
+    padding: 16px !important;
+  }
+
+  /* Scrollable navigation status tabs instead of multi-line wrapping */
+  .order-filter-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    padding-bottom: 4px;
+  }
 }
 
 /* ============================================
@@ -2071,6 +2101,10 @@ body {
   .form-grid-2 {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .requests-form-card {
+    padding: 12px !important;
   }
 }
 

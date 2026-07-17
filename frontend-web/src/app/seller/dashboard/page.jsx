@@ -4563,7 +4563,7 @@ export default function EmahuProDashboard() {
                           />
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className="form-grid-2-col" style={{ display: 'grid', gap: '12px' }}>
                           <div className="form-group">
                             <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Price (INR) *</label>
                             <input
@@ -4736,7 +4736,7 @@ export default function EmahuProDashboard() {
                                    )}
                                  </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <div className="form-grid-2-col" style={{ display: 'grid', gap: '10px' }}>
                                   <div className="form-group" style={{ margin: 0 }}>
                                     <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Variant Name / Description *</label>
                                     <input
@@ -4787,7 +4787,7 @@ export default function EmahuProDashboard() {
                                   />
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <div className="form-grid-2-col" style={{ display: 'grid', gap: '10px' }}>
                                   <div className="form-group" style={{ margin: 0 }}>
                                     <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Price (INR) *</label>
                                     <input
@@ -4899,8 +4899,7 @@ export default function EmahuProDashboard() {
                       📋 Verification History
                     </h3>
 
-                    <div style={{ overflowX: 'auto', width: '100%' }}>
-                      <div style={{ maxHeight: '550px', overflowY: 'auto' }}>
+                    <div style={{ overflowX: 'auto', maxHeight: '550px', overflowY: 'auto', width: '100%' }}>
                         <table className="portal-table" style={{ width: '100%', minWidth: '500px', fontSize: '0.85rem' }}>
                           <thead>
                             <tr>
@@ -5069,7 +5068,6 @@ export default function EmahuProDashboard() {
                         </table>
                       </div>
                     </div>
-                  </div>
 
                 </div>
               </div>
