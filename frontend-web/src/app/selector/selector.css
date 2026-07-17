@@ -1216,7 +1216,9 @@
     border-radius: 20px;
   }
   .sel-delivery-dropdown-menu {
-    width: 280px;
+    width: 90vw;
+    max-width: 320px;
+    box-sizing: border-box;
   }
 }
 

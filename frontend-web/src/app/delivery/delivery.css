@@ -1266,3 +1266,21 @@
 .orders-table tr:hover {
   background-color: #f7fafc;
 }
+
+/* Responsive Dashboard Tabs on Mobile */
+@media (max-width: 600px) {
+  .dash-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dash-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .dash-tab-btn {
+    flex: 0 0 auto !important;
+    padding: 8px 12px !important;
+    font-size: 0.78rem !important;
+  }
+}
