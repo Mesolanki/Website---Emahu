@@ -834,7 +834,7 @@ export default function CartPage() {
                       </button>
                     </div>
                     {p.quantity >= p.stock && p.stock > 0 && (
-                      <span style={{ fontSize: '0.68rem', color: '#d97706', marginTop: '4px', display: 'block', textAlign: 'center' }}>
+                      <span className="cart-max-qty-msg" style={{ fontSize: '0.68rem', color: '#d97706', marginTop: '4px', display: 'block', textAlign: 'center' }}>
                         Max qty
                       </span>
                     )}
@@ -1172,6 +1172,38 @@ export default function CartPage() {
           </div>
         )}
       </main>
+
+      {/* Fixed Bottom Checkout Bar for Mobile Screens */}
+      {cartItems.length > 0 && checkoutStep === 'idle' && (
+        <div className="cart-mobile-sticky-checkout">
+          <div className="cart-mobile-sticky-info">
+            <span className="cart-mobile-sticky-label">Total Amount</span>
+            <strong className="cart-mobile-sticky-price">₹{grandTotal.toLocaleString('en-IN')}</strong>
+          </div>
+          <button
+            onClick={(e) => {
+              if (hasDeliveredOrder) {
+                e.preventDefault();
+                alert(`Checkout Blocked: Please confirm receipt of your arrived order #${deliveredOrderId} before placing a new order.`);
+                return;
+              }
+              if (!buyerCoordinates.latitude || !buyerCoordinates.longitude) {
+                e.preventDefault();
+                alert('Location Required: You must share your GPS location to calculate transit delivery fee before proceeding to checkout.');
+                return;
+              }
+              window.location.href = '/buyer/checkout';
+            }}
+            disabled={hasDeliveredOrder}
+            className="cart-mobile-sticky-btn"
+          >
+            <span>Proceed to Checkout</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* ─── SECURE Emahu CHECKOUT MODAL OVERLAY ─── */}
       {checkoutStep !== 'idle' && (
