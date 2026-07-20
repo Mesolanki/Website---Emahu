@@ -406,13 +406,37 @@ export default function ProductsPage() {
 
   // Helper: does this seller serve the selected city?
   const sellerServesLocation = (seller, city) => {
-    if (!seller) return false;
+    if (!seller) return true;
     const cityLower = (city || 'Ahmedabad').toLowerCase().trim();
 
     // All India buyer selection shows all products
     if (cityLower === 'all india' || cityLower === 'india') return true;
 
     if (typeof seller === 'string') return true;
+
+    const sObj = typeof seller === 'object' ? seller : {};
+
+    // Check if seller delivers to All India (coveredCities has All India or seller state/city is All India)
+    const coveredCities = Array.isArray(sObj.coveredCities)
+      ? sObj.coveredCities.map(c => String(c).toLowerCase().trim())
+      : [];
+
+    const sellerCity = (sObj.city || sObj.currentCity || sObj.location || sObj.address || sObj.serviceAreaCity || '').toLowerCase().trim();
+    const sellerState = (sObj.state || sObj.serviceAreaState || '').toLowerCase().trim();
+
+    if (
+      coveredCities.includes('all india') ||
+      coveredCities.includes('india') ||
+      sellerCity === 'all india' ||
+      sellerCity === 'india' ||
+      sellerState === 'all india' ||
+      sellerState === 'india' ||
+      sObj.allIndia === true ||
+      sObj.sellScope === 'all_india' ||
+      sObj.deliveryScope === 'all_india'
+    ) {
+      return true;
+    }
 
     // 1. Calculate distance using coordinates from localStorage if available
     try {
@@ -421,8 +445,8 @@ export default function ProductsPage() {
         const coords = JSON.parse(coordsStr);
         const bLat = parseFloat(coords.latitude);
         const bLon = parseFloat(coords.longitude);
-        const sLat = parseFloat(seller.latitude);
-        const sLon = parseFloat(seller.longitude);
+        const sLat = parseFloat(sObj.latitude);
+        const sLon = parseFloat(sObj.longitude);
         
         if (!isNaN(bLat) && !isNaN(bLon) && !isNaN(sLat) && !isNaN(sLon)) {
           const R = 6371; // km
@@ -444,17 +468,9 @@ export default function ProductsPage() {
       console.warn('Failed to calculate distance in sellerServesLocation:', err);
     }
 
-    const sellerCity = (seller.city || seller.currentCity || seller.location || seller.address || '').toLowerCase().trim();
-    
-    // Check if seller delivers to All India/India (coveredCities has All India)
-    const coveredCities = Array.isArray(seller.coveredCities)
-      ? seller.coveredCities.map(c => c.toLowerCase().trim())
-      : [];
-    if (coveredCities.includes('all india') || coveredCities.includes('india')) return true;
-
     // Exact or contains match on city
     if (sellerCity === cityLower) return true;
-    if (sellerCity.includes(cityLower) || cityLower.includes(sellerCity)) return true;
+    if (sellerCity && cityLower && (sellerCity.includes(cityLower) || cityLower.includes(sellerCity))) return true;
 
     // Buyer city specifically in covered cities
     if (coveredCities.includes(cityLower) || coveredCities.some(c => cityLower.includes(c) || c.includes(cityLower))) return true;

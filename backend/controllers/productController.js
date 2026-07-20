@@ -546,6 +546,17 @@ exports.adminDecision = async (req, res) => {
       }
 
       product.sku = finalSku;
+
+      // Ensure each variant has its own unique SKU code
+      if (Array.isArray(product.variants) && product.variants.length > 0) {
+        product.variants = product.variants.map((v, idx) => {
+          if (!v.sku || !v.sku.trim()) {
+            return { ...v, sku: `${finalSku}-VAR-${idx + 1}` };
+          }
+          return v;
+        });
+      }
+
       product.approvalStatus = 'pending'; // Activation pending by seller code
       if (!product.adminCode) {
         product.adminCode = `APP-${Math.floor(1000 + Math.random() * 9000)}`;

@@ -279,13 +279,37 @@ export default function ProductDetailPage() {
 
   // Helper: check if seller serves the buyer location
   const sellerServesLocation = (seller, city) => {
-    if (!seller) return false;
+    if (!seller) return true;
     const cityLower = (city || 'Ahmedabad').toLowerCase().trim();
 
     // All India option
     if (cityLower === 'all india' || cityLower === 'india') return true;
 
     if (typeof seller === 'string') return true;
+
+    const sObj = typeof seller === 'object' ? seller : {};
+
+    // Check if seller delivers to All India (coveredCities has All India or seller state/city is All India)
+    const coveredCities = Array.isArray(sObj.coveredCities)
+      ? sObj.coveredCities.map(c => String(c).toLowerCase().trim())
+      : [];
+
+    const sellerCity = (sObj.city || sObj.currentCity || sObj.location || sObj.address || sObj.serviceAreaCity || '').toLowerCase().trim();
+    const sellerState = (sObj.state || sObj.serviceAreaState || '').toLowerCase().trim();
+
+    if (
+      coveredCities.includes('all india') ||
+      coveredCities.includes('india') ||
+      sellerCity === 'all india' ||
+      sellerCity === 'india' ||
+      sellerState === 'all india' ||
+      sellerState === 'india' ||
+      sObj.allIndia === true ||
+      sObj.sellScope === 'all_india' ||
+      sObj.deliveryScope === 'all_india'
+    ) {
+      return true;
+    }
 
     // 1. Calculate distance using coordinates from localStorage if available
     try {
@@ -294,8 +318,8 @@ export default function ProductDetailPage() {
         const coords = JSON.parse(coordsStr);
         const bLat = parseFloat(coords.latitude);
         const bLon = parseFloat(coords.longitude);
-        const sLat = parseFloat(seller.latitude);
-        const sLon = parseFloat(seller.longitude);
+        const sLat = parseFloat(sObj.latitude);
+        const sLon = parseFloat(sObj.longitude);
 
         if (!isNaN(bLat) && !isNaN(bLon) && !isNaN(sLat) && !isNaN(sLon)) {
           const R = 6371; // km
@@ -317,17 +341,9 @@ export default function ProductDetailPage() {
       console.warn('Failed to calculate distance in sellerServesLocation:', err);
     }
 
-    const sellerCity = (seller.city || seller.currentCity || seller.location || seller.address || '').toLowerCase().trim();
-
-    // Check if seller delivers to All India/India (coveredCities has All India)
-    const coveredCities = Array.isArray(seller.coveredCities)
-      ? seller.coveredCities.map(c => c.toLowerCase().trim())
-      : [];
-    if (coveredCities.includes('all india') || coveredCities.includes('india')) return true;
-
     // Exact or contains match on city
     if (sellerCity === cityLower) return true;
-    if (sellerCity.includes(cityLower) || cityLower.includes(sellerCity)) return true;
+    if (sellerCity && cityLower && (sellerCity.includes(cityLower) || cityLower.includes(sellerCity))) return true;
 
     // Buyer city specifically in covered cities
     if (coveredCities.includes(cityLower) || coveredCities.some(c => cityLower.includes(c) || c.includes(cityLower))) return true;
@@ -873,6 +889,70 @@ export default function ProductDetailPage() {
           <p className="pd-price-note">Inclusive of all taxes</p>
 
           <div className="pd-divider" />
+
+          {/* Main Parent Product Banner */}
+          {product.variants && product.variants.length > 0 && (
+            <div style={{
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              border: '1px solid #cbd5e1',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '8px',
+                  background: '#4169e1',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  fontSize: '1.1rem',
+                  flexShrink: 0
+                }}>
+                  📦
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Main Parent Product
+                  </div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#0f172a' }}>
+                    {product.name}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '1px' }}>
+                    Base SKU: <code style={{ background: '#e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#1e293b' }}>{product.sku || 'EM-MAIN-BASE'}</code> • Base Price: <strong>₹{product.price.toLocaleString('en-IN')}</strong>
+                  </div>
+                </div>
+              </div>
+              {activeVariantIndex !== 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveVariantIndex(0)}
+                  style={{
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '6px 12px',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  View Main Base Product
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Variants Selector */}
           {product.variants && product.variants.length > 0 && (

@@ -55,7 +55,7 @@ const loadRazorpayScript = () => {
 };
 
 const sellerServesLocation = (seller, city) => {
-  if (!seller) return false;
+  if (!seller) return true;
   const cityLower = (city || 'Ahmedabad').toLowerCase().trim();
 
   // All India option
@@ -63,22 +63,39 @@ const sellerServesLocation = (seller, city) => {
 
   if (typeof seller === 'string') return true;
 
+  const sObj = typeof seller === 'object' ? seller : {};
+
+  // Check if seller delivers to All India (coveredCities has All India or seller state/city is All India)
+  const coveredCities = Array.isArray(sObj.coveredCities)
+    ? sObj.coveredCities.map(c => String(c).toLowerCase().trim())
+    : [];
+
+  const sellerCity = (sObj.city || sObj.currentCity || sObj.location || sObj.address || sObj.serviceAreaCity || '').toLowerCase().trim();
+  const sellerState = (sObj.state || sObj.serviceAreaState || sObj.address || '').toLowerCase().trim();
+
+  if (
+    coveredCities.includes('all india') ||
+    coveredCities.includes('india') ||
+    sellerCity === 'all india' ||
+    sellerCity === 'india' ||
+    sellerState === 'all india' ||
+    sellerState === 'india' ||
+    sObj.allIndia === true ||
+    sObj.sellScope === 'all_india' ||
+    sObj.deliveryScope === 'all_india'
+  ) {
+    return true;
+  }
+
   // 1. Calculate distance using coordinates if available
   try {
-    const bLat = parseFloat(seller.latitude);
-    const bLon = parseFloat(seller.longitude);
-    // distance logic can be computed if coordinate inputs are available, otherwise fall back to string parsing
+    const bLat = parseFloat(sObj.latitude);
+    const bLon = parseFloat(sObj.longitude);
   } catch (_) { }
 
-  const sellerCity = (seller.city || seller.currentCity || seller.location || seller.address || '').toLowerCase().trim();
-  const sellerState = (seller.state || seller.serviceAreaState || seller.address || '').toLowerCase().trim();
-
   if (sellerCity === cityLower) return true;
-  if (sellerCity.includes(cityLower) || cityLower.includes(sellerCity)) return true;
+  if (sellerCity && cityLower && (sellerCity.includes(cityLower) || cityLower.includes(sellerCity))) return true;
 
-  const coveredCities = Array.isArray(seller.coveredCities)
-    ? seller.coveredCities.map(c => c.toLowerCase().trim())
-    : [];
   if (coveredCities.includes(cityLower) || coveredCities.some(c => cityLower.includes(c) || c.includes(cityLower))) return true;
 
   // City to State Map for state level coverage matching

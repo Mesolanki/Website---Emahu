@@ -2499,7 +2499,7 @@ export default function EmahuProDashboard() {
     if (hasVariants) {
       for (let i = 0; i < newProductVariants.length; i++) {
         const v = newProductVariants[i];
-        if (!v.name || !v.name.trim() || !v.sku || !v.sku.trim() || !v.description || !v.description.trim() || !v.price || !v.price.trim() || !v.stock || !v.stock.trim()) {
+        if (!v.name || !v.name.trim() || !v.description || !v.description.trim() || !v.price || !v.price.trim() || !v.stock || !v.stock.trim()) {
           setFormError(`Please fill in all required fields for Variant #${i + 1}`);
           return;
         }
@@ -2573,7 +2573,7 @@ export default function EmahuProDashboard() {
           colors: [],
           variants: newProductVariants.filter(v => v.name.trim() !== '').map(v => ({
             name: v.name.trim(),
-            sku: v.sku ? v.sku.trim() : null,
+            sku: (v.sku && v.sku.trim()) ? v.sku.trim().toUpperCase() : `EM-VAR-${Date.now().toString().slice(-4)}-${Math.floor(100 + Math.random() * 900)}`,
             description: v.description ? v.description.trim() : null,
             price: v.price ? parseFloat(v.price) : priceNum,
             stock: v.stock ? parseInt(v.stock) : stockNum,
@@ -4762,39 +4762,21 @@ export default function EmahuProDashboard() {
                                      )}
                                    </div>
 
-                                  <div className="form-grid-2-col" style={{ display: 'grid', gap: '10px' }}>
-                                    <div className="form-group" style={{ margin: 0 }}>
-                                      <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Variant Name / Description *</label>
-                                      <input
-                                        type="text"
-                                        className="form-input"
-                                        style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
-                                        placeholder="e.g. Small / Red or 128GB Storage"
-                                        value={variant.name}
-                                        onChange={(e) => {
-                                          const updated = [...newProductVariants];
-                                          updated[index].name = e.target.value;
-                                          setNewProductVariants(updated);
-                                        }}
-                                        required
-                                      />
-                                    </div>
-                                    <div className="form-group" style={{ margin: 0 }}>
-                                      <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>SKU *</label>
-                                      <input
-                                        type="text"
-                                        className="form-input"
-                                        style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
-                                        placeholder="e.g. EARBUD-SMALL-RED"
-                                        value={variant.sku || ''}
-                                        onChange={(e) => {
-                                          const updated = [...newProductVariants];
-                                          updated[index].sku = e.target.value;
-                                          setNewProductVariants(updated);
-                                        }}
-                                        required
-                                      />
-                                    </div>
+                                  <div className="form-group" style={{ margin: 0 }}>
+                                    <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Variant Name / Option *</label>
+                                    <input
+                                      type="text"
+                                      className="form-input"
+                                      style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px' }}
+                                      placeholder="e.g. Small / Red or 128GB Storage"
+                                      value={variant.name}
+                                      onChange={(e) => {
+                                        const updated = [...newProductVariants];
+                                        updated[index].name = e.target.value;
+                                        setNewProductVariants(updated);
+                                      }}
+                                      required
+                                    />
                                   </div>
 
                                   <div className="form-group" style={{ margin: 0 }}>
@@ -8194,6 +8176,19 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
                         <div className="product-meta-details">
                           <span className="product-name">{p.name}</span>
                           <span className="product-sku" style={{ textTransform: 'capitalize' }}>Category: {p.category}</span>
+                          {p.variants && p.variants.length > 0 && (
+                            <div style={{ marginTop: '6px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', padding: '6px 8px', borderRadius: '6px', fontSize: '0.72rem' }}>
+                              <strong style={{ color: '#38bdf8', display: 'block', marginBottom: '4px' }}>🔍 Product Variants & SKUs to Verify ({p.variants.length}):</strong>
+                              {p.variants.map((v, vIdx) => (
+                                <div key={vIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0', borderBottom: vIdx < p.variants.length - 1 ? '1px dashed rgba(255,255,255,0.06)' : 'none' }}>
+                                  <span>{v.name}</span>
+                                  <span style={{ color: '#94a3b8' }}>
+                                    SKU: <code style={{ background: 'rgba(255,255,255,0.1)', padding: '0 4px', borderRadius: '3px', color: '#67e8f9' }}>{v.sku || `EM-VAR-${vIdx+1}`}</code> (₹{v.price || p.price})
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>

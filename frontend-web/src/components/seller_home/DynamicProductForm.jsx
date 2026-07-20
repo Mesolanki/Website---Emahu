@@ -1289,17 +1289,9 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                                   )}
                                 </td>
                                 <td style={{ padding: '10px' }}>
-                                  <input 
-                                    type="text" 
-                                    className="form-input" 
-                                    style={{ margin: 0, height: '28px', padding: '2px 6px', fontSize: '0.78rem' }}
-                                    value={v.sku}
-                                    onChange={(e) => {
-                                      const copy = [...variantsList];
-                                      copy[i].sku = e.target.value;
-                                      setVariantsList(copy);
-                                    }}
-                                  />
+                                  <code style={{ fontSize: '0.75rem', background: 'rgba(59, 130, 246, 0.08)', color: '#2563eb', padding: '3px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                                    {v.sku || `EM-VAR-${i + 1}`}
+                                  </code>
                                 </td>
                                 <td style={{ padding: '10px' }}>
                                   <input 

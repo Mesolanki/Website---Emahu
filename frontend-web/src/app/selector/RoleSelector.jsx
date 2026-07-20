@@ -125,7 +125,7 @@ const isRealImage = (img) => {
 };
 
 const sellerServesLocation = (seller, city) => {
-  if (!seller) return false;
+  if (!seller) return true;
   const cityLower = (city || 'Ahmedabad').toLowerCase().trim();
 
   // All India option
@@ -134,6 +134,28 @@ const sellerServesLocation = (seller, city) => {
   if (typeof seller === 'string') return true;
 
   const sObj = typeof seller === 'object' ? seller : {};
+
+  // Check if seller delivers to All India (coveredCities has All India or seller state/city is All India)
+  const coveredCities = Array.isArray(sObj.coveredCities)
+    ? sObj.coveredCities.map(c => String(c).toLowerCase().trim())
+    : [];
+
+  const sellerCity = (sObj.city || sObj.currentCity || sObj.location || sObj.address || sObj.serviceAreaCity || '').toLowerCase().trim();
+  const sellerState = (sObj.state || sObj.serviceAreaState || '').toLowerCase().trim();
+
+  if (
+    coveredCities.includes('all india') ||
+    coveredCities.includes('india') ||
+    sellerCity === 'all india' ||
+    sellerCity === 'india' ||
+    sellerState === 'all india' ||
+    sellerState === 'india' ||
+    sObj.allIndia === true ||
+    sObj.sellScope === 'all_india' ||
+    sObj.deliveryScope === 'all_india'
+  ) {
+    return true;
+  }
 
   // 1. Calculate distance using coordinates from localStorage if available
   try {
@@ -165,17 +187,9 @@ const sellerServesLocation = (seller, city) => {
     console.warn('Failed to calculate distance in sellerServesLocation:', err);
   }
 
-  const sellerCity = (sObj.city || sObj.currentCity || sObj.location || sObj.address || '').toLowerCase().trim();
-
-  // Check if seller delivers to All India/India (coveredCities has All India)
-  const coveredCities = Array.isArray(sObj.coveredCities)
-    ? sObj.coveredCities.map(c => c.toLowerCase().trim())
-    : [];
-  if (coveredCities.includes('all india') || coveredCities.includes('india')) return true;
-
   // Exact or contains match on city
   if (sellerCity === cityLower) return true;
-  if (sellerCity.includes(cityLower) || cityLower.includes(sellerCity)) return true;
+  if (sellerCity && cityLower && (sellerCity.includes(cityLower) || cityLower.includes(sellerCity))) return true;
 
   // Buyer city specifically in covered cities
   if (coveredCities.includes(cityLower) || coveredCities.some(c => cityLower.includes(c) || c.includes(cityLower))) return true;
