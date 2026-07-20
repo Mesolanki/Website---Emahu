@@ -3824,9 +3824,53 @@ export default function AdminDashboard() {
                     )}
                     <div style={{ marginTop: '10px' }}>
                       <span className="ad-detail-row-label" style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem' }}>Description Summary</span>
-                      <p style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.5', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-admin-border)', maxHeight: '120px', overflowY: 'auto' }}>
-                        {selectedDetailProduct.description || 'No description provided by merchant.'}
-                      </p>
+                      <div style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.5', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-admin-border)', maxHeight: '180px', overflowY: 'auto' }}>
+                        {(() => {
+                          const desc = selectedDetailProduct.description || '';
+                          if (desc.trim().startsWith('{') && desc.trim().endsWith('}')) {
+                            try {
+                              const parsed = JSON.parse(desc);
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                  {parsed.overview && (
+                                    <div>
+                                      <strong style={{ color: '#06b6d4' }}>Overview:</strong>
+                                      <div style={{ paddingLeft: '8px', color: '#94a3b8', marginTop: '2px' }}>{parsed.overview}</div>
+                                    </div>
+                                  )}
+                                  {parsed.size && (
+                                    <div>
+                                      <strong style={{ color: '#06b6d4' }}>Size & Fit / Dimensions:</strong>
+                                      <div style={{ paddingLeft: '8px', color: '#94a3b8', marginTop: '2px' }}>{parsed.size}</div>
+                                    </div>
+                                  )}
+                                  {parsed.color && (
+                                    <div>
+                                      <strong style={{ color: '#06b6d4' }}>Color & Design:</strong>
+                                      <div style={{ paddingLeft: '8px', color: '#94a3b8', marginTop: '2px' }}>{parsed.color}</div>
+                                    </div>
+                                  )}
+                                  {parsed.memory && (
+                                    <div>
+                                      <strong style={{ color: '#06b6d4' }}>Memory & Specs:</strong>
+                                      <div style={{ paddingLeft: '8px', color: '#94a3b8', marginTop: '2px' }}>{parsed.memory}</div>
+                                    </div>
+                                  )}
+                                  {parsed.warranty && (
+                                    <div>
+                                      <strong style={{ color: '#06b6d4' }}>Warranty & Care:</strong>
+                                      <div style={{ paddingLeft: '8px', color: '#94a3b8', marginTop: '2px' }}>{parsed.warranty}</div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            } catch (e) {
+                              // Fall back
+                            }
+                          }
+                          return desc || 'No description provided by merchant.';
+                        })()}
+                      </div>
                     </div>
                   </div>
 

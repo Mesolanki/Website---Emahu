@@ -4042,7 +4042,7 @@ export default function EmahuProDashboard() {
                 <div className="stat-card warning-theme">
                   <div className="stat-header">
                     <span className="stat-title">Low Stock SKUs</span>
-                    <div className="stat-icon warning">⚠️ï¸</div>
+                    <div className="stat-icon warning">⚠️</div>
                   </div>
                   <div className="stat-value">{lowStockCount}</div>
                   <div className="stat-footer">
@@ -4164,8 +4164,8 @@ export default function EmahuProDashboard() {
                         <div className="realtime-img">
                           {order.product.includes('Headphones') ? '🎧' :
                             order.product.includes('Chrono') ? '⌚' :
-                              order.product.includes('Desk') ? 'ðŸ–¥ï¸' :
-                                (order.product.includes('Tracker') || order.product.includes('Ring')) ? 'ðŸ’' : '📦'}
+                              order.product.includes('Desk') ? '🖥️' :
+                                (order.product.includes('Tracker') || order.product.includes('Ring')) ? '💍' : '📦'}
                         </div>
                         <div className="realtime-details">
                           <span className="realtime-title">{order.customer}</span>
@@ -4600,7 +4600,15 @@ export default function EmahuProDashboard() {
                             placeholder="20"
                             value={newProductStock}
                             onChange={(e) => setNewProductStock(e.target.value)}
-                             {/* Variations & Options */}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          {renderMultiImageSelector()}
+                        </div>
+
+                        {/* Variations & Options */}
                         {newProductVariants.length === 0 ? (
                           <div style={{ marginTop: '4px', marginBottom: '8px' }}>
                             <button
@@ -5019,25 +5027,6 @@ export default function EmahuProDashboard() {
                                         onClick={() => setSelectedDetailedProduct(product)}
                                       >
                                         Details
-                                      </button>
-
-                                      <button
-                                        className="company-portal-btn"
-                                        style={{
-                                          height: '24px',
-                                          fontSize: '0.7rem',
-                                          padding: '0 8px',
-                                          background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-                                          color: '#ffffff',
-                                          border: 'none',
-                                          cursor: 'pointer'
-                                        }}
-                                        onClick={() => {
-                                          setAddVariantOfProductId(product.id || product._id);
-                                          setIsAddModalOpen(true);
-                                        }}
-                                      >
-                                        Add Variant
                                       </button>
 
                                       {isPending && product.adminCode && (
@@ -6664,14 +6653,14 @@ export default function EmahuProDashboard() {
             setProducts(prev => prev.map(p => (p.id || p._id) === resubmitProductId ? newOrUpdatedProd : p));
             triggerToast(
               'Product Submitted',
-              `EMAHU-PRO: "${newOrUpdatedProd.name}" has been updated and is pending admin approval.`,
+              `EMAHU-PRO: "${newOrUpdatedProd.name}" has been updated and is live on your store.`,
               'success'
             );
           } else {
             setProducts(prev => [newOrUpdatedProd, ...prev]);
             triggerToast(
               'Product Created',
-              `EMAHU-PRO: "${newOrUpdatedProd.name}" has been submitted and is pending admin approval.`,
+              `EMAHU-PRO: "${newOrUpdatedProd.name}" has been submitted and is live on your store.`,
               'success'
             );
           }

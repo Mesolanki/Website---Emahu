@@ -184,10 +184,7 @@ export default function BuyerHeader() {
             }
           },
           (geoErr) => {
-            console.warn('Geolocation permission denied or failed on arrival, asking again:', geoErr);
-            if (confirm("Location permission is required for EMAHU to show products near you. Would you like to grant location access?")) {
-              getPosOnArrival();
-            }
+            console.warn('Geolocation permission denied or failed on arrival:', geoErr);
           }
         );
       };
@@ -557,30 +554,7 @@ export default function BuyerHeader() {
           </div>
         )}
 
-        {/* Mobile Location Selector */}
-        <div className="bh-mobile-drawer__location" style={{ padding: '12px 20px', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>Select Location</div>
-          <select 
-            value={selectedCity} 
-            onChange={(e) => handleCityChange(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0',
-              backgroundColor: '#f8fafc',
-              fontSize: '0.85rem',
-              fontWeight: '600',
-              color: '#334155',
-              cursor: 'pointer',
-              outline: 'none'
-            }}
-          >
-            {['Ahmedabad', 'Delhi', 'Mumbai', 'Pune', 'Bangalore', 'Kolkata', 'Hyderabad', 'Surat', 'Vadodara', 'Rajkot'].map(city => (
-              <option key={city} value={city}>{city}</option>
-            ))}
-          </select>
-        </div>
+
 
         {/* Quick action badges */}
         <div className="bh-mobile-drawer__quick-actions">

@@ -1011,7 +1011,7 @@ export default function CheckoutPage() {
       const rzpOrder = orderInitData.order;
 
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_TCxKJiam0vUNgJ',
+        key: orderInitData.key || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_TEYhKt96XRAfQq',
         amount: rzpOrder.amount,
         currency: rzpOrder.currency,
         name: 'Emahu Marketplace',

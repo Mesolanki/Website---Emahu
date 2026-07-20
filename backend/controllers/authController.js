@@ -268,7 +268,7 @@ exports.register = async (req, res) => {
       perKmRate,
       coveredCities,
       deliveryScope,
-      status: (role === 'seller' || role === 'delivery') ? 'pending' : 'approved'
+      status: 'approved'
     });
 
     // Notify all admins of new seller registration
@@ -279,7 +279,7 @@ exports.register = async (req, res) => {
         await Notification.create({
           recipient: admin._id,
           title: 'New Seller Registration',
-          message: `Seller "${name}" (${storeName || 'N/A'}) has registered and is pending approval.`,
+          message: `Seller "${name}" (${storeName || 'N/A'}) has registered and is approved.`,
           type: 'info'
         });
       }
@@ -293,7 +293,7 @@ exports.register = async (req, res) => {
         await Notification.create({
           recipient: admin._id,
           title: 'New Delivery Partner Registration',
-          message: `Delivery partner "${name}" (${operatingLocation || 'N/A'}) has registered and is pending approval.`,
+          message: `Delivery partner "${name}" (${operatingLocation || 'N/A'}) has registered and is approved.`,
           type: 'info'
         });
       }
@@ -1141,7 +1141,7 @@ exports.uploadDocument = async (req, res) => {
         });
       }
       doc.fileUrl = fileUrl;
-      doc.status = 'pending';
+      doc.status = 'approved';
       doc.feedback = '';
       await doc.save();
     } else {
@@ -1149,20 +1149,20 @@ exports.uploadDocument = async (req, res) => {
         seller: req.user._id,
         documentType,
         fileUrl,
-        status: 'pending'
+        status: 'approved'
       });
     }
 
-    // Update seller status back to pending if they were in more_info_requested
+    // Update seller status back to approved if they were in more_info_requested
     if (req.user.status === 'more_info_requested') {
       const user = await User.findById(req.user._id);
-      user.status = 'pending';
+      user.status = 'approved';
       await user.save();
     }
 
     res.status(201).json({
       success: true,
-      message: 'Document uploaded successfully and verification is pending.',
+      message: 'Document uploaded successfully and verification is approved.',
       document: doc
     });
   } catch (error) {
@@ -2139,7 +2139,7 @@ exports.changeRole = async (req, res) => {
       }
 
       user.role = 'seller';
-      user.status = 'pending';
+      user.status = 'approved';
       user.storeName = storeDetails.storeName;
       user.category = storeDetails.category;
       user.isPhoneVerified = true;
@@ -2164,14 +2164,14 @@ exports.changeRole = async (req, res) => {
         seller: user._id,
         documentType: 'id_proof',
         fileUrl: docUrl,
-        status: 'pending'
+        status: 'approved'
       });
 
       await SellerDocument.create({
         seller: user._id,
         documentType: 'business_registration',
         fileUrl: `${req.protocol}://${req.get('host')}/api/auth/gst_certificate_stub.pdf`,
-        status: 'pending'
+        status: 'approved'
       });
 
       // Notify admins
@@ -2180,8 +2180,8 @@ exports.changeRole = async (req, res) => {
       for (const admin of admins) {
         await Notification.create({
           recipient: admin._id,
-          title: 'Role Upgrade Request: Seller',
-          message: `User "${user.name}" has requested to switch role to Seller for store "${user.storeName}" and is pending approval.`,
+          title: 'Role Upgrade: Seller',
+          message: `User "${user.name}" has switched role to Seller for store "${user.storeName}" and is approved.`,
           type: 'info'
         });
       }
@@ -2198,7 +2198,7 @@ exports.changeRole = async (req, res) => {
       }
 
       user.role = 'delivery';
-      user.status = 'pending';
+      user.status = 'approved';
       user.vehicleType = vehicleDetails.vehicleType;
       user.vehicleNumber = vehicleDetails.vehicleNumber;
       user.currentCity = vehicleDetails.currentCity || user.city || 'Ahmedabad';
@@ -2220,8 +2220,8 @@ exports.changeRole = async (req, res) => {
       for (const admin of admins) {
         await Notification.create({
           recipient: admin._id,
-          title: 'Role Upgrade Request: Delivery Partner',
-          message: `User "${user.name}" has requested to switch role to Delivery Partner and is pending approval.`,
+          title: 'Role Upgrade: Delivery Partner',
+          message: `User "${user.name}" has switched role to Delivery Partner and is approved.`,
           type: 'info'
         });
       }

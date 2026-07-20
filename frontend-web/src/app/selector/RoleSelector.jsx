@@ -416,8 +416,6 @@ export default function RoleSelector() {
       }
     };
     fetchDbProducts();
-    const interval = setInterval(fetchDbProducts, 4000);
-    return () => clearInterval(interval);
   }, []);
 
   // Fetch dynamic categories from Backend API
@@ -434,8 +432,6 @@ export default function RoleSelector() {
       }
     };
     fetchCategories();
-    const interval = setInterval(fetchCategories, 4000);
-    return () => clearInterval(interval);
   }, []);
 
   // Close delivery dropdown on click outside
@@ -757,16 +753,18 @@ export default function RoleSelector() {
             initial="hidden"
             animate="show"
           >
-            {/* 1. Buyer Hub Button */}
-            <motion.div variants={heroSubtitle} whileHover={buttonHoverProps} whileTap={buttonTapProps}>
-              <Link href="/buyer/products" className="sel-nav-btn sel-nav-btn--buyer">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-                <span>Buyer Hub</span>
-              </Link>
-            </motion.div>
+            {/* 1. Buyer Hub Button - only shown after user login/signup */}
+            {isLoggedIn && (
+              <motion.div variants={heroSubtitle} whileHover={buttonHoverProps} whileTap={buttonTapProps}>
+                <Link href="/buyer/products" className="sel-nav-btn sel-nav-btn--buyer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                  <span>Buyer Hub</span>
+                </Link>
+              </motion.div>
+            )}
 
             {/* 2. Cart Button with count badge */}
             <motion.div variants={heroSubtitle} whileHover={buttonHoverProps} whileTap={buttonTapProps}>
@@ -786,7 +784,7 @@ export default function RoleSelector() {
             {/* 3. Login/Signup Button */}
             <motion.div variants={heroSubtitle} whileHover={buttonHoverProps} whileTap={buttonTapProps}>
               {isLoggedIn ? (
-                <Link href="/buyer/products" className="sel-nav-btn sel-nav-btn--profile">
+                <Link href="/buyer/settings" className="sel-nav-btn sel-nav-btn--profile">
                   <div className="sel-profile-avatar">
                     {userProfile?.name?.charAt(0).toUpperCase() || 'U'}
                   </div>

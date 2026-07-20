@@ -58,7 +58,7 @@ exports.createProduct = async (req, res) => {
       sizes: Array.isArray(req.body.sizes) ? req.body.sizes : [],
       colors: Array.isArray(req.body.colors) ? req.body.colors : [],
       seller: req.user.id,
-      approvalStatus: 'pending',
+      approvalStatus: 'approved',
       adminCode: undefined,
       approvalAttempts: 0,
       
@@ -107,8 +107,8 @@ exports.createProduct = async (req, res) => {
     if (admins.length > 0) {
       const notifications = admins.map(admin => ({
         recipient: admin._id,
-        title: 'New Product Pending Review',
-        message: `Product "${product.name}" has been listed by "${req.user.name}" and is pending review.`,
+        title: 'New Product Listed',
+        message: `Product "${product.name}" has been listed by "${req.user.name}" and is approved.`,
         type: 'info'
       }));
       await Notification.insertMany(notifications);
@@ -139,7 +139,34 @@ exports.createProduct = async (req, res) => {
 // @access  Public
 exports.getProducts = async (req, res) => {
   try {
-    const products = await Product.find({ approvalStatus: 'approved' }).populate('seller', 'name email phone storeName latitude longitude address city state serviceAreaState serviceAreaCity coveredCities');
+    const filter = { approvalStatus: 'approved' };
+    
+    // Support category filter (case-insensitive exact match)
+    if (req.query.category) {
+      filter.category = new RegExp(`^${req.query.category}$`, 'i');
+    }
+    
+    let query = Product.find(filter);
+    
+    // Support custom fields selection or default to optimized lightweight fields
+    if (req.query.select) {
+      query = query.select(req.query.select);
+    } else {
+      query = query.select('name brand category subcategory price comparePrice stock status image rating reviews seller approvalStatus isNew createdAt');
+    }
+    
+    query = query.populate('seller', 'name email phone storeName latitude longitude address city state serviceAreaState serviceAreaCity coveredCities');
+    
+    // Support limit constraint
+    if (req.query.limit) {
+      const limit = parseInt(req.query.limit, 10);
+      if (!isNaN(limit) && limit > 0) {
+        query = query.limit(limit);
+      }
+    }
+    
+    const products = await query.lean();
+    
     res.status(200).json({
       success: true,
       products
@@ -458,8 +485,8 @@ exports.resubmitProduct = async (req, res) => {
     product.variants = Array.isArray(variants) ? variants : product.variants;
     product.specifications = req.body.specifications !== undefined ? req.body.specifications : product.specifications;
 
-    // Reset verification to false / pending admin approval
-    product.approvalStatus = 'pending';
+    // Reset verification to approved
+    product.approvalStatus = 'approved';
     product.rejectionReason = undefined;
     product.adminCode = undefined;
 

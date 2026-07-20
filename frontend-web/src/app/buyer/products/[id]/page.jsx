@@ -164,7 +164,8 @@ export default function ProductDetailPage() {
     if (!product) return;
     const fetchRelated = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
+        const categoryQuery = product.category ? `?category=${encodeURIComponent(product.category)}&limit=20` : '?limit=20';
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products${categoryQuery}`);
         const data = await res.json();
         if (data.success && data.products) {
           const productCategory = product.category;
@@ -195,12 +196,20 @@ export default function ProductDetailPage() {
 
           // Fallback if not enough category items
           if (matched.length < 4) {
-            const extra = data.products.filter(p => String(p._id || p.id) !== String(product.id) && sellerServesLocation(p.seller, selectedCity));
-            extra.forEach(p => {
-              if (matched.length < 4 && !matched.some(m => String(m._id || m.id) === String(p._id || p.id))) {
-                matched.push(p);
+            try {
+              const fallbackRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products?limit=20`);
+              const fallbackData = await fallbackRes.json();
+              if (fallbackData.success && fallbackData.products) {
+                const extra = fallbackData.products.filter(p => String(p._id || p.id) !== String(product.id) && sellerServesLocation(p.seller, selectedCity));
+                extra.forEach(p => {
+                  if (matched.length < 4 && !matched.some(m => String(m._id || m.id) === String(p._id || p.id))) {
+                    matched.push(p);
+                  }
+                });
               }
-            });
+            } catch (fallbackErr) {
+              console.warn('Fallback related products fetch failed:', fallbackErr);
+            }
           }
 
           // Format dynamic related products
@@ -1041,9 +1050,58 @@ export default function ProductDetailPage() {
 
         {activeTab === 'desc' && (
           <div className="pd-desc">
-            <p>{currentDescription} Built for people who demand the best — designed, inspected, and delivered with premium care through the EMAHU quality assurance system.</p>
-            <p>Every EMAHU-listed product undergoes rigorous 47-point physical inspection at one of our secure hub facilities before reaching your doorstep. Your satisfaction is guaranteed.</p>
-            <div className="pd-features-grid">
+            {(() => {
+              try {
+                if (currentDescription && currentDescription.trim().startsWith('{') && currentDescription.trim().endsWith('}')) {
+                  const parsed = JSON.parse(currentDescription);
+                  if (parsed && typeof parsed === 'object') {
+                    return (
+                      <div className="pd-desc-structured" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+                        {parsed.overview && (
+                          <div className="desc-section" style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
+                            <h4 style={{ color: '#0f172a', fontWeight: '800', fontSize: '0.95rem', marginBottom: '6px', fontFamily: "'Outfit', sans-serif" }}>Overview / Highlights</h4>
+                            <p style={{ margin: 0, color: '#4b5563', lineHeight: '1.6' }}>{parsed.overview}</p>
+                          </div>
+                        )}
+                        {parsed.size && (
+                          <div className="desc-section" style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
+                            <h4 style={{ color: '#0f172a', fontWeight: '800', fontSize: '0.95rem', marginBottom: '6px', fontFamily: "'Outfit', sans-serif" }}>Size & Fit / Dimensions</h4>
+                            <p style={{ margin: 0, color: '#4b5563', lineHeight: '1.6' }}>{parsed.size}</p>
+                          </div>
+                        )}
+                        {parsed.color && (
+                          <div className="desc-section" style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
+                            <h4 style={{ color: '#0f172a', fontWeight: '800', fontSize: '0.95rem', marginBottom: '6px', fontFamily: "'Outfit', sans-serif" }}>Color & Style Finish</h4>
+                            <p style={{ margin: 0, color: '#4b5563', lineHeight: '1.6' }}>{parsed.color}</p>
+                          </div>
+                        )}
+                        {parsed.memory && (
+                          <div className="desc-section" style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
+                            <h4 style={{ color: '#0f172a', fontWeight: '800', fontSize: '0.95rem', marginBottom: '6px', fontFamily: "'Outfit', sans-serif" }}>Memory, Storage & Tech Details</h4>
+                            <p style={{ margin: 0, color: '#4b5563', lineHeight: '1.6' }}>{parsed.memory}</p>
+                          </div>
+                        )}
+                        {parsed.warranty && (
+                          <div className="desc-section" style={{ paddingBottom: '12px' }}>
+                            <h4 style={{ color: '#0f172a', fontWeight: '800', fontSize: '0.95rem', marginBottom: '6px', fontFamily: "'Outfit', sans-serif" }}>Warranty & Care Policy</h4>
+                            <p style={{ margin: 0, color: '#4b5563', lineHeight: '1.6' }}>{parsed.warranty}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                }
+              } catch (e) {
+                console.error('Failed to parse structured description:', e);
+              }
+              return (
+                <p style={{ color: '#4b5563', lineHeight: '1.6', marginBottom: '24px' }}>
+                  {currentDescription} Built for people who demand the best — designed, inspected, and delivered with premium care through the EMAHU quality assurance system.
+                </p>
+              );
+            })()}
+            <p style={{ color: '#4b5563', lineHeight: '1.6' }}>Every EMAHU-listed product undergoes rigorous 47-point physical inspection at one of our secure hub facilities before reaching your doorstep. Your satisfaction is guaranteed.</p>
+            <div className="pd-features-grid" style={{ marginTop: '24px' }}>
               {[
                 { icon: '🛡️', title: 'Quality Assured', sub: '47-point physical inspection' },
                 { icon: '📦', title: 'Premium Packaging', sub: 'Tamper-proof EMAHU seal' },

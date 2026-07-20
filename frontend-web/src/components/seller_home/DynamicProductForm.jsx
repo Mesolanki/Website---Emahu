@@ -27,6 +27,11 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
   const [productType, setProductType] = useState('');
   const [modelNumber, setModelNumber] = useState('');
   const [description, setDescription] = useState('');
+  const [descOverview, setDescOverview] = useState('');
+  const [descSize, setDescSize] = useState('');
+  const [descColor, setDescColor] = useState('');
+  const [descMemory, setDescMemory] = useState('');
+  const [descWarranty, setDescWarranty] = useState('');
   const [shortTitle, setShortTitle] = useState('');
 
   // Media
@@ -367,7 +372,21 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
           setPrice(prod.price !== undefined ? String(prod.price) : '');
           setComparePrice(prod.comparePrice !== undefined ? String(prod.comparePrice) : '');
           setStock(prod.stock !== undefined ? String(prod.stock) : '');
-          setDescription(prod.description || '');
+          const rawDesc = prod.description || '';
+          setDescription(rawDesc);
+          let parsedDesc = { overview: rawDesc, size: '', color: '', memory: '', warranty: '' };
+          if (rawDesc.trim().startsWith('{') && rawDesc.trim().endsWith('}')) {
+            try {
+              parsedDesc = JSON.parse(rawDesc);
+            } catch (e) {
+              console.error('Failed to parse description JSON:', e);
+            }
+          }
+          setDescOverview(parsedDesc.overview || '');
+          setDescSize(parsedDesc.size || '');
+          setDescColor(parsedDesc.color || '');
+          setDescMemory(parsedDesc.memory || '');
+          setDescWarranty(parsedDesc.warranty || '');
           setImages(prod.images ? prod.images.map(img => typeof img === 'string' ? { url: img, quality: 'High Quality', isWarning: false } : img) : []);
           setShortTitle(prod.shortTitle || '');
           setModelNumber(prod.modelNumber || '');
@@ -423,6 +442,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     const interval = setInterval(() => {
       const draftData = {
         name, brand, category, subcategory, price, comparePrice, stock, description, images,
+        descOverview, descSize, descColor, descMemory, descWarranty,
         shortTitle, modelNumber, sku, barcode, tax, hsnCode, moq, maxOrderQty, lowStockAlert,
         backorderAllowed, warehouse, images360, videoUrl, altText, weight, length, width, height,
         shippingCharges, freeShipping, deliveryTime, dynamicAttributes, seoTitle, metaDescription,
@@ -436,6 +456,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     return () => clearInterval(interval);
   }, [
     name, brand, category, subcategory, price, comparePrice, stock, description, images,
+    descOverview, descSize, descColor, descMemory, descWarranty,
     shortTitle, modelNumber, sku, barcode, tax, hsnCode, moq, maxOrderQty, lowStockAlert,
     backorderAllowed, warehouse, images360, videoUrl, altText, weight, length, width, height,
     shippingCharges, freeShipping, deliveryTime, dynamicAttributes, seoTitle, metaDescription,
@@ -453,6 +474,11 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
       setComparePrice('');
       setStock('');
       setDescription('');
+      setDescOverview('');
+      setDescSize('');
+      setDescColor('');
+      setDescMemory('');
+      setDescWarranty('');
       setImages([]);
       setShortTitle('');
       setModelNumber('');
@@ -500,6 +526,11 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
         setComparePrice(d.comparePrice || '');
         setStock(d.stock || '');
         setDescription(d.description || '');
+        setDescOverview(d.descOverview || '');
+        setDescSize(d.descSize || '');
+        setDescColor(d.descColor || '');
+        setDescMemory(d.descMemory || '');
+        setDescWarranty(d.descWarranty || '');
         setImages(d.images || []);
         setShortTitle(d.shortTitle || '');
         setModelNumber(d.modelNumber || '');
@@ -550,8 +581,9 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     if (name.length >= 30 && name.length <= 80) score += 20;
     else score += 10;
 
-    if (description.length >= 100) score += 20;
-    else if (description.length >= 40) score += 10;
+    const totalDescLen = (descOverview || '').length + (descSize || '').length + (descColor || '').length + (descMemory || '').length + (descWarranty || '').length;
+    if (totalDescLen >= 100) score += 20;
+    else if (totalDescLen >= 40) score += 10;
 
     if (images.length >= 3) score += 20;
     else if (images.length > 0) score += 10;
@@ -560,7 +592,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     if (metaDescription && metaDescription.length >= 50) score += 20;
 
     return { score, color: score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444' };
-  }, [name, description, images, seoTitle, metaDescription]);
+  }, [name, descOverview, descSize, descColor, descMemory, descWarranty, images, seoTitle, metaDescription]);
 
   const uploadImageFile = async (file) => {
     const formData = new FormData();
@@ -682,7 +714,11 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
       setTimeout(() => {
         setAiStep('Polishing details...');
         setTimeout(() => {
-          setDescription(`Experience premium luxury and top-tier capabilities with the ${name}. Fully optimized for durability and style, it sets a brand new standard in its category.\n\nKey features include high-performance design materials and optimized functionality.`);
+          setDescOverview(`Experience premium luxury and top-tier capabilities with the ${name}. Fully optimized for durability and style, it sets a brand new standard in its category.`);
+          setDescSize(`Fits true to size. Standard dimensions tailored for perfect ergonomics.`);
+          setDescColor(`Available in multiple premium finishes with smooth, high-fidelity coating.`);
+          setDescMemory(`Built with optimal capacity and high-efficiency performance modules.`);
+          setDescWarranty(`Covered by EMAHU 1-Year limited warranty policy. Easy return window applicable.`);
           setShortTitle(`Premium high-fidelity ${name} built for optimal results.`);
           setSeoTitle(`${name} | Buy Professional Edition`);
           setMetaDescription(`Get the premium ${name} with official warranty and free delivery. Order today for the best marketplace discounts.`);
@@ -702,12 +738,21 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
 
     try {
       const token = localStorage.getItem('emahu_seller_token');
+      
+      const serializedDescription = JSON.stringify({
+        overview: descOverview,
+        size: descSize,
+        color: descColor,
+        memory: descMemory,
+        warranty: descWarranty
+      });
+
       const payload = {
         name, brand, category, subcategory,
         price: parseFloat(price) || 0,
         comparePrice: parseFloat(comparePrice) || 0,
         stock: parseInt(stock) || 0,
-        description,
+        description: serializedDescription,
         image: thumbnail || (images[0] ? images[0].url : '📦'),
         images: images.map(img => img.url),
         shortTitle, modelNumber, sku, barcode, tax: parseFloat(tax), hsnCode,
@@ -747,7 +792,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
       if (data.success) {
         localStorage.removeItem('emahu_product_wizard_draft');
         triggerToast('Success', resubmitProductId ? 'Listing updated successfully!' : 'Listing requested successfully!', 'success');
-        if (onSuccess) onSuccess();
+        if (onSuccess) onSuccess(data.product);
         onClose();
       } else {
         setFormError(data.error || 'Server rejected product configuration.');
@@ -802,20 +847,19 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
             { s: 1, label: '1. Basic Info' },
             { s: 2, label: '2. Media' },
             { s: 3, label: '3. Attributes' },
-            { s: 4, label: '4. Variants Matrix' },
-            { s: 5, label: '5. Specifications' },
-            { s: 6, label: '6. Pricing' },
-            { s: 7, label: '7. Inventory' },
-            { s: 8, label: '8. Shipping' },
-            { s: 9, label: '9. Warranty & Return' },
-            { s: 10, label: '10. SEO Config' }
-          ].map(step => (
+            { s: 5, label: '4. Specifications' },
+            { s: 6, label: '5. Pricing' },
+            { s: 7, label: '6. Inventory' },
+            { s: 8, label: '7. Shipping' },
+            { s: 9, label: '8. Warranty & Return' },
+            { s: 10, label: '9. SEO Config' }
+          ].map((step, idx) => (
             <div 
               key={step.s} 
               className={`step-item ${currentStep === step.s ? 'active' : ''} ${currentStep > step.s ? 'completed' : ''}`}
               onClick={() => setCurrentStep(step.s)}
             >
-              <div className="step-badge">{currentStep > step.s ? '✓' : step.s}</div>
+              <div className="step-badge">{currentStep > step.s ? '✓' : (idx + 1)}</div>
               <div className="step-text">{step.label}</div>
             </div>
           ))}
@@ -888,14 +932,16 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                     {showBrandSuggestions && (
                       <div style={{
                         position: 'absolute', top: '100%', left: 0, width: '100%',
-                        maxHeight: '120px', overflowY: 'auto', background: '#1e293b',
-                        border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', zIndex: 999
+                        maxHeight: '120px', overflowY: 'auto', background: '#ffffff',
+                        border: '1px solid rgba(0, 0, 0, 0.15)', borderRadius: '8px', zIndex: 999,
+                        color: '#0f172a'
                       }}>
                         {matchingBrands.filter(b => b.toLowerCase().includes(brandQuery.toLowerCase())).map(b => (
                           <div 
                             key={b}
                             onMouseDown={() => { setBrand(b); setShowBrandSuggestions(false); }}
-                            style={{ padding: '8px 12px', cursor: 'pointer', hover: { background: '#334155' } }}
+                            style={{ padding: '8px 12px', cursor: 'pointer' }}
+                            className="brand-suggestion-item"
                           >
                             {b}
                           </div>
@@ -940,16 +986,64 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Detailed Description *</label>
-                  <textarea 
-                    className="form-textarea" 
-                    rows="4"
-                    placeholder="Explain specifications, warranty conditions, packaging..."
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                    required
-                  />
+                <div className="description-boxes-container" style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: 'rgba(0, 0, 0, 0.02)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(0, 0, 0, 0.06)' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#06b6d4', fontWeight: 'bold' }}>📝 Structured Product Details</h4>
+                  
+                  <div className="form-group">
+                    <label className="form-label">General Overview / Highlights *</label>
+                    <textarea 
+                      className="form-textarea" 
+                      rows="3"
+                      placeholder="General description, key features, packaging highlights..."
+                      value={descOverview}
+                      onChange={e => setDescOverview(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Size & Fit / Dimensions (Optional)</label>
+                    <textarea 
+                      className="form-textarea" 
+                      rows="2"
+                      placeholder="Sizing instructions, physical dimensions, fit parameters (e.g. Length: 10cm, Height: 5cm)..."
+                      value={descSize}
+                      onChange={e => setDescSize(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Color & Finish details (Optional)</label>
+                    <textarea 
+                      className="form-textarea" 
+                      rows="2"
+                      placeholder="Shade descriptors, matte/glossy finish, design aesthetics (e.g. Royal Blue color with chrome accents)..."
+                      value={descColor}
+                      onChange={e => setDescColor(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Memory & Storage / Tech Specifications (Optional)</label>
+                    <textarea 
+                      className="form-textarea" 
+                      rows="2"
+                      placeholder="Storage capacity, RAM config, speed, battery, processing info (e.g. 128GB ROM, 8GB RAM)..."
+                      value={descMemory}
+                      onChange={e => setDescMemory(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Warranty, Care & Policies (Optional)</label>
+                    <textarea 
+                      className="form-textarea" 
+                      rows="2"
+                      placeholder="Warranty details, maintenance guide, care tips, return specifics..."
+                      value={descWarranty}
+                      onChange={e => setDescWarranty(e.target.value)}
+                    />
+                  </div>
                 </div>
               </>
             )}
@@ -1086,7 +1180,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
             {currentStep === 4 && (
               <>
                 <h3 className="form-section-title">🧬 Variant configuration matrix</h3>
-                <div style={{ marginBottom: '16px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ marginBottom: '16px', background: 'rgba(0,0,0,0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.06)' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
                     <input 
                       type="checkbox"
@@ -1101,7 +1195,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                   <div>
                     {selectedCategoryConfig && selectedCategoryConfig.attributes && selectedCategoryConfig.attributes.filter(a => a.isVariant).length > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
-                        <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>Input variants options below separating items by commas. Matrix generates automatically.</p>
+                        <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>Input variants options below separating items by commas. Matrix generates automatically.</p>
                         
                         {selectedCategoryConfig.attributes.filter(a => a.isVariant).map((a) => {
                           const valString = variantAttributeSelections[a.name] ? variantAttributeSelections[a.name].join(', ') : '';
@@ -1121,7 +1215,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                       </div>
                     ) : (
                       <div style={{ marginBottom: '16px' }}>
-                        <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.8rem', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
+                        <div style={{ background: 'rgba(59, 130, 246, 0.08)', color: '#1d4ed8', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.8rem', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
                           No pre-configured variant attributes found for this category. You can add combinations manually using the button below.
                         </div>
                         <button
@@ -1160,10 +1254,10 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                     )}
 
                     {variantsList.length > 0 && (
-                      <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }}>
+                      <div style={{ overflowX: 'auto', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                           <thead>
-                            <tr style={{ background: 'rgba(255,255,255,0.03)', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                            <tr style={{ background: 'rgba(0,0,0,0.03)', color: '#475569', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
                               <th style={{ padding: '10px', textAlign: 'left' }}>Combination</th>
                               <th style={{ padding: '10px', textAlign: 'left' }}>SKU Code</th>
                               <th style={{ padding: '10px', textAlign: 'left' }}>MRP (₹)</th>
@@ -1175,7 +1269,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                           </thead>
                           <tbody>
                             {variantsList.map((v, i) => (
-                              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                              <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                                 <td style={{ padding: '10px' }}>
                                   {selectedCategoryConfig && selectedCategoryConfig.attributes && selectedCategoryConfig.attributes.filter(a => a.isVariant).length > 0 ? (
                                     <span style={{ fontWeight: 'bold' }}>{v.variantName}</span>
@@ -1710,7 +1804,13 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
           <button 
             type="button" 
             className="footer-btn prev"
-            onClick={() => setCurrentStep(prev => Math.max(1, prev - 1))}
+            onClick={() => {
+              if (currentStep === 5) {
+                setCurrentStep(3);
+              } else {
+                setCurrentStep(prev => Math.max(1, prev - 1));
+              }
+            }}
             disabled={currentStep === 1}
           >
             Previous Step
@@ -1749,12 +1849,9 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                         return;
                       }
                     }
-                  }
-                  if (currentStep === 4) {
-                    if (selectedCategoryConfig && selectedCategoryConfig.validationRules && selectedCategoryConfig.validationRules.variantRequired && !enableVariants) {
-                      setFormError('Setting up variations is mandatory for this category.');
-                      return;
-                    }
+                    setFormError('');
+                    setCurrentStep(5);
+                    return;
                   }
                   if (currentStep === 5) {
                     if (selectedCategoryConfig && selectedCategoryConfig.specifications) {

@@ -639,7 +639,9 @@
 }
 
 @media (max-width: 768px) {
-  .bh-location-wrap--desktop {
+  .bh-location-wrap,
+  .bh-location-wrap--desktop,
+  .bh-mobile-drawer__location {
     display: none !important;
   }
 }

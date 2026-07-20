@@ -6,9 +6,25 @@ const sendEmail = require('../utils/sendEmail');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 
+const getKeyId = () => {
+  const val = process.env.RAZORPAY_KEY_ID;
+  if (!val || val === 'undefined' || val.trim() === '') {
+    return 'rzp_test_TEYhKt96XRAfQq';
+  }
+  return val.trim();
+};
+
+const getKeySecret = () => {
+  const val = process.env.RAZORPAY_KEY_SECRET;
+  if (!val || val === 'undefined' || val.trim() === '') {
+    return 'djjOQP7AOzoLy3KTJXoonu0g';
+  }
+  return val.trim();
+};
+
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET
+  key_id: getKeyId(),
+  key_secret: getKeySecret()
 });
 
 
@@ -288,13 +304,26 @@ exports.createRazorpayOrder = async (req, res) => {
     };
 
     const razorpayOrder = await razorpay.orders.create(options);
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      order: razorpayOrder
+      order: razorpayOrder,
+      key: getKeyId()
     });
   } catch (error) {
     console.error('createRazorpayOrder error:', error);
-    res.status(500).json({ success: false, error: 'Failed to create Razorpay order: ' + error.message });
+    let errMsg = 'Unknown error';
+    if (typeof error === 'string') {
+      errMsg = error;
+    } else if (error && error.error && error.error.description) {
+      errMsg = error.error.description;
+    } else if (error && error.description) {
+      errMsg = error.description;
+    } else if (error && error.message) {
+      errMsg = error.message;
+    } else if (error) {
+      errMsg = JSON.stringify(error);
+    }
+    res.status(500).json({ success: false, error: 'Failed to create Razorpay order: ' + errMsg });
   }
 };
 
@@ -311,7 +340,7 @@ exports.verifyRazorpaySignature = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing Razorpay signature details' });
     }
 
-    const shasum = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
+    const shasum = crypto.createHmac('sha256', getKeySecret());
     shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
     const digest = shasum.digest('hex');
 
