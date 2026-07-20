@@ -1220,8 +1220,7 @@ export default function CheckoutPage() {
             ))}
 
             <div className="co-success-actions" style={{ justifyContent: 'center', marginTop: '24px', gap: '12px' }}>
-              <Link href="/buyer/orders" className="co-btn-solid">View My Orders</Link>
-              <Link href="/buyer/products" className="co-btn-outline">Continue Shopping</Link>
+              <Link href="/buyer/products" className="co-btn-solid">Continue Shopping</Link>
             </div>
           </div>
         ) : (

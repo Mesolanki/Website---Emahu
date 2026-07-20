@@ -804,6 +804,24 @@
 }
 
 @media (max-width: 640px) {
+  .co-container {
+    padding: 16px 12px 60px;
+  }
+
+  .co-success-card {
+    padding: 28px 16px;
+    margin: 12px auto;
+    border-radius: 16px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .co-success-summary-box {
+    padding: 16px;
+    margin-bottom: 24px;
+    width: 100%;
+    box-sizing: border-box;
+  }
 
   .co-input-row,
   .co-input-row-three {
@@ -831,7 +849,7 @@
   }
 
   .co-form-bento {
-    padding: 24px;
+    padding: 20px 16px;
   }
 
   .co-btn-lock-Emahu {

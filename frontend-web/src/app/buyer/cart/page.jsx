@@ -791,20 +791,20 @@ export default function CartPage() {
                     </div>
                     {/* Stock availability badge */}
                     {p.stock <= 0 ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: '700', color: '#dc2626', background: 'rgba(220,38,38,0.08)', borderRadius: '6px', padding: '2px 8px', marginTop: '4px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: '700', color: '#dc2626', background: 'rgba(220,38,38,0.08)', borderRadius: '6px', padding: '2px 8px', marginTop: '4px', width: 'fit-content', maxWidth: '100%' }}>
                         ✕ Out of Stock
                       </span>
                     ) : p.stock <= 5 ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: '700', color: '#d97706', background: 'rgba(217,119,6,0.08)', borderRadius: '6px', padding: '2px 8px', marginTop: '4px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: '700', color: '#d97706', background: 'rgba(217,119,6,0.08)', borderRadius: '6px', padding: '2px 8px', marginTop: '4px', width: 'fit-content', maxWidth: '100%' }}>
                         ⚡ Only {p.stock} left in stock
                       </span>
                     ) : (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: '700', color: '#16a34a', background: 'rgba(22,163,74,0.08)', borderRadius: '6px', padding: '2px 8px', marginTop: '4px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: '700', color: '#16a34a', background: 'rgba(22,163,74,0.08)', borderRadius: '6px', padding: '2px 8px', marginTop: '4px', width: 'fit-content', maxWidth: '100%' }}>
                         ✓ In Stock ({p.stock} available)
                       </span>
                     )}
                     {p.verified && (
-                      <span className="cart-item-row__verified">
+                      <span className="cart-item-row__verified" style={{ marginTop: '4px', width: 'fit-content' }}>
                         🛡️ 100% EMAHU Hub Verified
                       </span>
                     )}
@@ -874,9 +874,9 @@ export default function CartPage() {
                   <p style={{ margin: '0 0 16px 0', fontSize: '0.76rem', color: '#64748b', lineHeight: '1.4' }}>
                     Add these matching products to your cart for combined shipping!
                   </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                  <div className="cart-suggestions-grid">
                     {cartSuggestions.map((s, idx) => (
-                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', justifyContent: 'space-between' }}>
+                      <div key={idx} className="cart-suggestion-card">
                         <div>
                           <div style={{ width: '100%', height: '110px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', marginBottom: '10px' }}>
                             {isRealImage(s.img) ? (
