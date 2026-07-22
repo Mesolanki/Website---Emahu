@@ -2,7 +2,7 @@ import API_BASE from './config';
 
 /**
  * Universal safe fetch function for EMAHU Web Client.
- * 1. Automatically resolves relative URLs (/api/...) against API_BASE.
+ * 1. Automatically normalizes URLs (e.g. /auth/... -> /api/auth/...) and prepends API_BASE.
  * 2. Automatically retries 502/503/504 cloud cold-start wakeups.
  * 3. Inspects response Content-Type to prevent "Unexpected token '<'" JSON parse crashes.
  * 4. Returns unified response object with a safe .json() helper method.
@@ -11,6 +11,13 @@ export async function safeFetch(url, options = {}, retries = 2, delayMs = 1500) 
   let targetUrl = url;
 
   if (typeof targetUrl === 'string') {
+    // If URL starts with /auth/ or auth/ (missing /api prefix), normalize to /api/auth/
+    if (targetUrl.startsWith('/auth/') || targetUrl.startsWith('auth/')) {
+      const cleanAuthPath = targetUrl.startsWith('/') ? targetUrl : '/' + targetUrl;
+      targetUrl = `/api${cleanAuthPath}`;
+    }
+
+    // Prepend API_BASE if relative path (/api/...)
     if (targetUrl.startsWith('/api') || targetUrl.startsWith('api/')) {
       const cleanPath = targetUrl.startsWith('/') ? targetUrl : '/' + targetUrl;
       targetUrl = `${API_BASE}${cleanPath}`;

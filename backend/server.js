@@ -93,8 +93,11 @@ app.get('/', (req, res) => {
 
 // Register API Routes
 app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes); // Aliased route without /api prefix for compatibility
 app.use('/api/products', productRoutes);
+app.use('/products', productRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/orders', orderRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/audit', auditRoutes);
