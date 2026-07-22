@@ -658,9 +658,19 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
             }));
             setThumbnail(prev => prev ? prev : url);
           } catch (err) {
-            console.error('File upload error:', err);
-            setImages(prev => prev.filter(item => item.tempId !== tempId));
-            setFormError('Failed to upload image. Please try again.');
+            console.warn('Server upload error, applying Base64 image fallback:', err);
+            setImages(prev => prev.map(item => {
+              if (item.tempId === tempId) {
+                return {
+                  ...item,
+                  url: dataUrl,
+                  quality: qualityStatus,
+                  loading: false
+                };
+              }
+              return item;
+            }));
+            setThumbnail(prev => prev ? prev : dataUrl);
           }
         };
       };

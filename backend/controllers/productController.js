@@ -5,7 +5,25 @@ const Product = require('../models/Product');
 // @access  Private (Seller only)
 exports.createProduct = async (req, res) => {
   try {
-    const { name, brand, category, price, comparePrice, stock, description, image } = req.body;
+    const { name, brand, category, price, comparePrice, stock, description } = req.body;
+
+    let primaryImage = '';
+    if (typeof req.body.image === 'string' && req.body.image.trim()) {
+      primaryImage = req.body.image.trim();
+    } else if (Array.isArray(req.body.images) && req.body.images.length > 0 && typeof req.body.images[0] === 'string') {
+      primaryImage = req.body.images[0].trim();
+    } else if (typeof req.body.thumbnail === 'string' && req.body.thumbnail.trim()) {
+      primaryImage = req.body.thumbnail.trim();
+    }
+
+    if (!primaryImage) {
+      primaryImage = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
+    }
+
+    let allImages = Array.isArray(req.body.images) ? req.body.images.filter(i => typeof i === 'string' && i.trim()) : [];
+    if (primaryImage && !allImages.includes(primaryImage)) {
+      allImages.unshift(primaryImage);
+    }
 
     // Validation
     if (
@@ -15,8 +33,7 @@ exports.createProduct = async (req, res) => {
       price === undefined || isNaN(parseFloat(price)) || parseFloat(price) <= 0 ||
       comparePrice === undefined || isNaN(parseFloat(comparePrice)) || parseFloat(comparePrice) <= 0 ||
       stock === undefined || isNaN(parseInt(stock)) || parseInt(stock) < 0 ||
-      !description || !description.trim() ||
-      !image || !image.trim()
+      !description || !description.trim()
     ) {
       return res.status(400).json({
         success: false,
@@ -44,17 +61,17 @@ exports.createProduct = async (req, res) => {
     } = req.body;
 
     const product = await Product.create({
-      name,
-      brand,
+      name: name.trim(),
+      brand: brand.trim(),
       sku: tempSku,
       category,
       subcategory: req.body.subcategory || 'General',
-      price,
-      comparePrice,
-      stock,
-      description,
-      image,
-      images: req.body.images || [],
+      price: parseFloat(price),
+      comparePrice: parseFloat(comparePrice),
+      stock: parseInt(stock),
+      description: description.trim(),
+      image: primaryImage,
+      images: allImages,
       sizes: Array.isArray(req.body.sizes) ? req.body.sizes : [],
       colors: Array.isArray(req.body.colors) ? req.body.colors : [],
       seller: req.user.id,
@@ -385,7 +402,7 @@ exports.verifyProduct = async (req, res) => {
 // @access  Private (Seller only)
 exports.resubmitProduct = async (req, res) => {
   try {
-    const { name, brand, sku, category, price, comparePrice, stock, description, image } = req.body;
+    const { name, brand, sku, category, price, comparePrice, stock, description } = req.body;
     const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ success: false, error: 'Product not found' });
@@ -398,6 +415,24 @@ exports.resubmitProduct = async (req, res) => {
 
     const finalSku = (sku || product.sku || '').trim();
 
+    let primaryImage = product.image || '';
+    if (typeof req.body.image === 'string' && req.body.image.trim()) {
+      primaryImage = req.body.image.trim();
+    } else if (Array.isArray(req.body.images) && req.body.images.length > 0 && typeof req.body.images[0] === 'string') {
+      primaryImage = req.body.images[0].trim();
+    } else if (typeof req.body.thumbnail === 'string' && req.body.thumbnail.trim()) {
+      primaryImage = req.body.thumbnail.trim();
+    }
+
+    if (!primaryImage) {
+      primaryImage = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
+    }
+
+    let allImages = Array.isArray(req.body.images) ? req.body.images.filter(i => typeof i === 'string' && i.trim()) : (product.images || []);
+    if (primaryImage && !allImages.includes(primaryImage)) {
+      allImages.unshift(primaryImage);
+    }
+
     // Validation
     if (
       !name || !name.trim() ||
@@ -407,8 +442,7 @@ exports.resubmitProduct = async (req, res) => {
       price === undefined || isNaN(parseFloat(price)) || parseFloat(price) <= 0 ||
       comparePrice === undefined || isNaN(parseFloat(comparePrice)) || parseFloat(comparePrice) <= 0 ||
       stock === undefined || isNaN(parseInt(stock)) || parseInt(stock) < 0 ||
-      !description || !description.trim() ||
-      !image || !image.trim()
+      !description || !description.trim()
     ) {
       return res.status(400).json({
         success: false,
@@ -435,15 +469,15 @@ exports.resubmitProduct = async (req, res) => {
     // Update values
     product.name = name.trim();
     product.brand = brand.trim();
-    product.sku = sku.trim().toUpperCase();
+    product.sku = finalSku.toUpperCase();
     product.category = category;
     product.subcategory = req.body.subcategory !== undefined ? req.body.subcategory : product.subcategory;
     product.price = parseFloat(price);
     product.comparePrice = parseFloat(comparePrice);
     product.stock = parseInt(stock);
     product.description = description.trim();
-    product.image = image.trim();
-    product.images = req.body.images || [];
+    product.image = primaryImage;
+    product.images = allImages;
     product.sizes = Array.isArray(req.body.sizes) ? req.body.sizes : product.sizes;
     product.colors = Array.isArray(req.body.colors) ? req.body.colors : product.colors;
 

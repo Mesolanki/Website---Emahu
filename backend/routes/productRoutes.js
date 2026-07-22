@@ -20,10 +20,16 @@ router.post('/upload', protect, authorize('seller'), upload.single('image'), (re
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'Please upload an image file' });
     }
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    const hostHeader = req.get('host') || '';
+    let publicBase = `${req.protocol}://${hostHeader}`;
+    if (hostHeader.includes('127.0.0.1') || hostHeader.includes('localhost') || process.env.PUBLIC_APP_URL) {
+      publicBase = process.env.PUBLIC_APP_URL || 'https://emahu.com';
+    }
+    const fileUrl = `${publicBase}/uploads/${req.file.filename}`;
     res.status(200).json({
       success: true,
-      url: fileUrl
+      url: fileUrl,
+      relativePath: `/uploads/${req.file.filename}`
     });
   } catch (error) {
     console.error('File Upload Route Error:', error);

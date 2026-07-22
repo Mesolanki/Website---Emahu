@@ -26,8 +26,8 @@ const app = express();
 connectDB();
 
 // Middleware
-app.use(express.json({ limit: '10mb' })); // Parse JSON requests up to 10mb
-app.use(express.urlencoded({ limit: '10mb', extended: true })); // Parse url-encoded requests up to 10mb
+app.use(express.json({ limit: '50mb' })); // Parse JSON requests up to 50mb
+app.use(express.urlencoded({ limit: '50mb', extended: true })); // Parse url-encoded requests up to 50mb
 app.use(cookieParser()); // Parse cookies from headers
 
 // Serve uploaded product files statically
