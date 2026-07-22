@@ -3,8 +3,9 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 const RAW_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-const CLIENT_ID = (RAW_CLIENT_ID && RAW_CLIENT_ID !== 'undefined' && RAW_CLIENT_ID !== 'null') ? RAW_CLIENT_ID.trim() : '';
-const isGoogleEnabled = !!(CLIENT_ID && !CLIENT_ID.includes('1emahu0982347109283740192837'));
+const DEFAULT_CLIENT_ID = '99676552821-bfllodch8jnjal3gg9hujrledlsm61ul.apps.googleusercontent.com';
+const CLIENT_ID = (RAW_CLIENT_ID && RAW_CLIENT_ID !== 'undefined' && RAW_CLIENT_ID !== 'null') ? RAW_CLIENT_ID.trim() : DEFAULT_CLIENT_ID;
+const isGoogleEnabled = true;
 
 /**
  * Reusable hook to trigger Google Sign-In natively on the current page.
