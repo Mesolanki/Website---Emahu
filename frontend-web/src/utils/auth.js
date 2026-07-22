@@ -38,6 +38,28 @@ export async function fetchWithRetry(url, options = {}, retries = 2, delayMs = 2
 }
 
 /**
+ * Safely parses response JSON. If response is HTML (e.g. 404/502 error page), extracts error message cleanly.
+ */
+export async function safeParseJson(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html') || contentType.includes('text/plain')) {
+    const text = await response.text();
+    if (response.status === 404) {
+      throw new Error(`API Endpoint Not Found (404). Please verify backend server deployment.`);
+    } else if (response.status === 502 || response.status === 503 || response.status === 504) {
+      throw new Error(`Database / Server is starting up (${response.status}). Please retry in a few seconds.`);
+    }
+    throw new Error(`Server returned non-JSON response (${response.status}).`);
+  }
+
+  try {
+    return await response.json();
+  } catch (err) {
+    throw new Error(`Invalid server response format (${response.status}).`);
+  }
+}
+
+/**
  * Helper to get default fetch headers
  */
 const getHeaders = (token = null) => {
@@ -61,7 +83,7 @@ export async function registerUser(userData) {
       body: JSON.stringify(userData),
     });
 
-    const data = await response.json();
+    const data = await safeParseJson(response);
     if (!response.ok) {
       throw new Error(data.error || 'Registration failed');
     }
@@ -83,7 +105,7 @@ export async function loginUser(email, password, role) {
       body: JSON.stringify({ email, password, role }),
     });
 
-    const data = await response.json();
+    const data = await safeParseJson(response);
     if (!response.ok) {
       throw new Error(data.error || 'Invalid credentials');
     }
@@ -105,7 +127,7 @@ export async function googleLoginUser({ email, name, role, idToken }) {
       body: JSON.stringify({ email, name, role, idToken }),
     });
 
-    const data = await response.json();
+    const data = await safeParseJson(response);
     if (!response.ok) {
       throw new Error(data.error || 'Google login failed');
     }
@@ -125,7 +147,7 @@ export async function logoutUser() {
       method: 'POST',
       headers: getHeaders(),
     });
-    return await response.json();
+    return await safeParseJson(response);
   } catch (error) {
     console.error('API Logout Error:', error.message);
     return { success: false, error: error.message };
@@ -142,7 +164,7 @@ export async function getProfile(token) {
       headers: getHeaders(token),
     });
 
-    const data = await response.json();
+    const data = await safeParseJson(response);
     if (!response.ok) {
       throw new Error(data.error || 'Failed to fetch profile');
     }
