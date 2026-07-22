@@ -75,7 +75,7 @@ exports.createProduct = async (req, res) => {
       sizes: Array.isArray(req.body.sizes) ? req.body.sizes : [],
       colors: Array.isArray(req.body.colors) ? req.body.colors : [],
       seller: req.user.id,
-      approvalStatus: 'approved',
+      approvalStatus: req.user.role === 'admin' ? 'approved' : 'pending',
       adminCode: undefined,
       approvalAttempts: 0,
       
@@ -117,16 +117,16 @@ exports.createProduct = async (req, res) => {
       specifications: req.body.specifications || {}
     });
 
-    // Notify all admins in bulk
+    // Notify all admins in bulk of new pending product request
     const User = require('../models/User');
     const Notification = require('../models/Notification');
     const admins = await User.find({ role: 'admin' }).select('_id');
     if (admins.length > 0) {
       const notifications = admins.map(admin => ({
         recipient: admin._id,
-        title: 'New Product Listed',
-        message: `Product "${product.name}" has been listed by "${req.user.name}" and is approved.`,
-        type: 'info'
+        title: 'New Product Pending Verification',
+        message: `Product "${product.name}" has been listed by seller "${req.user.name}" and requires admin approval.`,
+        type: 'warning'
       }));
       await Notification.insertMany(notifications);
     }
@@ -519,8 +519,8 @@ exports.resubmitProduct = async (req, res) => {
     product.variants = Array.isArray(variants) ? variants : product.variants;
     product.specifications = req.body.specifications !== undefined ? req.body.specifications : product.specifications;
 
-    // Reset verification to approved
-    product.approvalStatus = 'approved';
+    // Reset verification to pending for admin review
+    product.approvalStatus = 'pending';
     product.rejectionReason = undefined;
     product.adminCode = undefined;
 

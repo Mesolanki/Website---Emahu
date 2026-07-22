@@ -251,9 +251,8 @@ exports.register = async (req, res) => {
       serviceAreaState,
       serviceAreaCity,
       perKmRate,
-      coveredCities,
       deliveryScope,
-      status: 'approved'
+      status: (role === 'seller' || role === 'delivery') ? 'pending' : 'approved'
     });
 
     // Notify all admins of new seller registration
@@ -263,9 +262,9 @@ exports.register = async (req, res) => {
       for (const admin of admins) {
         await Notification.create({
           recipient: admin._id,
-          title: 'New Seller Registration',
-          message: `Seller "${name}" (${storeName || 'N/A'}) has registered and is approved.`,
-          type: 'info'
+          title: 'New Seller Registration Pending Approval',
+          message: `Seller "${name}" (${storeName || 'N/A'}) has registered and requires admin verification.`,
+          type: 'warning'
         });
       }
     }
