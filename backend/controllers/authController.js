@@ -1125,7 +1125,7 @@ exports.uploadDocument = async (req, res) => {
         });
       }
       doc.fileUrl = fileUrl;
-      doc.status = 'approved';
+      doc.status = 'pending';
       doc.feedback = '';
       await doc.save();
     } else {
@@ -1133,14 +1133,14 @@ exports.uploadDocument = async (req, res) => {
         seller: req.user._id,
         documentType,
         fileUrl,
-        status: 'approved'
+        status: 'pending'
       });
     }
 
-    // Update seller status back to approved if they were in more_info_requested
+    // Update seller status back to pending if they were in more_info_requested
     if (req.user.status === 'more_info_requested') {
       const user = await User.findById(req.user._id);
-      user.status = 'approved';
+      user.status = 'pending';
       await user.save();
     }
 
