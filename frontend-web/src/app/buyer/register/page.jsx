@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './buyer-register.css';
 import { registerUser, saveAuthSession, googleLoginUser, fetchWithRetry } from '@/utils/auth';
-import { useGoogleAuth } from '@/utils/useGoogleAuth';
-import { detectLocationWithGPS } from '@/utils/location';
 import { wakeupServer } from '@/utils/serverWakeup';
 
 /**
@@ -224,30 +222,6 @@ export default function BuyerRegister() {
       setErrors((prev) => ({ ...prev, otp: err.message || 'Invalid or expired verification code.' }));
     } finally {
       setOtpLoading(false);
-    }
-  };
-
-  const handleGPSDetectRegister = async () => {
-    setGpsDetectLoading(true);
-    setErrors((prev) => ({ ...prev, general: '' }));
-    try {
-      const res = await detectLocationWithGPS();
-      setFormData((prev) => ({
-        ...prev,
-        address: res.streetAddress || res.fullAddress || prev.address,
-        city: res.city || prev.city,
-        state: res.state || prev.state,
-        zipCode: res.pincode || prev.zipCode,
-      }));
-      setErrors((prev) => ({ ...prev, address: '', city: '', state: '', zipCode: '' }));
-    } catch (err) {
-      console.error('Registration GPS detect error:', err);
-      setErrors((prev) => ({
-        ...prev,
-        general: 'Unable to detect GPS location. Please allow browser location access or enter your address manually.',
-      }));
-    } finally {
-      setGpsDetectLoading(false);
     }
   };
 

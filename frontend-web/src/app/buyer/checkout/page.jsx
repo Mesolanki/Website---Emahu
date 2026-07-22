@@ -1444,22 +1444,11 @@ export default function CheckoutPage() {
                           </div>
                         </div>
 
-                        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          <button
-                            type="button"
-                            className="co-btn-outline"
-                            onClick={handleGPSDetect}
-                            style={{ width: 'max-content', padding: '10px 16px', fontSize: '0.85rem', fontWeight: '700' }}
-                          >
-                            📡 Autofill with Current Location (GPS)
-                          </button>
-
-                          {deliveryCalculationError && (
-                            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '0.82rem', fontWeight: '600' }}>
-                              ⚠️ {deliveryCalculationError}
-                            </div>
-                          )}
-                        </div>
+                        {deliveryCalculationError && (
+                          <div style={{ marginTop: '16px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '0.82rem', fontWeight: '600' }}>
+                            ⚠️ {deliveryCalculationError}
+                          </div>
+                        )}
                       </div>
                     </>
                   )}

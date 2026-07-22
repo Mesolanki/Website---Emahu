@@ -1139,11 +1139,6 @@ export default function CartPage() {
                     alert(`Checkout Blocked: Please confirm receipt of your arrived order #${deliveredOrderId} before placing a new order.`);
                     return;
                   }
-                  if (!buyerCoordinates.latitude || !buyerCoordinates.longitude) {
-                    e.preventDefault();
-                    alert('Location Required: You must share your GPS location to calculate transit delivery fee before proceeding to checkout.');
-                    return;
-                  }
                   window.location.href = '/buyer/checkout';
                 }}
                 disabled={hasDeliveredOrder}
@@ -1185,11 +1180,6 @@ export default function CartPage() {
               if (hasDeliveredOrder) {
                 e.preventDefault();
                 alert(`Checkout Blocked: Please confirm receipt of your arrived order #${deliveredOrderId} before placing a new order.`);
-                return;
-              }
-              if (!buyerCoordinates.latitude || !buyerCoordinates.longitude) {
-                e.preventDefault();
-                alert('Location Required: You must share your GPS location to calculate transit delivery fee before proceeding to checkout.');
                 return;
               }
               window.location.href = '/buyer/checkout';
