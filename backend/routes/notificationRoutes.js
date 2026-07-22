@@ -7,7 +7,8 @@ const { protect } = require('../middleware/authMiddleware');
 // @route   GET /api/notifications
 router.get('/', protect, async (req, res) => {
   try {
-    const notifications = await Notification.find({ recipient: req.user._id }).sort({ createdAt: -1 });
+    const userId = req.user.id || req.user._id;
+    const notifications = await Notification.find({ recipient: userId }).sort({ createdAt: -1 });
     res.status(200).json({ success: true, notifications });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -18,8 +19,9 @@ router.get('/', protect, async (req, res) => {
 // @route   PUT /api/notifications/:id/read
 router.put('/:id/read', protect, async (req, res) => {
   try {
+    const userId = req.user.id || req.user._id;
     const notification = await Notification.findOneAndUpdate(
-      { _id: req.params.id, recipient: req.user._id },
+      { _id: req.params.id, recipient: userId },
       { isRead: true },
       { new: true }
     );
