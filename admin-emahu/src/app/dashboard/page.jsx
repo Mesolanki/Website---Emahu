@@ -5,8 +5,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './dashboard.css';
 import { logoutUser, clearAuthSession } from '@/utils/auth';
-import { indiaStatesCities } from '@/utils/indiaStatesCities';
+import API_BASE from '@/utils/config';
+
 let toastIdCounter = 0;
+
+const getAdminApiUrl = (endpoint) => {
+  const base = API_BASE.replace(/\/$/, '');
+  const clean = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
+  return `${base}${clean}`;
+};
 
 const resolveDocUrl = (url) => {
   if (!url || typeof url !== 'string') return '';
@@ -14,9 +21,12 @@ const resolveDocUrl = (url) => {
   if (clean.startsWith('data:')) {
     return clean;
   }
-  let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+  let apiUrl = API_BASE;
   apiUrl = apiUrl.replace(/\/api\/auth$/, '').replace(/\/api$/, '').replace(/\/$/, '');
   clean = clean.replace(/^http:\/\/(localhost|127\.0\.0\.1):5000/, apiUrl);
+  if (clean.startsWith('http:') && typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    clean = clean.replace('http:', 'https:');
+  }
   return clean;
 };
 
@@ -429,7 +439,7 @@ export default function AdminDashboard() {
       const token = localStorage.getItem('emahu_admin_token');
       if (!token) return;
 
-      const res = await fetch(`/api/auth/admin/sellers`, {
+      const res = await fetch(getAdminApiUrl('/api/auth/admin/sellers'), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -484,7 +494,7 @@ export default function AdminDashboard() {
       const token = localStorage.getItem('emahu_admin_token');
       if (!token) return;
 
-      const res = await fetch(`/api/products/admin/all`, {
+      const res = await fetch(getAdminApiUrl('/api/products/admin/all'), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -535,7 +545,7 @@ export default function AdminDashboard() {
     setLoadingAdminCategories(true);
     setAdminCategoriesError(false);
     try {
-      const res = await fetch(`/api/categories?status=all`);
+      const res = await fetch(getAdminApiUrl('/api/categories?status=all'));
       const data = await res.json();
       if (data.success) {
         setAdminCategories(data.data || []);
@@ -629,8 +639,8 @@ export default function AdminDashboard() {
       };
 
       const url = isNew
-        ? `/api/categories`
-        : `/api/categories/${selectedAdminCategory.id || selectedAdminCategory._id}`;
+        ? getAdminApiUrl('/api/categories')
+        : getAdminApiUrl(`/api/categories/${selectedAdminCategory.id || selectedAdminCategory._id}`);
 
       const method = isNew ? 'POST' : 'PUT';
 
@@ -667,7 +677,7 @@ export default function AdminDashboard() {
     if (!window.confirm('Are you sure you want to permanently delete this category? Any children subcategories will be unnested.')) return;
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/categories/${catId}`, {
+      const res = await fetch(getAdminApiUrl(`/api/categories/${catId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -695,7 +705,7 @@ export default function AdminDashboard() {
       const token = localStorage.getItem('emahu_admin_token');
       if (!token) return;
 
-      const res = await fetch(`/api/orders/admin/all`, {
+      const res = await fetch(getAdminApiUrl('/api/orders/admin/all'), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -741,7 +751,7 @@ export default function AdminDashboard() {
       const token = localStorage.getItem('emahu_admin_token');
       if (!token) return;
 
-      const res = await fetch(`/api/auth/admin/delivery-partners`, {
+      const res = await fetch(getAdminApiUrl('/api/auth/admin/delivery-partners'), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -773,7 +783,7 @@ export default function AdminDashboard() {
     setActionLoadingOrder(prev => ({ ...prev, [orderId]: true }));
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/orders/${orderId}`, {
+      const res = await fetch(getAdminApiUrl(`/api/orders/${orderId}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -829,7 +839,7 @@ export default function AdminDashboard() {
       const penaltyAmt = parseFloat(adminPenaltyAmount) || 0;
       const netPayout = parseFloat((productAmount - feeAmount - penaltyAmt).toFixed(2));
 
-      const res = await fetch(`/api/orders/${orderId}`, {
+      const res = await fetch(getAdminApiUrl(`/api/orders/${orderId}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -999,7 +1009,7 @@ export default function AdminDashboard() {
     setNotificationsError(false);
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/notifications`, {
+      const res = await fetch(getAdminApiUrl('/api/notifications'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -1021,14 +1031,13 @@ export default function AdminDashboard() {
     }
   };
 
-  // Mark all notifications read
   // Mark all notifications read in parallel
   const markAllNotificationsRead = async () => {
     try {
       const token = localStorage.getItem('emahu_admin_token');
       const unread = notifications.filter(n => !n.isRead);
       const promises = unread.map(n =>
-        fetch(`/api/notifications/${n._id}/read`, {
+        fetch(getAdminApiUrl(`/api/notifications/${n._id}/read`), {
           method: 'PUT',
           headers: { 'Authorization': `Bearer ${token}` }
         }).then(res => {
@@ -1052,7 +1061,7 @@ export default function AdminDashboard() {
     setLoadingDocsSellerId(sellerId);
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/auth/admin/sellers/${sellerId}/documents`, {
+      const res = await fetch(getAdminApiUrl(`/api/auth/admin/sellers/${sellerId}/documents`), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -1079,7 +1088,7 @@ export default function AdminDashboard() {
     setSellerOrdersError(false);
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/orders?sellerId=${sellerId}`, {
+      const res = await fetch(getAdminApiUrl(`/api/orders?sellerId=${sellerId}`), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -1109,7 +1118,7 @@ export default function AdminDashboard() {
 
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/orders/${orderId}`, {
+      const res = await fetch(getAdminApiUrl(`/api/orders/${orderId}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1142,7 +1151,7 @@ export default function AdminDashboard() {
 
       // 1. If penaltyAmount is > 0, first save it to the order
       if (parseFloat(penaltyAmount) > 0) {
-        const orderRes = await fetch(`/api/orders/${orderId}`, {
+        const orderRes = await fetch(getAdminApiUrl(`/api/orders/${orderId}`), {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -1162,7 +1171,7 @@ export default function AdminDashboard() {
       }
 
       // 2. Call the release endpoint
-      const releaseRes = await fetch(`/api/payment/release/${orderId}`, {
+      const releaseRes = await fetch(getAdminApiUrl(`/api/payment/release/${orderId}`), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1207,7 +1216,7 @@ export default function AdminDashboard() {
   const handleVerifySellerDocument = async (sellerId, docId, status, feedback = '') => {
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/auth/admin/sellers/${sellerId}/documents/${docId}`, {
+      const res = await fetch(getAdminApiUrl(`/api/auth/admin/sellers/${sellerId}/documents/${docId}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1239,7 +1248,7 @@ export default function AdminDashboard() {
   const handle2FASetup = async () => {
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/auth/admin/2fa/setup`, {
+      const res = await fetch(getAdminApiUrl('/api/auth/admin/2fa/setup'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -1263,7 +1272,7 @@ export default function AdminDashboard() {
   const handle2FAVerify = async () => {
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/auth/admin/2fa/verify`, {
+      const res = await fetch(getAdminApiUrl('/api/auth/admin/2fa/verify'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1298,7 +1307,7 @@ export default function AdminDashboard() {
   const handle2FADisable = async () => {
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/auth/admin/2fa/disable`, {
+      const res = await fetch(getAdminApiUrl('/api/auth/admin/2fa/disable'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1332,7 +1341,7 @@ export default function AdminDashboard() {
   const fetchPlatformSettings = async () => {
     setLoadingPlatformSettings(true);
     try {
-      const res = await fetch(`/api/payment/settings`);
+      const res = await fetch(getAdminApiUrl('/api/payment/settings'));
       const data = await res.json();
       if (data.success) {
         setPlatformFeePercent(data.platformFeePercent);
@@ -1354,7 +1363,7 @@ export default function AdminDashboard() {
     setSavingPlatformSettings(true);
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/payment/settings`, {
+      const res = await fetch(getAdminApiUrl('/api/payment/settings'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1384,7 +1393,7 @@ export default function AdminDashboard() {
   const fetchDeliverySettings = async () => {
     setLoadingSettings(true);
     try {
-      const res = await fetch('/api/delivery/settings');
+      const res = await fetch(getAdminApiUrl('/api/delivery/settings'));
       const data = await res.json();
       if (data.success) {
         setDeliverySettings(data.settings || { slabs: [] });
@@ -1400,7 +1409,7 @@ export default function AdminDashboard() {
   const handleSaveDeliverySettings = async (updatedSettings) => {
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch('/api/delivery/settings', {
+      const res = await fetch(getAdminApiUrl('/api/delivery/settings'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1671,7 +1680,7 @@ export default function AdminDashboard() {
     const generatedPassword = 'default_delivery_pass_123';
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch('/api/delivery/partners', {
+      const res = await fetch(getAdminApiUrl('/api/delivery/partners'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1767,7 +1776,7 @@ export default function AdminDashboard() {
 
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/delivery/partners/${partnerId}`, {
+      const res = await fetch(getAdminApiUrl(`/api/delivery/partners/${partnerId}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1825,7 +1834,7 @@ export default function AdminDashboard() {
     setActionLoading(prev => ({ ...prev, [id]: true }));
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/auth/admin/sellers/${id}/decision`, {
+      const res = await fetch(getAdminApiUrl(`/api/auth/admin/sellers/${id}/decision`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1855,7 +1864,7 @@ export default function AdminDashboard() {
     setActionLoading(prev => ({ ...prev, [id]: true }));
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/auth/admin/delivery-partners/${id}/decision`, {
+      const res = await fetch(getAdminApiUrl(`/api/auth/admin/delivery-partners/${id}/decision`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1888,7 +1897,7 @@ export default function AdminDashboard() {
     setActionLoading(prev => ({ ...prev, [id]: true }));
     try {
       const token = localStorage.getItem('emahu_admin_token');
-      const res = await fetch(`/api/products/${id}/admin-decision`, {
+      const res = await fetch(getAdminApiUrl(`/api/products/${id}/admin-decision`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

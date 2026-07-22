@@ -2874,25 +2874,37 @@ export default function EmahuProDashboard() {
     };
 
     const processFiles = (files) => {
-      files.forEach(async (file) => {
+      files.forEach((file) => {
         if (!file.type.startsWith('image/')) return;
         
-        const tempId = Math.random().toString();
-        setNewProductImages(prev => [...prev, `uploading-${tempId}`]);
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const dataUrl = e.target.result;
+          const tempId = Math.random().toString();
+          setNewProductImages(prev => [...prev, `uploading-${tempId}`]);
 
-        try {
-          const url = await uploadImageFile(file);
-          setNewProductImages(prev => prev.map(img => {
-            if (img === `uploading-${tempId}`) {
-              return url;
+          try {
+            let url = await uploadImageFile(file);
+            if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http:')) {
+              url = url.replace('http:', 'https:');
             }
-            return img;
-          }));
-        } catch (err) {
-          console.error(err);
-          setNewProductImages(prev => prev.filter(img => img !== `uploading-${tempId}`));
-          triggerToast('Upload Error', 'Failed to upload image.', 'danger');
-        }
+            setNewProductImages(prev => prev.map(img => {
+              if (img === `uploading-${tempId}`) {
+                return url;
+              }
+              return img;
+            }));
+          } catch (err) {
+            console.warn('Server image upload error, using Base64 fallback:', err);
+            setNewProductImages(prev => prev.map(img => {
+              if (img === `uploading-${tempId}`) {
+                return dataUrl;
+              }
+              return img;
+            }));
+          }
+        };
+        reader.readAsDataURL(file);
       });
     };
 
@@ -3026,10 +3038,14 @@ export default function EmahuProDashboard() {
                 ) : (
                   <>
                     <img
-                      src={img}
+                      src={typeof window !== 'undefined' && window.location.protocol === 'https:' && img.startsWith('http:') ? img.replace('http:', 'https:') : img}
                       alt={`Product img ${idx + 1}`}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => { e.target.src = 'https://placehold.co/60x60?text=Error'; }}
+                      onError={(e) => {
+                        if (img.startsWith('http:') && typeof window !== 'undefined' && window.location.protocol === 'https:') {
+                          e.target.src = img.replace('http:', 'https:');
+                        }
+                      }}
                     />
                     <button
                       type="button"
