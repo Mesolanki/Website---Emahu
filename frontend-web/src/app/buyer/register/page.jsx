@@ -289,9 +289,9 @@ export default function BuyerRegister() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1 && validateStep1()) {
-      setStep(2);
+      await handleSendEmailOtp();
     }
   };
 
