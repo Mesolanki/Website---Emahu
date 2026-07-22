@@ -3,9 +3,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 const RAW_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-const DEFAULT_CLIENT_ID = '1047648491873-1emahu0982347109283740192837.apps.googleusercontent.com';
-const CLIENT_ID = (RAW_CLIENT_ID && RAW_CLIENT_ID !== 'undefined' && RAW_CLIENT_ID !== 'null') ? RAW_CLIENT_ID.trim() : DEFAULT_CLIENT_ID;
-const isGoogleEnabled = true;
+const CLIENT_ID = (RAW_CLIENT_ID && RAW_CLIENT_ID !== 'undefined' && RAW_CLIENT_ID !== 'null') ? RAW_CLIENT_ID.trim() : '';
+const isGoogleEnabled = !!(CLIENT_ID && !CLIENT_ID.includes('1emahu0982347109283740192837'));
 
 /**
  * Reusable hook to trigger Google Sign-In natively on the current page.
@@ -36,7 +35,6 @@ export function useGoogleAuth(onSuccess, onError) {
     const currentOrigin = window.location.origin;
     console.log("[GIS_DIAGNOSTIC] Current origin:", currentOrigin);
     console.log("[GIS_DIAGNOSTIC] Loaded Client ID:", CLIENT_ID || "(missing/empty)");
-    console.log("[GIS_DIAGNOSTIC] Google Sign-In enabled state:", isGoogleEnabled);
 
     if (!isGoogleEnabled) {
       console.warn("[GIS_DIAGNOSTIC] Google Sign-In is disabled because NEXT_PUBLIC_GOOGLE_CLIENT_ID is not properly configured in .env files.");
@@ -114,11 +112,9 @@ export function useGoogleAuth(onSuccess, onError) {
 
     return () => {
       active = false;
-      // Clean up outstanding prompts on unmount to prevent memory leaks and credentials collision
       if (typeof window !== 'undefined' && window.google?.accounts?.id) {
         try {
           window.google.accounts.id.cancel();
-          console.log("[GIS_DIAGNOSTIC] Canceled outstanding Google Sign-In prompts on unmount.");
         } catch (_) {}
       }
     };
@@ -127,11 +123,11 @@ export function useGoogleAuth(onSuccess, onError) {
   const triggerGoogleSignIn = useCallback(() => {
     if (typeof window === 'undefined') return;
 
-    const currentOrigin = window.location.origin;
     if (!isGoogleEnabled) {
-      const errorMsg = 'Google Client ID is not configured.';
+      const errorMsg = 'Google Sign-In is not configured yet. Please add your Google Client ID to NEXT_PUBLIC_GOOGLE_CLIENT_ID in your .env.local file.';
       console.error("[GIS_DIAGNOSTIC] " + errorMsg);
       onErrorRef.current?.(errorMsg);
+      alert(errorMsg);
       return;
     }
 
