@@ -1182,8 +1182,152 @@ export default function RoleSelector() {
         </motion.div>
       </div>
 
+      {/* SNAP SECTION 2: Platform Policy & Seller Classifications Banner */}
+      <div className="sel-container" style={{ padding: '0 24px', marginBottom: '40px' }}>
+        <motion.div
+          style={{
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
+            borderRadius: '28px',
+            padding: '32px 36px',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            boxShadow: '0 20px 40px rgba(239, 68, 68, 0.04), 0 4px 16px rgba(15, 23, 42, 0.02)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {/* Header Title with warning emoji badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(245, 158, 11, 0.15) 100%)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.4rem'
+              }}
+            >
+              ⚠️
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '850', color: '#0f172a', letterSpacing: '-0.3px' }}>
+                Platform Policy & Seller Classifications
+              </h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.875rem', color: '#64748b', fontWeight: '500' }}>
+                Transparent operating rules & merchant structures across the EMAHU network
+              </p>
+            </div>
+          </div>
+
+          {/* 3 Seller Classifications Cards Grid */}
+          <div style={{ marginBottom: '24px' }}>
+            <h4 style={{ fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#64748b', marginBottom: '14px' }}>
+              Seller Categories & Merchant Tiers
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+              {/* Tier 1 */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid rgba(226, 232, 240, 0.9)',
+                borderRadius: '16px',
+                padding: '18px 20px',
+                display: 'flex',
+                gap: '14px',
+                alignItems: 'flex-start',
+                boxShadow: '0 2px 8px rgba(15, 23, 42, 0.02)'
+              }}>
+                <div style={{ fontSize: '1.75rem', lineHeight: 1 }}>🏡</div>
+                <div>
+                  <strong style={{ display: 'block', fontSize: '0.925rem', color: '#0f172a', fontWeight: '750', marginBottom: '4px' }}>
+                    Home & Individual Sellers
+                  </strong>
+                  <span style={{ fontSize: '0.825rem', color: '#475569', lineHeight: '1.45', display: 'block' }}>
+                    Dispatching items crafted or stored at home. Flexible local operations & specialty goods.
+                  </span>
+                </div>
+              </div>
+
+              {/* Tier 2 */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid rgba(226, 232, 240, 0.9)',
+                borderRadius: '16px',
+                padding: '18px 20px',
+                display: 'flex',
+                gap: '14px',
+                alignItems: 'flex-start',
+                boxShadow: '0 2px 8px rgba(15, 23, 42, 0.02)'
+              }}>
+                <div style={{ fontSize: '1.75rem', lineHeight: 1 }}>🏬</div>
+                <div>
+                  <strong style={{ display: 'block', fontSize: '0.925rem', color: '#0f172a', fontWeight: '750', marginBottom: '4px' }}>
+                    Retail Shops & Local Stores
+                  </strong>
+                  <span style={{ fontSize: '0.825rem', color: '#475569', lineHeight: '1.45', display: 'block' }}>
+                    Physical brick-and-mortar storefronts offering instant local city catalog pick & fast dispatch.
+                  </span>
+                </div>
+              </div>
+
+              {/* Tier 3 */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid rgba(226, 232, 240, 0.9)',
+                borderRadius: '16px',
+                padding: '18px 20px',
+                display: 'flex',
+                gap: '14px',
+                alignItems: 'flex-start',
+                boxShadow: '0 2px 8px rgba(15, 23, 42, 0.02)'
+              }}>
+                <div style={{ fontSize: '1.75rem', lineHeight: 1 }}>🏢</div>
+                <div>
+                  <strong style={{ display: 'block', fontSize: '0.925rem', color: '#0f172a', fontWeight: '750', marginBottom: '4px' }}>
+                    Corporate Brands & Enterprises
+                  </strong>
+                  <span style={{ fontSize: '0.825rem', color: '#475569', lineHeight: '1.45', display: 'block' }}>
+                    Scaled regional business entities with dedicated multi-city warehousing & shipping logistics.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Return Logistics Policy Alert Callout */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%)',
+              border: '1.5px dashed rgba(239, 68, 68, 0.35)',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              display: 'flex',
+              gap: '14px',
+              alignItems: 'flex-start'
+            }}
+          >
+            <div style={{ fontSize: '1.35rem', color: '#ef4444', flexShrink: 0, marginTop: '2px' }}>🚨</div>
+            <div style={{ fontSize: '0.875rem', color: '#1e293b', lineHeight: '1.6' }}>
+              <strong style={{ color: '#dc2626', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                Return Logistics Notice:
+              </strong>{' '}
+              If a buyer declines or fails to accept a perfect, undamaged order matching the exact listed product specifications, the{' '}
+              <strong style={{ color: '#991b1b' }}>
+                entire logistics cost, return transit coordination, and absolute platform responsibility lie solely on the Seller
+              </strong>.
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
       {/* SNAP SECTION 3: Portals & Footer */}
-      <div className="sel-snap-section sel-container">
+      <div className="sel-snap-section sel-container" style={{ paddingTop: '20px' }}>
         {/* ── DOWNSIDE PORTAL: MERCHANT SELLER & DELIVERY PARTNER ACTIONS ── */}
         <motion.div
           className="sel-portals animate-fade-in-delayed"
@@ -1300,44 +1444,7 @@ export default function RoleSelector() {
                   )}
                 </AnimatePresence>
               </div>
-          </motion.div>
-        </motion.div>
-
-        {/* Policy Information Banner */}
-        <motion.div
-            style={{
-              marginTop: '32px',
-              padding: '24px',
-              borderRadius: '20px',
-              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.06) 0%, rgba(245, 158, 11, 0.06) 100%)',
-              border: '1px dashed rgba(239, 68, 68, 0.3)',
-              color: '#334155',
-              fontSize: '0.88rem',
-              lineHeight: '1.6',
-              textAlign: 'left',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
-              maxWidth: '900px',
-              margin: '32px auto 0'
-            }}
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <div style={{ fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', marginBottom: '8px', fontSize: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              ⚠️ Platform Policy & Seller Classifications
-            </div>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Seller Categories:</strong> The EMAHU network accommodates three distinct merchant structures: 
-              <ul style={{ margin: '6px 0 0 20px', padding: 0 }}>
-                <li><strong>Home & Individual Sellers:</strong> Dispatching items crafted or stored at home.</li>
-                <li><strong>Retail Shops & Local Stores:</strong> Physical brick-and-mortar storefronts.</li>
-                <li><strong>Corporate Brands & Enterprises:</strong> Scaled regional business entities with dedicated shipping logistics.</li>
-              </ul>
-            </div>
-            <div style={{ borderTop: '1px solid rgba(239, 68, 68, 0.1)', paddingTop: '10px' }}>
-              <strong>Return Logistics Notice:</strong> If a buyer declines/fails to accept a perfect, undamaged order matching the exact listed product specifications, the <strong>entire logistics cost, return transit coordination, and absolute platform responsibility lie solely on the Seller</strong>.
-            </div>
+            </motion.div>
           </motion.div>
         </motion.div>
 
