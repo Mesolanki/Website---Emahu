@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './buyer-register.css';
 import { registerUser, saveAuthSession, googleLoginUser, fetchWithRetry } from '@/utils/auth';
+import { useGoogleAuth } from '@/utils/useGoogleAuth';
 import { wakeupServer } from '@/utils/serverWakeup';
 
 /**
