@@ -531,20 +531,6 @@ export default function BuyerRegister() {
                     </button>
                   </div>
 
-                  {isGoogleEnabled && (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', margin: '16px 0', gap: '10px' }}>
-                        <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(0,0,0,0.08)' }} />
-                        <span style={{ fontSize: '0.75rem', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.5px' }}>or</span>
-                        <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(0,0,0,0.08)' }} />
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px', alignItems: 'center' }}>
-                        <div id="google-signin-btn" style={{ width: '100%', minHeight: '44px' }} />
-                      </div>
-                    </>
-                  )}
-
                   <div style={{ textAlign: 'center', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '20px', marginTop: '24px', fontSize: '0.85rem' }}>
                     <span style={{ color: '#718096' }}>Already registered? </span>
                     <Link href="/buyer/login" className="br-btn-sub text-buyer" style={{ fontWeight: '600' }}>

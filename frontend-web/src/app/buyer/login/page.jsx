@@ -213,20 +213,6 @@ export default function BuyerLogin() {
               >
                 {loading ? 'Authenticating...' : 'Sign In'}
               </button>
-
-              {isGoogleEnabled && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', margin: '16px 0', gap: '10px' }}>
-                    <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(0,0,0,0.08)' }} />
-                    <span style={{ fontSize: '0.75rem', color: '#718096', textTransform: 'uppercase', letterSpacing: '0.5px' }}>or</span>
-                    <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(0,0,0,0.08)' }} />
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px', alignItems: 'center' }}>
-                    <div id="google-signin-btn" style={{ width: '100%', minHeight: '44px' }} />
-                  </div>
-                </>
-              )}
             </form>
           ) : (
             <div className="br-success-view" style={{ padding: '20px 0' }}>
