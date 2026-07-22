@@ -326,15 +326,6 @@ export default function BuyerSettingsPage() {
     e.preventDefault();
     setSuccessMsg('');
     setErrorMsg('');
-
-    // If phone has changed, verify first!
-    if (user && profileForm.phone !== user.phone) {
-      setIsOtpModalOpen(true);
-      sendOtpToNewPhone();
-      return;
-    }
-
-    // Otherwise save directly
     await saveProfileData();
   };
 

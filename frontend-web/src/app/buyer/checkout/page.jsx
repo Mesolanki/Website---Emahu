@@ -223,9 +223,9 @@ export default function CheckoutPage() {
   const [orderSellers, setOrderSellers] = useState([]);
   const [placedOrderObjects, setPlacedOrderObjects] = useState([]);
 
-  // ── LOCATION GATE ── (must confirm location before checkout)
-  const [locationConfirmed, setLocationConfirmed] = useState(false);
-  const [locationMode, setLocationMode] = useState(null); // null | 'gps' | 'manual'
+  // ── LOCATION GATE ── (manual address by default)
+  const [locationConfirmed, setLocationConfirmed] = useState(true);
+  const [locationMode, setLocationMode] = useState('manual');
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
 
@@ -1198,61 +1198,20 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="co-loc-choice-row">
-                    {/* Option 1: GPS */}
+                    {/* Option 2: Manual Address Entry */}
                     <div
-                      className={`co-loc-choice-card ${locationMode === 'gps' ? 'co-loc-choice-card--selected' : ''}`}
-                      onClick={() => { if (!gpsLoading) setLocationMode('gps'); }}
-                    >
-                      <div className="co-loc-choice-icon">📡</div>
-                      <div>
-                        <div style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a' }}>You can write down adress from gps location</div>
-                        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>Auto-detect your location instantly</div>
-                      </div>
-                      <div className={`co-loc-choice-radio ${locationMode === 'gps' ? 'co-loc-choice-radio--selected' : ''}`} />
-                    </div>
-
-                    {/* Option 2: Manual */}
-                    <div
-                      className={`co-loc-choice-card ${locationMode === 'manual' ? 'co-loc-choice-card--selected' : ''}`}
+                      className="co-loc-choice-card co-loc-choice-card--selected"
                       onClick={() => { setLocationMode('manual'); setGpsError(''); }}
+                      style={{ width: '100%' }}
                     >
                       <div className="co-loc-choice-icon">✍️</div>
                       <div>
                         <div style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a' }}>Enter Address Manually</div>
                         <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>Type your full delivery address</div>
                       </div>
-                      <div className={`co-loc-choice-radio ${locationMode === 'manual' ? 'co-loc-choice-radio--selected' : ''}`} />
+                      <div className="co-loc-choice-radio co-loc-choice-radio--selected" />
                     </div>
                   </div>
-
-                  {/* GPS Flow */}
-                  {locationMode === 'gps' && (
-                    <div style={{ marginTop: '16px' }}>
-                      {gpsError && (
-                        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '10px 14px', color: '#dc2626', fontSize: '0.82rem', marginBottom: '12px', lineHeight: 1.5 }}>
-                          ⚠️ {gpsError}
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleGPSDetect(true)}
-                        disabled={gpsLoading}
-                        style={{
-                          width: '100%', padding: '14px',
-                          background: gpsLoading ? '#94a3b8' : 'linear-gradient(135deg, #4169e1, #3b5acd)',
-                          color: '#fff', border: 'none', borderRadius: '10px',
-                          fontWeight: '800', fontSize: '0.9rem', cursor: gpsLoading ? 'not-allowed' : 'pointer',
-                          boxShadow: '0 4px 14px rgba(65,105,225,0.3)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        {gpsLoading ? (
-                          <><span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spinRing 0.8s linear infinite' }} /> Detecting GPS Location...</>
-                        ) : '📡 Detect My GPS Location'}
-                      </button>
-                    </div>
-                  )}
 
                   {/* Manual Entry Flow */}
                   {locationMode === 'manual' && !manualConfirmed && (
