@@ -304,6 +304,20 @@ export default function SellerLogin() {
             </button>
           </form>
 
+          {/* Social login divider */}
+          <div className="sl-social-divider">
+            <span className="sl-social-divider__line" />
+            <span className="sl-social-divider__text">or sign in with</span>
+            <span className="sl-social-divider__line" />
+          </div>
+
+          {/* Social Sign-In buttons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', width: '100%', minHeight: '44px' }}>
+              <div id="google-signin-btn" style={{ width: '100%' }} />
+            </div>
+          </div>
+
           {/* Form Footer links */}
           <div className="sl-form-card__footer">
             <span className="sl-form-card__footer-text">New to Emahu Seller?</span>
