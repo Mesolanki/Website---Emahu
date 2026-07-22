@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './buyer-register.css';
-import { registerUser, saveAuthSession, googleLoginUser } from '@/utils/auth';
+import { registerUser, saveAuthSession, googleLoginUser, fetchWithRetry } from '@/utils/auth';
 import { useGoogleAuth } from '@/utils/useGoogleAuth';
 import { detectLocationWithGPS } from '@/utils/location';
 import { wakeupServer } from '@/utils/serverWakeup';
@@ -149,7 +149,7 @@ export default function BuyerRegister() {
       }
 
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const res = await fetch(`${apiBase}/api/auth/send-phone-otp`, {
+      const res = await fetchWithRetry(`${apiBase}/api/auth/send-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: cleanPhone, role: 'buyer' })
@@ -199,7 +199,7 @@ export default function BuyerRegister() {
       }
 
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const res = await fetch(`${apiBase}/api/auth/verify-phone-otp`, {
+      const res = await fetchWithRetry(`${apiBase}/api/auth/verify-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

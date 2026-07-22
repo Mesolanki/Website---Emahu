@@ -9,7 +9,7 @@ const API_BASE_URL = `${API_BASE}/api/auth`;
 /**
  * Smart fetch wrapper that automatically retries when backend/database is waking up from standby/sleep (503 Service Unavailable).
  */
-async function fetchWithRetry(url, options = {}, retries = 2, delayMs = 2000) {
+export async function fetchWithRetry(url, options = {}, retries = 2, delayMs = 2000) {
   let attempt = 0;
   while (attempt <= retries) {
     try {

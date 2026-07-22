@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './register.css';
-import { registerUser, saveAuthSession } from '@/utils/auth';
+import { registerUser, saveAuthSession, fetchWithRetry } from '@/utils/auth';
 import API_BASE from '@/utils/config';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '@/utils/firebase';
@@ -195,7 +195,7 @@ export default function SellerRegister() {
         cleanPhone = cleanPhone.slice(2);
       }
 
-      const res = await fetch(`${API_BASE}/api/auth/send-phone-otp`, {
+      const res = await fetchWithRetry(`${API_BASE}/api/auth/send-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: cleanPhone, role: 'seller' })
@@ -247,7 +247,7 @@ export default function SellerRegister() {
         cleanPhone = cleanPhone.slice(2);
       }
 
-      const res = await fetch(`${API_BASE}/api/auth/verify-phone-otp`, {
+      const res = await fetchWithRetry(`${API_BASE}/api/auth/verify-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

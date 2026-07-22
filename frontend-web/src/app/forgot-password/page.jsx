@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './forgot-password.css';
 import API_BASE from '@/utils/config';
+import { fetchWithRetry } from '@/utils/auth';
 
 export default function ForgotPassword() {
   const router = useRouter();
@@ -110,7 +111,7 @@ export default function ForgotPassword() {
     setDevOtp('');
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+      const res = await fetchWithRetry(`${API_BASE}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase() })
@@ -182,7 +183,7 @@ export default function ForgotPassword() {
     setError('');
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
+      const res = await fetchWithRetry(`${API_BASE}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -220,7 +221,7 @@ export default function ForgotPassword() {
     setDevOtp('');
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/resend-otp`, {
+      const res = await fetchWithRetry(`${API_BASE}/api/auth/resend-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase() })
@@ -267,7 +268,7 @@ export default function ForgotPassword() {
     setSuccessMsg('');
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+      const res = await fetchWithRetry(`${API_BASE}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

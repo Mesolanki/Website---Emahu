@@ -1,0 +1,55 @@
+name: Deploy EMAHU to VPS
+
+on:
+  push:
+    branches:
+      - main    # Triggers automatic deployment on push to main branch
+
+jobs:
+  deploy:
+    name: Deploy Application via SSH
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and Deploy EMAHU Stack
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "🚀 Starting EMAHU VPS Deployment..."
+            
+            # Navigate to website directory on VPS
+            cd /var/www/emahu
+            
+            echo "📥 Fetching latest code from main branch..."
+            git pull origin main
+
+            echo "📦 Updating Backend Dependencies..."
+            cd backend
+            npm install --production=false
+            cd ..
+
+            echo "🌐 Building Frontend Web Client..."
+            cd frontend-web
+            npm install --production=false
+            npm run build
+            cd ..
+
+            echo "⚙️ Building Admin Dashboard..."
+            cd admin-emahu
+            npm install --production=false
+            npm run build
+            cd ..
+
+            echo "🔄 Reloading PM2 services..."
+            if pm2 info emahu-backend > /dev/null 2>&1; then
+              pm2 restart ecosystem.config.js
+            else
+              pm2 start ecosystem.config.js
+            fi
+            pm2 save
+
+            echo "🎉 EMAHU Stack Deployed Successfully!"
