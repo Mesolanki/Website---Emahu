@@ -1102,6 +1102,37 @@ export default function AdminDashboard() {
     }
   };
 
+  // Process Refund helper for cancelled orders
+  const handleAdminProcessRefund = async (orderId) => {
+    const confirmRefund = window.confirm(`Process refund for Order #${orderId} back to the original payment account (or Cash)?`);
+    if (!confirmRefund) return;
+
+    try {
+      const token = localStorage.getItem('emahu_admin_token');
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          refundStatus: 'refunded'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        triggerToast('Refund Successful', `Refund for Order #${orderId} processed back to same account / Cash.`, 'success');
+        fetchOrders();
+        setSelectedDetailOrder(data.order);
+      } else {
+        triggerToast('Error', data.error || 'Failed to process refund', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error processing refund', 'danger');
+    }
+  };
+
   // Release payment helper
   const handleReleasePayment = async (orderId, penaltyAmount, penaltyReason) => {
     setReleasingOrderId(orderId);
@@ -4299,6 +4330,38 @@ export default function AdminDashboard() {
                     ⏳ <strong>Waiting for Seller Approval:</strong><br />
                     This transaction is currently awaiting approval from the seller side. The seller must confirm stock and accept the order before courier tracking and dispatch operations can begin.
                   </div>
+                ) : ['CANCELLED', '❌ Order Cancelled'].includes(selectedDetailOrder.status) ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '8px', padding: '16px', color: '#ef4444', fontSize: '0.85rem', lineHeight: '1.5' }}>
+                      ❌ <strong>Order Cancelled by Buyer:</strong><br />
+                      This transaction was cancelled by the buyer within the 24-hour window. Payment release is blocked.
+                      <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.78rem', color: '#cbd5e1' }}>
+                        💳 <strong>Payment Method Used:</strong> {selectedDetailOrder.EmahuMethod?.toUpperCase() || 'WALLET'} / CASH
+                      </div>
+                    </div>
+                    {selectedDetailOrder.refundStatus === 'refunded' ? (
+                      <div style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', padding: '14px', color: '#10b981', fontSize: '0.82rem', textAlign: 'center', fontWeight: 'bold' }}>
+                        ✓ Refund Processed back to original account / Cash
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleAdminProcessRefund(selectedDetailOrder.orderId)}
+                        style={{
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '12px',
+                          fontSize: '0.85rem',
+                          fontWeight: '750',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                        }}
+                      >
+                        💸 Process Refund to Same Account / Cash
+                      </button>
+                    )}
+                  </div>
                 ) : ['REJECTED', '❌ Order Rejected by Seller'].includes(selectedDetailOrder.status) ? (
                   <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '8px', padding: '16px', color: '#ef4444', fontSize: '0.85rem', lineHeight: '1.5' }}>
                     ❌ <strong>Order Rejected by Seller:</strong><br />
@@ -5493,7 +5556,7 @@ export default function AdminDashboard() {
                   if (orderStatusFilter === 'READY') return order.status === 'READY_FOR_PICKUP';
                   if (orderStatusFilter === 'IN_TRANSIT') return ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(order.status);
                   if (orderStatusFilter === 'DELIVERED') return ['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].includes(order.status);
-                  if (orderStatusFilter === 'DISPUTED') return ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(order.status);
+                  if (orderStatusFilter === 'DISPUTED') return ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller', 'CANCELLED', '❌ Order Cancelled'].includes(order.status);
                   return true;
                 });
 
@@ -5509,7 +5572,7 @@ export default function AdminDashboard() {
                           { key: 'READY', label: 'Ready', count: orders.filter(o => o.status === 'READY_FOR_PICKUP').length },
                           { key: 'IN_TRANSIT', label: 'In Transit', count: orders.filter(o => ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(o.status)).length },
                           { key: 'DELIVERED', label: 'Completed', count: orders.filter(o => ['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].includes(o.status)).length },
-                          { key: 'DISPUTED', label: 'Cancelled/Disputed', count: orders.filter(o => ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(o.status)).length }
+                          { key: 'DISPUTED', label: 'Cancelled/Disputed', count: orders.filter(o => ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller', 'CANCELLED', '❌ Order Cancelled'].includes(o.status)).length }
                         ].map(f => (
                           <button
                             key={f.key}
@@ -5556,7 +5619,7 @@ export default function AdminDashboard() {
                         <tbody>
                           {filteredOrders.map(order => {
                             const isPending = order.status === 'PENDING_APPROVAL';
-                            const isDisputed = ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(order.status);
+                            const isDisputed = ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller', 'CANCELLED', '❌ Order Cancelled'].includes(order.status);
                             const isCompleted = ['DELIVERED', 'COMPLETED', '🔓 FUNDS RELEASED'].includes(order.status);
 
                             return (

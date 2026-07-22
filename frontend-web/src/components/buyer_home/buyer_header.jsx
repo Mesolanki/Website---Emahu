@@ -15,16 +15,16 @@ export default function BuyerHeader() {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
-  
+
   const profileDropdownRef = useRef(null);
   const lastScrollY = useRef(0);
-  
+
   const [selectedCity, setSelectedCity] = useState('Ahmedabad');
   const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
   const locationDropdownRef = useRef(null);
   const [detecting, setDetecting] = useState(false);
   const [manualCity, setManualCity] = useState('');
-  
+
   const [cartCount, setCartCount] = useState(0);
   const [wishCount, setWishCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
@@ -126,10 +126,10 @@ export default function BuyerHeader() {
   // Check login state from localStorage
   useEffect(() => {
     const checkLogin = () => {
-      const loggedIn = localStorage.getItem('emahu_buyer_logged_in') === 'true' || 
-                        localStorage.getItem('emahu_buyer_registered') === 'true';
+      const loggedIn = localStorage.getItem('emahu_buyer_logged_in') === 'true' ||
+        localStorage.getItem('emahu_buyer_registered') === 'true';
       setIsLoggedIn(loggedIn);
-      
+
       const userData = localStorage.getItem('emahu_buyer_user');
       if (userData) {
         try {
@@ -167,7 +167,7 @@ export default function BuyerHeader() {
               const lat = position.coords.latitude;
               const lon = position.coords.longitude;
               localStorage.setItem('emahu_buyer_coordinates', JSON.stringify({ latitude: lat, longitude: lon }));
-              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`);
               const data = await res.json();
               if (data && data.address) {
                 const cityVal = data.address.city || data.address.town || data.address.village || data.address.state_district || '';
@@ -233,7 +233,7 @@ export default function BuyerHeader() {
               const lat = position.coords.latitude;
               const lon = position.coords.longitude;
               localStorage.setItem('emahu_buyer_coordinates', JSON.stringify({ latitude: lat, longitude: lon }));
-              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`);
               const data = await res.json();
               if (data && data.address) {
                 const cityVal = data.address.city || data.address.town || data.address.village || data.address.state_district || '';
@@ -313,7 +313,7 @@ export default function BuyerHeader() {
         style={{ willChange: 'transform, opacity' }}
       >
         <div className="bh-header__container">
-          
+
           {/* Left Side: Logo */}
           <Link href="/buyer/products" className="bh-logo" onClick={closeMobileMenu}>
             <div className="bh-logo__icon-wrap">
@@ -330,7 +330,7 @@ export default function BuyerHeader() {
 
           {/* Right Side: Action Icons (desktop) */}
           <div className="bh-header__right">
-            
+
             {/* Wishlist Icon */}
             <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.93 }} transition={{ duration: 0.18 }}>
               <Link href="/buyer/wishlist" className="bh-action-icon bh-action-icon--desktop" aria-label="Wishlist" style={{ position: 'relative' }}>
@@ -363,10 +363,10 @@ export default function BuyerHeader() {
 
             {/* Notification Icon */}
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }} ref={notifRef} className="bh-action-icon--desktop">
-              <motion.button 
-                className="bh-action-icon" 
+              <motion.button
+                className="bh-action-icon"
                 onClick={() => { setIsNotifOpen(!isNotifOpen); handleMarkNotifsRead(); }}
-                aria-label="Notifications" 
+                aria-label="Notifications"
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.93 }}
                 transition={{ duration: 0.18 }}
@@ -392,7 +392,7 @@ export default function BuyerHeader() {
                   >
                     <div className="bh-notif-dropdown__header">
                       <strong>Notifications</strong>
-                      <button 
+                      <button
                         onClick={() => {
                           try {
                             const stored = localStorage.getItem('emahu_notifications') || '[]';
@@ -433,8 +433,8 @@ export default function BuyerHeader() {
             <div className="bh-profile bh-action-icon--desktop" ref={profileDropdownRef}>
               {isLoggedIn ? (
                 <>
-                  <motion.button 
-                    className="bh-profile__btn" 
+                  <motion.button
+                    className="bh-profile__btn"
                     onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                     whileHover={{ scale: 1.04 }}
                     whileTap={{ scale: 0.96 }}
@@ -590,6 +590,11 @@ export default function BuyerHeader() {
           <Link href="/buyer/settings" className="bh-mobile-drawer__link" onClick={closeMobileMenu}>
             <span>⚙️</span> Profile Settings
           </Link>
+          {isLoggedIn && (
+            <button onClick={handleSignOut} className="bh-mobile-drawer__link bh-mobile-drawer__link--logout" style={{ background: 'none', border: 'none', width: '100%', cursor: 'pointer', textAlign: 'left' }}>
+              <span>🚪</span> Logout
+            </button>
+          )}
         </nav>
 
         {/* Auth buttons at bottom */}

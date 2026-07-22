@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
+import { detectLocationWithGPS } from '@/utils/location';
 import './checkout.css';
 
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
@@ -170,33 +171,33 @@ const sellerServesLocation = (seller, city) => {
 
 // Known Indian cities and states for validation
 const KNOWN_CITIES = [
-  'ahmedabad','surat','rajkot','vadodara','gandhinagar','bhavnagar','jamnagar','junagadh','anand','mehsana','morbi',
-  'mumbai','pune','nagpur','nashik','aurangabad','thane','solapur','kolhapur','amravati',
-  'delhi','noida','gurugram','faridabad','ghaziabad',
-  'bangalore','bengaluru','mysore','mangalore','hubli','belgaum',
-  'chennai','coimbatore','madurai','salem','tiruchirappalli',
-  'hyderabad','warangal','nizamabad','secunderabad',
-  'kolkata','howrah','siliguri','asansol','durgapur',
-  'jaipur','jodhpur','udaipur','kota','ajmer',
-  'lucknow','kanpur','agra','varanasi','allahabad','meerut',
-  'chandigarh','ludhiana','amritsar','jalandhar','ambala',
-  'bhopal','indore','gwalior','jabalpur',
-  'patna','gaya','bhubaneswar','cuttack','visakhapatnam','vijayawada'
+  'ahmedabad', 'surat', 'rajkot', 'vadodara', 'gandhinagar', 'bhavnagar', 'jamnagar', 'junagadh', 'anand', 'mehsana', 'morbi',
+  'mumbai', 'pune', 'nagpur', 'nashik', 'aurangabad', 'thane', 'solapur', 'kolhapur', 'amravati',
+  'delhi', 'noida', 'gurugram', 'faridabad', 'ghaziabad',
+  'bangalore', 'bengaluru', 'mysore', 'mangalore', 'hubli', 'belgaum',
+  'chennai', 'coimbatore', 'madurai', 'salem', 'tiruchirappalli',
+  'hyderabad', 'warangal', 'nizamabad', 'secunderabad',
+  'kolkata', 'howrah', 'siliguri', 'asansol', 'durgapur',
+  'jaipur', 'jodhpur', 'udaipur', 'kota', 'ajmer',
+  'lucknow', 'kanpur', 'agra', 'varanasi', 'allahabad', 'meerut',
+  'chandigarh', 'ludhiana', 'amritsar', 'jalandhar', 'ambala',
+  'bhopal', 'indore', 'gwalior', 'jabalpur',
+  'patna', 'gaya', 'bhubaneswar', 'cuttack', 'visakhapatnam', 'vijayawada'
 ];
 
 const KNOWN_STATES = [
-  'gujarat','maharashtra','delhi','karnataka','tamil nadu','telangana',
-  'west bengal','rajasthan','uttar pradesh','punjab','haryana','madhya pradesh',
-  'bihar','odisha','andhra pradesh','kerala','jharkhand','assam','uttarakhand',
-  'himachal pradesh','chhattisgarh','goa','tripura','meghalaya','manipur',
-  'nagaland','arunachal pradesh','mizoram','sikkim'
+  'gujarat', 'maharashtra', 'delhi', 'karnataka', 'tamil nadu', 'telangana',
+  'west bengal', 'rajasthan', 'uttar pradesh', 'punjab', 'haryana', 'madhya pradesh',
+  'bihar', 'odisha', 'andhra pradesh', 'kerala', 'jharkhand', 'assam', 'uttarakhand',
+  'himachal pradesh', 'chhattisgarh', 'goa', 'tripura', 'meghalaya', 'manipur',
+  'nagaland', 'arunachal pradesh', 'mizoram', 'sikkim'
 ];
 
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   const dp = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0));
   for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
-    dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
   }
   return dp[m][n];
 }
@@ -473,75 +474,30 @@ export default function CheckoutPage() {
 
   const handleGPSDetect = async (fromGate = false) => {
     if (fromGate) { setGpsLoading(true); setGpsError(''); }
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      const getPosCheckout = () => {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
+    try {
+      const result = await detectLocationWithGPS();
+      setBuyerCoordinates(result.coords);
 
-            const coords = {
-              latitude: lat.toFixed(6),
-              longitude: lon.toFixed(6)
-            };
-            setBuyerCoordinates(coords);
-            localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
+      if (result.streetAddress || result.fullAddress) {
+        setAddress(result.streetAddress || result.fullAddress);
+      }
+      if (result.city) setCity(result.city);
+      if (result.state) setStateName(result.state);
+      if (result.pincode) setPincode(result.pincode);
+      setAddressType('manual');
 
-            // Nominatim reverse-geocoding
-            try {
-              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-              const data = await res.json();
-              if (data && data.address) {
-                const road = data.address.road || '';
-                const suburb = data.address.suburb || data.address.neighbourhood || '';
-                const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || '';
-                const stateVal = data.address.state || '';
-                const postcodeVal = data.address.postcode || data.address.postal || '';
-
-                const parts = [road, suburb, cityVal, stateVal].filter(Boolean);
-                let fullAddr = parts.join(', ');
-                if (postcodeVal) fullAddr += ` - ${postcodeVal}`;
-                if (!fullAddr) fullAddr = data.display_name;
-
-                setAddress(fullAddr);
-                setCity(cityVal);
-                setStateName(stateVal);
-                setPincode(postcodeVal);
-                setAddressType('manual');
-              }
-            } catch (geocodingErr) {
-              console.error('Reverse geocoding failed:', geocodingErr);
-            }
-
-            if (fromGate) {
-              setGpsLoading(false);
-              setLocationMode('gps');
-              setLocationConfirmed(true);
-            }
-          },
-          (error) => {
-            console.error(error);
-            if (fromGate) {
-              if (error.code === 1) {
-                if (confirm("Location permission is denied. EMAHU requires location access to find local products. Try again?")) {
-                  getPosCheckout();
-                  return;
-                }
-              }
-              setGpsLoading(false);
-              setGpsError(error.code === 1
-                ? 'Location permission denied. Please allow location access in your browser settings or enter your address manually.'
-                : 'Unable to detect GPS location. Please try again or enter address manually.');
-            }
-          },
-          { timeout: 10000, maximumAge: 60000 }
-        );
-      };
-      getPosCheckout();
-    } else {
       if (fromGate) {
         setGpsLoading(false);
-        setGpsError('Your browser does not support GPS location. Please enter your address manually.');
+        setLocationMode('gps');
+        setLocationConfirmed(true);
+      }
+    } catch (error) {
+      console.error('Checkout GPS detection error:', error);
+      if (fromGate) {
+        setGpsLoading(false);
+        setGpsError(error.code === 1
+          ? 'Location permission denied. Please allow location access in your browser settings or enter your address manually.'
+          : 'Unable to detect GPS location. Please try again or enter address manually.');
       }
     }
   };
@@ -1249,7 +1205,7 @@ export default function CheckoutPage() {
                     >
                       <div className="co-loc-choice-icon">📡</div>
                       <div>
-                        <div style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a' }}>Use GPS Location</div>
+                        <div style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a' }}>You can write down adress from gps location</div>
                         <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>Auto-detect your location instantly</div>
                       </div>
                       <div className={`co-loc-choice-radio ${locationMode === 'gps' ? 'co-loc-choice-radio--selected' : ''}`} />
@@ -1402,176 +1358,176 @@ export default function CheckoutPage() {
               )}
 
               {locationConfirmed && (
-              <form onSubmit={handlePlaceOrder} className="co-form">
-                {addressType === 'saved' ? (
-                  <div className="co-form-bento">
-                    <div className="co-bento-header">
-                      <span className="co-bento-num">01</span>
-                      <h3>Recipient & Delivery Details</h3>
-                    </div>
-
-                    <div style={{ padding: '24px', borderRadius: '12px', background: '#f8fafc', border: '1.5px solid #e2e8f0', marginTop: '16px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '800', letterSpacing: '0.5px', color: '#10b981', background: '#ecfdf5', padding: '5px 10px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>✓ USING PROFILE ADDRESS</span>
-                        <button type="button" onClick={() => setAddressType('manual')} style={{ fontSize: '0.82rem', fontWeight: '750', color: '#4169e1', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
-                          Use Different / New Address
-                        </button>
-                      </div>
-                      <div style={{ fontSize: '1.05rem', fontWeight: '750', color: '#0f172a', marginBottom: '4px' }}>{fullName}</div>
-                      <div style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
-                        <span style={{ marginRight: '16px' }}>📞 {phone}</span>
-                        <span>✉ {email}</span>
-                      </div>
-                      <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '12px', marginTop: '12px' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Delivery Address</span>
-                        <strong style={{ fontSize: '0.92rem', color: '#1e293b', lineHeight: '1.5' }}>📍 {address || 'No address saved in profile.'}</strong>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
+                <form onSubmit={handlePlaceOrder} className="co-form">
+                  {addressType === 'saved' ? (
                     <div className="co-form-bento">
                       <div className="co-bento-header">
                         <span className="co-bento-num">01</span>
-                        <h3>Recipient Contact Details</h3>
+                        <h3>Recipient & Delivery Details</h3>
                       </div>
 
-                      {localStorage.getItem('emahu_buyer_user') && (
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-                          <button type="button" onClick={() => setAddressType('saved')} style={{ fontSize: '0.82rem', fontWeight: '750', color: '#4169e1', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
-                            Use Saved Profile Address
+                      <div style={{ padding: '24px', borderRadius: '12px', background: '#f8fafc', border: '1.5px solid #e2e8f0', marginTop: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '800', letterSpacing: '0.5px', color: '#10b981', background: '#ecfdf5', padding: '5px 10px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>✓ USING PROFILE ADDRESS</span>
+                          <button type="button" onClick={() => setAddressType('manual')} style={{ fontSize: '0.82rem', fontWeight: '750', color: '#4169e1', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
+                            Use Different / New Address
                           </button>
                         </div>
-                      )}
-
-                      <div className="co-input-group">
-                        <label>Full Legal Name</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Rahul Sharma"
-                          required
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="co-input-row">
-                        <div className="co-input-group">
-                          <label>Active Contact Phone</label>
-                          <input
-                            type="tel"
-                            placeholder="e.g. +91 98765 43210"
-                            required
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                          />
+                        <div style={{ fontSize: '1.05rem', fontWeight: '750', color: '#0f172a', marginBottom: '4px' }}>{fullName}</div>
+                        <div style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '12px' }}>
+                          <span style={{ marginRight: '16px' }}>📞 {phone}</span>
+                          <span>✉ {email}</span>
                         </div>
-                        <div className="co-input-group">
-                          <label>Email Address</label>
-                          <input
-                            type="email"
-                            placeholder="e.g. rahul@example.com"
-                            required
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                          />
+                        <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '12px', marginTop: '12px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Delivery Address</span>
+                          <strong style={{ fontSize: '0.92rem', color: '#1e293b', lineHeight: '1.5' }}>📍 {address || 'No address saved in profile.'}</strong>
                         </div>
                       </div>
                     </div>
-
-                    <div className="co-form-bento">
-                      <div className="co-bento-header">
-                        <span className="co-bento-num">02</span>
-                        <h3>Physical Transit Destination</h3>
-                      </div>
-
-                      <div className="co-input-group">
-                        <label>Street Address, Building, Floor</label>
-                        <input
-                          type="text"
-                          placeholder="House No, Suite, Colony, Sector..."
-                          required
-                          value={address}
-                          onChange={(e) => setAddress(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="co-input-row-three">
-                        <div className="co-input-group">
-                          <label>City</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. New Delhi"
-                            required
-                            value={city}
-                            onChange={(e) => setCity(e.target.value)}
-                          />
+                  ) : (
+                    <>
+                      <div className="co-form-bento">
+                        <div className="co-bento-header">
+                          <span className="co-bento-num">01</span>
+                          <h3>Recipient Contact Details</h3>
                         </div>
-                        <div className="co-input-group">
-                          <label>State</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Delhi"
-                            required
-                            value={stateName}
-                            onChange={(e) => setStateName(e.target.value)}
-                          />
-                        </div>
-                        <div className="co-input-group">
-                          <label>Postal Pincode</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 110001"
-                            required
-                            value={pincode}
-                            onChange={(e) => setPincode(e.target.value)}
-                          />
-                        </div>
-                      </div>
 
-                      <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <button
-                          type="button"
-                          className="co-btn-outline"
-                          onClick={handleGPSDetect}
-                          style={{ width: 'max-content', padding: '10px 16px', fontSize: '0.85rem', fontWeight: '700' }}
-                        >
-                          📡 Autofill with Current Location (GPS)
-                        </button>
-
-                        {deliveryCalculationError && (
-                          <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '0.82rem', fontWeight: '600' }}>
-                            ⚠️ {deliveryCalculationError}
+                        {localStorage.getItem('emahu_buyer_user') && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                            <button type="button" onClick={() => setAddressType('saved')} style={{ fontSize: '0.82rem', fontWeight: '750', color: '#4169e1', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
+                              Use Saved Profile Address
+                            </button>
                           </div>
                         )}
+
+                        <div className="co-input-group">
+                          <label>Full Legal Name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Rahul Sharma"
+                            required
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="co-input-row">
+                          <div className="co-input-group">
+                            <label>Active Contact Phone</label>
+                            <input
+                              type="tel"
+                              placeholder="e.g. +91 98765 43210"
+                              required
+                              value={phone}
+                              onChange={(e) => setPhone(e.target.value)}
+                            />
+                          </div>
+                          <div className="co-input-group">
+                            <label>Email Address</label>
+                            <input
+                              type="email"
+                              placeholder="e.g. rahul@example.com"
+                              required
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                            />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </>
-                )}
 
-                {/* Mobile View Terms Checklist */}
-                <div className="co-terms-wrap-mobile" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '16px 0 16px 0', padding: '0 4px' }}>
-                  <input
-                    id="agree-to-terms-chk-mobile"
-                    type="checkbox"
-                    checked={agreeToTerms}
-                    onChange={(e) => setAgreeToTerms(e.target.checked)}
-                    style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
-                  />
-                  <label htmlFor="agree-to-terms-chk-mobile" style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
-                    I agree to the <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('terms'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Terms of Service</a>, <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('privacy'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Privacy Policy</a>, and <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('Emahu'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Emahu Team return/refund conditions</a> of Emahu Marketplace.
-                  </label>
-                </div>
+                      <div className="co-form-bento">
+                        <div className="co-bento-header">
+                          <span className="co-bento-num">02</span>
+                          <h3>Physical Transit Destination</h3>
+                        </div>
 
-                <button
-                  type="submit"
-                  className="co-btn-submit-mobile"
-                  disabled={!agreeToTerms}
-                  style={!agreeToTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8' } : {}}
-                >
-                  {!agreeToTerms ? 'Accept Terms to Buy' : ('Buy Now (\u20B9' + grandTotal.toLocaleString('en-IN') + ')')}
-                </button>
-              </form>
+                        <div className="co-input-group">
+                          <label>Street Address, Building, Floor</label>
+                          <input
+                            type="text"
+                            placeholder="House No, Suite, Colony, Sector..."
+                            required
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="co-input-row-three">
+                          <div className="co-input-group">
+                            <label>City</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. New Delhi"
+                              required
+                              value={city}
+                              onChange={(e) => setCity(e.target.value)}
+                            />
+                          </div>
+                          <div className="co-input-group">
+                            <label>State</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Delhi"
+                              required
+                              value={stateName}
+                              onChange={(e) => setStateName(e.target.value)}
+                            />
+                          </div>
+                          <div className="co-input-group">
+                            <label>Postal Pincode</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 110001"
+                              required
+                              value={pincode}
+                              onChange={(e) => setPincode(e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <button
+                            type="button"
+                            className="co-btn-outline"
+                            onClick={handleGPSDetect}
+                            style={{ width: 'max-content', padding: '10px 16px', fontSize: '0.85rem', fontWeight: '700' }}
+                          >
+                            📡 Autofill with Current Location (GPS)
+                          </button>
+
+                          {deliveryCalculationError && (
+                            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '0.82rem', fontWeight: '600' }}>
+                              ⚠️ {deliveryCalculationError}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Mobile View Terms Checklist */}
+                  <div className="co-terms-wrap-mobile" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', margin: '16px 0 16px 0', padding: '0 4px' }}>
+                    <input
+                      id="agree-to-terms-chk-mobile"
+                      type="checkbox"
+                      checked={agreeToTerms}
+                      onChange={(e) => setAgreeToTerms(e.target.checked)}
+                      style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="agree-to-terms-chk-mobile" style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4', cursor: 'pointer', userSelect: 'none' }}>
+                      I agree to the <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('terms'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Terms of Service</a>, <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('privacy'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Privacy Policy</a>, and <a href="#" onClick={(e) => { e.preventDefault(); handleOpenTermsModal('Emahu'); }} style={{ color: '#4169e1', textDecoration: 'underline', fontWeight: 'bold' }}>Emahu Team return/refund conditions</a> of Emahu Marketplace.
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="co-btn-submit-mobile"
+                    disabled={!agreeToTerms}
+                    style={!agreeToTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8' } : {}}
+                  >
+                    {!agreeToTerms ? 'Accept Terms to Buy' : ('Buy Now (\u20B9' + grandTotal.toLocaleString('en-IN') + ')')}
+                  </button>
+                </form>
               )}
             </div>
 

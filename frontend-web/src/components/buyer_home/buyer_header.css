@@ -567,6 +567,16 @@
   padding-left: 24px;
 }
 
+.bh-mobile-drawer__link--logout {
+  color: #ef4444 !important;
+  font-family: inherit;
+}
+
+.bh-mobile-drawer__link--logout:hover {
+  background: #fef2f2 !important;
+  color: #ef4444 !important;
+}
+
 /* Footer of drawer */
 .bh-mobile-drawer__footer {
   padding: 20px;

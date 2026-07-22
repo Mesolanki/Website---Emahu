@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import './buyer-register.css';
 import { registerUser, saveAuthSession, googleLoginUser } from '@/utils/auth';
 import { useGoogleAuth } from '@/utils/useGoogleAuth';
+import { detectLocationWithGPS } from '@/utils/location';
 
 /**
  * Retail Buyer Registration Component
@@ -16,6 +17,7 @@ export default function BuyerRegister() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [gpsDetectLoading, setGpsDetectLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [hasOpenedTerms, setHasOpenedTerms] = useState(false);
@@ -214,6 +216,30 @@ export default function BuyerRegister() {
       setErrors((prev) => ({ ...prev, otp: err.message || 'Invalid or expired verification code.' }));
     } finally {
       setOtpLoading(false);
+    }
+  };
+
+  const handleGPSDetectRegister = async () => {
+    setGpsDetectLoading(true);
+    setErrors((prev) => ({ ...prev, general: '' }));
+    try {
+      const res = await detectLocationWithGPS();
+      setFormData((prev) => ({
+        ...prev,
+        address: res.streetAddress || res.fullAddress || prev.address,
+        city: res.city || prev.city,
+        state: res.state || prev.state,
+        zipCode: res.pincode || prev.zipCode,
+      }));
+      setErrors((prev) => ({ ...prev, address: '', city: '', state: '', zipCode: '' }));
+    } catch (err) {
+      console.error('Registration GPS detect error:', err);
+      setErrors((prev) => ({
+        ...prev,
+        general: 'Unable to detect GPS location. Please allow browser location access or enter your address manually.',
+      }));
+    } finally {
+      setGpsDetectLoading(false);
     }
   };
 
@@ -557,15 +583,48 @@ export default function BuyerRegister() {
                     <p className="br-subtitle">Please set up your primary delivery address for smooth checkout.</p>
                   </div>
 
+                  <button
+                    type="button"
+                    onClick={handleGPSDetectRegister}
+                    disabled={gpsDetectLoading}
+                    style={{
+                      width: '100%',
+                      margin: '14px 0 20px 0',
+                      padding: '12px 16px',
+                      background: gpsDetectLoading ? '#cbd5e1' : 'linear-gradient(135deg, #4169e1, #3b5acd)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontWeight: '700',
+                      fontSize: '0.88rem',
+                      cursor: gpsDetectLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 14px rgba(65, 105, 225, 0.25)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {gpsDetectLoading ? (
+                      <>
+                        <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spinRing 0.8s linear infinite' }} />
+                        <span>Detecting Location...</span>
+                      </>
+                    ) : (
+                      <>📡 Auto-Detect My Location (GPS)</>
+                    )}
+                  </button>
+
                   <div className="br-form-grid">
                     <div className="br-field br-field--full">
-                      <label className="br-label" htmlFor="address">Street Address</label>
+                      <label className="br-label" htmlFor="address">Street Address, Building, Floor</label>
                       <input
                         type="text"
                         id="address"
                         name="address"
                         className={`br-input ${errors.address ? 'br-input--error' : ''}`}
-                        placeholder="House No, Apartment, Street name"
+                        placeholder="House No, Building, Floor, Street name"
                         value={formData.address}
                         onChange={handleInputChange}
                       />

@@ -77,7 +77,9 @@ const orderSchema = new mongoose.Schema(
         'COMPLETED',
         '⚠️ VAULT DISPUTED / FROZEN',
         '🔓 FUNDS RELEASED',
-        '❌ Order Rejected by Seller'
+        '❌ Order Rejected by Seller',
+        'CANCELLED',
+        '❌ Order Cancelled'
       ],
       default: 'PENDING_APPROVAL',
       index: true
@@ -178,6 +180,11 @@ const orderSchema = new mongoose.Schema(
     paymentReleased: {
       type: Boolean,
       default: false
+    },
+    refundStatus: {
+      type: String,
+      enum: ['unrefunded', 'pending', 'refunded'],
+      default: 'unrefunded'
     },
     paymentReleasedAt: {
       type: Date

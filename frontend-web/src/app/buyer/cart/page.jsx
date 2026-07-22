@@ -501,7 +501,7 @@ export default function CartPage() {
           setGpsLoading(false);
           // Reverse geocode to get city, state, pincode name
           try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`);
             const data = await res.json();
             if (data && data.address) {
               const cityVal = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || '';

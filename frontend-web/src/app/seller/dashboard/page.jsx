@@ -3374,7 +3374,9 @@ export default function EmahuProDashboard() {
     ? orders
     : orderStatusFilter === 'DELIVERED'
       ? orders.filter(o => o.status === 'DELIVERED' || o.status === 'COMPLETED')
-      : orders.filter(o => o.status === orderStatusFilter);
+      : orderStatusFilter === 'REJECTED'
+        ? orders.filter(o => o.status === 'REJECTED' || o.status === 'CANCELLED')
+        : orders.filter(o => o.status === orderStatusFilter);
 
   // Render high-end loading display during verification to prevent DOM flash
   if (!isAuthorized) {
@@ -5108,7 +5110,7 @@ export default function EmahuProDashboard() {
                   { key: 'all', label: 'All Orders' },
                   { key: 'PENDING_APPROVAL', label: 'Pending Approval' },
                   { key: 'APPROVED', label: 'Approved' },
-                  { key: 'REJECTED', label: 'Rejected' },
+                  { key: 'REJECTED', label: 'Cancelled / Rejected' },
                   { key: 'READY_FOR_PICKUP', label: 'Ready For Pickup' },
                   { key: 'IN_TRANSIT', label: 'In Transit' },
                   { key: 'DELIVERED', label: 'Delivered' },
@@ -5117,7 +5119,9 @@ export default function EmahuProDashboard() {
                     ? orders.length
                     : tab.key === 'DELIVERED'
                       ? orders.filter(o => o.status === 'DELIVERED' || o.status === 'COMPLETED').length
-                      : orders.filter(o => o.status === tab.key).length;
+                      : tab.key === 'REJECTED'
+                        ? orders.filter(o => o.status === 'REJECTED' || o.status === 'CANCELLED').length
+                        : orders.filter(o => o.status === tab.key).length;
                   return (
                     <button
                       key={tab.key}
@@ -5861,7 +5865,7 @@ export default function EmahuProDashboard() {
                                   const raw = o.raw || o;
                                   const { productAmount, feePercent, feeAmount, penaltyAmount, netPayout } = getPayoutDetails(o);
                                   const isReleased = raw.paymentReleased || (raw.status && raw.status.includes('RELEASED'));
-                                  const isRejected = raw.status && (raw.status.includes('REJECTED') || raw.status.includes('Rejected'));
+                                  const isRejected = raw.status && (raw.status.includes('REJECTED') || raw.status.includes('Rejected') || raw.status === 'CANCELLED');
 
                                   return (
                                     <tr key={raw.orderId ? `payout-${raw.orderId}-${idx}` : `payout-idx-${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
@@ -7683,7 +7687,7 @@ export default function EmahuProDashboard() {
                       )}
 
                       {/* FEATURE 3: Rejected status box */}
-                      {(selectedDetailedOrder.status === 'REJECTED' || selectedDetailedOrder.sellerRejected || selectedDetailedOrder.timeline?.some(t => t.label === 'Courier Rejected')) && (
+                      {(selectedDetailedOrder.status === 'REJECTED' || selectedDetailedOrder.status === 'CANCELLED' || selectedDetailedOrder.sellerRejected || selectedDetailedOrder.timeline?.some(t => t.label === 'Courier Rejected')) && (
                         <div style={{
                           background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                           color: '#ffffff',
@@ -7696,16 +7700,18 @@ export default function EmahuProDashboard() {
                           gap: '8px'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', fontSize: '0.95rem' }}>
-                            <span style={{ fontSize: '1.25rem' }}>❌</span> Order Rejected / Assignment Declined
+                            <span style={{ fontSize: '1.25rem' }}>❌</span> {selectedDetailedOrder.status === 'CANCELLED' ? 'Order Cancelled' : 'Order Rejected / Assignment Declined'}
                           </div>
                           <div style={{ fontSize: '0.82rem', opacity: 0.9, lineHeight: '1.4' }}>
-                            {selectedDetailedOrder.status === 'REJECTED' || selectedDetailedOrder.sellerRejected ? (
+                            {selectedDetailedOrder.status === 'CANCELLED' ? (
+                              'This order was cancelled by the customer under the 24-hour window. Payment release is blocked, and funds have been returned to the customer.'
+                            ) : selectedDetailedOrder.status === 'REJECTED' || selectedDetailedOrder.sellerRejected ? (
                               `This order was rejected. Reason: ${selectedDetailedOrder.rejectionReason || 'No reason provided.'}`
                             ) : (
                               'The previously assigned courier partner rejected/declined the assignment request. Please select and reassign another carrier partner below.'
                             )}
                           </div>
-                          {selectedDetailedOrder.timeline?.some(t => t.label === 'Courier Rejected') && !selectedDetailedOrder.carrier && (
+                          {selectedDetailedOrder.timeline?.some(t => t.label === 'Courier Rejected') && !selectedDetailedOrder.carrier && selectedDetailedOrder.status !== 'CANCELLED' && (
                             <button
                               onClick={() => {
                                 setSelectedOrderId(selectedDetailedOrder.orderId);

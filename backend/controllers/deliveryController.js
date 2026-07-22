@@ -1100,17 +1100,25 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
 
     const availablePartners = [];
     for (const partner of partners) {
-      const pCities = (partner.coveredCities && partner.coveredCities.length > 0)
-        ? partner.coveredCities.map(c => c.trim().toLowerCase())
-        : [(partner.currentCity || partner.city || '').trim().toLowerCase()].filter(Boolean);
+      const partnerCity = (partner.currentCity || partner.city || '').trim().toLowerCase();
+      
+      const pCities = [];
+      if (partnerCity) {
+        pCities.push(partnerCity);
+      }
+      if (partner.coveredCities && partner.coveredCities.length > 0) {
+        partner.coveredCities.forEach(c => {
+          if (c) pCities.push(c.trim().toLowerCase());
+        });
+      }
 
-      const coversBuyer = orderCity ? pCities.includes(orderCity) : false;
-      const coversSeller = sellerCity ? pCities.includes(sellerCity) : false;
+      const isAllIndia = partner.deliveryScope === 'all_india' || pCities.includes('all india') || partner.coveredCities?.includes('All India');
+      const coversBuyer = isAllIndia || (orderCity ? (pCities.includes(orderCity) || partnerCity === orderCity) : false);
+      const coversSeller = isAllIndia || (sellerCity ? (pCities.includes(sellerCity) || partnerCity === sellerCity) : false);
 
-      // City-based exclusion: skip partners who don't cover buyer's city
-      if (orderCity && !coversBuyer) continue;
-      // For cross-city orders also require seller-city coverage
-      if (!isSameCityOrder && sellerCity && orderCity && !coversSeller) continue;
+      // A partner is eligible if they are All India, cover the buyer's city, or cover the seller's city
+      const isEligibleCity = isAllIndia || coversBuyer || coversSeller;
+      if (!isEligibleCity) continue;
 
       const isCityMatch = coversBuyer || coversSeller;
 

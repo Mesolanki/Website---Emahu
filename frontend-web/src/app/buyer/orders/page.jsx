@@ -44,6 +44,78 @@ export default function OrdersPage() {
   const [disputedOrdersList, setDisputedOrdersList] = useState([]);
   const [releasedOrdersList, setReleasedOrdersList] = useState([]);
 
+  const canCancel = (orderGroup) => {
+    if (['🔓 FUNDS RELEASED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller', 'CANCELLED', '❌ Order Cancelled'].includes(orderGroup.status)) {
+      return false;
+    }
+    const inTransitOrDelivered = orderGroup.ordersList.some(o => 
+      ['picked_up', 'in_transit', 'out_for_delivery', 'arrived', 'delivered', 'completed'].includes(o.deliveryStatus?.toLowerCase()) || 
+      ['picked_up', 'in_transit', 'out_for_delivery', 'arrived', 'delivered', 'completed'].includes(o.status?.toLowerCase())
+    );
+    if (inTransitOrDelivered) return false;
+
+    const createdAt = orderGroup.createdAt || orderGroup.ordersList?.[0]?.createdAt;
+    if (!createdAt) return true;
+
+    const orderTime = new Date(createdAt);
+    const diffHours = (new Date() - orderTime) / (1000 * 60 * 60);
+    return diffHours < 24;
+  };
+
+  const canCancelSubOrder = (subOrd) => {
+    if (!subOrd) return false;
+    if (['🔓 FUNDS RELEASED', '⚠️ VAULT DISPUTED / FROZEN', 'CANCELLED', '❌ Order Cancelled', '❌ Order Rejected by Seller'].includes(subOrd.status)) {
+      return false;
+    }
+    const isShipped = ['picked_up', 'in_transit', 'out_for_delivery', 'arrived', 'delivered', 'completed'].includes(subOrd.deliveryStatus?.toLowerCase()) || 
+                      ['picked_up', 'in_transit', 'out_for_delivery', 'arrived', 'delivered', 'completed'].includes(subOrd.status?.toLowerCase());
+    if (isShipped) return false;
+
+    const createdAt = subOrd.createdAt;
+    if (!createdAt) return true;
+
+    const orderTime = new Date(createdAt);
+    const diffHours = (new Date() - orderTime) / (1000 * 60 * 60);
+    return diffHours < 24;
+  };
+
+  const handleCancelOrder = async (orderGroup) => {
+    const confirmCancel = window.confirm("Are you sure you want to cancel this entire order group? This will cancel the transaction, void the payment, return the funds to your buyer wallet, and notify the Admin and Seller.");
+    if (!confirmCancel) return;
+
+    try {
+      for (const subOrd of orderGroup.ordersList) {
+        await syncOrderStatus(subOrd.orderId, 'CANCELLED');
+      }
+
+      alert(`Success: Order group #${orderGroup.billId} has been cancelled!\n- Notification sent to Admin.\n- Notification sent to Seller(s).\n- Payment release blocked permanently.\n- Buyer funds successfully refunded to wallet.`);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('storage'));
+      }
+    } catch (err) {
+      console.error('Failed to cancel order:', err);
+      alert('Error processing order cancellation.');
+    }
+  };
+
+  const handleCancelSubOrder = async (orderId) => {
+    const confirmCancel = window.confirm(`Are you sure you want to cancel item order #${orderId}? This will cancel this product item, void the payment, return the funds to your buyer wallet, and notify the Admin and Seller.`);
+    if (!confirmCancel) return;
+
+    try {
+      await syncOrderStatus(orderId, 'CANCELLED');
+      alert(`Success: Item order #${orderId} has been cancelled!\n- Notification sent to Admin.\n- Notification sent to Seller.\n- Payment release blocked permanently.\n- Buyer funds successfully refunded to wallet.`);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('storage'));
+      }
+    } catch (err) {
+      console.error('Failed to cancel item order:', err);
+      alert('Error processing item cancellation.');
+    }
+  };
+
   const handleRetryOrder = (group) => {
     const storedCartStr = localStorage.getItem('emahu_cart') || '[]';
     let storedCart = [];
@@ -477,15 +549,16 @@ export default function OrdersPage() {
           /* Orders list */
           <div className="orders-list">
             {orders.map(ord => {
-              const isDisputed = disputedOrdersList.includes(ord.billId) || ord.status.includes('DISPUTED') || ord.ordersList.some(o => o.sellerRejected);
-              const isReleased = releasedOrdersList.includes(ord.billId) || ord.status.includes('RELEASED');
-              const isLocked = !isDisputed && !isReleased;
-              const isArrived = (ord.hasDelivered || ord.hasArrived) && !isReleased && !isDisputed;
+              const isCancelled = ord.status === 'CANCELLED' || ord.status === '❌ Order Cancelled';
+              const isDisputed = (disputedOrdersList.includes(ord.billId) || ord.status.includes('DISPUTED') || ord.ordersList.some(o => o.sellerRejected)) && !isCancelled;
+              const isReleased = (releasedOrdersList.includes(ord.billId) || ord.status.includes('RELEASED')) && !isCancelled;
+              const isLocked = !isDisputed && !isReleased && !isCancelled;
+              const isArrived = (ord.hasDelivered || ord.hasArrived) && !isReleased && !isDisputed && !isCancelled;
 
               return (
                 <div
                   key={ord.billId}
-                  className={`order-card ${isDisputed ? 'order-card--disputed' : ''} ${isReleased ? 'order-card--released' : ''} ${isLocked ? 'order-card--locked' : ''}`}
+                  className={`order-card ${isCancelled ? 'order-card--disputed' : ''} ${isDisputed ? 'order-card--disputed' : ''} ${isReleased ? 'order-card--released' : ''} ${isLocked ? 'order-card--locked' : ''}`}
                   style={{}}
                 >
 
@@ -507,8 +580,8 @@ export default function OrdersPage() {
                     </div>
                     <div>
                       <span className="order-card-label">LOCK STATE</span>
-                      <span className={`order-status-badge ${isDisputed ? 'badge-disputed' : ''} ${isReleased ? 'badge-released' : ''} ${isLocked ? 'badge-locked' : ''}`}>
-                        {ord.status}
+                      <span className={`order-status-badge ${isDisputed ? 'badge-disputed' : ''} ${isReleased ? 'badge-released' : ''} ${isCancelled ? 'badge-cancelled' : ''} ${isLocked ? 'badge-locked' : ''}`}>
+                        {ord.status === 'CANCELLED' ? '❌ Order Cancelled' : ord.status}
                       </span>
                     </div>
                   </div>
@@ -517,9 +590,10 @@ export default function OrdersPage() {
                   <div className="order-card-body">
                     <div className="order-card-items">
                       {ord.items.map((item, idx) => {
-                        const isItemRejected = item._sellerRejected || (item._status && (item._status.includes('REJECTED') || item._status === '❌ Order Rejected by Seller'));
-                        const isItemPending = !item._status || item._status === 'PENDING_APPROVAL';
-                        const isItemConfirmed = !isItemRejected && item._status && ['APPROVED', 'DELIVERY_ASSIGNED', 'LABEL_GENERATED', 'READY_FOR_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', '✓ Delivery Confirmed by Seller', '🔓 FUNDS RELEASED'].some(s => item._status.includes(s));
+                        const isItemCancelled = isCancelled || item._status === 'CANCELLED';
+                        const isItemRejected = (item._sellerRejected || (item._status && (item._status.includes('REJECTED') || item._status === '❌ Order Rejected by Seller'))) && !isItemCancelled;
+                        const isItemPending = (!item._status || item._status === 'PENDING_APPROVAL') && !isItemCancelled && !isItemRejected;
+                        const isItemConfirmed = !isItemRejected && !isItemCancelled && item._status && ['APPROVED', 'DELIVERY_ASSIGNED', 'LABEL_GENERATED', 'READY_FOR_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', '✓ Delivery Confirmed by Seller', '🔓 FUNDS RELEASED'].some(s => item._status.includes(s));
                         return (
                           <div key={idx} className="order-item-row" style={isItemRejected ? { opacity: 0.75, background: 'rgba(239,68,68,0.04)', borderRadius: '10px', padding: '2px 6px' } : {}}>
                             <img src={item.img} alt={item.name} className="order-item-img" style={isItemRejected ? { filter: 'grayscale(0.5)' } : {}} />
@@ -528,6 +602,11 @@ export default function OrdersPage() {
                               <h4 className="order-item-name">{item.name}</h4>
                               <span className="order-item-qty">Qty: <strong>{item.quantity}</strong></span>
                               {/* Per-item delivery status badge */}
+                              {isItemCancelled && (
+                                <span style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.73rem', fontWeight: '700', color: '#ef4444', background: 'rgba(239,68,68,0.1)', borderRadius: '6px', padding: '3px 8px', width: 'fit-content' }}>
+                                  ✕ Order Cancelled
+                                </span>
+                              )}
                               {isItemRejected && (
                                 <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.73rem', fontWeight: '700', color: '#ef4444', background: 'rgba(239,68,68,0.1)', borderRadius: '6px', padding: '3px 8px', width: 'fit-content' }}>
@@ -539,17 +618,51 @@ export default function OrdersPage() {
                                   )}
                                 </div>
                               )}
-                              {isItemPending && !isItemRejected && (
+                              {isItemPending && !isItemRejected && !isItemCancelled && (
                                 <span style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.73rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', borderRadius: '6px', padding: '3px 8px', width: 'fit-content' }}>
                                   ⏳ Awaiting Seller Approval
                                 </span>
                               )}
-                              {isItemConfirmed && (
+                              {isItemConfirmed && !isItemCancelled && (
                                 <span style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.73rem', fontWeight: '700', color: '#10b981', background: 'rgba(16,185,129,0.1)', borderRadius: '6px', padding: '3px 8px', width: 'fit-content' }}>
                                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
                                   Confirmed for Delivery
                                 </span>
                               )}
+
+                              {/* Cancel suborder button */}
+                              {(() => {
+                                const subOrd = ord.ordersList.find(o => o.orderId === item._orderId);
+                                if (canCancelSubOrder(subOrd)) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCancelSubOrder(subOrd.orderId)}
+                                      style={{
+                                        marginTop: '8px',
+                                        padding: '5px 12px',
+                                        background: '#fef2f2',
+                                        color: '#ef4444',
+                                        border: '1px solid #fee2e2',
+                                        borderRadius: '6px',
+                                        fontSize: '0.74rem',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        width: 'fit-content',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      onMouseEnter={(e) => { e.currentTarget.style.background = '#fee2e2'; }}
+                                      onMouseLeave={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
+                                    >
+                                      ✕ Cancel Item
+                                    </button>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </div>
                             <div className="order-item-price">
                               ₹{(item.price * item.quantity).toLocaleString('en-IN')}
@@ -700,6 +813,37 @@ export default function OrdersPage() {
                           </svg>
                           <span style={{ color: 'var(--color-success)', fontWeight: '600' }}>Transaction Completed</span>
                         </>
+                      ) : isCancelled ? (
+                        <div style={{
+                          width: '100%',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1.5px solid #ef4444',
+                          borderRadius: '10px',
+                          padding: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          margin: '8px 0'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              backgroundColor: '#ef4444',
+                              color: '#fff',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold'
+                            }}>✕</span>
+                            <span style={{ color: '#991b1b', fontWeight: '800', fontSize: '0.9rem' }}>Order Cancelled</span>
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: '#7f1d1d' }}>
+                            This transaction was cancelled by the buyer under the 24-hour window. Platform payments have been halted (release not possible), and the capital has been refunded to your buyer wallet. Both the admin and seller have been notified.
+                          </div>
+                        </div>
                       ) : (disputedOrdersList.includes(ord.billId) || ord.status.includes('DISPUTED')) ? (
                         <>
                           <svg className="footer-icon-disputed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5">
@@ -828,6 +972,23 @@ export default function OrdersPage() {
                         </div>
                       )}
                     </div>
+
+                    {canCancel(ord) && (
+                      <div className="order-actions" style={{ marginLeft: 'auto' }}>
+                        <button
+                          type="button"
+                          className="orders-btn-outline-danger"
+                          onClick={() => handleCancelOrder(ord)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          ✕ Cancel Order (Under 24h)
+                        </button>
+                      </div>
+                    )}
 
                     {/* Arrived Sub-Orders Receipt Confirmation */}
                     {!isReleased && !isDisputed && ord.ordersList.map((subOrd) => {

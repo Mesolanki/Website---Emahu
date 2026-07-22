@@ -31,7 +31,7 @@ export default function BuyerLogin() {
   useEffect(() => {
     // Background warm-up call to minimize Render cold start delay
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    fetch(apiUrl).catch(() => {});
+    fetch(apiUrl).catch(() => { });
   }, []);
 
   const onGoogleSuccess = useCallback(async ({ email, name, idToken }) => {

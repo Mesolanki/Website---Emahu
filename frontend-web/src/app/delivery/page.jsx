@@ -534,17 +534,17 @@ export default function DeliveryPortal() {
         password,
         role: 'delivery',
         phone: phoneNumber.trim(),
-        operatingLocation: `${currentArea}, ${coveredCities[0] || currentCity}`,
+        operatingLocation: deliveryScope === 'all_india' ? 'All India' : `${currentArea}, ${coveredCities[0] || currentCity}`,
         category: regCategory,
         vehicleType: regCategory === 'single_two_boy' ? vehicleType : 'other',
-        vehicleNumber: regCategory === 'single_two_boy' ? vehicleNumber : regCategory === 'agency' ? `Number of Employees: ${fleetSize}` : 'N/A',
-        currentCity: coveredCities[0] || currentCity,
+        vehicleNumber: regCategory === 'single_two_boy' ? vehicleNumber : `Number of Employees: ${fleetSize}`,
+        currentCity: deliveryScope === 'all_india' ? 'All India' : (coveredCities[0] || currentCity),
         currentArea,
         pincode,
         serviceRadius: parseFloat(serviceRadius),
         perItemCharge: parseFloat(perKmRate),
         perKmRate: parseFloat(perKmRate),
-        coveredCities,
+        coveredCities: deliveryScope === 'all_india' ? ['All India'] : coveredCities,
         deliveryScope,
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
@@ -555,7 +555,7 @@ export default function DeliveryPortal() {
             ? `Corporate Contact: ${contactName.trim()}\n${dispatchNotes}`
             : dispatchNotes,
         status: 'pending',
-        serviceAreaState: regCategory === 'single_two_boy' ? serviceAreaState : selectedStates,
+        serviceAreaState: regCategory === 'single_two_boy' ? serviceAreaState : (deliveryScope === 'all_india' ? ['All India'] : selectedStates),
         address
       };
 
@@ -634,6 +634,7 @@ export default function DeliveryPortal() {
     // Category-specific validations
     if (regCategory === 'single_two_boy') {
       if (!deliveryName.trim()) newErrors.deliveryName = 'Driver Name is required';
+      if (!vehicleNumber.trim()) newErrors.vehicleNumber = 'Vehicle registration number is required';
     } else if (regCategory === 'agency') {
       if (!deliveryName.trim()) newErrors.deliveryName = 'Agency Name is required';
       if (!ownerName.trim()) newErrors.ownerName = 'Owner/Manager Name is required';
@@ -644,6 +645,9 @@ export default function DeliveryPortal() {
       if (!deliveryName.trim()) newErrors.deliveryName = 'Company Name is required';
       if (!contactName.trim()) newErrors.contactName = 'Corporate Contact Name is required';
       if (!gstNumber.trim()) newErrors.gstNumber = 'GSTIN is required';
+      if (!fleetSize.trim() || isNaN(fleetSize) || Number(fleetSize) < 50) {
+        newErrors.fleetSize = 'Delivery Partners must have at least 50 employees';
+      }
     }
 
     if (!phoneNumber.trim()) {
@@ -651,8 +655,8 @@ export default function DeliveryPortal() {
     } else if (!isEmailVerified) {
       newErrors.phoneNumber = 'Please verify your mobile number via OTP first';
     }
-    if (!password || password.length < 6) newErrors.password = 'Password must be >= 6 chars';
-    if (!phoneNumber.trim()) newErrors.phoneNumber = 'Contact number is required';
+    if (!password || password.length < 6) newErrors.password = 'Password must be >= 6 characters';
+    if (!email.trim()) newErrors.email = 'Email address is required';
     if (!currentArea.trim()) newErrors.currentArea = 'Area is required';
     if (!pincode.trim()) newErrors.pincode = 'Pincode is required';
     if (regCategory === 'single_two_boy') {
@@ -663,18 +667,25 @@ export default function DeliveryPortal() {
         newErrors.coveredCities = 'Single/Two Boy category can only select 1 city';
       }
     } else {
-      if (!selectedStates || selectedStates.length === 0) {
-        newErrors.serviceAreaState = 'At least one service state is required';
-      }
-      if (!coveredCities || coveredCities.length === 0) {
-        newErrors.coveredCities = 'At least one covered city is required';
-      } else if (deliveryScope === 'local' && coveredCities.length > 2) {
-        newErrors.coveredCities = 'Local partners can select a maximum of 2 cities';
+      if (deliveryScope !== 'all_india') {
+        if (!selectedStates || selectedStates.length === 0) {
+          newErrors.serviceAreaState = 'At least one service state is required';
+        }
+        if (!coveredCities || coveredCities.length === 0) {
+          newErrors.coveredCities = 'At least one covered city is required';
+        } else if (deliveryScope === 'local' && coveredCities.length > 2) {
+          newErrors.coveredCities = 'Local partners can select a maximum of 2 cities';
+        }
       }
     }
     if (!address.trim()) newErrors.address = 'Street address is required';
-    if (!serviceRadius.trim() || isNaN(serviceRadius)) newErrors.serviceRadius = 'Enter valid radius (KM)';
-    if (!perKmRate.trim() || isNaN(perKmRate)) newErrors.perKmRate = 'Enter rate per KM';
+    if (!serviceRadius.trim() || isNaN(serviceRadius) || Number(serviceRadius) <= 0) {
+      newErrors.serviceRadius = 'Enter a valid radius (KM)';
+    }
+    if (!perKmRate.trim() || isNaN(perKmRate) || Number(perKmRate) <= 0) {
+      newErrors.perKmRate = 'Enter a valid rate per KM';
+    }
+    if (!dispatchNotes.trim()) newErrors.dispatchNotes = 'Remarks & SLA details are required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -686,6 +697,7 @@ export default function DeliveryPortal() {
     // Category-specific validations
     if (regCategory === 'single_two_boy') {
       if (!deliveryName.trim()) newErrors.deliveryName = 'Driver Name is required';
+      if (!vehicleNumber.trim()) newErrors.vehicleNumber = 'Vehicle registration number is required';
     } else if (regCategory === 'agency') {
       if (!deliveryName.trim()) newErrors.deliveryName = 'Agency Name is required';
       if (!ownerName.trim()) newErrors.ownerName = 'Owner/Manager Name is required';
@@ -696,6 +708,9 @@ export default function DeliveryPortal() {
       if (!deliveryName.trim()) newErrors.deliveryName = 'Company Name is required';
       if (!contactName.trim()) newErrors.contactName = 'Corporate Contact Name is required';
       if (!gstNumber.trim()) newErrors.gstNumber = 'GSTIN is required';
+      if (!fleetSize.trim() || isNaN(fleetSize) || Number(fleetSize) < 50) {
+        newErrors.fleetSize = 'Delivery Partners must have at least 50 employees';
+      }
     }
 
     if (!phoneNumber.trim()) {
@@ -703,7 +718,8 @@ export default function DeliveryPortal() {
     } else if (!/^\d{10}$/.test(phoneNumber.trim())) {
       newErrors.phoneNumber = 'Enter a valid 10-digit mobile number';
     }
-    if (!password || password.length < 6) newErrors.password = 'Password must be >= 6 chars';
+    if (!password || password.length < 6) newErrors.password = 'Password must be >= 6 characters';
+    if (!email.trim()) newErrors.email = 'Email address is required';
     if (!currentArea.trim()) newErrors.currentArea = 'Area is required';
     if (!pincode.trim()) newErrors.pincode = 'Pincode is required';
     if (regCategory === 'single_two_boy') {
@@ -714,18 +730,25 @@ export default function DeliveryPortal() {
         newErrors.coveredCities = 'Single/Two Boy category can only select 1 city';
       }
     } else {
-      if (!selectedStates || selectedStates.length === 0) {
-        newErrors.serviceAreaState = 'At least one service state is required';
-      }
-      if (!coveredCities || coveredCities.length === 0) {
-        newErrors.coveredCities = 'At least one covered city is required';
-      } else if (deliveryScope === 'local' && coveredCities.length > 2) {
-        newErrors.coveredCities = 'Local partners can select a maximum of 2 cities';
+      if (deliveryScope !== 'all_india') {
+        if (!selectedStates || selectedStates.length === 0) {
+          newErrors.serviceAreaState = 'At least one service state is required';
+        }
+        if (!coveredCities || coveredCities.length === 0) {
+          newErrors.coveredCities = 'At least one covered city is required';
+        } else if (deliveryScope === 'local' && coveredCities.length > 2) {
+          newErrors.coveredCities = 'Local partners can select a maximum of 2 cities';
+        }
       }
     }
     if (!address.trim()) newErrors.address = 'Street address is required';
-    if (!serviceRadius.trim() || isNaN(serviceRadius)) newErrors.serviceRadius = 'Enter valid radius (KM)';
-    if (!perKmRate.trim() || isNaN(perKmRate)) newErrors.perKmRate = 'Enter rate per KM';
+    if (!serviceRadius.trim() || isNaN(serviceRadius) || Number(serviceRadius) <= 0) {
+      newErrors.serviceRadius = 'Enter a valid radius (KM)';
+    }
+    if (!perKmRate.trim() || isNaN(perKmRate) || Number(perKmRate) <= 0) {
+      newErrors.perKmRate = 'Enter a valid rate per KM';
+    }
+    if (!dispatchNotes.trim()) newErrors.dispatchNotes = 'Remarks & SLA details are required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -848,18 +871,18 @@ export default function DeliveryPortal() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          currentCity: coveredCities[0] || currentCity,
+          currentCity: deliveryScope === 'all_india' ? 'All India' : (coveredCities[0] || currentCity),
           currentArea,
           pincode,
           serviceRadius: parseFloat(serviceRadius),
           perItemCharge: parseFloat(perKmRate),
           perKmRate: parseFloat(perKmRate),
-          coveredCities,
+          coveredCities: deliveryScope === 'all_india' ? ['All India'] : coveredCities,
           deliveryScope,
           vehicleType,
           vehicleNumber,
           isActivePartner: user?.isActivePartner,
-          serviceAreaState: user?.category === 'single_two_boy' ? serviceAreaState : selectedStates,
+          serviceAreaState: user?.category === 'single_two_boy' ? serviceAreaState : (deliveryScope === 'all_india' ? ['All India'] : selectedStates),
           address
         })
       });
@@ -1484,12 +1507,13 @@ export default function DeliveryPortal() {
 
             <div className="form-card-wrapper">
               {/* Category tabs */}
-              <div className="category-tabs" style={{ display: 'flex', gap: '8px', marginBottom: '24px', background: '#f1f5f9', padding: '6px', borderRadius: '12px' }}>
+              <div className="category-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '24px', background: '#f1f5f9', padding: '6px', borderRadius: '12px' }}>
                 <button
                   type="button"
                   onClick={() => setRegCategory('single_two_boy')}
                   style={{
                     flex: 1,
+                    minWidth: '150px',
                     padding: '10px 14px',
                     borderRadius: '8px',
                     fontSize: '0.85rem',
@@ -1508,7 +1532,8 @@ export default function DeliveryPortal() {
                   type="button"
                   onClick={() => setRegCategory('agency')}
                   style={{
-                    flex: 1,
+                    flex: 2,
+                    minWidth: '220px',
                     padding: '10px 14px',
                     borderRadius: '8px',
                     fontSize: '0.85rem',
@@ -1521,13 +1546,14 @@ export default function DeliveryPortal() {
                     transition: 'all 0.2s ease'
                   }}
                 >
-                  Delivery Agency
+                  Delivery Agency / Company Area Head / Company City Head / Company State Head
                 </button>
                 <button
                   type="button"
                   onClick={() => setRegCategory('partner')}
                   style={{
                     flex: 1,
+                    minWidth: '150px',
                     padding: '10px 14px',
                     borderRadius: '8px',
                     fontSize: '0.85rem',
@@ -1566,7 +1592,7 @@ export default function DeliveryPortal() {
                       <div className="form-group">
                         <label className="form-label" htmlFor="deliveryName">
                           {regCategory === 'single_two_boy' ? 'Driver Name' :
-                            regCategory === 'agency' ? 'Agency Name' : 'Company Name'}
+                            regCategory === 'agency' ? 'Agency / Area / City / State Head Name' : 'Company Name'}
                         </label>
                         <input
                           type="text"
@@ -1574,7 +1600,7 @@ export default function DeliveryPortal() {
                           className={`form-input ${errors.deliveryName ? 'form-input--error' : ''}`}
                           placeholder={
                             regCategory === 'single_two_boy' ? 'e.g. Rahul Sharma' :
-                              regCategory === 'agency' ? 'e.g. Ahmedabad Express' : 'e.g. EmahuXpress Enterprise'
+                              regCategory === 'agency' ? 'e.g. Express Agency / Area Head' : 'e.g. EmahuXpress Enterprise'
                           }
                           value={deliveryName}
                           onChange={(e) => setDeliveryName(e.target.value)}
@@ -1701,7 +1727,6 @@ export default function DeliveryPortal() {
                             )}
                           </div>
                         )}
-
                         {isEmailVerified && (
                           <div style={{ color: '#10b981', fontSize: '0.75rem', marginTop: '6px', fontWeight: 'bold' }}>
                             ✓ Mobile Number Verified Successfully
@@ -1709,17 +1734,20 @@ export default function DeliveryPortal() {
                         )}
                       </div>
 
-                      {/* Fleet Size (Agency only) */}
-                      {regCategory === 'agency' && (
+                      {/* Fleet Size (Agency & Partner) */}
+                      {(regCategory === 'agency' || regCategory === 'partner') && (
                         <div className="form-group">
-                          <label className="form-label" htmlFor="fleetSize">Number of Employees</label>
+                          <label className="form-label" htmlFor="fleetSize">
+                            {regCategory === 'partner' ? 'Number of Employees (Min 50+ Required)' : 'Number of Employees'}
+                          </label>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             id="fleetSize"
                             className={`form-input ${errors.fleetSize ? 'form-input--error' : ''}`}
-                            placeholder="e.g. 15"
+                            placeholder={regCategory === 'partner' ? "e.g. 75" : "e.g. 15"}
                             value={fleetSize}
-                            onChange={(e) => setFleetSize(e.target.value)}
+                            onChange={(e) => setFleetSize(e.target.value.replace(/\D/g, ''))}
                           />
                           {errors.fleetSize && <span className="form-error">{errors.fleetSize}</span>}
                         </div>
@@ -1739,15 +1767,16 @@ export default function DeliveryPortal() {
                       </div>
 
                       <div className="form-group">
-                        <label className="form-label" htmlFor="email">Email Address (Optional)</label>
+                        <label className="form-label" htmlFor="email">Email Address</label>
                         <input
                           type="email"
                           id="email"
-                          className="form-input"
+                          className={`form-input ${errors.email ? 'form-input--error' : ''}`}
                           placeholder="e.g. partner@emahu.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                         />
+                        {errors.email && <span className="form-error">{errors.email}</span>}
                       </div>
 
                       <div className="form-group form-group--full">
@@ -1779,26 +1808,28 @@ export default function DeliveryPortal() {
                         ⚙️ Service Information
                       </h3>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input
-                          type="checkbox"
-                          id="sameAsHq"
-                          checked={sameAsHq}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setSameAsHq(checked);
-                            if (checked) {
-                              const pinMatch = address.match(/\b\d{6}\b/);
-                              if (pinMatch) setPincode(pinMatch[0]);
-                              setCurrentArea(address || '');
-                            }
-                          }}
-                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                        />
-                        <label htmlFor="sameAsHq" style={{ fontSize: '0.8rem', fontWeight: '700', color: '#475569', cursor: 'pointer', userSelect: 'none' }}>
-                          Same as HQ Address
-                        </label>
-                      </div>
+                      {regCategory === 'single_two_boy' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input
+                            type="checkbox"
+                            id="sameAsHq"
+                            checked={sameAsHq}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setSameAsHq(checked);
+                              if (checked) {
+                                const pinMatch = address.match(/\b\d{6}\b/);
+                                if (pinMatch) setPincode(pinMatch[0]);
+                                setCurrentArea(address || '');
+                              }
+                            }}
+                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                          />
+                          <label htmlFor="sameAsHq" style={{ fontSize: '0.8rem', fontWeight: '700', color: '#475569', cursor: 'pointer', userSelect: 'none' }}>
+                            Same as HQ Address
+                          </label>
+                        </div>
+                      )}
                     </div>
 
                     <div className="form-grid">
@@ -1819,147 +1850,152 @@ export default function DeliveryPortal() {
                         >
                           <option value="local">Local Delivery Partner</option>
                           <option value="intercity">Intercity Delivery Partner</option>
+                          <option value="all_india">All India (Nationwide) Delivery Partner</option>
                         </select>
                       </div>
 
                       {/* State Selector */}
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="serviceAreaState">
-                          {regCategory === 'single_two_boy' ? 'Service State' : 'Service States (Select Multiple)'}
-                        </label>
-                        {regCategory === 'single_two_boy' ? (
-                          <select
-                            id="serviceAreaState"
-                            className={`form-input ${errors.serviceAreaState ? 'form-input--error' : ''}`}
-                            value={serviceAreaState}
-                            onChange={(e) => {
-                              setServiceAreaState(e.target.value);
-                              setCoveredCities([]); // Clear cities when state changes
-                            }}
-                          >
-                            <option value="">Select State</option>
-                            {Object.keys(indiaStatesCities).map((stateName) => (
-                              <option key={stateName} value={stateName}>{stateName}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <select
-                            id="serviceAreaState"
-                            className={`form-input ${errors.serviceAreaState ? 'form-input--error' : ''}`}
-                            value=""
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (!val) return;
-                              if (!selectedStates.includes(val)) {
-                                setSelectedStates([...selectedStates, val]);
-                              }
-                            }}
-                          >
-                            <option value="">Select State to Add</option>
-                            {Object.keys(indiaStatesCities).map((stateName) => (
-                              <option key={stateName} value={stateName}>{stateName}</option>
-                            ))}
-                          </select>
-                        )}
-                        {errors.serviceAreaState && <span className="form-error">{errors.serviceAreaState}</span>}
+                      {deliveryScope !== 'all_india' && (
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="serviceAreaState">
+                            {regCategory === 'single_two_boy' ? 'Service State' : 'Service States (Select Multiple)'}
+                          </label>
+                          {regCategory === 'single_two_boy' ? (
+                            <select
+                              id="serviceAreaState"
+                              className={`form-input ${errors.serviceAreaState ? 'form-input--error' : ''}`}
+                              value={serviceAreaState}
+                              onChange={(e) => {
+                                setServiceAreaState(e.target.value);
+                                setCoveredCities([]); // Clear cities when state changes
+                              }}
+                            >
+                              <option value="">Select State</option>
+                              {Object.keys(indiaStatesCities).map((stateName) => (
+                                <option key={stateName} value={stateName}>{stateName}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <select
+                              id="serviceAreaState"
+                              className={`form-input ${errors.serviceAreaState ? 'form-input--error' : ''}`}
+                              value=""
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (!val) return;
+                                if (!selectedStates.includes(val)) {
+                                  setSelectedStates([...selectedStates, val]);
+                                }
+                              }}
+                            >
+                              <option value="">Select State to Add</option>
+                              {Object.keys(indiaStatesCities).map((stateName) => (
+                                <option key={stateName} value={stateName}>{stateName}</option>
+                              ))}
+                            </select>
+                          )}
+                          {errors.serviceAreaState && <span className="form-error">{errors.serviceAreaState}</span>}
 
-                        {regCategory !== 'single_two_boy' && selectedStates.length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                            {selectedStates.map((st) => (
-                              <span key={st} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#4a5568', color: '#fff', padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
-                                {st}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updatedStates = selectedStates.filter(s => s !== st);
-                                    setSelectedStates(updatedStates);
-                                    const citiesOfState = indiaStatesCities[st] || [];
-                                    setCoveredCities(coveredCities.filter(c => !citiesOfState.includes(c)));
-                                  }}
-                                  style={{ border: 'none', background: 'transparent', color: '#feb2b2', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
-                                >
-                                  ✕
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                          {regCategory !== 'single_two_boy' && selectedStates.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                              {selectedStates.map((st) => (
+                                <span key={st} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#4a5568', color: '#fff', padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
+                                  {st}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updatedStates = selectedStates.filter(s => s !== st);
+                                      setSelectedStates(updatedStates);
+                                      const citiesOfState = indiaStatesCities[st] || [];
+                                      setCoveredCities(coveredCities.filter(c => !citiesOfState.includes(c)));
+                                    }}
+                                    style={{ border: 'none', background: 'transparent', color: '#feb2b2', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
+                                  >
+                                    ✕
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* City Multi-Selector */}
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="citySelect">
-                          {regCategory === 'single_two_boy' ? 'Service City' : 'Covered Cities'}
-                        </label>
-                        {regCategory === 'single_two_boy' ? (
-                          <select
-                            id="citySelect"
-                            className={`form-input ${errors.coveredCities ? 'form-input--error' : ''}`}
-                            value={coveredCities[0] || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val) {
-                                setCoveredCities([val]);
-                              } else {
-                                setCoveredCities([]);
+                      {deliveryScope !== 'all_india' && (
+                        <div className="form-group">
+                          <label className="form-label" htmlFor="citySelect">
+                            {regCategory === 'single_two_boy' ? 'Service City' : 'Covered Cities'}
+                          </label>
+                          {regCategory === 'single_two_boy' ? (
+                            <select
+                              id="citySelect"
+                              className={`form-input ${errors.coveredCities ? 'form-input--error' : ''}`}
+                              value={coveredCities[0] || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val) {
+                                  setCoveredCities([val]);
+                                } else {
+                                  setCoveredCities([]);
+                                }
+                              }}
+                              disabled={!serviceAreaState}
+                            >
+                              <option value="">{serviceAreaState ? "Select City" : "First Select a State"}</option>
+                              {serviceAreaState && (indiaStatesCities[serviceAreaState] || []).map((cityName) => (
+                                <option key={cityName} value={cityName}>{cityName}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <select
+                              id="citySelect"
+                              className={`form-input ${errors.coveredCities ? 'form-input--error' : ''}`}
+                              value=""
+                              onChange={(e) => {
+                                const selectedCity = e.target.value;
+                                if (!selectedCity) return;
+
+                                if (deliveryScope === 'local' && coveredCities.length >= 2) {
+                                  alert('Local Delivery Partners can select a maximum of 2 cities.');
+                                  return;
+                                }
+
+                                if (coveredCities.includes(selectedCity)) {
+                                  return;
+                                }
+
+                                setCoveredCities([...coveredCities, selectedCity]);
+                              }}
+                              disabled={selectedStates.length === 0}
+                            >
+                              <option value="">{selectedStates.length > 0 ? "Select City to Add" : "First Select at Least One State"}</option>
+                              {selectedStates.flatMap(st => (indiaStatesCities[st] || []).map(cityName => ({ state: st, city: cityName })))
+                                .map(({ state, city }) => (
+                                  <option key={`${state}-${city}`} value={city}>{city} ({state})</option>
+                                ))
                               }
-                            }}
-                            disabled={!serviceAreaState}
-                          >
-                            <option value="">{serviceAreaState ? "Select City" : "First Select a State"}</option>
-                            {serviceAreaState && (indiaStatesCities[serviceAreaState] || []).map((cityName) => (
-                              <option key={cityName} value={cityName}>{cityName}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <select
-                            id="citySelect"
-                            className={`form-input ${errors.coveredCities ? 'form-input--error' : ''}`}
-                            value=""
-                            onChange={(e) => {
-                              const selectedCity = e.target.value;
-                              if (!selectedCity) return;
+                            </select>
+                          )}
+                          {errors.coveredCities && <span className="form-error">{errors.coveredCities}</span>}
 
-                              if (deliveryScope === 'local' && coveredCities.length >= 2) {
-                                alert('Local Delivery Partners can select a maximum of 2 cities.');
-                                return;
-                              }
-
-                              if (coveredCities.includes(selectedCity)) {
-                                return;
-                              }
-
-                              setCoveredCities([...coveredCities, selectedCity]);
-                            }}
-                            disabled={selectedStates.length === 0}
-                          >
-                            <option value="">{selectedStates.length > 0 ? "Select City to Add" : "First Select at Least One State"}</option>
-                            {selectedStates.flatMap(st => (indiaStatesCities[st] || []).map(cityName => ({ state: st, city: cityName })))
-                              .map(({ state, city }) => (
-                                <option key={`${state}-${city}`} value={city}>{city} ({state})</option>
-                              ))
-                            }
-                          </select>
-                        )}
-                        {errors.coveredCities && <span className="form-error">{errors.coveredCities}</span>}
-
-                        {regCategory !== 'single_two_boy' && coveredCities.length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                            {coveredCities.map((city) => (
-                              <span key={city} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#319795', color: '#fff', padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
-                                {city}
-                                <button
-                                  type="button"
-                                  onClick={() => setCoveredCities(coveredCities.filter(c => c !== city))}
-                                  style={{ border: 'none', background: 'transparent', color: '#feb2b2', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
-                                >
-                                  ✕
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                          {regCategory !== 'single_two_boy' && coveredCities.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                              {coveredCities.map((city) => (
+                                <span key={city} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#319795', color: '#fff', padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
+                                  {city}
+                                  <button
+                                    type="button"
+                                    onClick={() => setCoveredCities(coveredCities.filter(c => c !== city))}
+                                    style={{ border: 'none', background: 'transparent', color: '#feb2b2', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
+                                  >
+                                    ✕
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       <div className="form-group">
                         <label className="form-label" htmlFor="currentArea">Service Area</label>
@@ -1993,12 +2029,13 @@ export default function DeliveryPortal() {
                             regCategory === 'agency' ? 'Max Service Radius (KM)' : 'Coverage Radius (KM)'}
                         </label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           id="serviceRadius"
                           className={`form-input ${errors.serviceRadius ? 'form-input--error' : ''}`}
                           placeholder="e.g. 20"
                           value={serviceRadius}
-                          onChange={(e) => setServiceRadius(e.target.value)}
+                          onChange={(e) => setServiceRadius(e.target.value.replace(/\D/g, ''))}
                         />
                         {errors.serviceRadius && <span className="form-error">{errors.serviceRadius}</span>}
                       </div>
@@ -2006,12 +2043,13 @@ export default function DeliveryPortal() {
                       <div className="form-group">
                         <label className="form-label" htmlFor="perKmRate">Rate per Kilometer (₹)</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           id="perKmRate"
                           className={`form-input ${errors.perKmRate ? 'form-input--error' : ''}`}
                           placeholder="e.g. 5"
                           value={perKmRate}
-                          onChange={(e) => setPerKmRate(e.target.value)}
+                          onChange={(e) => setPerKmRate(e.target.value.replace(/\D/g, ''))}
                         />
                         {errors.perKmRate && <span className="form-error">{errors.perKmRate}</span>}
                       </div>
@@ -2024,7 +2062,7 @@ export default function DeliveryPortal() {
                         </label>
                         <textarea
                           id="dispatchNotes"
-                          className="form-textarea"
+                          className={`form-textarea ${errors.dispatchNotes ? 'form-input--error' : ''}`}
                           placeholder={
                             regCategory === 'single_two_boy' ? 'e.g. Available for night deliveries, personal bike...' :
                               regCategory === 'agency' ? 'e.g. Fleet of 10 bikes and 5 vans, standard billing...' :
@@ -2034,6 +2072,7 @@ export default function DeliveryPortal() {
                           onChange={(e) => setDispatchNotes(e.target.value)}
                           disabled={loading}
                         />
+                        {errors.dispatchNotes && <span className="form-error">{errors.dispatchNotes}</span>}
                       </div>
                     </div>
                   </div>
@@ -2277,7 +2316,7 @@ export default function DeliveryPortal() {
                       Once approved, your availability toggle will be unlocked and you will be automatically assigned pending shipments in your service coverage areas.
                     </p>
                     <div style={{ padding: '12px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem', color: '#475569', display: 'inline-block' }}>
-                      Registered Name: <strong>{user?.name}</strong> &nbsp;|&nbsp; City: <strong>{user?.currentCity}</strong> &nbsp;|&nbsp; Category: <strong>{user?.category === 'single_two_boy' ? 'Single/Two Boy' : user?.category === 'agency' ? 'Agency' : 'Enterprise Partner'}</strong>
+                      Registered Name: <strong>{user?.name}</strong> &nbsp;|&nbsp; City: <strong>{user?.currentCity}</strong> &nbsp;|&nbsp; Category: <strong>{user?.category === 'single_two_boy' ? 'Single/Two Boy' : user?.category === 'agency' ? 'Agency / Area / City / State Head' : 'Enterprise Partner'}</strong>
                     </div>
 
                     <div style={{ marginTop: '24px' }}>
@@ -2327,141 +2366,146 @@ export default function DeliveryPortal() {
                     >
                       <option value="local">Local Delivery Partner</option>
                       <option value="intercity">Intercity Delivery Partner</option>
+                      <option value="all_india">All India (Nationwide) Delivery Partner</option>
                     </select>
                   </div>
 
                   {/* State Selector */}
-                  <div className="form-group">
-                    <label className="form-label">
-                      {user?.category === 'single_two_boy' ? 'Service State' : 'Service States (Select Multiple)'}
-                    </label>
-                    {user?.category === 'single_two_boy' ? (
-                      <select
-                        className="form-input"
-                        value={serviceAreaState}
-                        onChange={(e) => {
-                          setServiceAreaState(e.target.value);
-                          setCoveredCities([]); // Clear cities when state changes
-                        }}
-                      >
-                        <option value="">Select State</option>
-                        {Object.keys(indiaStatesCities).map((stateName) => (
-                          <option key={stateName} value={stateName}>{stateName}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <select
-                        className="form-input"
-                        value=""
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (!val) return;
-                          if (!selectedStates.includes(val)) {
-                            setSelectedStates([...selectedStates, val]);
-                          }
-                        }}
-                      >
-                        <option value="">Select State to Add</option>
-                        {Object.keys(indiaStatesCities).map((stateName) => (
-                          <option key={stateName} value={stateName}>{stateName}</option>
-                        ))}
-                      </select>
-                    )}
+                  {deliveryScope !== 'all_india' && (
+                    <div className="form-group">
+                      <label className="form-label">
+                        {user?.category === 'single_two_boy' ? 'Service State' : 'Service States (Select Multiple)'}
+                      </label>
+                      {user?.category === 'single_two_boy' ? (
+                        <select
+                          className="form-input"
+                          value={serviceAreaState}
+                          onChange={(e) => {
+                            setServiceAreaState(e.target.value);
+                            setCoveredCities([]); // Clear cities when state changes
+                          }}
+                        >
+                          <option value="">Select State</option>
+                          {Object.keys(indiaStatesCities).map((stateName) => (
+                            <option key={stateName} value={stateName}>{stateName}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <select
+                          className="form-input"
+                          value=""
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (!val) return;
+                            if (!selectedStates.includes(val)) {
+                              setSelectedStates([...selectedStates, val]);
+                            }
+                          }}
+                        >
+                          <option value="">Select State to Add</option>
+                          {Object.keys(indiaStatesCities).map((stateName) => (
+                            <option key={stateName} value={stateName}>{stateName}</option>
+                          ))}
+                        </select>
+                      )}
 
-                    {user?.category !== 'single_two_boy' && selectedStates.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                        {selectedStates.map((st) => (
-                          <span key={st} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#4a5568', color: '#fff', padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
-                            {st}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updatedStates = selectedStates.filter(s => s !== st);
-                                setSelectedStates(updatedStates);
-                                const citiesOfState = indiaStatesCities[st] || [];
-                                setCoveredCities(coveredCities.filter(c => !citiesOfState.includes(c)));
-                              }}
-                              style={{ border: 'none', background: 'transparent', color: '#feb2b2', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
-                            >
-                              ✕
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                      {user?.category !== 'single_two_boy' && selectedStates.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                          {selectedStates.map((st) => (
+                            <span key={st} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#4a5568', color: '#fff', padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
+                              {st}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedStates = selectedStates.filter(s => s !== st);
+                                  setSelectedStates(updatedStates);
+                                  const citiesOfState = indiaStatesCities[st] || [];
+                                  setCoveredCities(coveredCities.filter(c => !citiesOfState.includes(c)));
+                                }}
+                                style={{ border: 'none', background: 'transparent', color: '#feb2b2', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* City Selector */}
-                  <div className="form-group">
-                    <label className="form-label">
-                      {user?.category === 'single_two_boy' ? 'Service City' : 'Covered Cities'}
-                    </label>
-                    {user?.category === 'single_two_boy' ? (
-                      <select
-                        className="form-input"
-                        value={coveredCities[0] || ""}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val) {
-                            setCoveredCities([val]);
-                          } else {
-                            setCoveredCities([]);
+                  {deliveryScope !== 'all_india' && (
+                    <div className="form-group">
+                      <label className="form-label">
+                        {user?.category === 'single_two_boy' ? 'Service City' : 'Covered Cities'}
+                      </label>
+                      {user?.category === 'single_two_boy' ? (
+                        <select
+                          className="form-input"
+                          value={coveredCities[0] || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val) {
+                              setCoveredCities([val]);
+                            } else {
+                              setCoveredCities([]);
+                            }
+                          }}
+                          disabled={!serviceAreaState}
+                        >
+                          <option value="">{serviceAreaState ? "Select City" : "First Select a State"}</option>
+                          {serviceAreaState && (indiaStatesCities[serviceAreaState] || []).map((cityName) => (
+                            <option key={cityName} value={cityName}>{cityName}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <select
+                          className="form-input"
+                          value=""
+                          onChange={(e) => {
+                            const selectedCity = e.target.value;
+                            if (!selectedCity) return;
+
+                            if (deliveryScope === 'local' && coveredCities.length >= 2) {
+                              alert('Local Delivery Partners can select a maximum of 2 cities.');
+                              return;
+                            }
+
+                            if (coveredCities.includes(selectedCity)) {
+                              return;
+                            }
+
+                            setCoveredCities([...coveredCities, selectedCity]);
+                          }}
+                          disabled={selectedStates.length === 0}
+                        >
+                          <option value="">{selectedStates.length > 0 ? "Select City to Add" : "First Select at Least One State"}</option>
+                          {selectedStates.flatMap(st => (indiaStatesCities[st] || []).map(cityName => ({ state: st, city: cityName })))
+                            .map(({ state, city }) => (
+                              <option key={`${state}-${city}`} value={city}>{city} ({state})</option>
+                            ))
                           }
-                        }}
-                        disabled={!serviceAreaState}
-                      >
-                        <option value="">{serviceAreaState ? "Select City" : "First Select a State"}</option>
-                        {serviceAreaState && (indiaStatesCities[serviceAreaState] || []).map((cityName) => (
-                          <option key={cityName} value={cityName}>{cityName}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <select
-                        className="form-input"
-                        value=""
-                        onChange={(e) => {
-                          const selectedCity = e.target.value;
-                          if (!selectedCity) return;
+                        </select>
+                      )}
 
-                          if (deliveryScope === 'local' && coveredCities.length >= 2) {
-                            alert('Local Delivery Partners can select a maximum of 2 cities.');
-                            return;
-                          }
-
-                          if (coveredCities.includes(selectedCity)) {
-                            return;
-                          }
-
-                          setCoveredCities([...coveredCities, selectedCity]);
-                        }}
-                        disabled={selectedStates.length === 0}
-                      >
-                        <option value="">{selectedStates.length > 0 ? "Select City to Add" : "First Select at Least One State"}</option>
-                        {selectedStates.flatMap(st => (indiaStatesCities[st] || []).map(cityName => ({ state: st, city: cityName })))
-                          .map(({ state, city }) => (
-                            <option key={`${state}-${city}`} value={city}>{city} ({state})</option>
-                          ))
-                        }
-                      </select>
-                    )}
-
-                    {user?.category !== 'single_two_boy' && coveredCities.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                        {coveredCities.map((city) => (
-                          <span key={city} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#319795', color: '#fff', padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
-                            {city}
-                            <button
-                              type="button"
-                              onClick={() => setCoveredCities(coveredCities.filter(c => c !== city))}
-                              style={{ border: 'none', background: 'transparent', color: '#feb2b2', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
-                            >
-                              ✕
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                      {user?.category !== 'single_two_boy' && coveredCities.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                          {coveredCities.map((city) => (
+                            <span key={city} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#319795', color: '#fff', padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
+                              {city}
+                              <button
+                                type="button"
+                                onClick={() => setCoveredCities(coveredCities.filter(c => c !== city))}
+                                style={{ border: 'none', background: 'transparent', color: '#feb2b2', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="form-group">
                     <label className="form-label">Service Area</label>
@@ -2477,11 +2521,23 @@ export default function DeliveryPortal() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">Service Radius (KM)</label>
-                    <input type="number" className="form-input" value={serviceRadius} onChange={(e) => setServiceRadius(e.target.value)} />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="form-input"
+                      value={serviceRadius}
+                      onChange={(e) => setServiceRadius(e.target.value.replace(/\D/g, ''))}
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Rate per Kilometer (₹)</label>
-                    <input type="number" className="form-input" value={perKmRate} onChange={(e) => setPerKmRate(e.target.value)} />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="form-input"
+                      value={perKmRate}
+                      onChange={(e) => setPerKmRate(e.target.value.replace(/\D/g, ''))}
+                    />
                   </div>
 
                 </div>

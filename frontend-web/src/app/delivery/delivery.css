@@ -1281,6 +1281,15 @@
   .dash-tab-btn {
     flex: 0 0 auto !important;
     padding: 8px 12px !important;
-    font-size: 0.78rem !important;
   }
+}
+
+/* Remove up/down spinner arrows from number inputs */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
 }

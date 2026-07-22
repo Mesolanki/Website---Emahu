@@ -4,11 +4,22 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
-import { changeUserRole, clearAuthSession, saveAuthSession } from '@/utils/auth';
+import { changeUserRole, clearAuthSession, saveAuthSession, logoutUser } from '@/utils/auth';
 import './buyer_settings.css';
 
 export default function BuyerSettingsPage() {
   const router = useRouter();
+
+  const handleSignOut = async () => {
+    try {
+      await logoutUser();
+    } catch (err) {
+      console.error('Failed to log out from server:', err);
+    }
+    clearAuthSession('buyer');
+    window.dispatchEvent(new Event('storage'));
+    router.push('/');
+  };
 
   // Profile States
   const [profileForm, setProfileForm] = useState({
@@ -337,6 +348,9 @@ export default function BuyerSettingsPage() {
             <h1 className="settings-title">Buyer Account Dashboard</h1>
             <p className="settings-subtitle">Manage your shipping address, contact profile details, and review order transaction statistics.</p>
           </div>
+          <button onClick={handleSignOut} className="settings-logout-btn">
+            🚪 Logout
+          </button>
         </div>
 
         {/* Analytics Section */}

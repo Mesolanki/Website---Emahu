@@ -263,6 +263,12 @@
   border: 1px solid rgba(16, 185, 129, 0.15) !important;
 }
 
+.badge-cancelled {
+  background-color: rgba(239, 68, 68, 0.08) !important;
+  color: #ef4444 !important;
+  border: 1px solid rgba(239, 68, 68, 0.15) !important;
+}
+
 /* Body (Two Column Layout for items & shipping details) */
 .order-card-body {
   display: grid;

@@ -142,6 +142,9 @@ export default function ProductsPage() {
   const [selectedCity, setSelectedCity]   = useState('Ahmedabad');
   const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
   const locationDropdownRef               = useRef(null);
+  const [selectedShop, setSelectedShop]   = useState('All Shops');
+  const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
+  const shopDropdownRef                   = useRef(null);
   const [cartAdded, setCartAdded]         = useState([]);
   const [searchQuery, setSearchQuery]     = useState('');
   const [page, setPage]                   = useState(1);
@@ -511,6 +514,13 @@ export default function ProductsPage() {
     return allProductsCombined.filter(p => sellerServesLocation(p.seller, selectedCity));
   }, [allProductsCombined, selectedCity]);
 
+  const uniqueShopsAndBrands = useMemo(() => {
+    const shops = locationFilteredProducts.map(p => p.sellerStore).filter(Boolean);
+    const brandsList = locationFilteredProducts.map(p => p.brand).filter(Boolean);
+    const combined = [...shops, ...brandsList];
+    return Array.from(new Set(combined)).sort();
+  }, [locationFilteredProducts]);
+
   // Dynamic brand cleanup effect to reset selected brands not available in the new location
   useEffect(() => {
     const availableBrandsInNewCity = new Set(locationFilteredProducts.map(p => p.brand).filter(Boolean));
@@ -594,6 +604,9 @@ export default function ProductsPage() {
       if (locationDropdownRef.current && !locationDropdownRef.current.contains(e.target)) {
         setLocationDropdownOpen(false);
       }
+      if (shopDropdownRef.current && !shopDropdownRef.current.contains(e.target)) {
+        setShopDropdownOpen(false);
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -668,6 +681,7 @@ export default function ProductsPage() {
   const clearAll = () => {
     setCategory('All'); setActiveSubcategory('All'); setMaxPrice(maxPriceLimit); setBrands([]);
     setShowVerified(false); setShowOnSale(false); setShowNew(false);
+    setSelectedShop('All Shops');
     setSearchQuery(''); setPage(1);
   };
 
@@ -676,13 +690,14 @@ export default function ProductsPage() {
     const tags = [];
     if (searchQuery.trim())  tags.push({ label: `Search: "${searchQuery}"`, clear: () => setSearchQuery('') });
     if (category !== 'All') tags.push({ label: category, clear: () => setCategory('All') });
+    if (selectedShop !== 'All Shops') tags.push({ label: `Store: ${selectedShop}`, clear: () => setSelectedShop('All Shops') });
     if (showVerified)        tags.push({ label: 'Verified', clear: () => setShowVerified(false) });
     if (showOnSale)          tags.push({ label: 'On Sale',  clear: () => setShowOnSale(false) });
     if (showNew)             tags.push({ label: 'New In',   clear: () => setShowNew(false) });
     brands.forEach(b => tags.push({ label: b, clear: () => toggleBrand(b) }));
     if (maxPrice < maxPriceLimit)   tags.push({ label: `Under ₹${maxPrice.toLocaleString('en-IN')}`, clear: () => setMaxPrice(maxPriceLimit) });
     return tags;
-  }, [category, showVerified, showOnSale, showNew, brands, maxPrice, maxPriceLimit, searchQuery]);
+  }, [category, showVerified, showOnSale, showNew, brands, maxPrice, maxPriceLimit, searchQuery, selectedShop]);
 
   // Collect unique subcategories for the active category
   const availableSubcategories = useMemo(() => {
@@ -703,6 +718,7 @@ export default function ProductsPage() {
       );
     }
     if (category !== 'All')            items = items.filter(p => p.category === category);
+    if (selectedShop !== 'All Shops')  items = items.filter(p => p.sellerStore === selectedShop || p.brand === selectedShop);
     if (activeSubcategory !== 'All')   items = items.filter(p => p.subcategory === activeSubcategory);
     if (showVerified)                  items = items.filter(p => p.verified);
     if (showOnSale)                    items = items.filter(p => p.onSale);
@@ -715,7 +731,7 @@ export default function ProductsPage() {
     if (sortBy === 'discount')   items.sort((a,b) => b.discount - a.discount);
     if (sortBy === 'newest')     items.sort((a,b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
     return items;
-  }, [locationFilteredProducts, category, activeSubcategory, showVerified, showOnSale, showNew, brands, maxPrice, sortBy, searchQuery]);
+  }, [locationFilteredProducts, category, activeSubcategory, showVerified, showOnSale, showNew, brands, maxPrice, sortBy, searchQuery, selectedShop]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const paged      = filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
@@ -775,6 +791,44 @@ export default function ProductsPage() {
           <button className="theme-search-submit-btn" aria-label="Submit Search">
             <span>Search</span>
           </button>
+        </div>
+
+        {/* Shop/Company Filter Dropdown right next to the search bar */}
+        <div className="bp-location-selector-wrap" ref={shopDropdownRef}>
+          <button 
+            type="button" 
+            className="bp-location-btn" 
+            onClick={() => setShopDropdownOpen(!shopDropdownOpen)}
+          >
+            <span>🏪 {selectedShop === 'All Shops' ? 'All Shops / Companies' : selectedShop}</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: '4px' }}>
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          
+          {shopDropdownOpen && (
+            <div className="bp-location-dropdown">
+              <div className="bp-location-dropdown-title">Select Shop / Brand</div>
+              <button 
+                type="button" 
+                className={`bp-location-item ${selectedShop === 'All Shops' ? 'bp-location-item--active' : ''}`}
+                onClick={() => { setSelectedShop('All Shops'); setShopDropdownOpen(false); setPage(1); }}
+              >
+                All Shops / Companies
+              </button>
+              <div className="bp-location-dropdown-divider" />
+              {uniqueShopsAndBrands.map(shop => (
+                <button 
+                  key={shop}
+                  type="button" 
+                  className={`bp-location-item ${selectedShop === shop ? 'bp-location-item--active' : ''}`}
+                  onClick={() => { setSelectedShop(shop); setShopDropdownOpen(false); setPage(1); }}
+                >
+                  {shop}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1040,11 +1094,15 @@ export default function ProductsPage() {
                   /* Responsive skeleton adjustments */
                   @media (max-width: 576px) {
                     .bp-grid {
+                      grid-template-columns: repeat(2, 1fr) !important;
+                      gap: 10px !important;
+                    }
+                    .bp-grid--list {
                       grid-template-columns: 1fr !important;
-                      gap: 16px;
+                      gap: 12px !important;
                     }
                     .sk-thumb {
-                      aspect-ratio: 16/9;
+                      aspect-ratio: 4/3;
                     }
                   }
 
@@ -1062,6 +1120,30 @@ export default function ProductsPage() {
                   }
                   .bp-grid--list .sk-row {
                     flex: 1;
+                  }
+
+                  @media (max-width: 576px) {
+                    .bp-grid--list .sk-card {
+                      display: grid !important;
+                      grid-template-columns: 110px 1fr !important;
+                      grid-template-rows: auto auto !important;
+                      gap: 8px 12px !important;
+                      padding: 10px !important;
+                      align-items: start !important;
+                    }
+                    .bp-grid--list .sk-thumb {
+                      grid-column: 1 !important;
+                      grid-row: 1 / span 2 !important;
+                      width: 110px !important;
+                      min-width: 110px !important;
+                      height: 110px !important;
+                      min-height: 110px !important;
+                      aspect-ratio: 1 !important;
+                    }
+                    .bp-grid--list .sk-row {
+                      grid-column: 2 !important;
+                      grid-row: 1 !important;
+                    }
                   }
                 `}</style>
                 {[1, 2, 3, 4, 5, 6].map((n) => (

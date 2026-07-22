@@ -372,7 +372,7 @@ export default function RoleSelector() {
                   try {
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
-                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`);
                     const data = await res.json();
                     if (data && data.address) {
                       const cityVal = data.address.city || data.address.town || data.address.village || data.address.state_district || '';
@@ -1300,7 +1300,44 @@ export default function RoleSelector() {
                   )}
                 </AnimatePresence>
               </div>
-            </motion.div>
+          </motion.div>
+        </motion.div>
+
+        {/* Policy Information Banner */}
+        <motion.div
+            style={{
+              marginTop: '32px',
+              padding: '24px',
+              borderRadius: '20px',
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.06) 0%, rgba(245, 158, 11, 0.06) 100%)',
+              border: '1px dashed rgba(239, 68, 68, 0.3)',
+              color: '#334155',
+              fontSize: '0.88rem',
+              lineHeight: '1.6',
+              textAlign: 'left',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+              maxWidth: '900px',
+              margin: '32px auto 0'
+            }}
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            <div style={{ fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', marginBottom: '8px', fontSize: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              ⚠️ Platform Policy & Seller Classifications
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Seller Categories:</strong> The EMAHU network accommodates three distinct merchant structures: 
+              <ul style={{ margin: '6px 0 0 20px', padding: 0 }}>
+                <li><strong>Home & Individual Sellers:</strong> Dispatching items crafted or stored at home.</li>
+                <li><strong>Retail Shops & Local Stores:</strong> Physical brick-and-mortar storefronts.</li>
+                <li><strong>Corporate Brands & Enterprises:</strong> Scaled regional business entities with dedicated shipping logistics.</li>
+              </ul>
+            </div>
+            <div style={{ borderTop: '1px solid rgba(239, 68, 68, 0.1)', paddingTop: '10px' }}>
+              <strong>Return Logistics Notice:</strong> If a buyer declines/fails to accept a perfect, undamaged order matching the exact listed product specifications, the <strong>entire logistics cost, return transit coordination, and absolute platform responsibility lie solely on the Seller</strong>.
+            </div>
           </motion.div>
         </motion.div>
 

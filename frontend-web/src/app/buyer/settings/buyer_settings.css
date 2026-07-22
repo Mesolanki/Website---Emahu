@@ -14,6 +14,34 @@
 
 .settings-header-row {
   margin-bottom: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.settings-logout-btn {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #ef4444;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.settings-logout-btn:hover {
+  background-color: #fee2e2;
+  border-color: #f87171;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.08);
 }
 
 .settings-title {
@@ -225,15 +253,39 @@
 
 /* Responsive grid adjustments */
 @media (max-width: 768px) {
+  .settings-container {
+    padding: 20px 16px 60px;
+  }
+  .settings-header-row {
+    margin-bottom: 24px;
+  }
+  .settings-title {
+    font-size: 1.6rem;
+  }
+  .settings-subtitle {
+    font-size: 0.85rem;
+    margin-bottom: 0;
+  }
+  .analytics-section {
+    margin-bottom: 32px;
+  }
+  .stat-card {
+    padding: 16px;
+  }
   .form-grid {
     grid-template-columns: 1fr;
     gap: 16px;
   }
   .glass-card {
-    padding: 24px;
+    padding: 24px 16px;
   }
   .settings-submit-btn {
     align-self: stretch;
     text-align: center;
+    margin-top: 24px;
+  }
+  .settings-footer {
+    margin-top: 40px;
+    padding: 24px 16px;
   }
 }
