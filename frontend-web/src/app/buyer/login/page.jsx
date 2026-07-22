@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import '@/app/buyer/register/buyer-register.css'; // Reuses the unified light onboarding styles
 import { loginUser, saveAuthSession, googleLoginUser } from '@/utils/auth';
 import { useGoogleAuth } from '@/utils/useGoogleAuth';
+import { wakeupServer } from '@/utils/serverWakeup';
 
 /**
  * Retail Buyer Login Component
@@ -29,9 +30,8 @@ export default function BuyerLogin() {
   }, [router]);
 
   useEffect(() => {
-    // Background warm-up call to minimize Render cold start delay
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    fetch(apiUrl).catch(() => { });
+    // Pre-warm backend and database on landing to avoid cold start latency
+    wakeupServer();
   }, []);
 
   const onGoogleSuccess = useCallback(async ({ email, name, idToken }) => {

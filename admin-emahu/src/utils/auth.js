@@ -6,6 +6,36 @@ import API_BASE from './config';
 
 const API_BASE_URL = `${API_BASE}/api/auth`;
 
+/**
+ * Smart fetch wrapper that automatically retries when backend/database is waking up from standby/sleep (503 Service Unavailable).
+ */
+async function fetchWithRetry(url, options = {}, retries = 2, delayMs = 2000) {
+  let attempt = 0;
+  while (attempt <= retries) {
+    try {
+      const response = await fetch(url, options);
+
+      // If 503 Service Unavailable (e.g. database server waking up), retry cleanly
+      if (response.status === 503 && attempt < retries) {
+        console.warn(`[Admin API] Server/DB waking up. Retrying attempt ${attempt + 1}/${retries} in ${delayMs}ms...`);
+        await new Promise((res) => setTimeout(res, delayMs));
+        attempt++;
+        continue;
+      }
+
+      return response;
+    } catch (err) {
+      if (attempt < retries) {
+        console.warn(`[Admin API] Network error. Retrying attempt ${attempt + 1}/${retries} in ${delayMs}ms...`);
+        await new Promise((res) => setTimeout(res, delayMs));
+        attempt++;
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 const getHeaders = (token = null) => {
   const headers = {
     'Content-Type': 'application/json',
@@ -18,7 +48,7 @@ const getHeaders = (token = null) => {
 
 export async function registerUser({ name, email, password, role, phone, address, adminSecret }) {
   try {
-    const response = await fetch(`${API_BASE_URL}/register`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/register`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ name, email, password, role, phone, address, adminSecret }),
@@ -37,7 +67,7 @@ export async function registerUser({ name, email, password, role, phone, address
 
 export async function loginUser(email, password, twoFactorCode) {
   try {
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/login`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ email, password, twoFactorCode }),
@@ -56,7 +86,7 @@ export async function loginUser(email, password, twoFactorCode) {
 
 export async function logoutUser() {
   try {
-    const response = await fetch(`${API_BASE_URL}/logout`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/logout`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -69,7 +99,7 @@ export async function logoutUser() {
 
 export async function getProfile(token) {
   try {
-    const response = await fetch(`${API_BASE_URL}/me`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/me`, {
       method: 'GET',
       headers: getHeaders(token),
     });

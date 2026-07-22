@@ -7,6 +7,7 @@ import './buyer-register.css';
 import { registerUser, saveAuthSession, googleLoginUser } from '@/utils/auth';
 import { useGoogleAuth } from '@/utils/useGoogleAuth';
 import { detectLocationWithGPS } from '@/utils/location';
+import { wakeupServer } from '@/utils/serverWakeup';
 
 /**
  * Retail Buyer Registration Component
@@ -21,6 +22,11 @@ export default function BuyerRegister() {
   const [success, setSuccess] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [hasOpenedTerms, setHasOpenedTerms] = useState(false);
+
+  useEffect(() => {
+    // Pre-warm backend and database on landing to avoid cold start latency
+    wakeupServer();
+  }, []);
 
   // Form State Values
   const [formData, setFormData] = useState({

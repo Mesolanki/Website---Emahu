@@ -240,6 +240,7 @@ const DYNAMIC_ACCENTS = ['#0ea5e9', '#d946ef', '#14b8a6', '#f97316', '#8b5cf6', 
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 import API_BASE from '@/utils/config';
 import { useScrollProgress } from '@/utils/animate';
+import { wakeupServer } from '@/utils/serverWakeup';
 
 // ─── SPLIT TITLE into words for blur-reveal animation ───────────────────────
 function AnimatedTitle({ text, className }) {
@@ -325,6 +326,9 @@ export default function RoleSelector() {
 
   // Sync cart & login details on mount, and handle geolocation auto-detection
   useEffect(() => {
+    // Pre-warm backend & database connection immediately on site arrival
+    wakeupServer();
+
     const syncStates = () => {
       try {
         const cart = localStorage.getItem('emahu_cart');

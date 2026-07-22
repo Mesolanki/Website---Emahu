@@ -8,6 +8,7 @@ import { registerUser, saveAuthSession } from '@/utils/auth';
 import API_BASE from '@/utils/config';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '@/utils/firebase';
+import { wakeupServer } from '@/utils/serverWakeup';
 
 /**
  * SellerRegister Component
@@ -21,6 +22,11 @@ export default function SellerRegister() {
   const [regSuccessData, setRegSuccessData] = useState(null);
   const [dbCategories, setDbCategories] = useState([]);
   const [agreeTerms, setAgreeTerms] = useState(false);
+
+  useEffect(() => {
+    // Pre-warm backend and database on landing to avoid cold start latency
+    wakeupServer();
+  }, []);
 
   // Fallback category names (Amazon-like comprehensive list)
   const FALLBACK_CATEGORIES = [

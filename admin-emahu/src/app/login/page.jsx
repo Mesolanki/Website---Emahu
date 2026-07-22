@@ -29,9 +29,10 @@ export default function AdminLogin() {
   }, [router]);
 
   useEffect(() => {
-    // Background warm-up call to minimize Render cold start delay
-    const apiUrl = '';
-    fetch(apiUrl).catch(() => {});
+    // Pre-warm backend & database connection on landing
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const pingUrl = apiUrl.replace(/\/api\/auth$/, '').replace(/\/api$/, '').replace(/\/$/, '') + '/';
+    fetch(pingUrl).catch(() => {});
   }, []);
 
   const handleSubmit = async (e) => {

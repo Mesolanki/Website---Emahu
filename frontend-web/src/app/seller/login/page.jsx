@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import './login.css';
 import { loginUser, saveAuthSession, googleLoginUser } from '@/utils/auth';
 import { useGoogleAuth } from '@/utils/useGoogleAuth';
+import { wakeupServer } from '@/utils/serverWakeup';
 
 /**
  * SellerLogin Component
@@ -36,9 +37,8 @@ export default function SellerLogin() {
   }, [router]);
 
   useEffect(() => {
-    // Background warm-up call to minimize Render cold start delay
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    fetch(apiUrl).catch(() => {});
+    // Pre-warm backend and database on landing to avoid cold start latency
+    wakeupServer();
   }, []);
 
   const onGoogleSuccess = useCallback(async ({ email, name, idToken }) => {

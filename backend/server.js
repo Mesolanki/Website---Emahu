@@ -46,12 +46,39 @@ app.use(
   })
 );
 
-// Base route / health check
+// Ensure database connection is active on every API request
+app.use(async (req, res, next) => {
+  // Allow root health check endpoint to respond even if DB is still warming up
+  if (req.path === '/') {
+    // Fire background connection attempt on ping
+    connectDB().catch((err) => console.error('Background DB connect on ping error:', err.message));
+    return next();
+  }
+
+  try {
+    const mongoose = require('mongoose');
+    const conn = await connectDB();
+    if (!conn || mongoose.connection.readyState !== 1) {
+      throw new Error('Database connection is not in ready state (readyState !== 1)');
+    }
+    next();
+  } catch (err) {
+    console.error('Database connection middleware error:', err.message);
+    return res.status(503).json({ 
+      success: false, 
+      error: 'Database connection failed. The database server may be waking up from standby/sleep. Please retry in a few seconds.' 
+    });
+  }
+});
+
+// Base route / health check (Pre-warms backend and DB)
 app.get('/', (req, res) => {
+  const mongoose = require('mongoose');
   res.status(200).json({
     success: true,
     message: 'Welcome to Emahu E-Commerce API',
     status: 'Running',
+    dbConnected: mongoose.connection.readyState === 1,
     availableRoutes: {
       register: 'POST /api/auth/register',
       login: 'POST /api/auth/login',
@@ -62,24 +89,6 @@ app.get('/', (req, res) => {
       updatePassword: 'PUT /api/auth/update-password (Private)'
     }
   });
-});
-
-// Ensure database connection is active on every request
-app.use(async (req, res, next) => {
-  try {
-    const mongoose = require('mongoose');
-    const conn = await connectDB();
-    if (!conn || mongoose.connection.readyState !== 1) {
-      throw new Error('Database is in a disconnected or connecting state');
-    }
-    next();
-  } catch (err) {
-    console.error('Database connection middleware error:', err);
-    return res.status(503).json({ 
-      success: false, 
-      error: 'Database connection failed. The database server may be waking up from standby/sleep. Please retry in a few seconds.' 
-    });
-  }
 });
 
 // Register API Routes
