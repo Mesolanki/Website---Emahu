@@ -589,39 +589,6 @@ export default function BuyerRegister() {
                     <p className="br-subtitle">Please set up your primary delivery address for smooth checkout.</p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleGPSDetectRegister}
-                    disabled={gpsDetectLoading}
-                    style={{
-                      width: '100%',
-                      margin: '14px 0 20px 0',
-                      padding: '12px 16px',
-                      background: gpsDetectLoading ? '#cbd5e1' : 'linear-gradient(135deg, #4169e1, #3b5acd)',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      fontWeight: '700',
-                      fontSize: '0.88rem',
-                      cursor: gpsDetectLoading ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: '0 4px 14px rgba(65, 105, 225, 0.25)',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    {gpsDetectLoading ? (
-                      <>
-                        <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spinRing 0.8s linear infinite' }} />
-                        <span>Detecting Location...</span>
-                      </>
-                    ) : (
-                      <>📡 Auto-Detect My Location (GPS)</>
-                    )}
-                  </button>
-
                   <div className="br-form-grid">
                     <div className="br-field br-field--full">
                       <label className="br-label" htmlFor="address">Street Address, Building, Floor</label>
