@@ -66,7 +66,7 @@ app.use(async (req, res, next) => {
     console.error('Database connection middleware error:', err.message);
     return res.status(503).json({ 
       success: false, 
-      error: 'Database connection failed. The database server may be waking up from standby/sleep. Please retry in a few seconds.' 
+      error: `Database connection failed (${err.message}). Please verify MongoDB service or MONGO_URI in backend environment.` 
     });
   }
 });

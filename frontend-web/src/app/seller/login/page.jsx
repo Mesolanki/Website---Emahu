@@ -13,6 +13,8 @@ import { wakeupServer } from '@/utils/serverWakeup';
  * A luxury-themed, high-fidelity vendor login page with dynamic state handling,
  * responsive glassmorphism styling, and premium interactive micro-animations.
  */
+import SellerNormsModal from '@/components/seller_home/SellerNormsModal';
+
 export default function SellerLogin() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -22,6 +24,7 @@ export default function SellerLogin() {
   const [error, setError] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [hasOpenedTerms, setHasOpenedTerms] = useState(false);
+  const [isNormsModalOpen, setIsNormsModalOpen] = useState(false);
 
   // If already logged in, redirect directly to the seller dashboard (unless expired)
   useEffect(() => {
@@ -259,15 +262,24 @@ export default function SellerLogin() {
               />
               <label htmlFor="agree-portal-terms" style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', cursor: hasOpenedTerms ? 'pointer' : 'not-allowed', userSelect: 'none' }}>
                 <span style={{ color: hasOpenedTerms ? '#cbd5e1' : '#a0aec0' }}>
-                  I agree to the <a href="#" onClick={(e) => { e.preventDefault(); setHasOpenedTerms(true); alert("EMAHU Seller Agreement & Liability Disclaimer:\n\n1. PLATFORM ROLE: EMAHU acts solely as a matching portal and technology facilitator connecting sellers, buyers, and delivery partners. We do not own, inspect, handle, or guarantee any merchant listings or physical transactions.\n2. NO LIABILITY: Under no circumstances shall EMAHU, its owners, or developers be liable for direct, indirect, or consequential damages, loss of business, payment disputes, chargebacks, or inventory damage.\n3. LEGAL COMPLIANCE: Sellers are independent businesses and solely responsible for local taxes, product safety, licensing, and compliance. Any illegal, prohibited, or out-of-stock items listed will lead to permanent termination and forfeit of pending Emahubalances to buyers.\n4. EmahuRELEASES: Payments are held in secure Emahuand released to you only after successful delivery OTP validation by the courier. Emahudisputes will be handled by the team, and our decision is final and binding."); }} style={{ color: '#60a5fa', textDecoration: 'underline', fontWeight: 'bold' }}>Terms & Partner Conditions</a> of EMAHU Marketplace.
+                  I agree to the <a href="#" onClick={(e) => { e.preventDefault(); setIsNormsModalOpen(true); }} style={{ color: '#60a5fa', textDecoration: 'underline', fontWeight: 'bold' }}>Seller Governance Norms & Partner Terms</a> of EMAHU Marketplace.
                 </span>
                 {!hasOpenedTerms && (
                   <span style={{ color: '#f87171', display: 'block', fontSize: '0.72rem', marginTop: '4px', fontWeight: '600' }}>
-                    ⚠️ Please click and read the Terms link first to unlock this checkbox.
+                    ⚠️ Please click and read the Seller Norms link first to unlock this checkbox.
                   </span>
                 )}
               </label>
             </div>
+
+            <SellerNormsModal
+              isOpen={isNormsModalOpen}
+              onClose={() => setIsNormsModalOpen(false)}
+              onAccept={() => {
+                setHasOpenedTerms(true);
+                setAgreeTerms(true);
+              }}
+            />
 
             {/* Main Submit button with dynamic loading state */}
             <button

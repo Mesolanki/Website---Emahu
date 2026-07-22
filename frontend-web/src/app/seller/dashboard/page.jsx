@@ -7,6 +7,7 @@ import './dashboard.css';
 import { logoutUser, clearAuthSession, getProfile, changeUserRole, saveAuthSession } from '@/utils/auth';
 import CategorySelector from '@/components/seller_home/CategorySelector';
 import DynamicProductForm from '@/components/seller_home/DynamicProductForm';
+import SellerNormsModal from '@/components/seller_home/SellerNormsModal';
 import API_BASE from '@/utils/config';
 
 let localApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
@@ -502,6 +503,7 @@ export default function EmahuProDashboard() {
   const [sellersError, setSellersError] = useState('');
   const [selectedDetailedSeller, setSelectedDetailedSeller] = useState(null);
   const [sellerRejectionFeedback, setSellerRejectionFeedback] = useState({});
+  const [isNormsModalOpen, setIsNormsModalOpen] = useState(false);
 
   const fetchSellers = async () => {
     setLoadingSellers(true);
@@ -8548,6 +8550,10 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
           {submitting ? 'Resubmitting details...' : 'Resubmit for Verification'}
         </button>
       </div>
+      <SellerNormsModal
+        isOpen={isNormsModalOpen}
+        onClose={() => setIsNormsModalOpen(false)}
+      />
     </form>
   );
 }

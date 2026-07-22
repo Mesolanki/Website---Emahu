@@ -158,39 +158,6 @@ export default function BuyerHeader() {
     };
     syncCity();
 
-    // Request GPS permission and update location on page arrival
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      const getPosOnArrival = () => {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            try {
-              const lat = position.coords.latitude;
-              const lon = position.coords.longitude;
-              localStorage.setItem('emahu_buyer_coordinates', JSON.stringify({ latitude: lat, longitude: lon }));
-              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`);
-              const data = await res.json();
-              if (data && data.address) {
-                const cityVal = data.address.city || data.address.town || data.address.village || data.address.state_district || '';
-                if (cityVal) {
-                  const cleanCity = cityVal.replace(/District|Corporation/gi, '').trim();
-                  const capitalized = cleanCity.charAt(0).toUpperCase() + cleanCity.slice(1);
-                  setSelectedCity(capitalized);
-                  localStorage.setItem('emahu_buyer_city', capitalized);
-                  window.dispatchEvent(new Event('storage'));
-                }
-              }
-            } catch (geocodingErr) {
-              console.warn('Reverse geocoding auto-detection failed:', geocodingErr);
-            }
-          },
-          (geoErr) => {
-            console.warn('Geolocation permission denied or failed on arrival:', geoErr);
-          }
-        );
-      };
-      getPosOnArrival();
-    }
-
     const handleClickOutside = (e) => {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
         setProfileDropdownOpen(false);
