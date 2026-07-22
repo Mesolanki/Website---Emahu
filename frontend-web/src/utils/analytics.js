@@ -1,5 +1,7 @@
 'use client';
 
+import API_BASE from './config';
+
 export async function logAnalyticsEvent({ type, productId, sellerId }) {
   try {
     if (!sellerId) return;
@@ -17,16 +19,7 @@ export async function logAnalyticsEvent({ type, productId, sellerId }) {
       }
     }
 
-    let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-        apiUrl = apiUrl.replace('localhost', hostname).replace('127.0.0.1', hostname);
-      } else {
-        apiUrl = apiUrl.replace('localhost', '127.0.0.1');
-      }
-    }
-    await fetch(apiUrl + '/api/analytics/events', {
+    await fetch(`${API_BASE}/api/analytics/events`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

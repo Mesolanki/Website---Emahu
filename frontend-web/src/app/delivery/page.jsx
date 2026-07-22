@@ -8,27 +8,12 @@ import { indiaStatesCities } from '@/utils/indiaStatesCities';
 import './delivery.css';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '@/utils/firebase';
+import API_BASE from '@/utils/config';
 
-let localApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://website-emahu.onrender.com';
-
-if (typeof window !== 'undefined') {
-  let url = localApiUrl || 'https://website-emahu.onrender.com';
-  url = url.trim();
-  const hostname = window.location.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    localApiUrl = 'http://127.0.0.1:5000';
-  } else {
-    localApiUrl = url.replace('localhost', hostname).replace('127.0.0.1', hostname);
-  }
-}
+let localApiUrl = API_BASE;
 
 const getDynamicApiUrl = () => {
-  let base = localApiUrl || '';
-  base = base.trim();
-  if (!base || base.includes('localhost') || base.includes('127.0.0.1')) {
-    return '';
-  }
-  return base;
+  return API_BASE;
 };
 
 function getHaversineDistance(lat1, lon1, lat2, lon2) {

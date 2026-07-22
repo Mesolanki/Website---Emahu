@@ -10,18 +10,7 @@ import DynamicProductForm from '@/components/seller_home/DynamicProductForm';
 import SellerNormsModal from '@/components/seller_home/SellerNormsModal';
 import API_BASE from '@/utils/config';
 
-let localApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
-
-if (typeof window !== 'undefined') {
-  let url = localApiUrl || 'http://127.0.0.1:5000';
-  url = url.trim();
-  const hostname = window.location.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    localApiUrl = url.replace('localhost', '127.0.0.1');
-  } else {
-    localApiUrl = url.replace('localhost', hostname).replace('127.0.0.1', hostname);
-  }
-}
+let localApiUrl = API_BASE;
 
 const resolveDocUrl = (url) => {
   if (!url || typeof url !== 'string') return '';
