@@ -316,12 +316,7 @@ export default function BuyerRegister() {
 
   const handleNext = () => {
     if (step === 1 && validateStep1()) {
-      const isGoogleReg = formData.password && formData.password.startsWith('GoogleAuthPass_');
-      if (isGoogleReg) {
-        setStep(2);
-      } else {
-        handleSendEmailOtp();
-      }
+      setStep(2);
     }
   };
 
