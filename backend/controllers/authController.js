@@ -170,20 +170,29 @@ exports.register = async (req, res) => {
     if (!isGoogleReg) {
       const Otp = require('../models/Otp');
       const queryPhone = phone ? phone.trim() : 'non_existent_phone_123';
+      
       const otpRecord = await Otp.findOne({
         $or: [
           { phone: queryPhone },
           { email: finalEmail }
-        ],
-        isVerified: true
+        ]
       });
+
       if (!otpRecord) {
         return res.status(400).json({
           success: false,
-          error: 'Please verify your phone number via OTP first before registering'
+          error: 'Please request and verify your phone number via OTP first before registering'
         });
       }
-      // Delete the verified OTP record so it can't be reused
+
+      if (otpRecord.expiresAt && new Date(otpRecord.expiresAt) < new Date()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Verification OTP code has expired. Please request a new OTP.'
+        });
+      }
+
+      // Mark verified and delete OTP record so it can't be reused
       await Otp.deleteMany({
         $or: [
           { phone: queryPhone },

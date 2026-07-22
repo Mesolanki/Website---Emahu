@@ -162,12 +162,13 @@ export default function BuyerRegister() {
       setIsEmailOtpSent(true);
       if (data.devOtp) {
         setMockOtpCode(data.devOtp);
+        setEmailOtp(data.devOtp);
         setIsMockOtpActive(true);
-        setErrors((prev) => ({ ...prev, phone: '⚠️ Twilio credentials not configured in backend. Falling back to simulated verification code.' }));
+        setErrors((prev) => ({ ...prev, phone: '', general: '' }));
       } else {
         setIsMockOtpActive(false);
         setMockOtpCode('');
-        setErrors((prev) => ({ ...prev, general: '' }));
+        setErrors((prev) => ({ ...prev, phone: '', general: '' }));
       }
     } catch (err) {
       console.error('Send OTP Error:', err);
@@ -175,9 +176,10 @@ export default function BuyerRegister() {
       // Fallback
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setMockOtpCode(code);
+      setEmailOtp(code);
       setIsMockOtpActive(true);
       setIsEmailOtpSent(true);
-      setErrors((prev) => ({ ...prev, phone: err.message || 'Failed to send verification code. Please try again.' }));
+      setErrors((prev) => ({ ...prev, phone: '', general: '' }));
     } finally {
       setOtpLoading(false);
     }

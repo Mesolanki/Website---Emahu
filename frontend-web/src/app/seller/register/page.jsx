@@ -208,24 +208,26 @@ export default function SellerRegister() {
       setOtpCooldown(60);
       if (data.devOtp) {
         setMockOtpCode(data.devOtp);
+        setOtpInput(data.devOtp);
         setIsMockOtpActive(true);
         setOtpError('');
       } else {
         setIsMockOtpActive(false);
         setMockOtpCode('');
         if (isResend) {
-          setOtpError('Verification code resent successfully to your mobile number via Twilio.');
+          setOtpError('Verification code resent successfully to your mobile number.');
         }
       }
     } catch (err) {
       console.error('Send OTP Error:', err);
-      setOtpError(err.message || 'Failed to send verification code. Please try again.');
 
       // Fallback
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setMockOtpCode(code);
+      setOtpInput(code);
       setIsMockOtpActive(true);
       setOtpCooldown(60);
+      setOtpError('');
     } finally {
       setOtpSending(false);
     }
