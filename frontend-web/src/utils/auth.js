@@ -4,59 +4,25 @@
  */
 
 import API_BASE from './config';
+import { safeFetch } from './safeFetch';
 
 const API_BASE_URL = `${API_BASE}/api/auth`;
 
 /**
- * Smart fetch wrapper that automatically retries when backend/database is waking up from standby/sleep (503 Service Unavailable).
+ * Smart fetch wrapper that delegates to safeFetch to guarantee JSON safety and cold-start retries.
  */
 export async function fetchWithRetry(url, options = {}, retries = 2, delayMs = 2000) {
-  let attempt = 0;
-  while (attempt <= retries) {
-    try {
-      const response = await fetch(url, options);
-
-      // If 503 Service Unavailable (e.g. database server waking up), retry cleanly
-      if (response.status === 503 && attempt < retries) {
-        console.warn(`[API] Server/DB waking up. Retrying attempt ${attempt + 1}/${retries} in ${delayMs}ms...`);
-        await new Promise((res) => setTimeout(res, delayMs));
-        attempt++;
-        continue;
-      }
-
-      return response;
-    } catch (err) {
-      if (attempt < retries) {
-        console.warn(`[API] Network error. Retrying attempt ${attempt + 1}/${retries} in ${delayMs}ms...`);
-        await new Promise((res) => setTimeout(res, delayMs));
-        attempt++;
-        continue;
-      }
-      throw err;
-    }
-  }
+  return safeFetch(url, options, retries, delayMs);
 }
 
 /**
- * Safely parses response JSON. If response is HTML (e.g. 404/502 error page), extracts error message cleanly.
+ * Safely parses response JSON. Safe fallback for backward compatibility.
  */
 export async function safeParseJson(response) {
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('text/html') || contentType.includes('text/plain')) {
-    const text = await response.text();
-    if (response.status === 404) {
-      throw new Error(`API Endpoint Not Found (404). Please verify backend server deployment.`);
-    } else if (response.status === 502 || response.status === 503 || response.status === 504) {
-      throw new Error(`Database / Server is starting up (${response.status}). Please retry in a few seconds.`);
-    }
-    throw new Error(`Server returned non-JSON response (${response.status}).`);
-  }
-
-  try {
+  if (response && typeof response.json === 'function') {
     return await response.json();
-  } catch (err) {
-    throw new Error(`Invalid server response format (${response.status}).`);
   }
+  return response && response.data ? response.data : response;
 }
 
 /**
