@@ -591,7 +591,7 @@ exports.adminDecision = async (req, res) => {
         });
       }
 
-      product.approvalStatus = 'pending'; // Activation pending by seller code
+      product.approvalStatus = 'approved';
       if (!product.adminCode) {
         product.adminCode = `APP-${Math.floor(1000 + Math.random() * 9000)}`;
       }
@@ -619,7 +619,7 @@ exports.adminDecision = async (req, res) => {
       await Notification.create({
         recipient: product.seller,
         title: 'Product Approved & SKU Assigned',
-        message: `Your product "${product.name}" has been approved! Official SKU assigned: "${finalSku}". Enter activation code "${product.adminCode}" in your dashboard to publish it.`,
+        message: `Your product "${product.name}" has been approved! Official SKU assigned: "${finalSku}". Your product is now active and live on the marketplace.`,
         type: 'success'
       });
 

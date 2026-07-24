@@ -1831,11 +1831,14 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (data.success) {
         setSelectedDetailSeller(null);
-        setSellers(prev => prev.map(s => s._id === id ? data.seller : s));
+        setSellers(prev => prev.map(s => String(s._id || s.id) === String(id) ? { ...s, ...data.seller, status: data.seller.status || decision } : s));
         triggerToast('Seller Updated', `Seller account status changed to '${decision}' successfully.`, 'success');
       } else {
         triggerToast('Error', data.error || 'Failed to update seller.', 'danger');
       }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Error', 'Network error updating seller status.', 'danger');
     } finally {
       setActionLoading(prev => ({ ...prev, [id]: false }));
     }
@@ -1861,7 +1864,7 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (data.success) {
         setSelectedDetailPartner(null);
-        setDeliveryPartners(prev => prev.map(p => p._id === id ? data.deliveryPartner : p));
+        setDeliveryPartners(prev => prev.map(p => String(p._id || p.id) === String(id) ? { ...p, ...data.deliveryPartner, status: data.deliveryPartner.status || decision } : p));
         triggerToast('Partner Updated', `Delivery partner status updated to '${decision}' successfully.`, 'success');
       } else {
         triggerToast('Error', data.error || 'Failed to update delivery partner.', 'danger');
@@ -1895,12 +1898,12 @@ export default function AdminDashboard() {
       if (data.success) {
         setSelectedDetailProduct(null);
         if (data.productDeleted) {
-          setProducts(prev => prev.filter(p => (p.id || p._id) !== id));
+          setProducts(prev => prev.filter(p => String(p.id || p._id) !== String(id)));
           triggerToast('Product Deleted', 'Product listing rejected 3 times and removed permanently.', 'warning');
         } else {
-          setProducts(prev => prev.map(p => (p.id || p._id) === id ? data.product : p));
+          setProducts(prev => prev.map(p => String(p.id || p._id) === String(id) ? { ...p, ...data.product } : p));
           if (decision === 'approve') {
-            triggerToast('Product Approved', `Product approved! SKU Assigned: ${data.product.sku}. Activation Code: ${data.product.adminCode}`, 'success');
+            triggerToast('Product Approved', `Product approved! SKU Assigned: ${data.product.sku}. Live on marketplace!`, 'success');
           } else if (decision === 'request_changes') {
             triggerToast('Changes Requested', 'Seller notified to edit product properties.', 'warning');
           } else {
