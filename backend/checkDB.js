@@ -10,6 +10,7 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/emahu')
       console.log({
         id: p._id,
         name: p.name,
+        approvalStatus: p.approvalStatus,
         imageType: typeof p.image,
         imageVal: p.image ? p.image.substring(0, 80) + '...' : null,
         startsWithHttp: p.image?.startsWith('http'),
