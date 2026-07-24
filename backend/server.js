@@ -30,8 +30,16 @@ app.use(express.json({ limit: '50mb' })); // Parse JSON requests up to 50mb
 app.use(express.urlencoded({ limit: '50mb', extended: true })); // Parse url-encoded requests up to 50mb
 app.use(cookieParser()); // Parse cookies from headers
 
+const fs = require('fs');
+
+// Ensure uploads directory exists on disk for Linux/VPS deployments
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Serve uploaded product files statically
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(uploadsDir));
 
 // CORS configuration (allow requests from frontend ports like 3000, 5173, etc. or allow all for development)
 app.use(

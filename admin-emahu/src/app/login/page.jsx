@@ -29,10 +29,15 @@ export default function AdminLogin() {
   }, [router]);
 
   useEffect(() => {
-    // Pre-warm backend & database connection on landing
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    const pingUrl = apiUrl.replace(/\/api\/auth$/, '').replace(/\/api$/, '').replace(/\/$/, '') + '/';
-    fetch(pingUrl).catch(() => {});
+    // Pre-warm backend & database connection on landing without triggering loopback CORS warnings on HTTPS
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        fetch('http://localhost:5000/').catch(() => {});
+      } else {
+        fetch('/api/').catch(() => {});
+      }
+    }
   }, []);
 
   const handleSubmit = async (e) => {
