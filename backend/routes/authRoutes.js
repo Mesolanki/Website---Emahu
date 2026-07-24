@@ -91,5 +91,26 @@ router.route('/admin/sellers/:id/documents')
 router.route('/admin/sellers/:id/documents/:docId')
   .put(protect, authorize('admin'), verifySellerDocument);
 
+// Public diagnostic endpoint
+router.get('/test-db', async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const User = require('../models/User');
+    const dbName = mongoose.connection.name;
+    const dbHost = mongoose.connection.host;
+    const users = await User.find({}, '_id name email role status');
+    res.json({
+      success: true,
+      dbName,
+      dbHost,
+      mongoUriConfigured: process.env.MONGO_URI ? process.env.MONGO_URI.replace(/:([^@]+)@/, ':****@') : 'NOT_SET',
+      usersCount: users.length,
+      users
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
   
