@@ -9,7 +9,7 @@ if (typeof window !== 'undefined') {
   const protocol = window.location.protocol;
   if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
     if (hostname.includes('emahu.com')) {
-      API_BASE = 'https://emahu.com';
+      API_BASE = `${protocol}//emahu.com`;
     } else {
       API_BASE = `${protocol}//${hostname}`;
     }

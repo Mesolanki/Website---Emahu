@@ -22,8 +22,8 @@ router.post('/upload', protect, authorize('seller'), upload.single('image'), (re
     }
     const hostHeader = req.get('host') || '';
     let publicBase = `${req.protocol}://${hostHeader}`;
-    if (hostHeader.includes('127.0.0.1') || hostHeader.includes('localhost') || process.env.PUBLIC_APP_URL) {
-      publicBase = process.env.PUBLIC_APP_URL || 'https://emahu.com';
+    if (process.env.PUBLIC_APP_URL) {
+      publicBase = process.env.PUBLIC_APP_URL;
     }
     const fileUrl = `${publicBase}/uploads/${req.file.filename}`;
     res.status(200).json({
