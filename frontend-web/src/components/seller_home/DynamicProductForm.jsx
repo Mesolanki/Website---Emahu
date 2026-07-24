@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import CategorySelector from './CategorySelector';
+import API_BASE from '@/utils/config';
 import './DynamicProductForm.css';
 
 // Popular fallback suggestions if API config has no brands
@@ -169,7 +170,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     const fetchParentConfig = async () => {
       setConfigLoading(true);
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories`);
+        const res = await fetch(`${API_BASE}/api/categories`);
         const data = await res.json();
         if (data.success && data.data) {
           // Find parent category node in full tree
@@ -193,7 +194,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
             setAvailableSubcategories(subs);
 
             // Fetch full config for the parent
-            const detailRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories/${parentNode._id || parentNode.id}`);
+            const detailRes = await fetch(`${API_BASE}/api/categories/${parentNode._id || parentNode.id}`);
             const detailData = await detailRes.json();
             if (detailData.success && detailData.data) {
               setParentCategoryConfig(detailData.data);
@@ -224,7 +225,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     const fetchSubcategoryConfig = async () => {
       setConfigLoading(true);
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories`);
+        const res = await fetch(`${API_BASE}/api/categories`);
         const data = await res.json();
         if (data.success && data.data) {
           const findNode = (nodes, targetName) => {
@@ -240,7 +241,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
 
           const subNode = findNode(data.data, subcategory);
           if (subNode) {
-            const detailRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories/${subNode._id || subNode.id}`);
+            const detailRes = await fetch(`${API_BASE}/api/categories/${subNode._id || subNode.id}`);
             const detailData = await detailRes.json();
             if (detailData.success && detailData.data) {
               const subConfig = detailData.data;
@@ -599,7 +600,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     formData.append('image', file);
     
     const token = localStorage.getItem('emahu_seller_token');
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const baseUrl = API_BASE;
     const res = await fetch(`${baseUrl}/api/products/upload`, {
       method: 'POST',
       headers: {
@@ -785,8 +786,8 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
       };
 
       const url = resubmitProductId
-        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/${resubmitProductId}/resubmit`
-        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`;
+        ? `${API_BASE}/api/products/${resubmitProductId}/resubmit`
+        : `${API_BASE}/api/products`;
 
       const method = resubmitProductId ? 'PUT' : 'POST';
 

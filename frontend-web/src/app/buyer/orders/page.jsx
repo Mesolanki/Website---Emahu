@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
+import API_BASE from '@/utils/config';
 import './orders.css';
 
 function parseOrderDate(ord) {
@@ -183,7 +184,7 @@ export default function OrdersPage() {
 
         let storedOrders = '[]';
         try {
-          const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${buyerUserId}`;
+          const url = `${API_BASE}/api/orders?userId=${buyerUserId}`;
           const res = await fetch(url);
           const data = await res.json();
           if (data.success && data.orders) {
@@ -384,7 +385,7 @@ export default function OrdersPage() {
   const syncOrderStatus = async (orderId, nextStatus) => {
     try {
       // 1. Sync to database
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}`, {
+      await fetch(`${API_BASE}/api/orders/${orderId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -417,7 +418,7 @@ export default function OrdersPage() {
   const handleConfirmReceipt = async (orderId) => {
     const token = localStorage.getItem('emahu_buyer_token');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/confirm-receipt`, {
+      const res = await fetch(`${API_BASE}/api/orders/${orderId}/confirm-receipt`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`

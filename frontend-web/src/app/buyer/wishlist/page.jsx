@@ -6,6 +6,7 @@ import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import './wishlist.css';
 
+import API_BASE from '@/utils/config';
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 
 function Stars({ rating }) {
@@ -30,7 +31,7 @@ export default function WishlistPage() {
     try {
       let formattedList = [];
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
+        const res = await fetch(`${API_BASE}/api/products`);
         const data = await res.json();
         if (data.success && data.products) {
           formattedList = data.products.map(p => {

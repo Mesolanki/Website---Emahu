@@ -84,22 +84,24 @@ const openDocInNewTab = (url) => {
 };
 
 const decodeToken = (token) => {
+  if (!token || typeof token !== 'string') return null;
   try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return null;
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64Url = parts[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const padLen = (4 - (base64.length % 4)) % 4;
     const padded = base64 + '='.repeat(padLen);
-    const jsonPayload = decodeURIComponent(
-      atob(padded)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const decodedText = new TextDecoder().decode(bytes);
+    return JSON.parse(decodedText);
   } catch (e) {
     console.error('Safe JWT Decode Error:', e);
-    return null;
+    return { exp: Math.floor(Date.now() / 1000) + 86400 };
   }
 };
 
@@ -500,7 +502,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/admin/sellers`, {
+      const res = await fetch(`${API_BASE}/api/auth/admin/sellers`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -523,7 +525,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/admin/sellers/${sellerId}/decision`, {
+      const res = await fetch(`${API_BASE}/api/auth/admin/sellers/${sellerId}/decision`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -809,7 +811,7 @@ export default function EmahuProDashboard() {
         longitude: settingsForm.longitude !== '' ? parseFloat(settingsForm.longitude) : undefined
       };
 
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/update-details`, {
+      const res = await fetch(`${API_BASE}/api/auth/update-details`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -838,7 +840,7 @@ export default function EmahuProDashboard() {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
 
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/update-details`, {
+      const res = await fetch(`${API_BASE}/api/auth/update-details`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -864,7 +866,7 @@ export default function EmahuProDashboard() {
   const fetchAdminDeliverySettings = async () => {
     try {
       setLoadingAdminSettings(true);
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/delivery/settings`);
+      const res = await fetch(`${API_BASE}/api/delivery/settings`);
       const data = await res.json();
       if (data.success && data.settings) {
         setAdminDeliverySettings(data.settings);
@@ -889,7 +891,7 @@ export default function EmahuProDashboard() {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
 
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/delivery/settings`, {
+      const res = await fetch(`${API_BASE}/api/delivery/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1018,7 +1020,7 @@ export default function EmahuProDashboard() {
                       longitude: parseFloat(lon)
                     };
 
-                    const updateRes = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/update-details`, {
+                    const updateRes = await fetch(`${API_BASE}/api/auth/update-details`, {
                       method: 'PUT',
                       headers: {
                         'Content-Type': 'application/json',
@@ -1097,7 +1099,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const apiBase = localApiUrl || 'http://localhost:5000';
+      const apiBase = API_BASE;
       const res = await fetch(apiBase + '/api/auth/seller/documents', {
         headers: {
           'Authorization': 'Bearer ' + token
@@ -1250,7 +1252,7 @@ export default function EmahuProDashboard() {
       try {
         const token = localStorage.getItem('emahu_seller_token');
         if (!token) return;
-        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/products/my`, {
+        const res = await fetch(`${API_BASE}/api/products/my`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -1291,8 +1293,8 @@ export default function EmahuProDashboard() {
         const sellerUserIdOpt = sellerUser ? (sellerUser._id || sellerUser.id || '').toString() : '';
         try {
           const url = sellerUserIdOpt
-            ? `${localApiUrl || 'http://localhost:5000'}/api/orders?sellerId=${sellerUserIdOpt}`
-            : `${localApiUrl || 'http://localhost:5000'}/api/orders`;
+            ? `${API_BASE}/api/orders?sellerId=${sellerUserIdOpt}`
+            : `${API_BASE}/api/orders`;
           const res = await fetch(url);
           const data = await res.json();
           if (data.success && data.orders) {
@@ -1695,7 +1697,7 @@ export default function EmahuProDashboard() {
 
     const fetchLiveTracking = async () => {
       try {
-        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/delivery/track/live/${selectedDetailedOrder.orderId}`);
+        const res = await fetch(`${API_BASE}/api/delivery/track/live/${selectedDetailedOrder.orderId}`);
         const data = await res.json();
         if (data.success) {
           setLiveTrackingDetails(data);
@@ -1787,7 +1789,7 @@ export default function EmahuProDashboard() {
   useEffect(() => {
     const fetchPlatformSettings = async () => {
       try {
-        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/payment/settings`);
+        const res = await fetch(`${API_BASE}/api/payment/settings`);
         const data = await res.json();
         if (data.success) {
           setPlatformFeePercent(data.platformFeePercent);
@@ -1803,7 +1805,7 @@ export default function EmahuProDashboard() {
   const handleReleasePayment = async (orderId) => {
     setIsReleasingPayment(true);
     try {
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/payment/release/${orderId}`, {
+      const res = await fetch(`${API_BASE}/api/payment/release/${orderId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1866,7 +1868,7 @@ export default function EmahuProDashboard() {
 
       const unread = notifications.filter(n => !n.read);
       for (const n of unread) {
-        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/notifications/${n.id}/read`, {
+        const res = await fetch(`${API_BASE}/api/notifications/${n.id}/read`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -1896,7 +1898,7 @@ export default function EmahuProDashboard() {
         delete payload._id;
         delete payload.__v;
 
-        const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/orders/${orderId}`, {
+        const res = await fetch(`${API_BASE}/api/orders/${orderId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
@@ -2064,7 +2066,7 @@ export default function EmahuProDashboard() {
       setOrderLoading(prev => ({ ...prev, [orderId]: true }));
       const token = localStorage.getItem('emahu_seller_token');
 
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/delivery/assign`, {
+      const res = await fetch(`${API_BASE}/api/delivery/assign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2540,8 +2542,8 @@ export default function EmahuProDashboard() {
       setIsSubmittingProduct(true);
       const token = localStorage.getItem('emahu_seller_token');
       const url = resubmitProductId
-        ? `${localApiUrl || 'http://localhost:5000'}/api/products/${resubmitProductId}/resubmit`
-        : `${localApiUrl || 'http://localhost:5000'}/api/products`;
+        ? `${API_BASE}/api/products/${resubmitProductId}/resubmit`
+        : `${API_BASE}/api/products`;
       const method = resubmitProductId ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -2662,7 +2664,7 @@ export default function EmahuProDashboard() {
 
     try {
       const token = localStorage.getItem('emahu_seller_token');
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/products/${productId}/verify`, {
+      const res = await fetch(`${API_BASE}/api/products/${productId}/verify`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2848,7 +2850,7 @@ export default function EmahuProDashboard() {
       formData.append('image', file);
       
       const token = localStorage.getItem('emahu_seller_token');
-      const baseUrl = localApiUrl || 'http://localhost:5000';
+      const baseUrl = API_BASE;
       const res = await fetch(`${baseUrl}/api/products/upload`, {
         method: 'POST',
         headers: {
@@ -3102,7 +3104,7 @@ export default function EmahuProDashboard() {
       setReviewsLoading(true);
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/reviews/seller`, {
+      const res = await fetch(`${API_BASE}/api/reviews/seller`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -3123,7 +3125,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/reviews/${reviewId}`, {
+      const res = await fetch(`${API_BASE}/api/reviews/${reviewId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -3162,7 +3164,7 @@ export default function EmahuProDashboard() {
     try {
       const token = localStorage.getItem('emahu_seller_token');
       const productId = productToDelete.id || productToDelete._id;
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/products/${productId}`, {
+      const res = await fetch(`${API_BASE}/api/products/${productId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -4500,7 +4502,7 @@ export default function EmahuProDashboard() {
                   try {
                     const token = localStorage.getItem('emahu_seller_token');
                     if (!token) return;
-                    const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/products`, {
+                    const res = await fetch(`${API_BASE}/api/products`, {
                       headers: {
                         'Authorization': `Bearer ${token}`
                       }
@@ -8108,7 +8110,7 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
     }
 
     try {
-      const res = await fetch(`${localApiUrl || 'http://localhost:5000'}/api/products/${productId}/admin-decision`, {
+      const res = await fetch(`${API_BASE}/api/products/${productId}/admin-decision`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -8419,7 +8421,7 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
       const promises = [];
       if (needsBusiness && businessDocUrl.trim()) {
         promises.push(
-          fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/seller/documents`, {
+          fetch(`${API_BASE}/api/auth/seller/documents`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -8444,7 +8446,7 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
 
       if (needsId && idDocUrl.trim()) {
         promises.push(
-          fetch(`${localApiUrl || 'http://localhost:5000'}/api/auth/seller/documents`, {
+          fetch(`${API_BASE}/api/auth/seller/documents`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

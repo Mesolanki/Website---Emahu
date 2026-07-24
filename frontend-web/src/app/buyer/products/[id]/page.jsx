@@ -7,6 +7,7 @@ import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import './product-detail.css';
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
+import API_BASE from '@/utils/config';
 
 const ALL_PRODUCTS = STATIC_PRODUCTS;
 
@@ -165,7 +166,7 @@ export default function ProductDetailPage() {
     const fetchRelated = async () => {
       try {
         const categoryQuery = product.category ? `?category=${encodeURIComponent(product.category)}&limit=20` : '?limit=20';
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products${categoryQuery}`);
+        const res = await fetch(`${API_BASE}/api/products${categoryQuery}`);
         const data = await res.json();
         if (data.success && data.products) {
           const productCategory = product.category;
@@ -197,7 +198,7 @@ export default function ProductDetailPage() {
           // Fallback if not enough category items
           if (matched.length < 4) {
             try {
-              const fallbackRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products?limit=20`);
+              const fallbackRes = await fetch(`${API_BASE}/api/products?limit=20`);
               const fallbackData = await fallbackRes.json();
               if (fallbackData.success && fallbackData.products) {
                 const extra = fallbackData.products.filter(p => String(p._id || p.id) !== String(product.id) && sellerServesLocation(p.seller, selectedCity));
@@ -415,7 +416,7 @@ export default function ProductDetailPage() {
         let orders = [];
         if (buyerUserId) {
           try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${buyerUserId}`);
+            const res = await fetch(`${API_BASE}/api/orders?userId=${buyerUserId}`);
             const data = await res.json();
             if (data.success && data.orders) orders = data.orders;
           } catch (_) { }
@@ -499,7 +500,7 @@ export default function ProductDetailPage() {
     const fetchDbProduct = async () => {
       let fetchedSuccessfully = false;
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products/${id}`);
+        const res = await fetch(`${API_BASE}/api/products/${id}`);
         const data = await res.json();
         if (data.success && data.product) {
           const p = data.product;

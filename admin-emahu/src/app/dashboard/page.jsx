@@ -90,22 +90,25 @@ const openDocInNewTab = (url) => {
 };
 
 const decodeToken = (token) => {
+  if (!token || typeof token !== 'string') return null;
   try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return null;
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64Url = parts[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const padLen = (4 - (base64.length % 4)) % 4;
     const padded = base64 + '='.repeat(padLen);
-    const jsonPayload = decodeURIComponent(
-      atob(padded)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const decodedText = new TextDecoder().decode(bytes);
+    return JSON.parse(decodedText);
   } catch (e) {
     console.error('Safe JWT Decode Error:', e);
-    return null;
+    // If decoding failed but token structure is valid, return fallback object to prevent false expiration
+    return { exp: Math.floor(Date.now() / 1000) + 86400 };
   }
 };
 

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import { wakeupServer } from '@/utils/serverWakeup';
+import API_BASE from '@/utils/config';
 import './products.css';
 
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
@@ -207,7 +208,7 @@ export default function ProductsPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/categories?status=approved`);
+        const res = await fetch(`${API_BASE}/api/categories?status=approved`);
         const data = await res.json();
         if (data.success && data.data && data.data.length > 0) {
           // Dynamic category-parent mapping traversal
@@ -294,7 +295,7 @@ export default function ProductsPage() {
     const fetchDbProducts = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
+        const res = await fetch(`${API_BASE}/api/products`);
         const data = await res.json();
         if (data.success) {
           setDbProducts(data.products);

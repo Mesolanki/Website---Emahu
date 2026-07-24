@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
+import API_BASE from '@/utils/config';
 import './track.css';
 
 // Sub-component for interactive Leaflet Map for a specific orderId
@@ -181,7 +182,7 @@ function TrackOrderContent() {
 
       for (const subOrd of activeSubOrders) {
         try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/track/live/${subOrd.orderId}`);
+          const res = await fetch(`${API_BASE}/api/delivery/track/live/${subOrd.orderId}`);
           const data = await res.json();
           if (data.success) {
             updatedTracking[subOrd.orderId] = data;
@@ -274,7 +275,7 @@ function TrackOrderContent() {
     const fetchOrders = async () => {
       if (!buyerUserId) return;
       try {
-        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${buyerUserId}`;
+        const url = `${API_BASE}/api/orders?userId=${buyerUserId}`;
         const res = await fetch(url);
         const data = await res.json();
         if (data.success && data.orders) {
@@ -299,7 +300,7 @@ function TrackOrderContent() {
 
     const fetchTrackedOrder = async () => {
       try {
-        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?orderId=${queryId.trim()}`;
+        const url = `${API_BASE}/api/orders?orderId=${queryId.trim()}`;
         const res = await fetch(url);
         const data = await res.json();
         if (data.success && data.orders && data.orders.length > 0) {

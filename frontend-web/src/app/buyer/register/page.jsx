@@ -7,6 +7,7 @@ import './buyer-register.css';
 import { registerUser, saveAuthSession, googleLoginUser, fetchWithRetry } from '@/utils/auth';
 import { useGoogleAuth } from '@/utils/useGoogleAuth';
 import { wakeupServer } from '@/utils/serverWakeup';
+import API_BASE from '@/utils/config';
 
 /**
  * Retail Buyer Registration Component
@@ -147,7 +148,7 @@ export default function BuyerRegister() {
         cleanPhone = cleanPhone.slice(2);
       }
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiBase = API_BASE;
       const res = await fetchWithRetry(`${apiBase}/api/auth/send-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -199,7 +200,7 @@ export default function BuyerRegister() {
         cleanPhone = cleanPhone.slice(2);
       }
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiBase = API_BASE;
       const res = await fetchWithRetry(`${apiBase}/api/auth/verify-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

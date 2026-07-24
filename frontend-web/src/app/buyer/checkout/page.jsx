@@ -8,6 +8,7 @@ import { detectLocationWithGPS } from '@/utils/location';
 import './checkout.css';
 
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
+import API_BASE from '@/utils/config';
 
 const cleanImageUrl = (img) => {
   if (!img || typeof img !== 'string') return '';
@@ -290,7 +291,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/settings`);
+        const res = await fetch(`${API_BASE}/api/delivery/settings`);
         const data = await res.json();
         if (data.success && data.settings) {
           setDeliverySettings(data.settings);
@@ -550,7 +551,7 @@ export default function CheckoutPage() {
       }
 
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/calculate`, {
+        const res = await fetch(`${API_BASE}/api/delivery/calculate`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -613,7 +614,7 @@ export default function CheckoutPage() {
         } catch (e) { }
       }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
+      const res = await fetch(`${API_BASE}/api/products`);
       const data = await res.json();
       let formattedList = [];
       if (data.success && data.products) {
@@ -968,7 +969,7 @@ export default function CheckoutPage() {
     }
 
     try {
-      const initOrderRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/razorpay-order`, {
+      const initOrderRes = await fetch(`${API_BASE}/api/payment/razorpay-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -994,7 +995,7 @@ export default function CheckoutPage() {
           setCheckoutStep('securing');
 
           try {
-            const verifyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payment/razorpay-verify`, {
+            const verifyRes = await fetch(`${API_BASE}/api/payment/razorpay-verify`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'

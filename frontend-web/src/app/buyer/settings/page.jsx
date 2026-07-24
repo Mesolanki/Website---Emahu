@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { changeUserRole, clearAuthSession, saveAuthSession, logoutUser } from '@/utils/auth';
+import API_BASE from '@/utils/config';
 import './buyer_settings.css';
 
 export default function BuyerSettingsPage() {
@@ -176,7 +177,7 @@ export default function BuyerSettingsPage() {
     const fetchStats = async () => {
       try {
         const userId = user.id || user._id;
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${userId}`);
+        const res = await fetch(`${API_BASE}/api/orders?userId=${userId}`);
         const data = await res.json();
 
         if (data.success && data.orders) {
@@ -225,7 +226,7 @@ export default function BuyerSettingsPage() {
     setOtpError('');
     setMockOtpCode('');
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiBase = API_BASE;
       const res = await fetch(`${apiBase}/api/auth/send-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -258,7 +259,7 @@ export default function BuyerSettingsPage() {
     setOtpError('');
     setOtpLoading(true);
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiBase = API_BASE;
       const res = await fetch(`${apiBase}/api/auth/verify-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -284,7 +285,7 @@ export default function BuyerSettingsPage() {
   const saveProfileData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/update-details`, {
+      const res = await fetch(`${API_BASE}/api/auth/update-details`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

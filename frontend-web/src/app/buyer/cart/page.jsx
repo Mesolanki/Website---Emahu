@@ -6,6 +6,7 @@ import BuyerHeader from '@/components/buyer_home/buyer_header';
 import './cart.css';
 
 import { STATIC_PRODUCTS } from '@/utils/mockProducts';
+import API_BASE from '@/utils/config';
 
 const cleanImageUrl = (img) => {
   if (!img || typeof img !== 'string') return '';
@@ -178,7 +179,7 @@ export default function CartPage() {
       if (!buyerUserId) return;
 
       try {
-        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders?userId=${buyerUserId}`;
+        const url = `${API_BASE}/api/orders?userId=${buyerUserId}`;
         const res = await fetch(url);
         const data = await res.json();
         if (data.success && data.orders) {
@@ -203,7 +204,7 @@ export default function CartPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/settings`);
+        const res = await fetch(`${API_BASE}/api/delivery/settings`);
         const data = await res.json();
         if (data.success && data.settings) {
           setDeliverySettings(data.settings);
@@ -236,7 +237,7 @@ export default function CartPage() {
   const loadCartAndProducts = useCallback(async () => {
     let formattedList = [];
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/products`);
+      const res = await fetch(`${API_BASE}/api/products`);
       const data = await res.json();
       if (data.success && data.products) {
         formattedList = data.products.map(p => {
@@ -559,7 +560,7 @@ export default function CartPage() {
     setDeliveryCalculating(true);
     setDeliveryError('');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/delivery/calculate`, {
+      const res = await fetch(`${API_BASE}/api/delivery/calculate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
