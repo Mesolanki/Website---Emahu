@@ -24,7 +24,8 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000
+        PORT: 3000,
+        NEXT_PUBLIC_API_URL: 'http://127.0.0.1:5000'
       }
     },
     {
@@ -38,7 +39,8 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
-        PORT: 3001
+        PORT: 3001,
+        NEXT_PUBLIC_API_URL: 'http://127.0.0.1:5000'
       }
     }
   ]
