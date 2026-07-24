@@ -94,6 +94,9 @@ export async function getProfile(token) {
 
     const data = await safeParseJson(response);
     if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthSession('admin');
+      }
       throw new Error(data.error || 'Failed to fetch profile');
     }
     return data;

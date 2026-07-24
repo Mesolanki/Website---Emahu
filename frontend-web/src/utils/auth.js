@@ -123,7 +123,7 @@ export async function logoutUser() {
 /**
  * Retrieve user details using standard access token
  */
-export async function getProfile(token) {
+export async function getProfile(token, role) {
   try {
     const response = await fetchWithRetry(`${API_BASE_URL}/me`, {
       method: 'GET',
@@ -132,6 +132,9 @@ export async function getProfile(token) {
 
     const data = await safeParseJson(response);
     if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthSession(role);
+      }
       throw new Error(data.error || 'Failed to fetch profile');
     }
     return data;
