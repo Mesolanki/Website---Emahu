@@ -7,6 +7,11 @@ const DEFAULT_CLIENT_ID = '99676552821-bfllodch8jnjal3gg9hujrledlsm61ul.apps.goo
 const CLIENT_ID = (RAW_CLIENT_ID && RAW_CLIENT_ID !== 'undefined' && RAW_CLIENT_ID !== 'null') ? RAW_CLIENT_ID.trim() : DEFAULT_CLIENT_ID;
 const isGoogleEnabled = true;
 
+// Module-level flag — persists across component mounts/navigations.
+// This prevents GIS from being re-initialized on every page navigation,
+// which caused a second Google button to appear alongside the existing one.
+let gisInitialized = false;
+
 /**
  * Reusable hook to trigger Google Sign-In natively on the current page.
  * Fires Google's OAuth popup directly — no intermediate popup window.
@@ -27,7 +32,6 @@ export function useGoogleAuth(onSuccess, onError) {
     onErrorRef.current = onError;
   }, [onError]);
 
-  const initializedRef = useRef(false);
 
   // Load GIS script once and initialize on mount
   useEffect(() => {
@@ -52,7 +56,7 @@ export function useGoogleAuth(onSuccess, onError) {
         return;
       }
 
-      if (initializedRef.current) {
+      if (gisInitialized) {
         console.log("[GIS_DIAGNOSTIC] Google Identity Services already initialized.");
         return;
       }
@@ -87,12 +91,15 @@ export function useGoogleAuth(onSuccess, onError) {
             }
           },
           // Do NOT set ux_mode here — renderButton() handles its own popup/redirect mode.
-          // Setting ux_mode:'popup' at the initialize level conflicts with renderButton() and causes duplicate buttons.
           auto_select: false,
           cancel_on_tap_outside: true,
           itp_support: true,
         });
-        initializedRef.current = true;
+        // IMPORTANT: Cancel the auto one-tap prompt immediately after initialization.
+        // Without this, GIS auto-shows a floating "Sign in with Google" one-tap dialog
+        // in addition to the renderButton() output — causing TWO Google buttons to appear.
+        window.google.accounts.id.cancel();
+        gisInitialized = true;
         console.log("[GIS_DIAGNOSTIC] Google Sign-In initialization status: SUCCESS");
       } catch (err) {
         console.error('[GIS_DIAGNOSTIC] GIS initialization error:', err);
@@ -203,7 +210,7 @@ export function useGoogleAuth(onSuccess, onError) {
             type: "standard",
             theme: "outline",
             size: "large",
-            text: "continue_with",
+            text: "signin_with",
             shape: "rectangular",
             logo_alignment: "left",
             width: btnContainer.offsetWidth || "400",
