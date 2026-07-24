@@ -86,8 +86,11 @@ export function useGoogleAuth(onSuccess, onError) {
               onErrorRef.current?.('Failed to read Google account info.');
             }
           },
-          ux_mode: 'popup',
+          // Do NOT set ux_mode here — renderButton() handles its own popup/redirect mode.
+          // Setting ux_mode:'popup' at the initialize level conflicts with renderButton() and causes duplicate buttons.
+          auto_select: false,
           cancel_on_tap_outside: true,
+          itp_support: true,
         });
         initializedRef.current = true;
         console.log("[GIS_DIAGNOSTIC] Google Sign-In initialization status: SUCCESS");
@@ -132,8 +135,10 @@ export function useGoogleAuth(onSuccess, onError) {
       return;
     }
 
+    // Fix: use window.location.origin directly instead of the closure-scoped currentOrigin
+    const origin = window.location.origin;
     console.log("[GIS_DIAGNOSTIC] Google Sign-In triggered.");
-    console.log("[GIS_DIAGNOSTIC] Check origin allowed: Make sure '" + currentOrigin + "' is added to your Authorized JavaScript Origins under client ID " + CLIENT_ID + " in the Google Cloud Console.");
+    console.log("[GIS_DIAGNOSTIC] Check origin allowed: Make sure '" + origin + "' is added to your Authorized JavaScript Origins under client ID " + CLIENT_ID + " in the Google Cloud Console.");
 
     if (!window.google?.accounts?.id) {
       const errorMsg = 'Google Sign-In is loading, please try again.';
@@ -183,6 +188,11 @@ export function useGoogleAuth(onSuccess, onError) {
       if (!window.google?.accounts?.id) {
         console.warn("[GIS_DIAGNOSTIC] google.accounts.id not loaded yet. Retrying standard button render...");
         setTimeout(render, 150);
+        return;
+      }
+      // Prevent double-rendering: if the container already has Google button content, skip
+      if (btnContainer.hasChildNodes() && btnContainer.querySelector('iframe, [data-google-button]')) {
+        console.log("[GIS_DIAGNOSTIC] Google button already rendered inside:", elementId, "- skipping re-render.");
         return;
       }
       try {

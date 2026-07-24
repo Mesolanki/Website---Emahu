@@ -448,6 +448,12 @@ export default function AdminDashboard() {
         }
       });
       if (res.status === 401) {
+        if (retryCount === 0) {
+          // Retry once after 2s to guard against cold-start 401s from Render.com
+          console.warn('[AdminAuth] Got 401 from sellers endpoint. Retrying in 2s before logging out...');
+          setTimeout(() => fetchSellers(1), 2000);
+          return;
+        }
         handleSessionExpired();
         return;
       }
@@ -503,6 +509,11 @@ export default function AdminDashboard() {
         }
       });
       if (res.status === 401) {
+        if (retryCount === 0) {
+          console.warn('[AdminAuth] Got 401 from products endpoint. Retrying in 2s before logging out...');
+          setTimeout(() => fetchProducts(1), 2000);
+          return;
+        }
         handleSessionExpired();
         return;
       }
@@ -714,6 +725,11 @@ export default function AdminDashboard() {
         }
       });
       if (res.status === 401) {
+        if (retryCount === 0) {
+          console.warn('[AdminAuth] Got 401 from orders endpoint. Retrying in 2s before logging out...');
+          setTimeout(() => fetchOrders(1), 2000);
+          return;
+        }
         handleSessionExpired();
         return;
       }
@@ -760,7 +776,8 @@ export default function AdminDashboard() {
         }
       });
       if (res.status === 401) {
-        handleSessionExpired();
+        // Don't immediately log out - delivery partners 401 could be transient
+        console.warn('[AdminAuth] Got 401 from delivery-partners endpoint.');
         return;
       }
       const data = await res.json();
