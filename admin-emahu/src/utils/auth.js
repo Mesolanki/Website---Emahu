@@ -2,10 +2,10 @@
  * Authentication and Session Management Utility for Standalone Admin Panel
  */
 
-import API_BASE from './config';
+import API_BASE, { getApiBase } from './config';
 import { safeFetch } from './safeFetch';
 
-const API_BASE_URL = `${API_BASE}/api/auth`;
+const getAuthApiUrl = () => `${getApiBase() || String(API_BASE)}/api/auth`;
 
 /**
  * Smart fetch wrapper that delegates to safeFetch to guarantee JSON safety and cold-start retries.
@@ -36,7 +36,7 @@ const getHeaders = (token = null) => {
 
 export async function registerUser({ name, email, password, role, phone, address, adminSecret }) {
   try {
-    const response = await fetchWithRetry(`${API_BASE_URL}/register`, {
+    const response = await fetchWithRetry(`${getAuthApiUrl()}/register`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ name, email, password, role, phone, address, adminSecret }),
@@ -55,7 +55,7 @@ export async function registerUser({ name, email, password, role, phone, address
 
 export async function loginUser(email, password, twoFactorCode) {
   try {
-    const response = await fetchWithRetry(`${API_BASE_URL}/login`, {
+    const response = await fetchWithRetry(`${getAuthApiUrl()}/login`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ email, password, twoFactorCode }),
@@ -74,7 +74,7 @@ export async function loginUser(email, password, twoFactorCode) {
 
 export async function logoutUser() {
   try {
-    const response = await fetchWithRetry(`${API_BASE_URL}/logout`, {
+    const response = await fetchWithRetry(`${getAuthApiUrl()}/logout`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -87,7 +87,7 @@ export async function logoutUser() {
 
 export async function getProfile(token) {
   try {
-    const response = await fetchWithRetry(`${API_BASE_URL}/me`, {
+    const response = await fetchWithRetry(`${getAuthApiUrl()}/me`, {
       method: 'GET',
       headers: getHeaders(token),
     });

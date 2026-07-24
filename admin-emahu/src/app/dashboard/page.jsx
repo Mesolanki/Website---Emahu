@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './dashboard.css';
 import { logoutUser, clearAuthSession } from '@/utils/auth';
-import API_BASE from '@/utils/config';
+import API_BASE, { getApiBase } from '@/utils/config';
 
 let toastIdCounter = 0;
 
 const getAdminApiUrl = (endpoint) => {
-  const base = API_BASE.replace(/\/$/, '');
+  const base = (getApiBase() || String(API_BASE)).replace(/\/$/, '');
   const clean = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
   return `${base}${clean}`;
 };

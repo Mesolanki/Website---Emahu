@@ -5,7 +5,7 @@
 export function getApiBase() {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
+    const protocol = window.location.protocol || 'https:';
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
       if (hostname === 'manage.emahu.com') {
         return `${protocol}//manage.emahu.com`;
@@ -23,7 +23,16 @@ export function getApiBase() {
   return 'http://127.0.0.1:5000';
 }
 
-let API_BASE = getApiBase();
+/**
+ * Dynamic Proxy / getter object so template literals `${API_BASE}` evaluate getApiBase() dynamically at fetch runtime.
+ */
+const API_BASE = {
+  toString: () => getApiBase(),
+  valueOf: () => getApiBase(),
+  replace: (...args) => getApiBase().replace(...args),
+  startsWith: (...args) => getApiBase().startsWith(...args),
+  includes: (...args) => getApiBase().includes(...args)
+};
 
 export default API_BASE;
 
