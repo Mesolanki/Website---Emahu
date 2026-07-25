@@ -2915,37 +2915,42 @@ export default function EmahuProDashboard() {
     };
 
     const processFiles = (files) => {
-      files.forEach((file) => {
+      files.forEach(async (file) => {
         if (!file.type.startsWith('image/')) return;
-        
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const dataUrl = e.target.result;
-          const tempId = Math.random().toString();
-          setNewProductImages(prev => [...prev, `uploading-${tempId}`]);
+        const tempId = Math.random().toString();
+        setNewProductImages(prev => [...prev, `uploading-${tempId}`]);
 
-          try {
-            let url = await uploadImageFile(file);
-            if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http:')) {
-              url = url.replace('http:', 'https:');
+        try {
+          const compressedFile = await compressImageFile(file, 1200, 1200, 0.82);
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const dataUrl = e.target.result;
+            try {
+              let url = await uploadImageFile(compressedFile);
+              if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http:')) {
+                url = url.replace('http:', 'https:');
+              }
+              setNewProductImages(prev => prev.map(img => {
+                if (img === `uploading-${tempId}`) {
+                  return url;
+                }
+                return img;
+              }));
+            } catch (err) {
+              console.warn('Server image upload error, using compressed Base64 fallback:', err);
+              setNewProductImages(prev => prev.map(img => {
+                if (img === `uploading-${tempId}`) {
+                  return dataUrl;
+                }
+                return img;
+              }));
             }
-            setNewProductImages(prev => prev.map(img => {
-              if (img === `uploading-${tempId}`) {
-                return url;
-              }
-              return img;
-            }));
-          } catch (err) {
-            console.warn('Server image upload error, using Base64 fallback:', err);
-            setNewProductImages(prev => prev.map(img => {
-              if (img === `uploading-${tempId}`) {
-                return dataUrl;
-              }
-              return img;
-            }));
-          }
-        };
-        reader.readAsDataURL(file);
+          };
+          reader.readAsDataURL(compressedFile);
+        } catch (err) {
+          console.error('Error processing file upload:', err);
+          setNewProductImages(prev => prev.filter(img => img !== `uploading-${tempId}`));
+        }
       });
     };
 
