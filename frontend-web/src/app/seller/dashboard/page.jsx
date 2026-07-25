@@ -2817,10 +2817,23 @@ export default function EmahuProDashboard() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
             {images.map((img, imgIdx) => (
               <div key={imgIdx} style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                {img.startsWith('http') || img.startsWith('data:') || img.includes('uploads') ? (
-                  <img src={cleanImageUrl(img)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {img ? (
+                  <img
+                    src={cleanImageUrl(img)}
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      const cleaned = cleanImageUrl(img);
+                      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+                      const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
+                      if (cleaned && !e.target.dataset.triedFallback) {
+                        e.target.dataset.triedFallback = 'true';
+                        e.target.src = cleaned.startsWith('/') ? `${fallbackBase}${cleaned}` : cleaned;
+                      }
+                    }}
+                  />
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', fontSize: '1.2rem' }}>{img}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', fontSize: '1.2rem' }}>📦</div>
                 )}
                 <button
                   type="button"
@@ -2876,7 +2889,7 @@ export default function EmahuProDashboard() {
       if (!data.success) {
         throw new Error(data.error || 'Image upload failed');
       }
-      return data.url;
+      return data.relativePath || data.url;
     };
 
     const handleFileSelect = (e) => {
@@ -3054,8 +3067,11 @@ export default function EmahuProDashboard() {
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       onError={(e) => {
                         const cleaned = cleanImageUrl(img);
-                        if (cleaned && e.target.src !== cleaned) {
-                          e.target.src = cleaned;
+                        const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+                        const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
+                        if (cleaned && !e.target.dataset.triedFallback) {
+                          e.target.dataset.triedFallback = 'true';
+                          e.target.src = cleaned.startsWith('/') ? `${fallbackBase}${cleaned}` : cleaned;
                         }
                       }}
                     />
