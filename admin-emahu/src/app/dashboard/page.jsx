@@ -3920,14 +3920,44 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="ad-detail-info-section" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
-                    <div style={{ width: '100%', height: '260px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--color-admin-border)', background: '#0a0b10', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {isRealImage(selectedDetailProduct.image) ? (
-                        <img src={cleanImageUrl(selectedDetailProduct.image)} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  <div className="ad-detail-info-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px', gap: '10px' }}>
+                    <div style={{ width: '100%', height: '240px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--color-admin-border)', background: '#0a0b10', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {isRealImage(selectedDetailProduct.image || (selectedDetailProduct.images && selectedDetailProduct.images[0])) ? (
+                        <img
+                          src={cleanImageUrl(selectedDetailProduct.image || (selectedDetailProduct.images && selectedDetailProduct.images[0]))}
+                          alt={selectedDetailProduct.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          onError={(e) => {
+                            if (!e.target.dataset.triedFallback) {
+                              e.target.dataset.triedFallback = 'true';
+                              const fallbackBase = (getApiBase() || String(API_BASE)).replace(/\/$/, '');
+                              const cleaned = cleanImageUrl(selectedDetailProduct.image || (selectedDetailProduct.images && selectedDetailProduct.images[0]));
+                              e.target.src = cleaned.startsWith('http') ? cleaned : `${fallbackBase}${cleaned.startsWith('/') ? '' : '/'}${cleaned}`;
+                            } else if (!e.target.dataset.triedPlaceholder) {
+                              e.target.dataset.triedPlaceholder = 'true';
+                              e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                            }
+                          }}
+                        />
                       ) : (
-                        <span style={{ fontSize: '5rem' }}>{cleanImageUrl(selectedDetailProduct.image) || '📦'}</span>
+                        <span style={{ fontSize: '5rem' }}>📦</span>
                       )}
                     </div>
+                    {selectedDetailProduct.images && selectedDetailProduct.images.length > 0 && (
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', width: '100%', justifyContent: 'center' }}>
+                        {selectedDetailProduct.images.map((gImg, gIdx) => (
+                          <img
+                            key={gIdx}
+                            src={cleanImageUrl(gImg)}
+                            alt="gallery thumb"
+                            style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--color-admin-border)', cursor: 'pointer' }}
+                            onError={(e) => {
+                              e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

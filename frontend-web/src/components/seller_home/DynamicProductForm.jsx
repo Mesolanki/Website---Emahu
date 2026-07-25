@@ -595,12 +595,66 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     return { score, color: score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444' };
   }, [name, descOverview, descSize, descColor, descMemory, descWarranty, images, seoTitle, metaDescription]);
 
+  const compressImageFile = (file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) => {
+    return new Promise((resolve) => {
+      if (!file || !file.type || !file.type.startsWith('image/')) {
+        resolve(file);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth || height > maxHeight) {
+            if (width > height) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                resolve(file);
+                return;
+              }
+              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                type: 'image/jpeg',
+                lastModified: Date.now()
+              });
+              resolve(compressedFile);
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        img.onerror = () => resolve(file);
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const uploadImageFile = async (file) => {
     const formData = new FormData();
     formData.append('image', file);
     
     const token = localStorage.getItem('emahu_seller_token');
-    const baseUrl = API_BASE;
+    const baseUrl = (getApiBase ? getApiBase() : String(API_BASE)).replace(/\/$/, '');
     const res = await fetch(`${baseUrl}/api/products/upload`, {
       method: 'POST',
       headers: {
@@ -620,62 +674,67 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     return data.url;
   };
 
-  // Process selected file uploads
+  // Process selected file uploads with fast automatic compression
   const processFiles = (files) => {
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target.result;
-        const img = new Image();
-        img.src = dataUrl;
-        img.onload = async () => {
-          const isHighRes = img.width >= 800 && img.height >= 800;
-          const isSquare = Math.abs(img.width - img.height) < 50;
-          let qualityStatus = 'High Quality (Square)';
-          if (!isHighRes) qualityStatus = 'Warning: Low Resolution';
-          else if (!isSquare) qualityStatus = 'Warning: Not Square Aspect';
+    files.forEach(async (file) => {
+      try {
+        const compressedFile = await compressImageFile(file, 1200, 1200, 0.85);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target.result;
+          const img = new Image();
+          img.src = dataUrl;
+          img.onload = async () => {
+            const isHighRes = img.width >= 600 && img.height >= 600;
+            const isSquare = Math.abs(img.width - img.height) < 100;
+            let qualityStatus = 'High Quality';
+            if (!isHighRes) qualityStatus = 'Warning: Low Resolution';
+            else if (!isSquare) qualityStatus = 'Warning: Non-Square';
 
-          const tempId = Math.random().toString();
-          setImages(prev => [...prev, {
-            url: '',
-            tempId,
-            quality: 'Uploading...',
-            isWarning: !isHighRes || !isSquare,
-            loading: true
-          }]);
+            const tempId = Math.random().toString();
+            setImages(prev => [...prev, {
+              url: '',
+              tempId,
+              quality: 'Uploading...',
+              isWarning: !isHighRes,
+              loading: true
+            }]);
 
-          try {
-            const url = await uploadImageFile(file);
-            setImages(prev => prev.map(item => {
-              if (item.tempId === tempId) {
-                return {
-                  ...item,
-                  url,
-                  quality: qualityStatus,
-                  loading: false
-                };
-              }
-              return item;
-            }));
-            setThumbnail(prev => prev ? prev : url);
-          } catch (err) {
-            console.warn('Server upload error, applying Base64 image fallback:', err);
-            setImages(prev => prev.map(item => {
-              if (item.tempId === tempId) {
-                return {
-                  ...item,
-                  url: dataUrl,
-                  quality: qualityStatus,
-                  loading: false
-                };
-              }
-              return item;
-            }));
-            setThumbnail(prev => prev ? prev : dataUrl);
-          }
+            try {
+              const url = await uploadImageFile(compressedFile);
+              setImages(prev => prev.map(item => {
+                if (item.tempId === tempId) {
+                  return {
+                    ...item,
+                    url,
+                    quality: qualityStatus,
+                    loading: false
+                  };
+                }
+                return item;
+              }));
+              setThumbnail(prev => prev ? prev : url);
+            } catch (err) {
+              console.warn('Server upload error, applying Base64 image fallback:', err);
+              setImages(prev => prev.map(item => {
+                if (item.tempId === tempId) {
+                  return {
+                    ...item,
+                    url: dataUrl,
+                    quality: qualityStatus,
+                    loading: false
+                  };
+                }
+                return item;
+              }));
+              setThumbnail(prev => prev ? prev : dataUrl);
+            }
+          };
         };
-      };
-      reader.readAsDataURL(file);
+        reader.readAsDataURL(compressedFile);
+      } catch (err) {
+        console.error('Error processing file:', err);
+      }
     });
   };
 
