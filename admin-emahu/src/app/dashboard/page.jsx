@@ -22,9 +22,30 @@ const resolveDocUrl = (url) => {
   if (clean.startsWith('data:')) {
     return clean;
   }
-  let apiUrl = API_BASE;
-  apiUrl = apiUrl.replace(/\/api\/auth$/, '').replace(/\/api$/, '').replace(/\/$/, '');
-  clean = clean.replace(/^http:\/\/(localhost|127\.0\.0\.1):5000/, apiUrl);
+  clean = clean.replace(/\\/g, '/');
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  if (clean.startsWith('[') && clean.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(clean);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return resolveDocUrl(parsed[0]);
+      }
+    } catch (e) {
+      clean = clean.slice(1, -1).trim();
+    }
+  }
+
+  // Convert localhost/127.0.0.1 upload URLs to relative /uploads/
+  clean = clean.replace(/^http:\/\/(localhost|127\.0\.0\.1):(5000|3001|3000)\/uploads\//, '/uploads/');
+
+  // Ensure uploads/ has leading slash
+  if (clean.startsWith('uploads/')) {
+    clean = '/' + clean;
+  }
+
+  // Upgrade HTTP to HTTPS if on HTTPS protocol
   if (clean.startsWith('http:') && typeof window !== 'undefined' && window.location.protocol === 'https:') {
     clean = clean.replace('http:', 'https:');
   }
@@ -33,24 +54,7 @@ const resolveDocUrl = (url) => {
 
 const cleanImageUrl = (img) => {
   if (!img || typeof img !== 'string') return '';
-  let clean = img.trim();
-  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
-    clean = clean.slice(1, -1).trim();
-  }
-  if (clean.startsWith('[') && clean.endsWith(']')) {
-    try {
-      const parsed = JSON.parse(clean);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return cleanImageUrl(parsed[0]);
-      }
-    } catch (e) {
-      clean = clean.slice(1, -1).trim();
-      if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
-        clean = clean.slice(1, -1).trim();
-      }
-    }
-  }
-  return resolveDocUrl(clean);
+  return resolveDocUrl(img);
 };
 
 const isRealImage = (img) => {
@@ -4100,7 +4104,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <span className={`ad-status-badge ${selectedDetailOrder.status === 'PENDING_APPROVAL' ? 'pending' :
-                  ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(selectedDetailOrder.status) ? 'rejected' : 'approved'
+                ['REJECTED', '⚠️ VAULT DISPUTED / FROZEN', '❌ Order Rejected by Seller'].includes(selectedDetailOrder.status) ? 'rejected' : 'approved'
                 }`} style={{ fontSize: '0.85rem', padding: '6px 14px' }}>
                 {selectedDetailOrder.status?.replace(/_/g, ' ')?.toUpperCase()}
               </span>
@@ -5644,8 +5648,8 @@ export default function AdminDashboard() {
                                 <td>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
                                     <span className={`ad-status-badge ${isPending ? 'pending' :
-                                        isDisputed ? 'rejected' :
-                                          isCompleted ? 'approved' : 'changes_requested'
+                                      isDisputed ? 'rejected' :
+                                        isCompleted ? 'approved' : 'changes_requested'
                                       }`} style={{ fontSize: '0.7rem' }}>
                                       {order.status?.replace(/_/g, ' ')}
                                     </span>

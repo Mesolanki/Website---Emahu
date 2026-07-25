@@ -18,15 +18,7 @@ const resolveDocUrl = (url) => {
   if (clean.startsWith('data:')) {
     return clean;
   }
-  let apiUrl = localApiUrl || 'http://127.0.0.1:5000';
-  apiUrl = apiUrl.replace(/\/api\/auth$/, '').replace(/\/api$/, '').replace(/\/$/, '');
-  clean = clean.replace(/^http:\/\/(localhost|127\.0\.0\.1):5000/, apiUrl);
-  return clean;
-};
-
-const cleanImageUrl = (img) => {
-  if (!img || typeof img !== 'string') return '';
-  let clean = img.trim();
+  clean = clean.replace(/\\/g, '/');
   if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
     clean = clean.slice(1, -1).trim();
   }
@@ -34,16 +26,31 @@ const cleanImageUrl = (img) => {
     try {
       const parsed = JSON.parse(clean);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return cleanImageUrl(parsed[0]);
+        return resolveDocUrl(parsed[0]);
       }
     } catch (e) {
       clean = clean.slice(1, -1).trim();
-      if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
-        clean = clean.slice(1, -1).trim();
-      }
     }
   }
-  return resolveDocUrl(clean);
+
+  // Convert localhost/127.0.0.1 upload URLs to relative /uploads/
+  clean = clean.replace(/^http:\/\/(localhost|127\.0\.0\.1):(5000|3001|3000)\/uploads\//, '/uploads/');
+
+  // Ensure uploads/ has leading slash
+  if (clean.startsWith('uploads/')) {
+    clean = '/' + clean;
+  }
+
+  // Upgrade HTTP to HTTPS if on HTTPS protocol
+  if (clean.startsWith('http:') && typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    clean = clean.replace('http:', 'https:');
+  }
+  return clean;
+};
+
+const cleanImageUrl = (img) => {
+  if (!img || typeof img !== 'string') return '';
+  return resolveDocUrl(img);
 };
 
 const isRealImage = (img) => {
@@ -2808,8 +2815,8 @@ export default function EmahuProDashboard() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
             {images.map((img, imgIdx) => (
               <div key={imgIdx} style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                {img.startsWith('http') || img.startsWith('data:') ? (
-                  <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {img.startsWith('http') || img.startsWith('data:') || img.includes('uploads') ? (
+                  <img src={cleanImageUrl(img)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', fontSize: '1.2rem' }}>{img}</div>
                 )}
@@ -3040,12 +3047,13 @@ export default function EmahuProDashboard() {
                 ) : (
                   <>
                     <img
-                      src={typeof window !== 'undefined' && window.location.protocol === 'https:' && img.startsWith('http:') ? img.replace('http:', 'https:') : img}
+                      src={cleanImageUrl(img)}
                       alt={`Product img ${idx + 1}`}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       onError={(e) => {
-                        if (img.startsWith('http:') && typeof window !== 'undefined' && window.location.protocol === 'https:') {
-                          e.target.src = img.replace('http:', 'https:');
+                        const cleaned = cleanImageUrl(img);
+                        if (cleaned && e.target.src !== cleaned) {
+                          e.target.src = cleaned;
                         }
                       }}
                     />

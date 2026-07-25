@@ -13,6 +13,9 @@ import API_BASE from '@/utils/config';
 const cleanImageUrl = (img) => {
   if (!img || typeof img !== 'string') return '';
   let clean = img.trim();
+  if (clean.startsWith('data:')) return clean;
+
+  clean = clean.replace(/\\/g, '/');
   if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
     clean = clean.slice(1, -1).trim();
   }
@@ -24,17 +27,28 @@ const cleanImageUrl = (img) => {
       }
     } catch (e) {
       clean = clean.slice(1, -1).trim();
-      if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
-        clean = clean.slice(1, -1).trim();
-      }
     }
+  }
+
+  // Convert hardcoded localhost/127.0.0.1 upload URLs to relative /uploads/
+  clean = clean.replace(/^http:\/\/(localhost|127\.0\.0\.1):(5000|3001|3000)\/uploads\//, '/uploads/');
+
+  // Ensure uploads/ has leading slash
+  if (clean.startsWith('uploads/')) {
+    clean = '/' + clean;
+  }
+
+  // Upgrade HTTP to HTTPS if protocol is HTTPS
+  if (clean.startsWith('http:') && typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    clean = clean.replace('http:', 'https:');
   }
   return clean;
 };
 
 const isRealImage = (img) => {
   const clean = cleanImageUrl(img);
-  return clean.startsWith('http') || clean.startsWith('data:image');
+  if (clean.toLowerCase().endsWith('.pdf')) return false;
+  return clean.startsWith('http') || clean.startsWith('data:image') || clean.startsWith('/uploads/');
 };
 
 const loadRazorpayScript = () => {

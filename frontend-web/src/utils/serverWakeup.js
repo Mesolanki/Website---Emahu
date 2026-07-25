@@ -6,7 +6,7 @@
  */
 
 const BACKEND_URL = (() => {
-  const raw = process.env.NEXT_PUBLIC_API_URL || 'https://emahu.com';
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'https://website-emahu.onrender.com';
   return raw
     .replace(/\/api\/auth$/, '')
     .replace(/\/api$/, '')
