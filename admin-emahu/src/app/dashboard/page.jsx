@@ -58,9 +58,20 @@ const cleanImageUrl = (img) => {
 };
 
 const isRealImage = (img) => {
+  if (!img || typeof img !== 'string') return false;
   const clean = cleanImageUrl(img);
-  if (clean.toLowerCase().endsWith('.pdf')) return false;
-  return clean.startsWith('http') || clean.startsWith('data:image');
+  if (!clean) return false;
+  const lower = clean.toLowerCase();
+  if (lower.endsWith('.pdf')) return false;
+  return (
+    lower.startsWith('http://') ||
+    lower.startsWith('https://') ||
+    lower.startsWith('data:image') ||
+    lower.startsWith('/uploads/') ||
+    lower.startsWith('uploads/') ||
+    lower.includes('/uploads/') ||
+    /\.(jpg|jpeg|png|gif|webp|avif|svg)(\?.*)?$/i.test(clean)
+  );
 };
 
 const openDocInNewTab = (url) => {
