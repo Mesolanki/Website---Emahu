@@ -2826,10 +2826,14 @@ export default function EmahuProDashboard() {
                       const cleaned = cleanImageUrl(img);
                       const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
                       const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
-                      if (cleaned && !e.target.dataset.triedFallback) {
-                        e.target.dataset.triedFallback = 'true';
-                        e.target.src = cleaned.startsWith('/') ? `${fallbackBase}${cleaned}` : cleaned;
+                      if (!e.target.dataset.triedFallback) {
+                        e.target.dataset.triedFallback = '1';
+                        if (cleaned && cleaned.startsWith('/')) {
+                          e.target.src = `${fallbackBase}${cleaned}`;
+                          return;
+                        }
                       }
+                      e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
                     }}
                   />
                 ) : (
@@ -3069,10 +3073,14 @@ export default function EmahuProDashboard() {
                         const cleaned = cleanImageUrl(img);
                         const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
                         const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
-                        if (cleaned && !e.target.dataset.triedFallback) {
-                          e.target.dataset.triedFallback = 'true';
-                          e.target.src = cleaned.startsWith('/') ? `${fallbackBase}${cleaned}` : cleaned;
+                        if (!e.target.dataset.triedFallback) {
+                          e.target.dataset.triedFallback = '1';
+                          if (cleaned && cleaned.startsWith('/')) {
+                            e.target.src = `${fallbackBase}${cleaned}`;
+                            return;
+                          }
                         }
+                        e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
                       }}
                     />
                     <button
@@ -4395,7 +4403,23 @@ export default function EmahuProDashboard() {
                               <div className="product-cell">
                                 <div className="product-img">
                                   {isRealImage(product.image) ? (
-                                    <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <img
+                                      src={cleanImageUrl(product.image)}
+                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                      onError={(e) => {
+                                        const cleaned = cleanImageUrl(product.image);
+                                        const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+                                        const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
+                                        if (!e.target.dataset.triedFallback) {
+                                          e.target.dataset.triedFallback = '1';
+                                          if (cleaned && cleaned.startsWith('/')) {
+                                            e.target.src = `${fallbackBase}${cleaned}`;
+                                            return;
+                                          }
+                                        }
+                                        e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                                      }}
+                                    />
                                   ) : (
                                     cleanImageUrl(product.image) || '📦'
                                   )}

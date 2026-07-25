@@ -1192,7 +1192,25 @@ export default function ProductsPage() {
                       {p.img || '📦'}
                     </div>
                   ) : (
-                    <img src={p.img} alt={p.name} className="bp-card__img" loading="lazy" />
+                    <img
+                      src={cleanImageUrl(p.img)}
+                      alt={p.name}
+                      className="bp-card__img"
+                      loading="lazy"
+                      onError={(e) => {
+                        const cleaned = cleanImageUrl(p.img);
+                        const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+                        const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
+                        if (!e.target.dataset.triedFallback) {
+                          e.target.dataset.triedFallback = '1';
+                          if (cleaned && cleaned.startsWith('/')) {
+                            e.target.src = `${fallbackBase}${cleaned}`;
+                            return;
+                          }
+                        }
+                        e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                      }}
+                    />
                   )}
 
                   {/* Category chip */}

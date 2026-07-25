@@ -829,7 +829,23 @@ export default function ProductDetailPage() {
             ) : (
               currentImages.map((img, i) => (
                 <button key={i} className={`pd-thumb ${activeImg === i ? 'pd-thumb--active' : ''}`} onClick={() => setActiveImg(i)}>
-                  <img src={img} alt={`View ${i + 1}`} />
+                  <img
+                    src={cleanImageUrl(img)}
+                    alt={`View ${i + 1}`}
+                    onError={(e) => {
+                      const cleaned = cleanImageUrl(img);
+                      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+                      const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
+                      if (!e.target.dataset.triedFallback) {
+                        e.target.dataset.triedFallback = '1';
+                        if (cleaned && cleaned.startsWith('/')) {
+                          e.target.src = `${fallbackBase}${cleaned}`;
+                          return;
+                        }
+                      }
+                      e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                    }}
+                  />
                 </button>
               ))
             )}
@@ -842,7 +858,24 @@ export default function ProductDetailPage() {
                 {product.imageEmoji}
               </div>
             ) : (
-              <img src={currentImages[activeImg]} alt={product.name} className="pd-main-img" />
+              <img
+                src={cleanImageUrl(currentImages[activeImg])}
+                alt={product.name}
+                className="pd-main-img"
+                onError={(e) => {
+                  const cleaned = cleanImageUrl(currentImages[activeImg]);
+                  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+                  const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
+                  if (!e.target.dataset.triedFallback) {
+                    e.target.dataset.triedFallback = '1';
+                    if (cleaned && cleaned.startsWith('/')) {
+                      e.target.src = `${fallbackBase}${cleaned}`;
+                      return;
+                    }
+                  }
+                  e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                }}
+              />
             )}
 
             {/* Badges */}

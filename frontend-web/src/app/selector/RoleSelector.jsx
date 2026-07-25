@@ -1094,8 +1094,26 @@ export default function RoleSelector() {
                           className="sel-prod-card"
                         >
                           <div className="sel-prod-card__img-wrap">
-                            {typeof p.image === 'string' && (p.image.startsWith('http') || p.image.startsWith('data:image')) ? (
-                              <img src={p.image} alt={p.name} className="sel-prod-card__img" loading="lazy" />
+                            {isRealImage(p.image) ? (
+                              <img
+                                src={cleanImageUrl(p.image)}
+                                alt={p.name}
+                                className="sel-prod-card__img"
+                                loading="lazy"
+                                onError={(e) => {
+                                  const cleaned = cleanImageUrl(p.image);
+                                  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+                                  const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
+                                  if (!e.target.dataset.triedFallback) {
+                                    e.target.dataset.triedFallback = '1';
+                                    if (cleaned && cleaned.startsWith('/')) {
+                                      e.target.src = `${fallbackBase}${cleaned}`;
+                                      return;
+                                    }
+                                  }
+                                  e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                                }}
+                              />
                             ) : (
                               <div className="sel-prod-card__placeholder">{p.image || '📦'}</div>
                             )}

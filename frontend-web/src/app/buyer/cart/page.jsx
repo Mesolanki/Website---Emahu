@@ -783,7 +783,24 @@ export default function CartPage() {
                   {/* Thumbnail Image */}
                   <div className="cart-item-row__img-wrap">
                     {isRealImage(p.img) ? (
-                      <img src={p.img} alt={p.name} className="cart-item-row__img" />
+                      <img
+                        src={cleanImageUrl(p.img)}
+                        alt={p.name}
+                        className="cart-item-row__img"
+                        onError={(e) => {
+                          const cleaned = cleanImageUrl(p.img);
+                          const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+                          const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
+                          if (!e.target.dataset.triedFallback) {
+                            e.target.dataset.triedFallback = '1';
+                            if (cleaned && cleaned.startsWith('/')) {
+                              e.target.src = `${fallbackBase}${cleaned}`;
+                              return;
+                            }
+                          }
+                          e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                        }}
+                      />
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '80px', height: '80px', background: '#f4f4f5', borderRadius: '8px', fontSize: '2rem' }}>
                         {p.img || '📦'}

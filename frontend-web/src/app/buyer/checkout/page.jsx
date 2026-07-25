@@ -1131,8 +1131,25 @@ export default function CheckoutPage() {
                 <div style={{ background: '#f8fafc', padding: '12px 18px', borderBottom: '1px solid #e2e8f0', fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Items Ordered</div>
                 {placedOrderObjects.flatMap((o) => o.items).map((item, idx) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', borderBottom: idx < placedOrderObjects.flatMap(o => o.items).length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                    {item.img && item.img.startsWith('http') ? (
-                      <img src={item.img} alt={item.name} style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }} />
+                    {isRealImage(item.img) ? (
+                      <img
+                        src={cleanImageUrl(item.img)}
+                        alt={item.name}
+                        style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}
+                        onError={(e) => {
+                          const cleaned = cleanImageUrl(item.img);
+                          const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+                          const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
+                          if (!e.target.dataset.triedFallback) {
+                            e.target.dataset.triedFallback = '1';
+                            if (cleaned && cleaned.startsWith('/')) {
+                              e.target.src = `${fallbackBase}${cleaned}`;
+                              return;
+                            }
+                          }
+                          e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                        }}
+                      />
                     ) : (
                       <div style={{ width: '48px', height: '48px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
