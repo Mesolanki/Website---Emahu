@@ -8,7 +8,7 @@ import { logoutUser, clearAuthSession, getProfile, changeUserRole, saveAuthSessi
 import CategorySelector from '@/components/seller_home/CategorySelector';
 import DynamicProductForm from '@/components/seller_home/DynamicProductForm';
 import SellerNormsModal from '@/components/seller_home/SellerNormsModal';
-import API_BASE from '@/utils/config';
+import API_BASE, { getApiBase } from '@/utils/config';
 
 let localApiUrl = API_BASE;
 
@@ -35,6 +35,19 @@ const resolveDocUrl = (url) => {
 
   // Strip any domain / protocol prefix before /uploads/ to make it a clean relative path /uploads/
   clean = clean.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/');
+
+  if (clean.startsWith('/uploads/')) {
+    let domain = 'http://127.0.0.1:5000';
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        domain = `${window.location.protocol || 'https:'}//${hostname}`;
+      }
+    } else if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
+      domain = 'https://emahu.com';
+    }
+    return `${domain}${clean}`;
+  }
 
   return clean;
 };
@@ -3945,25 +3958,78 @@ export default function EmahuProDashboard() {
                           <div>
                             <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem', display: 'block' }}>{docName}</strong>
                             {doc ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
-                                <button
-                                  onClick={(e) => { e.preventDefault(); openDocInNewTab(doc.fileUrl); }}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#4f46e5',
-                                    fontSize: '0.8rem',
-                                    textDecoration: 'underline',
-                                    fontWeight: '500',
-                                    cursor: 'pointer',
-                                    padding: 0,
-                                    fontFamily: 'inherit'
-                                  }}
-                                >
-                                  View Submitted Document
-                                </button>
-                                {doc.feedback && (
-                                  <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>(Feedback: {doc.feedback})</span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <button
+                                    onClick={(e) => { e.preventDefault(); openDocInNewTab(doc.fileUrl); }}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#4f46e5',
+                                      fontSize: '0.8rem',
+                                      textDecoration: 'underline',
+                                      fontWeight: '500',
+                                      cursor: 'pointer',
+                                      padding: 0,
+                                      fontFamily: 'inherit'
+                                    }}
+                                  >
+                                    View Submitted Document
+                                  </button>
+                                  {doc.feedback && (
+                                    <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>(Feedback: {doc.feedback})</span>
+                                  )}
+                                </div>
+
+                                {doc.fileUrl && (
+                                  <div style={{ marginTop: '4px' }}>
+                                    {isRealImage(doc.fileUrl) ? (
+                                      <div style={{
+                                        borderRadius: '8px',
+                                        overflow: 'hidden',
+                                        border: '1px solid var(--border-color)',
+                                        maxWidth: '220px',
+                                        maxHeight: '140px',
+                                        background: 'rgba(0,0,0,0.05)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                      }}>
+                                        <img
+                                          src={cleanImageUrl(doc.fileUrl)}
+                                          alt={docName}
+                                          style={{ maxWidth: '100%', maxHeight: '140px', objectFit: 'contain', cursor: 'pointer' }}
+                                          onClick={() => openDocInNewTab(cleanImageUrl(doc.fileUrl))}
+                                          onError={(e) => {
+                                            if (!e.target.dataset.triedFallback) {
+                                              e.target.dataset.triedFallback = 'true';
+                                              const fallbackBase = (getApiBase() || String(API_BASE)).replace(/\/$/, '');
+                                              const cleaned = cleanImageUrl(doc.fileUrl);
+                                              e.target.src = cleaned.startsWith('http') ? cleaned : `${fallbackBase}${cleaned.startsWith('/') ? '' : '/'}${cleaned}`;
+                                            } else if (!e.target.dataset.triedPlaceholder) {
+                                              e.target.dataset.triedPlaceholder = 'true';
+                                              e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                                            }
+                                          }}
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '6px',
+                                        background: 'rgba(79, 70, 229, 0.05)',
+                                        border: '1px solid var(--border-color)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                      }}>
+                                        <span style={{ fontSize: '1.2rem' }}>📄</span>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                                          {doc.fileUrl.split('/').pop() || 'document.pdf'}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             ) : (
