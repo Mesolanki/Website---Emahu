@@ -27,19 +27,6 @@ connectDB();
 // Middleware
 app.use(express.json({ limit: '50mb' })); // Parse JSON requests up to 50mb
 app.use(express.urlencoded({ limit: '50mb', extended: true })); // Parse url-encoded requests up to 50mb
-app.use(cookieParser()); // Parse cookies from headers
-
-const fs = require('fs');
-
-// Ensure uploads directory exists on disk for Linux/VPS deployments
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Serve uploaded product files statically
-app.use('/uploads', express.static(uploadsDir));
-
 // CORS configuration (allow requests from frontend ports like 3000, 5173, etc. or allow all for development)
 app.use(
   cors({
@@ -52,6 +39,21 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
+
+const fs = require('fs');
+
+// Ensure uploads directory exists on disk for Linux/VPS deployments
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Serve uploaded product files statically with explicit cross-origin headers
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(uploadsDir));
 
 // Ensure database connection is active on every API request
 app.use(async (req, res, next) => {
