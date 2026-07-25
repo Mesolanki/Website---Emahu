@@ -20,7 +20,7 @@ export function getApiBase() {
   if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
     return envUrl.replace(/\/$/, '');
   }
-  return 'http://127.0.0.1:5000';
+  return (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') ? 'https://emahu.com' : 'http://127.0.0.1:5000';
 }
 
 /**
