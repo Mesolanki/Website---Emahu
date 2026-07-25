@@ -2303,26 +2303,6 @@ export default function DeliveryPortal() {
                     <div style={{ padding: '12px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem', color: '#475569', display: 'inline-block' }}>
                       Registered Name: <strong>{user?.name}</strong> &nbsp;|&nbsp; City: <strong>{user?.currentCity}</strong> &nbsp;|&nbsp; Category: <strong>{user?.category === 'single_two_boy' ? 'Single/Two Boy' : user?.category === 'agency' ? 'Agency / Area / City / State Head' : 'Enterprise Partner'}</strong>
                     </div>
-
-                    <div style={{ marginTop: '24px' }}>
-                      <button
-                        type="button"
-                        onClick={handleDevApprove}
-                        style={{
-                          background: 'linear-gradient(135deg, #319795 0%, #2c7a7b 100%)',
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '10px 20px',
-                          borderRadius: '8px',
-                          fontSize: '0.85rem',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(49, 151, 149, 0.2)'
-                        }}
-                      >
-                        ⚡ Simulator: Approve Application (Dev Mode)
-                      </button>
-                    </div>
                   </>
                 )}
               </div>

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import './dashboard.css';
 import { logoutUser, clearAuthSession } from '@/utils/auth';
 import API_BASE, { getApiBase } from '@/utils/config';
+import { indiaStatesCities } from '@/utils/indiaStatesCities';
 
 let toastIdCounter = 0;
 
