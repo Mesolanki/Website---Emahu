@@ -41,7 +41,7 @@ const resolveDocUrl = (url) => {
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
       if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-        domain = `${window.location.protocol || 'https:'}//${hostname}`;
+        domain = 'https://emahu.com';
       }
     } else if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
       domain = 'https://emahu.com';

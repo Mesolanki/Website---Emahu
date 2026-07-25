@@ -21,15 +21,21 @@ router.post('/upload', protect, authorize('seller'), upload.single('image'), (re
       return res.status(400).json({ success: false, error: 'Please upload an image file' });
     }
     const hostHeader = req.get('host') || '';
-    let publicBase = `${req.protocol}://${hostHeader}`;
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || hostHeader.includes('emahu.com');
+    const protocol = isHttps ? 'https' : req.protocol;
+    
+    let publicBase = `${protocol}://${hostHeader}`;
     if (process.env.PUBLIC_APP_URL) {
       publicBase = process.env.PUBLIC_APP_URL;
     }
-    const fileUrl = `${publicBase}/uploads/${req.file.filename}`;
+    const relativePath = `/uploads/${req.file.filename}`;
+    const fullUrl = `${publicBase}${relativePath}`;
+
     res.status(200).json({
       success: true,
-      url: fileUrl,
-      relativePath: `/uploads/${req.file.filename}`
+      url: relativePath,
+      fullUrl: fullUrl,
+      relativePath: relativePath
     });
   } catch (error) {
     console.error('File Upload Route Error:', error);

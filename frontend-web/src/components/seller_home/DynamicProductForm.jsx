@@ -595,6 +595,50 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     return { score, color: score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444' };
   }, [name, descOverview, descSize, descColor, descMemory, descWarranty, images, seoTitle, metaDescription]);
 
+  const resolveDocUrl = (url) => {
+    if (!url || typeof url !== 'string') return '';
+    let clean = url.trim();
+    if (clean.startsWith('data:')) {
+      return clean;
+    }
+    clean = clean.replace(/\\/g, '/');
+    if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+      clean = clean.slice(1, -1).trim();
+    }
+    if (clean.startsWith('[') && clean.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(clean);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return resolveDocUrl(parsed[0]);
+        }
+      } catch (e) {
+        clean = clean.slice(1, -1).trim();
+      }
+    }
+
+    clean = clean.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/');
+
+    if (clean.startsWith('/uploads/')) {
+      let domain = 'http://127.0.0.1:5000';
+      if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+          domain = 'https://emahu.com';
+        }
+      } else if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
+        domain = 'https://emahu.com';
+      }
+      return `${domain}${clean}`;
+    }
+
+    return clean;
+  };
+
+  const cleanImageUrl = (img) => {
+    if (!img || typeof img !== 'string') return '';
+    return resolveDocUrl(img);
+  };
+
   const compressImageFile = (file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) => {
     return new Promise((resolve) => {
       if (!file || !file.type || !file.type.startsWith('image/')) {
@@ -1169,7 +1213,22 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                             </div>
                           ) : (
                             <>
-                              <img src={img.url} alt="gallery" className="gallery-thumb" />
+                              <img 
+                                src={cleanImageUrl(img.url)} 
+                                alt="gallery" 
+                                className="gallery-thumb" 
+                                onError={(e) => {
+                                  if (!e.target.dataset.triedFallback) {
+                                    e.target.dataset.triedFallback = '1';
+                                    const cleaned = cleanImageUrl(img.url);
+                                    if (cleaned && cleaned.startsWith('/')) {
+                                      e.target.src = `https://emahu.com${cleaned}`;
+                                      return;
+                                    }
+                                  }
+                                  e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                                }}
+                              />
                               <button type="button" className="remove-thumb-btn" onClick={() => setImages(images.filter((_, i) => i !== idx))}>×</button>
                               <span className={`quality-badge ${img.isWarning ? 'warning' : ''}`}>{img.quality}</span>
                               <button 
