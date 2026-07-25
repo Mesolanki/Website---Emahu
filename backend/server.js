@@ -19,8 +19,7 @@ const paymentRoutes = require('./routes/paymentRoutes');
 
 // Initialize app
 const app = express();
-
-
+app.set('trust proxy', true);
 
 // Connect to MongoDB Database
 connectDB();

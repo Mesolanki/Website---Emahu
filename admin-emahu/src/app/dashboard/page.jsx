@@ -37,18 +37,9 @@ const resolveDocUrl = (url) => {
     }
   }
 
-  // Convert localhost/127.0.0.1 upload URLs to relative /uploads/
-  clean = clean.replace(/^http:\/\/(localhost|127\.0\.0\.1):(5000|3001|3000)\/uploads\//, '/uploads/');
+  // Strip any domain / protocol prefix before /uploads/ to make it a clean relative path /uploads/
+  clean = clean.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/');
 
-  // Ensure uploads/ has leading slash
-  if (clean.startsWith('uploads/')) {
-    clean = '/' + clean;
-  }
-
-  // Upgrade HTTP to HTTPS if on HTTPS protocol
-  if (clean.startsWith('http:') && typeof window !== 'undefined' && window.location.protocol === 'https:') {
-    clean = clean.replace('http:', 'https:');
-  }
   return clean;
 };
 
