@@ -202,6 +202,7 @@ export default function DeliveryPortal() {
   const [editProfileMode, setEditProfileMode] = useState(false);
   const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
   const [faqActive, setFaqActive] = useState(null);
+  const [selectedJobForAccept, setSelectedJobForAccept] = useState(null);
 
   // New features states
   const [leafletLoaded, setLeafletLoaded] = useState(false);
@@ -2570,16 +2571,16 @@ export default function DeliveryPortal() {
                       🔔 Direct Job Requests ({assignedRequests.length})
                     </h4>
                     <p style={{ fontSize: '0.8rem', color: '#475569', margin: '0 0 16px 0' }}>
-                      These orders have been assigned directly to you by the merchant. Please Accept or Decline them.
+                      These orders have been assigned directly to you by the merchant. Payment (logistics charge) is collected directly from the seller.
                     </p>
                     <div className="orders-table-wrapper" style={{ overflowX: 'auto' }}>
                       <table className="orders-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                         <thead>
                           <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '0.85rem' }}>
                             <th style={{ padding: '12px' }}>Order ID</th>
-                            <th style={{ padding: '12px' }}>Addresses</th>
+                            <th style={{ padding: '12px' }}>Addresses & Merchant</th>
                             <th style={{ padding: '12px' }}>Distance</th>
-                            <th style={{ padding: '12px' }}>Payout</th>
+                            <th style={{ padding: '12px' }}>Seller Payment (Payout)</th>
                             <th style={{ padding: '12px', textAlign: 'right' }}>Actions</th>
                           </tr>
                         </thead>
@@ -2590,19 +2591,30 @@ export default function DeliveryPortal() {
                               <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
                                 <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
                                 <td style={{ padding: '12px' }}>
-                                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                    <strong>Pickup:</strong> {order.sellerLocation?.address || 'Seller Hub'}
+                                  <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: '600' }}>
+                                    <strong>Pickup (Merchant):</strong> {order.sellerName || order.sellerLocation?.shopName || 'Seller Store'}
                                   </div>
-                                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
-                                    <strong>Dropoff:</strong> {order.deliveryAddress?.address || order.buyerLocation?.address}
+                                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                                    {order.sellerLocation?.address || 'Seller Hub Address'}
+                                  </div>
+                                  <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: '600', marginTop: '6px' }}>
+                                    <strong>Dropoff (Customer):</strong> {order.deliveryAddress?.fullName || 'Customer'}
+                                  </div>
+                                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                                    {order.deliveryAddress?.address || order.buyerLocation?.address}
                                   </div>
                                 </td>
                                 <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
-                                <td style={{ padding: '12px', fontWeight: 700, color: '#319795' }}>₹{payout}</td>
+                                <td style={{ padding: '12px' }}>
+                                  <div style={{ fontWeight: 800, color: '#319795', fontSize: '0.95rem' }}>₹{payout}</div>
+                                  <div style={{ fontSize: '0.7rem', color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #bbf7d0', padding: '2px 7px', borderRadius: '4px', display: 'inline-block', marginTop: '4px', fontWeight: '700' }}>
+                                    💳 Taken from Seller
+                                  </div>
+                                </td>
                                 <td style={{ padding: '12px', textAlign: 'right' }}>
                                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
                                     <button
-                                      onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')}
+                                      onClick={() => setSelectedJobForAccept({ ...order, payout })}
                                       className="lp-btn lp-btn--primary"
                                       disabled={!!activeOrder}
                                       style={{
@@ -2617,7 +2629,7 @@ export default function DeliveryPortal() {
                                         opacity: activeOrder ? 0.6 : 1
                                       }}
                                     >
-                                      Accept
+                                      Accept Job
                                     </button>
                                     <button onClick={() => handleUpdateJobStatus(order.orderId, 'rejected')} className="lp-btn" style={{ padding: '6px 14px', fontSize: '0.8rem', backgroundColor: '#ef4444', border: 'none', color: '#fff', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
                                       Decline
@@ -2653,9 +2665,9 @@ export default function DeliveryPortal() {
                       <thead>
                         <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '0.85rem' }}>
                           <th style={{ padding: '12px' }}>Order ID</th>
-                          <th style={{ padding: '12px' }}>Addresses</th>
+                          <th style={{ padding: '12px' }}>Addresses & Merchant</th>
                           <th style={{ padding: '12px' }}>Distance</th>
-                          <th style={{ padding: '12px' }}>Payout Charge</th>
+                          <th style={{ padding: '12px' }}>Seller Payment (Payout)</th>
                           <th style={{ padding: '12px', textAlign: 'right' }}>Action</th>
                         </tr>
                       </thead>
@@ -2666,18 +2678,29 @@ export default function DeliveryPortal() {
                             <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
                               <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
                               <td style={{ padding: '12px' }}>
-                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                  <strong>Pickup:</strong> {order.sellerLocation?.address || 'Seller Hub'}
+                                <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: '600' }}>
+                                  <strong>Pickup (Merchant):</strong> {order.sellerName || order.sellerLocation?.shopName || 'Seller Store'}
                                 </div>
-                                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
-                                  <strong>Dropoff:</strong> {order.deliveryAddress?.address || order.buyerLocation?.address}
+                                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                                  {order.sellerLocation?.address || 'Seller Hub Address'}
+                                </div>
+                                <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: '600', marginTop: '6px' }}>
+                                  <strong>Dropoff (Customer):</strong> {order.deliveryAddress?.fullName || 'Customer'}
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                                  {order.deliveryAddress?.address || order.buyerLocation?.address}
                                 </div>
                               </td>
                               <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
-                              <td style={{ padding: '12px', fontWeight: 700, color: '#319795' }}>₹{payout}</td>
+                              <td style={{ padding: '12px' }}>
+                                <div style={{ fontWeight: 800, color: '#319795', fontSize: '0.95rem' }}>₹{payout}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #bbf7d0', padding: '2px 7px', borderRadius: '4px', display: 'inline-block', marginTop: '4px', fontWeight: '700' }}>
+                                  💳 Taken from Seller
+                                </div>
+                              </td>
                               <td style={{ padding: '12px', textAlign: 'right' }}>
                                 <button
-                                  onClick={() => handleUpdateJobStatus(order.orderId, 'accepted')}
+                                  onClick={() => setSelectedJobForAccept({ ...order, payout })}
                                   className="lp-btn lp-btn--primary"
                                   disabled={!!activeOrder}
                                   style={{
@@ -2700,6 +2723,106 @@ export default function DeliveryPortal() {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+
+                {/* Job Acceptance & Seller Payment Modal */}
+                {selectedJobForAccept && (
+                  <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                    backdropFilter: 'blur(4px)',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justify-content: 'center',
+                    padding: '20px'
+                  }}>
+                    <div style={{
+                      backgroundColor: '#ffffff',
+                      borderRadius: '16px',
+                      maxWidth: '480px',
+                      width: '100%',
+                      padding: '28px',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                      border: '1px solid #e2e8f0',
+                      animation: 'fadeIn 0.25s ease'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                          📦 Accept Delivery Job #{selectedJobForAccept.orderId}
+                        </h3>
+                        <button
+                          onClick={() => setSelectedJobForAccept(null)}
+                          style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {/* Seller Payment Breakdown Box */}
+                      <div style={{
+                        background: 'linear-gradient(135deg, #f0fdf4 0%, #e6fffa 100%)',
+                        border: '1.5px solid #319795',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        marginBottom: '20px'
+                      }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          💳 SELLER PAYMENT SUMMARY
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '6px' }}>
+                          <span style={{ fontSize: '0.9rem', color: '#334155' }}>Logistics Fee Payout:</span>
+                          <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#319795' }}>₹{selectedJobForAccept.payout}</span>
+                        </div>
+                        <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#166534', background: '#dcfce7', padding: '6px 10px', borderRadius: '6px', fontWeight: '700' }}>
+                          ✓ Payment Taken from Seller ({selectedJobForAccept.sellerName || selectedJobForAccept.sellerLocation?.shopName || 'Merchant Store'})
+                        </div>
+                      </div>
+
+                      {/* Job Address Details */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem', marginBottom: '24px', color: '#334155' }}>
+                        <div>
+                          <strong style={{ color: '#0f172a' }}>Merchant (Pickup):</strong>{' '}
+                          {selectedJobForAccept.sellerName || selectedJobForAccept.sellerLocation?.shopName || 'Seller Hub'}
+                          <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{selectedJobForAccept.sellerLocation?.address || 'Seller Address'}</div>
+                        </div>
+                        <div>
+                          <strong style={{ color: '#0f172a' }}>Customer (Dropoff):</strong>{' '}
+                          {selectedJobForAccept.deliveryAddress?.fullName || 'Customer'}
+                          <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{selectedJobForAccept.deliveryAddress?.address || selectedJobForAccept.buyerLocation?.address}</div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600 }}>
+                          <span>Distance: {selectedJobForAccept.distanceKm || 0} KM</span>
+                          <span>Settlement: Direct Merchant Payout</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <button
+                          onClick={() => {
+                            const orderId = selectedJobForAccept.orderId;
+                            setSelectedJobForAccept(null);
+                            handleUpdateJobStatus(orderId, 'accepted');
+                          }}
+                          className="lp-btn lp-btn--primary"
+                          style={{ flex: 1, padding: '12px', fontSize: '0.88rem', fontWeight: 800, background: '#319795', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+                        >
+                          ✓ Confirm & Accept Job
+                        </button>
+                        <button
+                          onClick={() => setSelectedJobForAccept(null)}
+                          className="lp-btn"
+                          style={{ padding: '12px 18px', fontSize: '0.88rem', fontWeight: 600, background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2730,6 +2853,33 @@ export default function DeliveryPortal() {
                             activeOrder.deliveryStatus === 'out_for_delivery' ? 'Out For Delivery' :
                               activeOrder.deliveryStatus === 'arrived' ? 'Arrived' : activeOrder.deliveryStatus}
                     </span>
+                  </div>
+
+                  {/* Active Delivery Seller Payment & Payout Summary */}
+                  <div style={{
+                    padding: '16px 20px',
+                    background: 'linear-gradient(135deg, #f0fdf4 0%, #e6fffa 100%)',
+                    borderRadius: '12px',
+                    border: '1.5.px solid #319795',
+                    marginBottom: '20px',
+                    boxShadow: '0 2px 8px rgba(49, 151, 149, 0.08)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          💳 SELLER PAYMENT & PAYOUT SUMMARY
+                        </div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>
+                          Payout Amount: <span style={{ color: '#319795' }}>₹{activeOrder.deliveryCharge || parseFloat(((activeOrder.distanceKm || 0) * 2).toFixed(2))}</span>
+                        </div>
+                      </div>
+                      <div style={{ background: '#10b981', color: '#ffffff', padding: '6px 14px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 800 }}>
+                        ✓ Payment Taken from Seller
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#334155', marginTop: '8px' }}>
+                      Merchant: <strong>{activeOrder.sellerName || activeOrder.sellerLocation?.shopName || 'Seller Hub'}</strong> &bull; Logistics charge is collected directly from the merchant's account.
+                    </div>
                   </div>
 
 

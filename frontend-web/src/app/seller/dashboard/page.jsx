@@ -5486,15 +5486,15 @@ export default function EmahuProDashboard() {
                   <thead>
                     <tr>
                       <th style={{ paddingLeft: '24px', minWidth: '100px' }}>Order ID</th>
-                      <th style={{ minWidth: '150px' }}>Customer</th>
+                      <th style={{ minWidth: '140px' }}>Customer</th>
                       <th style={{ minWidth: '110px' }}>Location</th>
                       <th style={{ minWidth: '95px' }}>Distance</th>
                       <th style={{ minWidth: '100px' }}>Delivery Fee</th>
                       <th style={{ minWidth: '100px' }}>Earnings</th>
                       <th style={{ minWidth: '100px' }}>Total Paid</th>
-                      <th style={{ minWidth: '170px' }}>Status</th>
+                      <th style={{ minWidth: '160px' }}>Status</th>
                       <th style={{ minWidth: '105px' }}>Date</th>
-                      <th style={{ paddingRight: '24px', minWidth: '220px', textAlign: 'right' }}>Actions</th>
+                      <th style={{ paddingRight: '24px', minWidth: '280px', width: '280px', textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -5508,7 +5508,7 @@ export default function EmahuProDashboard() {
                           >
                             #{order.id}
                           </td>
-                          <td style={{ fontWeight: 600, minWidth: '150px' }}>{order.customer}</td>
+                          <td style={{ fontWeight: 600, minWidth: '140px' }}>{order.customer}</td>
                           <td style={{ whiteSpace: 'nowrap' }}>
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                               {order.raw?.deliveryAddress?.city || order.raw?.deliveryAddress?.stateName || 'N/A'}
@@ -5554,11 +5554,11 @@ export default function EmahuProDashboard() {
                             </div>
                           </td>
                           <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{order.time}</td>
-                          <td style={{ paddingRight: '24px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                          <td style={{ paddingRight: '24px', minWidth: '280px', width: '280px', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'nowrap', width: '100%' }}>
                               <button
                                 className="btn-secondary"
-                                style={{ height: '30px', padding: '0 10px', fontSize: '0.75rem' }}
+                                style={{ height: '28px', padding: '0 9px', fontSize: '0.725rem', flexShrink: 0 }}
                                 onClick={() => setSelectedDetailedOrderId(order.id)}
                                 disabled={orderLoading[order.id]}
                               >
@@ -5600,7 +5600,7 @@ export default function EmahuProDashboard() {
                               )}
 
                               {order.status === 'DELIVERY_ASSIGNED' && (
-                                <div style={{ display: 'flex', gap: '4px' }}>
+                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'nowrap', flexShrink: 0 }}>
                                   <button
                                     className="order-action-btn label"
                                     onClick={() => handleGenerateLabel(order.id)}
@@ -5612,7 +5612,7 @@ export default function EmahuProDashboard() {
                                     className="order-action-btn carrier"
                                     onClick={() => { setSelectedOrderId(order.id); setIsDeliveryModalOpen(true); }}
                                     disabled={orderLoading[order.id]}
-                                    style={{ background: '#f59e0b', color: '#fff' }}
+                                    style={{ background: '#f59e0b', color: '#fff', border: 'none' }}
                                     title="Reassign Courier"
                                   >
                                     🔄 Reassign
