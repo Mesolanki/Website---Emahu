@@ -64,8 +64,16 @@ const cleanImageUrl = (img) => {
     }
   }
 
-  // Strip any domain / protocol prefix before /uploads/ to make it a clean relative path /uploads/
-  clean = clean.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/');
+  // Strip host/protocol (including http://127.0.0.1:5000, localhost, or domain) before /uploads/
+  clean = clean.replace(/^https?:\/\/[^\/]+\/?uploads\//i, '/uploads/');
+  if (clean.startsWith('uploads/')) clean = '/' + clean;
+
+  if (clean.startsWith('/uploads/')) {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}${clean}`;
+    }
+    return `https://emahu.com${clean}`;
+  }
 
   return clean;
 };

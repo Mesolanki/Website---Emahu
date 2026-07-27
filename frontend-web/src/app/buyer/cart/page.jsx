@@ -954,94 +954,6 @@ export default function CartPage() {
             <div className="cart-summary-bento">
               <h2 className="cart-summary-title">Order Safety Summary</h2>
 
-              {/* ── GPS Location Detection ── */}
-              <div style={{ marginBottom: '16px', padding: '14px', background: 'rgba(65,105,225,0.06)', borderRadius: '10px', border: '1px solid rgba(65,105,225,0.15)' }}>
-                <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#4169e1', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4169e1" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
-                  DELIVERY LOCATION
-                </div>
-
-                {buyerCoordinates.latitude && buyerCoordinates.longitude ? (
-                  /* Location detected card */
-                  <div style={{ background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '8px', padding: '10px 12px', marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-                          Location Pin Verified
-                        </div>
-                        <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: '600', lineHeight: 1.5 }}>
-                          📍 {buyerCity || 'Location Pinned'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '10px', lineHeight: 1.5 }}>
-                    Share your location for an accurate delivery charge calculated from the seller's shop to your doorstep.
-                  </p>
-                )}
-
-                {/* Detect / Update / Clear buttons */}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={handleGPSDetect}
-                    disabled={gpsLoading}
-                    style={{
-                      flex: 1,
-                      padding: '9px 0',
-                      background: gpsLoading ? '#e2e8f0' : '#4169e1',
-                      color: gpsLoading ? '#94a3b8' : '#fff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '0.8rem',
-                      fontWeight: '700',
-                      cursor: gpsLoading ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    {gpsLoading ? (
-                      <>
-                        <span style={{ width: '12px', height: '12px', border: '2px solid #94a3b8', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
-                        Detecting...
-                      </>
-                    ) : buyerCoordinates.latitude ? (
-                      <>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
-                        Update Location
-                      </>
-                    ) : (
-                      <>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
-                        Detect My Location
-                      </>
-                    )}
-                  </button>
-
-                  {/* Clear button — only shown when location is set */}
-                  {buyerCoordinates.latitude && (
-                    <button
-                      onClick={() => {
-                        setBuyerCoordinates({ latitude: '', longitude: '' });
-                        setBuyerCity('');
-                        localStorage.removeItem('emahu_buyer_coordinates');
-                        localStorage.removeItem('emahu_buyer_city');
-                      }}
-                      style={{ padding: '9px 12px', background: 'transparent', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                      title="Clear location"
-                    >
-                      ✕ Clear
-                    </button>
-                  )}
-                </div>
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-              </div>
-
-
               <div className="cart-summary-rows">
                 <div className="cart-summary-row">
                   <span>Subtotal ({cartItems.reduce((acc, p) => acc + p.quantity, 0)} items)</span>
@@ -1055,16 +967,6 @@ export default function CartPage() {
                     {deliveryDistance > 0 && (
                       <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
                         📏 Distance: {deliveryDistance.toFixed(1)} KM
-                      </span>
-                    )}
-                    {!buyerCoordinates.latitude && (
-                      <span style={{ fontSize: '0.71rem', color: '#94a3b8' }}>
-                        Share location for exact charge
-                      </span>
-                    )}
-                    {deliveryError && (
-                      <span style={{ fontSize: '0.71rem', color: '#ef4444' }}>
-                        ⚠ {deliveryError}
                       </span>
                     )}
                   </span>
@@ -1122,60 +1024,10 @@ export default function CartPage() {
                 </div>
               </div>
 
-
-
-              {/* Large Matte Checkout Button */}
-              {hasDeliveredOrder && (
-                <div style={{
-                  background: 'rgba(239,68,68,0.08)',
-                  border: '1.5px solid #dc2626',
-                  borderRadius: '10px',
-                  padding: '14px',
-                  marginBottom: '16px',
-                  fontSize: '0.8rem',
-                  color: '#991b1b',
-                  fontWeight: '600',
-                  lineHeight: '1.4',
-                  boxShadow: '0 2px 8px rgba(220,38,38,0.08)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: '#dc2626', color: '#fff', fontSize: '0.75rem', fontWeight: 'bold' }}>!</span>
-                    <strong style={{ color: '#dc2626' }}>Emahu Vault Confirmation Required</strong>
-                  </div>
-                  Please inspect and confirm delivery of your arrived order <strong>#{deliveredOrderId}</strong> before placing any new orders.
-                  <button
-                    onClick={() => window.location.href = '/buyer/orders'}
-                    style={{
-                      marginTop: '10px',
-                      background: '#dc2626',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '8px 12px',
-                      fontSize: '0.78rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'block',
-                      width: '100%',
-                      textAlign: 'center',
-                      boxShadow: '0 2px 4px rgba(220,38,38,0.2)'
-                    }}
-                  >
-                    Go to My Orders to Confirm Receipt
-                  </button>
-                </div>
-              )}
-
               <button
-                onClick={(e) => {
-                  if (hasDeliveredOrder) {
-                    e.preventDefault();
-                    alert(`Checkout Blocked: Please confirm receipt of your arrived order #${deliveredOrderId} before placing a new order.`);
-                    return;
-                  }
+                onClick={() => {
                   window.location.href = '/buyer/checkout';
                 }}
-                disabled={hasDeliveredOrder}
                 className="cart-checkout-btn"
                 style={{
                   textDecoration: 'none',
@@ -1184,9 +1036,7 @@ export default function CartPage() {
                   justifyContent: 'center',
                   width: '100%',
                   border: 'none',
-                  cursor: hasDeliveredOrder ? 'not-allowed' : 'pointer',
-                  opacity: hasDeliveredOrder ? 0.5 : 1,
-                  background: hasDeliveredOrder ? '#94a3b8' : ''
+                  cursor: 'pointer'
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
@@ -1210,15 +1060,9 @@ export default function CartPage() {
             <strong className="cart-mobile-sticky-price">₹{grandTotal.toLocaleString('en-IN')}</strong>
           </div>
           <button
-            onClick={(e) => {
-              if (hasDeliveredOrder) {
-                e.preventDefault();
-                alert(`Checkout Blocked: Please confirm receipt of your arrived order #${deliveredOrderId} before placing a new order.`);
-                return;
-              }
+            onClick={() => {
               window.location.href = '/buyer/checkout';
             }}
-            disabled={hasDeliveredOrder}
             className="cart-mobile-sticky-btn"
           >
             <span>Proceed to Checkout</span>

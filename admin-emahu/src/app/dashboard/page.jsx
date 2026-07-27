@@ -38,17 +38,15 @@ const resolveDocUrl = (url) => {
     }
   }
 
-  // Strip any domain / protocol prefix before /uploads/ to make it a clean relative path /uploads/
-  clean = clean.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/');
+  // Strip host/protocol (including http://127.0.0.1:5000, localhost, or domain) before /uploads/
+  clean = clean.replace(/^https?:\/\/[^\/]+\/?uploads\//i, '/uploads/');
+  if (clean.startsWith('uploads/')) clean = '/' + clean;
 
   if (clean.startsWith('/uploads/')) {
-    let domain = 'http://127.0.0.1:5000';
     if (typeof window !== 'undefined') {
-      domain = window.location.origin;
-    } else if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
-      domain = 'https://emahu.com';
+      return `${window.location.origin}${clean}`;
     }
-    return `${domain}${clean}`;
+    return `https://emahu.com${clean}`;
   }
 
   return clean;
