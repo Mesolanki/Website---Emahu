@@ -2834,17 +2834,17 @@ export default function EmahuProDashboard() {
         if (product.images.trim()) initialImgs = [product.images.trim()];
       }
     }
-    if (mainImg && !initialImgs.includes(mainImg)) {
+    if (mainImg) {
       initialImgs.unshift(mainImg);
     }
     if (product.variants && Array.isArray(product.variants)) {
       product.variants.forEach(v => {
         if (v.image && typeof v.image === 'string' && v.image.trim() && isRealImage(v.image)) {
-          if (!initialImgs.includes(v.image.trim())) initialImgs.push(v.image.trim());
+          initialImgs.push(v.image.trim());
         }
         if (Array.isArray(v.images)) {
           v.images.forEach(vImg => {
-            if (typeof vImg === 'string' && vImg.trim() && isRealImage(vImg) && !initialImgs.includes(vImg.trim())) {
+            if (typeof vImg === 'string' && vImg.trim() && isRealImage(vImg)) {
               initialImgs.push(vImg.trim());
             }
           });
@@ -2852,7 +2852,15 @@ export default function EmahuProDashboard() {
       });
     }
 
-    const cleanImgs = initialImgs.filter(img => typeof img === 'string' && img.trim() !== '' && img !== '📦');
+    const seenNorms = new Set();
+    const cleanImgs = initialImgs.filter(img => {
+      if (typeof img !== 'string' || !img.trim() || img === '📦') return false;
+      const clean = img.trim().replace(/\\/g, '/');
+      const norm = clean.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/');
+      if (seenNorms.has(norm)) return false;
+      seenNorms.add(norm);
+      return true;
+    });
     setNewProductImages(cleanImgs);
 
     setNewProductSizes(product.sizes || []);
@@ -3018,8 +3026,8 @@ export default function EmahuProDashboard() {
       const formData = new FormData();
       formData.append('image', file);
       
-      const token = localStorage.getItem('emahu_seller_token');
-      const baseUrl = API_BASE;
+      const token = localStorage.getItem('emahu_seller_token') || localStorage.getItem('emahu_token') || localStorage.getItem('token');
+      const baseUrl = (getApiBase ? getApiBase() : String(API_BASE)).replace(/\/$/, '');
       const res = await fetch(`${baseUrl}/api/products/upload`, {
         method: 'POST',
         headers: {
@@ -3061,7 +3069,9 @@ export default function EmahuProDashboard() {
                 url = url.replace('http:', 'https:');
               }
               setNewProductImages(prev => {
-                const updated = prev.map(img => img === `uploading-${tempId}` ? url : img);
+                const norm = url.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/');
+                const exists = prev.some(existing => existing.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/') === norm);
+                const updated = prev.map(img => img === `uploading-${tempId}` ? (exists ? null : url) : img).filter(Boolean);
                 if (!newProductImage || newProductImage === '📦') setNewProductImage(url);
                 return updated;
               });
@@ -3097,11 +3107,16 @@ export default function EmahuProDashboard() {
 
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
         processFiles(Array.from(e.dataTransfer.files));
+        return;
       }
 
       const link = e.dataTransfer.getData('text/plain');
       if (link && link.startsWith('http')) {
         setNewProductImages(prev => {
+          const norm = link.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/');
+          if (prev.some(existing => existing.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/') === norm)) {
+            return prev;
+          }
           const updated = [...prev, link];
           if (!newProductImage || newProductImage === '📦') setNewProductImage(link);
           return updated;
@@ -3113,6 +3128,10 @@ export default function EmahuProDashboard() {
       if (manualUrlInput.trim() && manualUrlInput.trim().startsWith('http')) {
         const link = manualUrlInput.trim();
         setNewProductImages(prev => {
+          const norm = link.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/');
+          if (prev.some(existing => existing.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/') === norm)) {
+            return prev;
+          }
           const updated = [...prev, link];
           if (!newProductImage || newProductImage === '📦') setNewProductImage(link);
           return updated;
@@ -3132,9 +3151,14 @@ export default function EmahuProDashboard() {
       });
     };
 
-    const filteredDisplayImages = (newProductImages || []).filter(img =>
-      typeof img === 'string' && img.trim() !== '' && img !== '📦'
-    );
+    const seenDisplayNorms = new Set();
+    const filteredDisplayImages = (newProductImages || []).filter(img => {
+      if (typeof img !== 'string' || !img.trim() || img === '📦') return false;
+      const norm = img.replace(/^(https?:\/\/[^\/]+)?\/?uploads\//i, '/uploads/');
+      if (seenDisplayNorms.has(norm)) return false;
+      seenDisplayNorms.add(norm);
+      return true;
+    });
 
     return (
       <div style={{ marginTop: '12px', width: '100%' }}>
