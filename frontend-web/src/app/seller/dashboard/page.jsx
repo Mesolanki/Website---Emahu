@@ -5485,16 +5485,16 @@ export default function EmahuProDashboard() {
                 <table className="pro-table">
                   <thead>
                     <tr>
-                      <th>Order ID</th>
-                      <th>Customer</th>
-                      <th>Location</th>
-                      <th>Distance</th>
-                      <th>Delivery Fee</th>
-                      <th>Earnings</th>
-                      <th>Total Paid</th>
-                      <th>Status</th>
-                      <th>Date</th>
-                      <th>Actions</th>
+                      <th style={{ paddingLeft: '24px', minWidth: '100px' }}>Order ID</th>
+                      <th style={{ minWidth: '150px' }}>Customer</th>
+                      <th style={{ minWidth: '110px' }}>Location</th>
+                      <th style={{ minWidth: '95px' }}>Distance</th>
+                      <th style={{ minWidth: '100px' }}>Delivery Fee</th>
+                      <th style={{ minWidth: '100px' }}>Earnings</th>
+                      <th style={{ minWidth: '100px' }}>Total Paid</th>
+                      <th style={{ minWidth: '170px' }}>Status</th>
+                      <th style={{ minWidth: '105px' }}>Date</th>
+                      <th style={{ paddingRight: '24px', minWidth: '220px', textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -5502,30 +5502,30 @@ export default function EmahuProDashboard() {
                       filteredOrdersDisplay.map((order) => (
                         <tr key={order.id}>
                           <td
-                            style={{ fontWeight: 700, color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline' }}
+                            style={{ paddingLeft: '24px', fontWeight: 700, color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap' }}
                             onClick={() => setSelectedDetailedOrderId(order.id)}
                             title="Click to open Order Details"
                           >
                             #{order.id}
                           </td>
-                          <td style={{ fontWeight: 600 }}>{order.customer}</td>
-                          <td>
+                          <td style={{ fontWeight: 600, minWidth: '150px' }}>{order.customer}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                               {order.raw?.deliveryAddress?.city || order.raw?.deliveryAddress?.stateName || 'N/A'}
                             </span>
                           </td>
-                          <td style={{ fontWeight: 600 }}>
+                          <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {order.raw?.distanceKm !== undefined ? `${order.raw.distanceKm} KM` : '—'}
                           </td>
-                          <td style={{ fontWeight: 600 }}>
+                          <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {order.raw?.deliveryCharge !== undefined ? `₹${order.raw.deliveryCharge}` : '—'}
                           </td>
-                          <td style={{ fontWeight: 700, color: 'var(--color-success)' }}>
+                          <td style={{ fontWeight: 700, color: 'var(--color-success)', whiteSpace: 'nowrap' }}>
                             {order.raw?.productAmount !== undefined ? `₹${order.raw.productAmount}` : '—'}
                           </td>
-                          <td style={{ fontWeight: 700 }}>₹{order.amount.toLocaleString('en-IN')}</td>
+                          <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>₹{order.amount.toLocaleString('en-IN')}</td>
                           <td>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
                               <span className={`status-badge ${order.status === 'COMPLETED' || order.status === 'DELIVERED' ? 'in-stock' :
                                 order.status === 'REJECTED' ? 'out-of-stock' :
                                   order.status === 'PENDING_APPROVAL' ? 'draft' : 'low-stock'
@@ -5542,20 +5542,20 @@ export default function EmahuProDashboard() {
                                                   order.status === 'COMPLETED' || order.status === 'DELIVERED' ? 'Delivered' : order.status}
                               </span>
                               {order.raw?.rejectionReason && order.status === 'REJECTED' && (
-                                <span style={{ fontSize: '0.7rem', color: 'var(--color-danger)' }}>
-                                  ↳ {order.raw.rejectionReason}
+                                <span style={{ fontSize: '0.72rem', color: 'var(--color-danger)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                  <span>↳</span> {order.raw.rejectionReason}
                                 </span>
                               )}
                               {order.raw?.carrier && (
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '500', whiteSpace: 'nowrap' }}>
                                   {order.raw.carrier}{order.raw.trackingId ? ` · ${order.raw.trackingId}` : ''}
                                 </span>
                               )}
                             </div>
                           </td>
                           <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{order.time}</td>
-                          <td>
-                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <td style={{ paddingRight: '24px', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
                               <button
                                 className="btn-secondary"
                                 style={{ height: '30px', padding: '0 10px', fontSize: '0.75rem' }}
