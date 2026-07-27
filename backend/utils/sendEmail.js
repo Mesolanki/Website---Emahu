@@ -53,13 +53,19 @@ const sendEmail = async (options) => {
   try {
     const resend = new Resend(apiKey);
 
-    const { data, error } = await resend.emails.send({
+    const resendPromise = resend.emails.send({
       from,
       to: [cleanTo],
       subject: options.subject,
       text: options.text,
       html: options.html || undefined
     });
+
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Email dispatch timed out after 5000ms')), 5000);
+    });
+
+    const { data, error } = await Promise.race([resendPromise, timeoutPromise]);
 
     if (error) {
       console.error('❌ Resend API Error:', error);

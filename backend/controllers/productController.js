@@ -612,30 +612,28 @@ exports.adminDecision = async (req, res) => {
       product.rejectionReason = undefined;
       await product.save();
 
-      // Log decision history
-      await ProductApprovalHistory.create({
-        product: product._id,
-        admin: req.user._id,
-        action: 'approve',
-        feedback: `Approved with SKU: ${finalSku}`
-      });
-
-      // Log admin audit
-      await AuditLog.create({
-        admin: req.user._id,
-        action: 'APPROVE_PRODUCT',
-        targetType: 'Product',
-        targetId: product._id,
-        details: { sku: finalSku }
-      });
-
-      // Notify seller
-      await Notification.create({
-        recipient: product.seller,
-        title: 'Product Approved & SKU Assigned',
-        message: `Your product "${product.name}" has been approved! Official SKU assigned: "${finalSku}". Your product is now active and live on the marketplace.`,
-        type: 'success'
-      });
+      // Log history, audit, and notify seller in parallel
+      Promise.all([
+        ProductApprovalHistory.create({
+          product: product._id,
+          admin: req.user._id,
+          action: 'approve',
+          feedback: `Approved with SKU: ${finalSku}`
+        }),
+        AuditLog.create({
+          admin: req.user._id,
+          action: 'APPROVE_PRODUCT',
+          targetType: 'Product',
+          targetId: product._id,
+          details: { sku: finalSku }
+        }),
+        Notification.create({
+          recipient: product.seller,
+          title: 'Product Approved & SKU Assigned',
+          message: `Your product "${product.name}" has been approved! Official SKU assigned: "${finalSku}". Your product is now active and live on the marketplace.`,
+          type: 'success'
+        })
+      ]).catch(err => console.error('Admin approval background tasks error:', err));
 
       res.status(200).json({
         success: true,
@@ -645,33 +643,30 @@ exports.adminDecision = async (req, res) => {
     } else if (decision === 'reject') {
       const attempts = (product.approvalAttempts || 0) + 1;
       
-      // Log decision history
-      await ProductApprovalHistory.create({
-        product: product._id,
-        admin: req.user._id,
-        action: 'reject',
-        feedback: reason || 'Rejected'
-      });
-
-      // Log admin audit
-      await AuditLog.create({
-        admin: req.user._id,
-        action: 'REJECT_PRODUCT',
-        targetType: 'Product',
-        targetId: product._id,
-        details: { attempts, reason }
-      });
-
       if (attempts >= 3) {
         await product.deleteOne();
         
-        // Notify seller of permanent deletion
-        await Notification.create({
-          recipient: product.seller,
-          title: 'Product Deleted Permanently',
-          message: `Your product "${product.name}" has been rejected 3 times and permanently removed from the system.`,
-          type: 'danger'
-        });
+        Promise.all([
+          ProductApprovalHistory.create({
+            product: product._id,
+            admin: req.user._id,
+            action: 'reject',
+            feedback: reason || 'Rejected 3 times'
+          }),
+          AuditLog.create({
+            admin: req.user._id,
+            action: 'REJECT_PRODUCT',
+            targetType: 'Product',
+            targetId: product._id,
+            details: { attempts, reason }
+          }),
+          Notification.create({
+            recipient: product.seller,
+            title: 'Product Deleted Permanently',
+            message: `Your product "${product.name}" has been rejected 3 times and permanently removed from the system.`,
+            type: 'danger'
+          })
+        ]).catch(err => console.error('Admin rejection background tasks error:', err));
 
         res.status(200).json({
           success: true,
@@ -685,13 +680,27 @@ exports.adminDecision = async (req, res) => {
         product.rejectionReason = reason || 'Product description or images do not match our standard listing terms.';
         await product.save();
 
-        // Notify seller of rejection
-        await Notification.create({
-          recipient: product.seller,
-          title: 'Product Listing Rejected',
-          message: `Your product listing "${product.name}" has been rejected. Reason: ${product.rejectionReason}. Attempts: ${attempts}/3`,
-          type: 'warning'
-        });
+        Promise.all([
+          ProductApprovalHistory.create({
+            product: product._id,
+            admin: req.user._id,
+            action: 'reject',
+            feedback: reason || 'Rejected'
+          }),
+          AuditLog.create({
+            admin: req.user._id,
+            action: 'REJECT_PRODUCT',
+            targetType: 'Product',
+            targetId: product._id,
+            details: { attempts, reason }
+          }),
+          Notification.create({
+            recipient: product.seller,
+            title: 'Product Listing Rejected',
+            message: `Your product listing "${product.name}" has been rejected. Reason: ${product.rejectionReason}. Attempts: ${attempts}/3`,
+            type: 'warning'
+          })
+        ]).catch(err => console.error('Admin rejection background tasks error:', err));
 
         res.status(200).json({
           success: true,
@@ -704,30 +713,27 @@ exports.adminDecision = async (req, res) => {
       product.rejectionReason = reason || 'Changes requested to title, description, or pricing.';
       await product.save();
 
-      // Log history
-      await ProductApprovalHistory.create({
-        product: product._id,
-        admin: req.user._id,
-        action: 'request_changes',
-        feedback: reason
-      });
-
-      // Log admin audit
-      await AuditLog.create({
-        admin: req.user._id,
-        action: 'REQUEST_CHANGES_PRODUCT',
-        targetType: 'Product',
-        targetId: product._id,
-        details: { reason }
-      });
-
-      // Notify seller
-      await Notification.create({
-        recipient: product.seller,
-        title: 'Changes Requested for Product',
-        message: `Changes requested for your product listing "${product.name}". Reason: ${product.rejectionReason}. Please edit and resubmit.`,
-        type: 'warning'
-      });
+      Promise.all([
+        ProductApprovalHistory.create({
+          product: product._id,
+          admin: req.user._id,
+          action: 'request_changes',
+          feedback: reason
+        }),
+        AuditLog.create({
+          admin: req.user._id,
+          action: 'REQUEST_CHANGES_PRODUCT',
+          targetType: 'Product',
+          targetId: product._id,
+          details: { reason }
+        }),
+        Notification.create({
+          recipient: product.seller,
+          title: 'Changes Requested for Product',
+          message: `Changes requested for your product listing "${product.name}". Reason: ${product.rejectionReason}. Please edit and resubmit.`,
+          type: 'warning'
+        })
+      ]).catch(err => console.error('Admin request_changes background tasks error:', err));
 
       res.status(200).json({
         success: true,

@@ -255,32 +255,34 @@ exports.register = async (req, res) => {
       status: (role === 'seller' || role === 'delivery') ? 'pending' : 'approved'
     });
 
-    // Notify all admins of new seller registration
+    // Notify all admins of new seller registration (non-blocking)
     if (role === 'seller') {
-      const admins = await User.find({ role: 'admin' });
-      const Notification = require('../models/Notification');
-      for (const admin of admins) {
-        await Notification.create({
-          recipient: admin._id,
-          title: 'New Seller Registration Pending Approval',
-          message: `Seller "${name}" (${storeName || 'N/A'}) has registered and requires admin verification.`,
-          type: 'warning'
-        });
-      }
+      User.find({ role: 'admin' }).select('_id').then(admins => {
+        if (admins && admins.length > 0) {
+          const Notification = require('../models/Notification');
+          Notification.insertMany(admins.map(admin => ({
+            recipient: admin._id,
+            title: 'New Seller Registration Pending Approval',
+            message: `Seller "${name}" (${storeName || 'N/A'}) has registered and requires admin verification.`,
+            type: 'warning'
+          }))).catch(err => console.error('Notify admins error:', err));
+        }
+      }).catch(err => console.error('Find admins error:', err));
     }
 
-    // Notify all admins of new delivery partner registration
+    // Notify all admins of new delivery partner registration (non-blocking)
     if (role === 'delivery') {
-      const admins = await User.find({ role: 'admin' });
-      const Notification = require('../models/Notification');
-      for (const admin of admins) {
-        await Notification.create({
-          recipient: admin._id,
-          title: 'New Delivery Partner Registration',
-          message: `Delivery partner "${name}" (${operatingLocation || 'N/A'}) has registered and is approved.`,
-          type: 'info'
-        });
-      }
+      User.find({ role: 'admin' }).select('_id').then(admins => {
+        if (admins && admins.length > 0) {
+          const Notification = require('../models/Notification');
+          Notification.insertMany(admins.map(admin => ({
+            recipient: admin._id,
+            title: 'New Delivery Partner Registration',
+            message: `Delivery partner "${name}" (${operatingLocation || 'N/A'}) has registered and is approved.`,
+            type: 'info'
+          }))).catch(err => console.error('Notify admins error:', err));
+        }
+      }).catch(err => console.error('Find admins error:', err));
     }
 
     // Send JWT and store refresh session
