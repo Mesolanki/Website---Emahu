@@ -1247,11 +1247,11 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                   <button type="button" className="footer-btn next" onClick={addManualUrl} style={{ padding: '0 16px' }}>Add Link</button>
                 </div>
 
-                {images.length > 0 && (
+                {images.filter(img => img && (img.loading || (img.url && img.url !== '📦'))).length > 0 && (
                   <div>
                     <span style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 'bold' }}>Uploaded Images:</span>
                     <div className="gallery-grid">
-                      {images.map((img, idx) => (
+                      {images.filter(img => img && (img.loading || (img.url && img.url !== '📦'))).map((img, idx) => (
                         <div key={idx} className="gallery-thumb-container" style={{ border: thumbnail === img.url ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {img.loading ? (
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '8px', textAlign: 'center' }}>
@@ -1267,13 +1267,15 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                                 onError={(e) => {
                                   if (!e.target.dataset.triedFallback) {
                                     e.target.dataset.triedFallback = '1';
-                                    const cleaned = cleanImageUrl(img.url);
-                                    if (cleaned && cleaned.startsWith('/')) {
-                                      e.target.src = `https://emahu.com${cleaned}`;
+                                    const raw = cleanImageUrl(img.url);
+                                    let relative = raw.replace(/^https?:\/\/[^\/]+\/?uploads\//i, '/uploads/');
+                                    if (relative.startsWith('uploads/')) relative = '/' + relative;
+                                    if (relative.startsWith('/uploads/')) {
+                                      e.target.src = `${window.location.protocol}//${window.location.host}${relative}`;
                                       return;
                                     }
                                   }
-                                  e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                                  e.target.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
                                 }}
                               />
                               <button type="button" className="remove-thumb-btn" onClick={() => setImages(images.filter((_, i) => i !== idx))}>×</button>
