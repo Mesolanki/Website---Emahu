@@ -2691,7 +2691,7 @@ export default function DeliveryPortal() {
                     zIndex: 9999,
                     display: 'flex',
                     alignItems: 'center',
-                    justify-content: 'center',
+                    justifyContent: 'center',
                     padding: '20px'
                   }}>
                     <div style={{
