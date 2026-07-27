@@ -634,19 +634,18 @@ export default function RoleSelector() {
       };
     });
 
-    const seen = new Set();
     const formattedStatic = STATIC_PRODUCTS.map((p, idx) => {
-      const mockCities = ['Ahmedabad', 'Surat', 'Mumbai', 'Delhi', 'Bangalore', 'Kolkata', 'Vadodara'];
+      const mockCities = ['Ahmedabad', 'Surat', 'Mumbai', 'Delhi', 'Bangalore', 'Kolkata', 'Vadodara', 'All India'];
       const city = mockCities[idx % mockCities.length];
       const stateMap = {
         'Ahmedabad': 'Gujarat', 'Surat': 'Gujarat', 'Vadodara': 'Gujarat',
-        'Mumbai': 'Maharashtra', 'Delhi': 'Delhi', 'Bangalore': 'Karnataka', 'Kolkata': 'West Bengal'
+        'Mumbai': 'Maharashtra', 'Delhi': 'Delhi', 'Bangalore': 'Karnataka', 'Kolkata': 'West Bengal', 'All India': 'All India'
       };
       return {
         id: p.id,
         name: p.name,
         brand: p.brand,
-        category: normalizeCat(p.category),
+        category: p.category || normalizeCat(p.category),
         subcategory: p.subcategory || 'General',
         price: p.price,
         originalPrice: p.originalPrice || p.price,
@@ -661,15 +660,20 @@ export default function RoleSelector() {
           storeName: p.seller || 'Emahu Store',
           city: city,
           state: stateMap[city],
-          serviceAreaCity: city,
-          serviceAreaState: stateMap[city]
+          coveredCities: ['All India', 'India', city, 'Ahmedabad', 'Surat', 'Mumbai', 'Delhi', 'Bangalore', 'Kolkata', 'Vadodara'],
+          allIndia: true,
+          sellScope: 'all_india',
+          deliveryScope: 'all_india'
         }
       };
     });
 
+    const seen = new Set();
     return [...mappedDb, ...formattedStatic].filter(p => {
-      if (seen.has(p.id)) return false;
-      seen.add(p.id);
+      if (!p || !p.id) return false;
+      const pid = p.id.toString();
+      if (seen.has(pid)) return false;
+      seen.add(pid);
       return true;
     });
   }, [dbProducts, categoryNameToId]);
@@ -681,7 +685,11 @@ export default function RoleSelector() {
     const targetCat = normalizeCat(selectedCategory.id) || normalizeCat(selectedCategory.name);
     const catProducts = allProducts.filter(p => {
       const pCat = normalizeCat(p.category);
-      return pCat === targetCat || pCat.includes(targetCat) || targetCat.includes(pCat);
+      return (
+        pCat === targetCat ||
+        pCat === selectedCategory.id ||
+        (pCat && targetCat && (pCat.includes(targetCat) || targetCat.includes(pCat)))
+      );
     });
 
     const sellersMap = new Map();
@@ -701,12 +709,31 @@ export default function RoleSelector() {
   const filteredProducts = useMemo(() => {
     if (!selectedCategory) return [];
 
-    const targetCat = normalizeCat(selectedCategory.id) || normalizeCat(selectedCategory.name);
+    const targetCatId = selectedCategory.id;
+    const targetCatNorm = normalizeCat(selectedCategory.id) || normalizeCat(selectedCategory.name);
+
     let base = allProducts.filter(p => {
-      const pCat = normalizeCat(p.category);
-      return pCat === targetCat || pCat.includes(targetCat) || targetCat.includes(pCat);
+      const pCatNorm = normalizeCat(p.category);
+      if (pCatNorm === targetCatNorm || pCatNorm === targetCatId || p.category === targetCatId) return true;
+      if (pCatNorm && targetCatNorm && (pCatNorm.includes(targetCatNorm) || targetCatNorm.includes(pCatNorm))) return true;
+      if (p.category && selectedCategory.name && p.category.toLowerCase().includes(selectedCategory.name.toLowerCase())) return true;
+      if (selectedCategory.name && p.name && p.name.toLowerCase().includes(selectedCategory.name.toLowerCase())) return true;
+      return false;
     });
 
+    // Fallback: If strict category match returned no products, search across allProducts by keyword
+    if (base.length === 0) {
+      const catKey = (selectedCategory.name || selectedCategory.id || '').toLowerCase();
+      base = allProducts.filter(p => {
+        return (
+          (p.category && p.category.toLowerCase().includes(catKey)) ||
+          (p.subcategory && p.subcategory.toLowerCase().includes(catKey)) ||
+          (p.name && p.name.toLowerCase().includes(catKey))
+        );
+      });
+    }
+
+    // Location filter with graceful fallback
     if (hasLocationPermission && selectedCity) {
       const locationFiltered = base.filter(p => sellerServesLocation(p.seller, selectedCity));
       if (locationFiltered.length > 0) {
@@ -724,18 +751,24 @@ export default function RoleSelector() {
     }
 
     if (selectedSeller !== 'All') {
-      base = base.filter(p => p.sellerStore === selectedSeller);
+      const sellerFiltered = base.filter(p => p.sellerStore === selectedSeller);
+      if (sellerFiltered.length > 0) {
+        base = sellerFiltered;
+      }
     }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      base = base.filter(p =>
+      const searchFiltered = base.filter(p =>
         p.name.toLowerCase().includes(query) ||
         p.brand.toLowerCase().includes(query) ||
         (p.sellerName && p.sellerName.toLowerCase().includes(query)) ||
         (p.sellerStore && p.sellerStore.toLowerCase().includes(query)) ||
         (p.subcategory && p.subcategory.toLowerCase().includes(query))
       );
+      if (searchFiltered.length > 0) {
+        base = searchFiltered;
+      }
     }
 
     return base;

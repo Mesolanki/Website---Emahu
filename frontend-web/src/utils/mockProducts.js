@@ -1,8 +1,4 @@
-const disableMockData = 
-  process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' || 
-  process.env.NODE_ENV === 'production';
-
-export const STATIC_PRODUCTS = disableMockData ? [] : [
+export const STATIC_PRODUCTS = [
   {
     id: 'backpack-001',
     name: 'OmniShield Premium Tech Backpack',
