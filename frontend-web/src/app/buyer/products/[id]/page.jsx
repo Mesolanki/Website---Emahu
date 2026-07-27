@@ -5,25 +5,8 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
-import './product-detail.css';
-import { STATIC_PRODUCTS } from '@/utils/mockProducts';
-import API_BASE from '@/utils/config';
-
-const ALL_PRODUCTS = STATIC_PRODUCTS;
-
-const REVIEWS = [
-  { id: 1, name: 'Rahul M.', rating: 5, date: 'May 2025', text: 'Absolutely premium quality! Packaging was immaculate and delivery was super fast. EMAHU verification seal was intact. 100% legit product.', tags: ['Fast Delivery', 'Authentic'], color: '#4169e1', verified: true },
-  { id: 2, name: 'Priya S.', rating: 4, date: 'Apr 2025', text: 'Great product, looks exactly like the images. Slightly delayed shipping but customer support was very helpful. Would recommend.', tags: ['Good Quality', 'Helpful Support'], color: '#12b7b2', verified: true },
-  { id: 3, name: 'Arjun K.', rating: 5, date: 'Apr 2025', text: 'Best deal I\'ve ever got! The EMAHU quality inspection report gave me full confidence. No compromise on quality whatsoever.', tags: ['Best Deal', 'Quality Checked'], color: '#f59e0b', verified: false },
-  { id: 4, name: 'Sneha R.', rating: 5, date: 'Mar 2025', text: 'I was skeptical at first but the verified badge and inspection scores convinced me. Zero regrets — perfect purchase!', tags: ['Trusted Platform', 'Premium Feel'], color: '#10b981', verified: true },
-];
-
-const STATIC_RELATED = [
-  { id: 3, name: 'Sony WH-1000XM5', brand: 'Sony', price: 26999, img: 'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=400&q=80' },
-  { id: 4, name: 'MacBook Air M3', brand: 'Apple', price: 114999, img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&q=80' },
-  { id: 14, name: 'Samsung 55" QLED 4K', brand: 'Samsung', price: 69999, img: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829e1?w=400&q=80' },
-  { id: 6, name: 'Adidas Ultraboost 22', brand: 'Adidas', price: 12499, img: 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?w=400&q=80' },
-];
+const ALL_PRODUCTS = [];
+const STATIC_RELATED = [];
 
 function Stars({ rating, size = 14 }) {
   return (
@@ -571,69 +554,10 @@ export default function ProductDetailPage() {
           fetchedSuccessfully = true;
         }
       } catch (err) {
-        console.error('Error fetching database product, falling back to static:', err);
+        console.error('Error fetching database product:', err);
       }
-
       if (!fetchedSuccessfully) {
-        // Fallback to STATIC_PRODUCTS
-        const staticIndex = STATIC_PRODUCTS.findIndex(p => String(p.id) === String(id));
-        const staticProd = STATIC_PRODUCTS[staticIndex];
-        if (staticProd) {
-          let mappedCategory = staticProd.category;
-          if (staticProd.category === 'Electronics' || staticProd.category === 'tech') mappedCategory = 'Tech';
-          else if (staticProd.category === 'Fitness' || staticProd.category === 'Furniture' || staticProd.category === 'lifestyle') mappedCategory = 'Lifestyle';
-
-          let mockCity = 'Ahmedabad';
-          const mod = staticIndex % 6;
-          if (mod === 0) mockCity = 'Ahmedabad';
-          else if (mod === 1) mockCity = 'Delhi';
-          else if (mod === 2) mockCity = 'Mumbai';
-          else if (mod === 3) mockCity = 'Bangalore';
-          else if (mod === 4) mockCity = 'Kolkata';
-          else if (mod === 5) {
-            if (staticIndex % 12 === 5) mockCity = 'Gandhinagar';
-            else mockCity = 'Vadodara';
-          }
-
-          setProduct({
-            id: staticProd.id,
-            name: staticProd.name,
-            brand: staticProd.brand || (typeof staticProd.seller === 'string' ? staticProd.seller : 'Emahu Brand'),
-            category: mappedCategory,
-            price: staticProd.price,
-            original: staticProd.originalPrice || staticProd.price,
-            discount: staticProd.originalPrice ? Math.round(((staticProd.originalPrice - staticProd.price) / staticProd.originalPrice) * 100) : 0,
-            rating: staticProd.rating || 4.7,
-            reviews: staticProd.reviews || 84,
-            imgs: (staticProd.images && staticProd.images.length > 0) ? staticProd.images.map(img => cleanImageUrl(img)).filter(Boolean) : (staticProd.image && isRealImage(staticProd.image)) ? [cleanImageUrl(staticProd.image)] : [],
-            imageEmoji: (!staticProd.image || !isRealImage(staticProd.image)) ? staticProd.image : null,
-            colors: [],
-            sizes: [],
-            variants: [],
-            sku: staticProd.sku || '',
-            desc: staticProd.desc || 'Premium quality product listing verified by EMAHU.',
-            stock: 10,
-            status: 'in-stock',
-            specs: [
-              ['Category', staticProd.category],
-              ['Subcategory', staticProd.subcategory || 'General'],
-              ['Available Inventory', '10 units'],
-              ['Status', 'In Stock'],
-              ['Seller Name', typeof staticProd.seller === 'string' ? staticProd.seller : 'Authorized Merchant'],
-              ['Seller Shop', typeof staticProd.seller === 'string' ? staticProd.seller : 'Authorized Store']
-            ],
-            verified: true,
-            isHot: false,
-            onSale: staticProd.originalPrice ? (staticProd.price < staticProd.originalPrice) : false,
-            seller: {
-              ...(typeof staticProd.seller === 'string' ? { name: staticProd.seller, id: 'static-seller-' + staticProd.id } : staticProd.seller),
-              city: mockCity,
-              currentCity: mockCity
-            },
-            sellerStore: typeof staticProd.seller === 'string' ? staticProd.seller : 'Emahu Store',
-            sellerName: staticProd.brand
-          });
-        }
+        setProduct(null);
       }
       setLoading(false);
     };

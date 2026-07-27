@@ -7,7 +7,6 @@ import { logAnalyticsEvent } from '@/utils/analytics';
 import { detectLocationWithGPS } from '@/utils/location';
 import './checkout.css';
 
-import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 import API_BASE from '@/utils/config';
 
 const cleanImageUrl = (img) => {
@@ -662,8 +661,8 @@ export default function CheckoutPage() {
         });
       }
 
-      // Combine DB products with static mock products
-      const allProducts = [...formattedList, ...STATIC_PRODUCTS];
+      // Use only real seller products from database
+      const allProducts = formattedList;
       const seen = new Set();
       const uniqueProducts = allProducts.filter(p => {
         const pid = p.id.toString();

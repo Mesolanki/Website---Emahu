@@ -5,7 +5,6 @@ import Link from 'next/link';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import './cart.css';
 
-import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 import API_BASE from '@/utils/config';
 
 const cleanImageUrl = (img) => {
@@ -285,61 +284,10 @@ export default function CartPage() {
         });
       }
     } catch (err) {
-      console.warn('Failed to fetch DB products for cart, falling back to static:', err);
+      console.warn('Failed to fetch DB products for cart:', err);
     }
-
     try {
-      // Combine DB products with static mock products (static get default stock of 99)
-      const formattedStatic = STATIC_PRODUCTS.map((p, idx) => {
-        let mockCity = 'Ahmedabad';
-        const mod = idx % 5;
-        if (mod === 0) mockCity = 'Delhi';
-        else if (mod === 1) mockCity = 'Mumbai';
-        else if (mod === 2) mockCity = 'Bangalore';
-        else if (mod === 3) mockCity = 'Kolkata';
-        else if (mod === 4) {
-          if (idx % 10 === 4) mockCity = 'Gandhinagar';
-          else mockCity = 'Vadodara';
-        }
-
-        let mappedCategory = p.category || 'Lifestyle & Home';
-        const catLC = mappedCategory.toLowerCase();
-        if (catLC === 'electronics' || catLC === 'tech' || catLC === 'tech & gadgets') {
-          mappedCategory = 'Tech';
-        } else if (catLC === 'apparel' || catLC === 'fashion') {
-          mappedCategory = 'Apparel';
-        } else if (catLC === 'shoes') {
-          mappedCategory = 'Shoes';
-        } else if (catLC === 'kitchen') {
-          mappedCategory = 'Kitchen';
-        } else if (catLC === 'lifestyle' || catLC === 'fitness' || catLC === 'furniture') {
-          mappedCategory = 'Lifestyle';
-        } else if (catLC === 'grocery' || catLC === 'groceries') {
-          mappedCategory = 'Grocery';
-        }
-
-        return {
-          id: p.id,
-          name: p.name,
-          brand: p.brand || p.seller || 'Emahu Seller',
-          category: mappedCategory,
-          price: p.price,
-          original: p.originalPrice || p.price,
-          rating: p.rating || 4.7,
-          reviews: p.reviews || 84,
-          img: p.image,
-          stock: p.stock ?? 99,
-          verified: true,
-          isNew: true,
-          isHot: false,
-          seller: {
-            city: mockCity,
-            currentCity: mockCity
-          }
-        };
-      });
-
-      const allProducts = [...formattedList, ...formattedStatic];
+      const allProducts = formattedList;
       const seen = new Set();
       const uniqueProducts = allProducts.filter(p => {
         if (!p || !p.id) return false;

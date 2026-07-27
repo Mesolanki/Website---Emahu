@@ -9,7 +9,7 @@ import { wakeupServer } from '@/utils/serverWakeup';
 import API_BASE from '@/utils/config';
 import './products.css';
 
-import { STATIC_PRODUCTS } from '@/utils/mockProducts';
+const ALL_PRODUCTS = [];
 
 /* ─── DATA ─── */
 const CATEGORY_IMAGES = {
@@ -40,8 +40,6 @@ const FALLBACK_CATEGORY_TILES = [
   { label: 'Books & Stationery', value: 'Books & Stationery', img: CATEGORY_IMAGES['books & stationery'] },
   { label: 'Grocery & Essentials', value: 'Grocery & Essentials', img: CATEGORY_IMAGES['grocery & essentials'] }
 ];
-
-const ALL_PRODUCTS = STATIC_PRODUCTS;
 
 
 const cleanImageUrl = (img) => {
@@ -414,50 +412,9 @@ export default function ProductsPage() {
     });
   }, [dbProducts, categoryParentMap]);
 
-  // Combine database products (shown at top) with default static ones
+  // Only real seller products from database
   const allProductsCombined = useMemo(() => {
-    const formattedStatic = ALL_PRODUCTS.map((p, idx) => {
-      let mappedCategory = p.category || 'Lifestyle & Home';
-      const catLC = mappedCategory.toLowerCase();
-      if (catLC === 'electronics' || catLC === 'tech' || catLC === 'tech & gadgets') {
-        mappedCategory = 'Electronics & Tech';
-      } else if (catLC === 'apparel' || catLC === 'fashion') {
-        mappedCategory = 'Apparel & Fashion';
-      } else if (catLC === 'shoes') {
-        mappedCategory = 'Shoes & Footwear';
-      } else if (catLC === 'kitchen') {
-        mappedCategory = 'Kitchen & Dining';
-      } else if (catLC === 'lifestyle' || catLC === 'fitness' || catLC === 'furniture') {
-        mappedCategory = 'Lifestyle & Home';
-      } else if (catLC === 'grocery' || catLC === 'groceries') {
-        mappedCategory = 'Grocery & Essentials';
-      }
-
-      let mockCity = 'Ahmedabad';
-      const mod = idx % 6;
-      if (mod === 0) mockCity = 'Ahmedabad';
-      else if (mod === 1) mockCity = 'Delhi';
-      else if (mod === 2) mockCity = 'Mumbai';
-      else if (mod === 3) mockCity = 'Bangalore';
-      else if (mod === 4) mockCity = 'Kolkata';
-      else if (mod === 5) {
-        if (idx % 12 === 5) mockCity = 'Gandhinagar';
-        else mockCity = 'Vadodara';
-      }
-
-      return {
-        ...p,
-        category: mappedCategory,
-        sellerStore: p.seller || 'Emahu Store',
-        sellerName: p.brand,
-        seller: {
-          ...p.seller,
-          city: mockCity,
-          currentCity: mockCity
-        }
-      };
-    });
-    return [...formattedDbProducts, ...formattedStatic];
+    return formattedDbProducts;
   }, [formattedDbProducts]);
 
   // Helper: does this seller serve the selected city?

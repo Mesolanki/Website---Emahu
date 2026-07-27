@@ -311,7 +311,6 @@ const DYNAMIC_CATEGORY_ICONS = {
 };
 const DYNAMIC_ACCENTS = ['#0ea5e9', '#d946ef', '#14b8a6', '#f97316', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16', '#e11d48', '#7c3aed'];
 
-import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 import API_BASE from '@/utils/config';
 import { useScrollProgress } from '@/utils/animate';
 import { wakeupServer } from '@/utils/serverWakeup';
@@ -640,42 +639,8 @@ export default function RoleSelector() {
       };
     });
 
-    const formattedStatic = STATIC_PRODUCTS.map((p, idx) => {
-      const mockCities = ['Ahmedabad', 'Surat', 'Mumbai', 'Delhi', 'Bangalore', 'Kolkata', 'Vadodara', 'All India'];
-      const city = mockCities[idx % mockCities.length];
-      const stateMap = {
-        'Ahmedabad': 'Gujarat', 'Surat': 'Gujarat', 'Vadodara': 'Gujarat',
-        'Mumbai': 'Maharashtra', 'Delhi': 'Delhi', 'Bangalore': 'Karnataka', 'Kolkata': 'West Bengal', 'All India': 'All India'
-      };
-      return {
-        id: p.id,
-        name: p.name,
-        brand: p.brand,
-        category: p.category || normalizeCat(p.category),
-        subcategory: p.subcategory || 'General',
-        price: p.price,
-        originalPrice: p.originalPrice || p.price,
-        rating: p.rating || 4.7,
-        reviews: p.reviews || 84,
-        sellerName: p.brand,
-        sellerStore: p.seller || 'Emahu Store',
-        image: p.image,
-        stock: 10,
-        seller: {
-          name: p.seller || 'Emahu Seller',
-          storeName: p.seller || 'Emahu Store',
-          city: city,
-          state: stateMap[city],
-          coveredCities: ['All India', 'India', city, 'Ahmedabad', 'Surat', 'Mumbai', 'Delhi', 'Bangalore', 'Kolkata', 'Vadodara'],
-          allIndia: true,
-          sellScope: 'all_india',
-          deliveryScope: 'all_india'
-        }
-      };
-    });
-
     const seen = new Set();
-    return [...mappedDb, ...formattedStatic].filter(p => {
+    return mappedDb.filter(p => {
       if (!p || !p.id) return false;
       const pid = p.id.toString();
       if (seen.has(pid)) return false;
@@ -741,11 +706,6 @@ export default function RoleSelector() {
           (pName && (pName.includes(catKey) || pName.includes(firstWord)))
         );
       });
-    }
-
-    // Fallback 2: If still empty, return all products so category page is never empty
-    if (base.length === 0) {
-      base = allProducts;
     }
 
     // Location filter with graceful fallback

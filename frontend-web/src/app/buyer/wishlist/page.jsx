@@ -7,7 +7,6 @@ import { logAnalyticsEvent } from '@/utils/analytics';
 import './wishlist.css';
 
 import API_BASE from '@/utils/config';
-import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 
 function Stars({ rating }) {
   return (
@@ -61,8 +60,8 @@ export default function WishlistPage() {
         console.warn('Backend offline, loading wishlist from local storage fallback:', fetchErr);
       }
 
-      // Combine database products with static mock products
-      const allProducts = [...formattedList, ...STATIC_PRODUCTS];
+      // Use only real seller products from database
+      const allProducts = formattedList;
       const seen = new Set();
       const uniqueProducts = allProducts.filter(p => {
         const pid = p.id.toString();
