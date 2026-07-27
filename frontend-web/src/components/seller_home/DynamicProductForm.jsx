@@ -388,7 +388,29 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
           setDescColor(parsedDesc.color || '');
           setDescMemory(parsedDesc.memory || '');
           setDescWarranty(parsedDesc.warranty || '');
-          setImages(prod.images ? prod.images.map(img => typeof img === 'string' ? { url: img, quality: 'High Quality', isWarning: false } : img) : []);
+          let allFormImgs = prod.images ? prod.images.map(img => typeof img === 'string' ? { url: img, quality: 'High Quality', isWarning: false } : img) : [];
+          if (allFormImgs.length === 0 && prod.image && prod.image !== '📦') {
+            allFormImgs.push({ url: prod.image, quality: 'High Quality', isWarning: false });
+          }
+          if (prod.variants && Array.isArray(prod.variants)) {
+            prod.variants.forEach(v => {
+              if (v.image && typeof v.image === 'string' && v.image.trim() && v.image !== '📦') {
+                if (!allFormImgs.some(item => item.url === v.image)) {
+                  allFormImgs.push({ url: v.image, quality: 'High Quality', isWarning: false });
+                }
+              }
+              if (Array.isArray(v.images)) {
+                v.images.forEach(vImg => {
+                  if (typeof vImg === 'string' && vImg.trim() && vImg !== '📦') {
+                    if (!allFormImgs.some(item => item.url === vImg)) {
+                      allFormImgs.push({ url: vImg, quality: 'High Quality', isWarning: false });
+                    }
+                  }
+                });
+              }
+            });
+          }
+          setImages(allFormImgs);
           setShortTitle(prod.shortTitle || '');
           setModelNumber(prod.modelNumber || '');
           if (resubmitProductId) {
@@ -867,8 +889,33 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
         comparePrice: parseFloat(comparePrice) || 0,
         stock: parseInt(stock) || 0,
         description: serializedDescription,
-        image: thumbnail || (images[0] ? images[0].url : '📦'),
-        images: images.map(img => img.url),
+        image: (() => {
+          let mainImg = thumbnail || (images[0] ? images[0].url : '');
+          if (!mainImg || mainImg === '📦') {
+            if (enableVariants && Array.isArray(variantsList)) {
+              const vMatch = variantsList.find(v => (v.image && v.image !== '📦') || (Array.isArray(v.images) && v.images.length > 0));
+              if (vMatch) {
+                mainImg = vMatch.image || (Array.isArray(vMatch.images) ? vMatch.images[0] : '');
+              }
+            }
+          }
+          return mainImg || '📦';
+        })(),
+        images: (() => {
+          const list = images.map(img => img.url).filter(Boolean);
+          let mainImg = thumbnail || (images[0] ? images[0].url : '');
+          if ((!mainImg || mainImg === '📦') && enableVariants && Array.isArray(variantsList)) {
+            variantsList.forEach(v => {
+              if (v.image && v.image !== '📦' && !list.includes(v.image)) list.push(v.image);
+              if (Array.isArray(v.images)) {
+                v.images.forEach(vImg => {
+                  if (vImg && vImg !== '📦' && !list.includes(vImg)) list.push(vImg);
+                });
+              }
+            });
+          }
+          return list;
+        })(),
         shortTitle, modelNumber, sku, barcode, tax: parseFloat(tax), hsnCode,
         moq: parseInt(moq) || 1,
         maxOrderQty: maxOrderQty ? parseInt(maxOrderQty) : undefined,

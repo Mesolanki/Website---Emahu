@@ -74,6 +74,38 @@ const isRealImage = (img) => {
   );
 };
 
+const getProductMainImage = (p) => {
+  if (!p) return '';
+  if (p.image && isRealImage(p.image)) return p.image;
+
+  let imgs = p.images;
+  if (typeof imgs === 'string') {
+    try {
+      const parsed = JSON.parse(imgs);
+      if (Array.isArray(parsed)) imgs = parsed;
+      else imgs = [imgs];
+    } catch(e) {
+      imgs = [imgs];
+    }
+  }
+  if (Array.isArray(imgs) && imgs.length > 0) {
+    const firstReal = imgs.find(img => isRealImage(img));
+    if (firstReal) return firstReal;
+  }
+
+  if (Array.isArray(p.variants) && p.variants.length > 0) {
+    for (const v of p.variants) {
+      if (v.image && isRealImage(v.image)) return v.image;
+      if (Array.isArray(v.images) && v.images.length > 0) {
+        const firstReal = v.images.find(img => isRealImage(img));
+        if (firstReal) return firstReal;
+      }
+    }
+  }
+
+  return p.image || '';
+};
+
 const compressImageFile = (file, maxWidth = 1200, maxHeight = 1200, quality = 0.82) => {
   return new Promise((resolve) => {
     if (!file || !file.type || !file.type.startsWith('image/')) {
@@ -2787,8 +2819,43 @@ export default function EmahuProDashboard() {
     setNewProductComparePrice(product.comparePrice ? product.comparePrice.toString() : '');
     setNewProductStock(product.stock.toString());
     setNewProductDescription(product.description || '');
-    setNewProductImage(product.image || '');
-    setNewProductImages(product.images || (product.image ? [product.image] : []));
+
+    const mainImg = getProductMainImage(product);
+    setNewProductImage(mainImg);
+
+    let initialImgs = [];
+    if (Array.isArray(product.images) && product.images.length > 0) {
+      initialImgs = product.images;
+    } else if (typeof product.images === 'string') {
+      try {
+        const parsed = JSON.parse(product.images);
+        if (Array.isArray(parsed)) initialImgs = parsed;
+        else if (parsed) initialImgs = [parsed];
+      } catch (e) {
+        if (product.images.trim()) initialImgs = [product.images.trim()];
+      }
+    }
+    if (mainImg && !initialImgs.includes(mainImg)) {
+      initialImgs.unshift(mainImg);
+    }
+    if (product.variants && Array.isArray(product.variants)) {
+      product.variants.forEach(v => {
+        if (v.image && typeof v.image === 'string' && v.image.trim() && isRealImage(v.image)) {
+          if (!initialImgs.includes(v.image.trim())) initialImgs.push(v.image.trim());
+        }
+        if (Array.isArray(v.images)) {
+          v.images.forEach(vImg => {
+            if (typeof vImg === 'string' && vImg.trim() && isRealImage(vImg) && !initialImgs.includes(vImg.trim())) {
+              initialImgs.push(vImg.trim());
+            }
+          });
+        }
+      });
+    }
+
+    const cleanImgs = initialImgs.filter(img => typeof img === 'string' && img.trim() !== '' && img !== '📦');
+    setNewProductImages(cleanImgs);
+
     setNewProductSizes(product.sizes || []);
     setNewProductColors(product.colors || []);
     if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
@@ -2824,11 +2891,21 @@ export default function EmahuProDashboard() {
         const reader = new FileReader();
         reader.onload = (ev) => {
           const updated = [...newProductVariants];
-          updated[index].images = [...(updated[index].images || []), ev.target.result];
+          const newImgUrl = ev.target.result;
+          updated[index].images = [...(updated[index].images || []), newImgUrl];
           if (!updated[index].image) {
-            updated[index].image = ev.target.result;
+            updated[index].image = newImgUrl;
           }
           setNewProductVariants(updated);
+
+          // Auto sync to parent product gallery if main images list is empty or lacking a main photo
+          setNewProductImages(prev => {
+            if (prev.length === 0 || !newProductImage || newProductImage === '📦') {
+              setNewProductImage(newImgUrl);
+              return [newImgUrl, ...prev];
+            }
+            return prev;
+          });
         };
         reader.readAsDataURL(file);
       });
@@ -2984,20 +3061,18 @@ export default function EmahuProDashboard() {
               if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http:')) {
                 url = url.replace('http:', 'https:');
               }
-              setNewProductImages(prev => prev.map(img => {
-                if (img === `uploading-${tempId}`) {
-                  return url;
-                }
-                return img;
-              }));
+              setNewProductImages(prev => {
+                const updated = prev.map(img => img === `uploading-${tempId}` ? url : img);
+                if (!newProductImage || newProductImage === '📦') setNewProductImage(url);
+                return updated;
+              });
             } catch (err) {
               console.warn('Server image upload error, using compressed Base64 fallback:', err);
-              setNewProductImages(prev => prev.map(img => {
-                if (img === `uploading-${tempId}`) {
-                  return dataUrl;
-                }
-                return img;
-              }));
+              setNewProductImages(prev => {
+                const updated = prev.map(img => img === `uploading-${tempId}` ? dataUrl : img);
+                if (!newProductImage || newProductImage === '📦') setNewProductImage(dataUrl);
+                return updated;
+              });
             }
           };
           reader.readAsDataURL(compressedFile);
@@ -3027,13 +3102,22 @@ export default function EmahuProDashboard() {
 
       const link = e.dataTransfer.getData('text/plain');
       if (link && link.startsWith('http')) {
-        setNewProductImages(prev => [...prev, link]);
+        setNewProductImages(prev => {
+          const updated = [...prev, link];
+          if (!newProductImage || newProductImage === '📦') setNewProductImage(link);
+          return updated;
+        });
       }
     };
 
     const addManualUrl = () => {
       if (manualUrlInput.trim() && manualUrlInput.trim().startsWith('http')) {
-        setNewProductImages(prev => [...prev, manualUrlInput.trim()]);
+        const link = manualUrlInput.trim();
+        setNewProductImages(prev => {
+          const updated = [...prev, link];
+          if (!newProductImage || newProductImage === '📦') setNewProductImage(link);
+          return updated;
+        });
         setManualUrlInput('');
       } else {
         triggerToast('Invalid URL', 'Please enter a valid HTTP/HTTPS image URL', 'danger');
@@ -3041,8 +3125,17 @@ export default function EmahuProDashboard() {
     };
 
     const removeImage = (indexToRemove) => {
-      setNewProductImages(prev => prev.filter((_, idx) => idx !== indexToRemove));
+      setNewProductImages(prev => {
+        const updated = prev.filter((_, idx) => idx !== indexToRemove);
+        if (updated[0]) setNewProductImage(updated[0]);
+        else setNewProductImage('');
+        return updated;
+      });
     };
+
+    const filteredDisplayImages = (newProductImages || []).filter(img =>
+      typeof img === 'string' && img.trim() !== '' && img !== '📦'
+    );
 
     return (
       <div style={{ marginTop: '12px', width: '100%' }}>
@@ -3106,7 +3199,7 @@ export default function EmahuProDashboard() {
           </button>
         </div>
 
-        {newProductImages.length > 0 && (
+        {filteredDisplayImages.length > 0 && (
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
@@ -3117,7 +3210,7 @@ export default function EmahuProDashboard() {
             borderRadius: '8px',
             border: '1px solid var(--border-color)'
           }}>
-            {newProductImages.map((img, idx) => (
+            {filteredDisplayImages.map((img, idx) => (
               <div key={idx} style={{
                 position: 'relative',
                 width: '60px',
@@ -8347,10 +8440,10 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
                     <td>
                       <div className="product-cell">
                         <div className="product-img">
-                          {isRealImage(p.image) ? (
-                            <img src={cleanImageUrl(p.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          {isRealImage(getProductMainImage(p)) ? (
+                            <img src={cleanImageUrl(getProductMainImage(p))} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
-                            cleanImageUrl(p.image) || '📦'
+                            cleanImageUrl(getProductMainImage(p)) || '📦'
                           )}
                         </div>
                         <div className="product-meta-details">

@@ -21,6 +21,20 @@ exports.createProduct = async (req, res) => {
     }
 
     let allImages = Array.isArray(req.body.images) ? req.body.images.filter(i => typeof i === 'string' && i.trim()) : [];
+    if (Array.isArray(req.body.variants) && req.body.variants.length > 0) {
+      req.body.variants.forEach(v => {
+        if (v.image && typeof v.image === 'string' && v.image.trim() && !allImages.includes(v.image.trim())) {
+          allImages.push(v.image.trim());
+        }
+        if (Array.isArray(v.images)) {
+          v.images.forEach(img => {
+            if (typeof img === 'string' && img.trim() && !allImages.includes(img.trim())) {
+              allImages.push(img.trim());
+            }
+          });
+        }
+      });
+    }
     if (primaryImage && !allImages.includes(primaryImage)) {
       allImages.unshift(primaryImage);
     }
@@ -735,7 +749,7 @@ exports.adminDecision = async (req, res) => {
 exports.getAdminProducts = async (req, res) => {
   try {
     const products = await Product.find()
-      .select('name brand category price stock sku approvalStatus adminCode rejectionReason approvalAttempts createdAt seller')
+      .select('name brand category price stock sku approvalStatus adminCode rejectionReason approvalAttempts createdAt seller image images variants')
       .populate('seller', 'name email phone storeName status')
       .lean();
     res.status(200).json({

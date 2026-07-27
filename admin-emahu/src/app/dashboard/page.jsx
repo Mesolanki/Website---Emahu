@@ -79,6 +79,38 @@ const isRealImage = (img) => {
   );
 };
 
+const getAdminProductMainImage = (p) => {
+  if (!p) return '';
+  if (p.image && isRealImage(p.image)) return p.image;
+
+  let imgs = p.images;
+  if (typeof imgs === 'string') {
+    try {
+      const parsed = JSON.parse(imgs);
+      if (Array.isArray(parsed)) imgs = parsed;
+      else imgs = [imgs];
+    } catch(e) {
+      imgs = [imgs];
+    }
+  }
+  if (Array.isArray(imgs) && imgs.length > 0) {
+    const firstReal = imgs.find(img => isRealImage(img));
+    if (firstReal) return firstReal;
+  }
+
+  if (Array.isArray(p.variants) && p.variants.length > 0) {
+    for (const v of p.variants) {
+      if (v.image && isRealImage(v.image)) return v.image;
+      if (Array.isArray(v.images) && v.images.length > 0) {
+        const firstReal = v.images.find(img => isRealImage(img));
+        if (firstReal) return firstReal;
+      }
+    }
+  }
+
+  return p.image || '';
+};
+
 const openDocInNewTab = (url) => {
   if (!url) return;
   const clean = resolveDocUrl(url);
@@ -3922,16 +3954,16 @@ export default function AdminDashboard() {
 
                   <div className="ad-detail-info-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px', gap: '10px' }}>
                     <div style={{ width: '100%', height: '240px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--color-admin-border)', background: '#0a0b10', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {isRealImage(selectedDetailProduct.image || (selectedDetailProduct.images && selectedDetailProduct.images[0])) ? (
+                      {isRealImage(getAdminProductMainImage(selectedDetailProduct)) ? (
                         <img
-                          src={cleanImageUrl(selectedDetailProduct.image || (selectedDetailProduct.images && selectedDetailProduct.images[0]))}
+                          src={cleanImageUrl(getAdminProductMainImage(selectedDetailProduct))}
                           alt={selectedDetailProduct.name}
                           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                           onError={(e) => {
                             if (!e.target.dataset.triedFallback) {
                               e.target.dataset.triedFallback = 'true';
                               const fallbackBase = (getApiBase() || String(API_BASE)).replace(/\/$/, '');
-                              const cleaned = cleanImageUrl(selectedDetailProduct.image || (selectedDetailProduct.images && selectedDetailProduct.images[0]));
+                              const cleaned = cleanImageUrl(getAdminProductMainImage(selectedDetailProduct));
                               e.target.src = cleaned.startsWith('http') ? cleaned : `${fallbackBase}${cleaned.startsWith('/') ? '' : '/'}${cleaned}`;
                             } else if (!e.target.dataset.triedPlaceholder) {
                               e.target.dataset.triedPlaceholder = 'true';
@@ -5494,8 +5526,8 @@ export default function AdminDashboard() {
                                     <td>
                                       <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                         <div className="ad-prod-image">
-                                          {isRealImage(product.image) ? (
-                                            <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                          {isRealImage(getAdminProductMainImage(product)) ? (
+                                            <img src={cleanImageUrl(getAdminProductMainImage(product))} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                           ) : (
                                             cleanImageUrl(product.image) || '📦'
                                           )}
