@@ -561,6 +561,24 @@ export default function SellerRegister() {
 
           {step === 1 && (
             <div className="sr-step-content">
+              {/* Mandatory Return Logistics Notice Alert */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(185, 28, 28, 0.12) 100%)',
+                border: '1.5px solid #ef4444',
+                borderRadius: '12px',
+                padding: '16px 18px',
+                marginBottom: '24px',
+                boxShadow: '0 4px 16px rgba(239, 68, 68, 0.15)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f87171', fontWeight: '800', fontSize: '0.88rem', marginBottom: '6px', letterSpacing: '0.3px' }}>
+                  <span style={{ fontSize: '1.25rem' }}>🚨</span>
+                  <span>MANDATORY SELLER LOGISTICS & RETURN POLICY WARNING</span>
+                </div>
+                <p style={{ color: '#fca5a5', fontSize: '0.82rem', lineHeight: '1.55', margin: 0, fontWeight: '500' }}>
+                  <strong>Return Logistics Notice:</strong> If a buyer declines or fails to accept a perfect, undamaged order matching the exact listed product specifications, the entire logistics cost, return transit coordination, and absolute platform responsibility lie solely on the Seller.
+                </p>
+              </div>
+
               <div className="sr-form-card__header">
                 <h2 className="sr-form-card__title">Create Seller Account</h2>
                 <p className="sr-form-card__subtitle">Start listing your products in minutes</p>

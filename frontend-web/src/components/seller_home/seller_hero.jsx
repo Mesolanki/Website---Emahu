@@ -49,6 +49,24 @@ export default function SellerHero() {
               Emahu provides the ultimate high-performance infrastructure for modern digital commerce. Experience 0% commission deductions, secure Emahu settlement cycles, and hyper-speed doorstep logistics in one unified platform.
             </p>
 
+            {/* Mandatory Return Logistics Notice Warning Banner */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.08) 100%)',
+              border: '1.5px solid #ef4444',
+              borderRadius: '12px',
+              padding: '14px 18px',
+              margin: '18px 0 22px 0',
+              boxShadow: '0 4px 16px rgba(239, 68, 68, 0.12)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: '800', fontSize: '0.82rem', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <span style={{ fontSize: '1.15rem' }}>⚠️</span>
+                <span>MANDATORY SELLER LOGISTICS POLICY NOTICE</span>
+              </div>
+              <p style={{ color: '#991b1b', fontSize: '0.8rem', lineHeight: '1.55', margin: 0, fontWeight: '600' }}>
+                <strong>Return Logistics Notice:</strong> If a buyer declines or fails to accept a perfect, undamaged order matching the exact listed product specifications, the entire logistics cost, return transit coordination, and absolute platform responsibility lie solely on the Seller.
+              </p>
+            </div>
+
             {/* Action Buttons */}
             <div className="sh-hero__actions">
               <button

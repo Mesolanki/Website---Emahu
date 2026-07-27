@@ -1307,7 +1307,7 @@ export default function RoleSelector() {
               whileHover={{ y: -6, scale: 1.01, transition: { duration: 0.3 } }}
             >
               <div className="sel-portal-box__icon">🏪</div>
-              <h3 className="sel-portal-box__title">Shop Seller Portal</h3>
+              <h3 className="sel-portal-box__title">Shop/Seller/Manufacturer/Wholeseller   Portal</h3>
               <p className="sel-portal-box__desc">
                 Whether you sell from home or run a large business list your products, manage stock, set delivery charges, and start growing your sales on EMAHU today.
               </p>
