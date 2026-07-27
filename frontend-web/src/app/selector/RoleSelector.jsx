@@ -179,7 +179,13 @@ const getProductMainImage = (p) => {
 
 const normalizeCat = (c) => {
   if (!c) return '';
-  const str = String(c).toLowerCase().trim();
+  let str = '';
+  if (typeof c === 'object') {
+    str = (c.name || c.title || c.slug || c._id || '').toString();
+  } else {
+    str = String(c);
+  }
+  str = str.toLowerCase().trim();
   if (str.includes('tech') || str.includes('electronic') || str.includes('gadget') || str.includes('computer') || str.includes('mobile')) return 'tech';
   if (str.includes('shoe') || str.includes('footwear') || str.includes('sneaker') || str.includes('boot')) return 'shoes';
   if (str.includes('kitchen') || str.includes('dining') || str.includes('cookware')) return 'kitchen';
@@ -721,16 +727,25 @@ export default function RoleSelector() {
       return false;
     });
 
-    // Fallback: If strict category match returned no products, search across allProducts by keyword
+    // Fallback 1: Search across allProducts by category name / id / subcategory / name keywords
     if (base.length === 0) {
       const catKey = (selectedCategory.name || selectedCategory.id || '').toLowerCase();
+      const firstWord = catKey.split(' ')[0].replace(/[^a-z0-9]/g, '');
       base = allProducts.filter(p => {
+        const pCat = (p.category || '').toLowerCase();
+        const pSub = (p.subcategory || '').toLowerCase();
+        const pName = (p.name || '').toLowerCase();
         return (
-          (p.category && p.category.toLowerCase().includes(catKey)) ||
-          (p.subcategory && p.subcategory.toLowerCase().includes(catKey)) ||
-          (p.name && p.name.toLowerCase().includes(catKey))
+          (pCat && (pCat.includes(catKey) || pCat.includes(firstWord))) ||
+          (pSub && (pSub.includes(catKey) || pSub.includes(firstWord))) ||
+          (pName && (pName.includes(catKey) || pName.includes(firstWord)))
         );
       });
+    }
+
+    // Fallback 2: If still empty, return all products so category page is never empty
+    if (base.length === 0) {
+      base = allProducts;
     }
 
     // Location filter with graceful fallback

@@ -770,7 +770,16 @@ export default function ProductsPage() {
         (p.subcategory && p.subcategory.toLowerCase().includes(q))
       );
     }
-    if (category !== 'All')            items = items.filter(p => p.category === category);
+    if (category !== 'All') {
+      const catTarget = category.toLowerCase().trim();
+      const filteredByCat = items.filter(p => {
+        const pCat = (p.category || '').toLowerCase().trim();
+        return pCat === catTarget || pCat.includes(catTarget) || catTarget.includes(pCat);
+      });
+      if (filteredByCat.length > 0) {
+        items = filteredByCat;
+      }
+    }
     if (selectedShop !== 'All Shops')  items = items.filter(p => p.sellerStore === selectedShop || p.brand === selectedShop);
     if (activeSubcategory !== 'All')   items = items.filter(p => p.subcategory === activeSubcategory);
     if (showVerified)                  items = items.filter(p => p.verified);
