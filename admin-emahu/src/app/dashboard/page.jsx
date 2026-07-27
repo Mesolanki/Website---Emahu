@@ -43,10 +43,7 @@ const resolveDocUrl = (url) => {
   if (clean.startsWith('uploads/')) clean = '/' + clean;
 
   if (clean.startsWith('/uploads/')) {
-    if (typeof window !== 'undefined') {
-      return `${window.location.origin}${clean}`;
-    }
-    return `https://emahu.com${clean}`;
+    return clean;
   }
 
   return clean;

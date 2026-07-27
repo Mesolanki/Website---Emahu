@@ -1,9 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
-    const defaultApi = isProd ? 'https://emahu.com' : 'http://127.0.0.1:5000';
-    const apiBase = (process.env.NEXT_PUBLIC_API_URL || defaultApi)
+    const defaultApi = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+    const apiBase = defaultApi
       .replace(/\/api\/auth$/, '')
       .replace(/\/api$/, '')
       .replace(/\/$/, '');
@@ -14,7 +13,7 @@ const nextConfig = {
       },
       {
         source: '/uploads/:path*',
-        destination: `${apiBase}/uploads/:path*`,
+        destination: 'http://127.0.0.1:5000/uploads/:path*',
       },
     ];
   },
