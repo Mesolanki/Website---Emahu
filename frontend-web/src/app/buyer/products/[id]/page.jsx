@@ -833,17 +833,17 @@ export default function ProductDetailPage() {
                     src={cleanImageUrl(img)}
                     alt={`View ${i + 1}`}
                     onError={(e) => {
-                      const cleaned = cleanImageUrl(img);
-                      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-                      const fallbackBase = isHttps ? 'https://emahu.com' : 'http://127.0.0.1:5000';
                       if (!e.target.dataset.triedFallback) {
                         e.target.dataset.triedFallback = '1';
-                        if (cleaned && cleaned.startsWith('/')) {
-                          e.target.src = `${fallbackBase}${cleaned}`;
+                        const raw = cleanImageUrl(img);
+                        let relative = raw.replace(/^https?:\/\/[^\/]+\/?uploads\//i, '/uploads/');
+                        if (relative.startsWith('uploads/')) relative = '/' + relative;
+                        if (relative.startsWith('/uploads/')) {
+                          e.target.src = `${window.location.protocol}//${window.location.host}${relative}`;
                           return;
                         }
                       }
-                      e.target.src = 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400&q=80';
+                      e.target.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
                     }}
                   />
                 </button>
