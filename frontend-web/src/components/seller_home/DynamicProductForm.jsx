@@ -1835,6 +1835,26 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                     <option value="Non-Cancellable">Non-Cancellable after order placement</option>
                   </select>
                 </div>
+
+                <div style={{
+                  marginTop: '16px',
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px dashed rgba(239, 68, 68, 0.3)',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  gap: '10px',
+                  alignItems: 'flex-start',
+                  fontSize: '0.8rem',
+                  color: '#94a3b8',
+                  lineHeight: '1.5'
+                }}>
+                  <span style={{ fontSize: '1.1rem', color: '#ef4444', flexShrink: 0 }}>🚨</span>
+                  <div>
+                    <strong style={{ color: '#f87171' }}>Return Logistics Notice:</strong>{' '}
+                    If a buyer declines or fails to accept a perfect, undamaged order matching the exact listed product specifications, the entire logistics cost, return transit coordination, and absolute platform responsibility lie solely on the Seller.
+                  </div>
+                </div>
               </>
             )}
 

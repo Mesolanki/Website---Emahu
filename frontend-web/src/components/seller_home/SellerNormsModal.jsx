@@ -112,6 +112,41 @@ export default function SellerNormsModal({ isOpen, onClose, onAccept }) {
             color: '#cbd5e1'
           }}
         >
+          {/* Return Logistics Notice Alert Callout */}
+          <div style={{ background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(245, 158, 11, 0.15) 100%)', border: '1.5px dashed rgba(239, 68, 68, 0.4)', padding: '16px 20px', borderRadius: '14px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>🚨</span>
+            <div style={{ fontSize: '0.88rem', lineHeight: '1.55', color: '#f8fafc' }}>
+              <strong style={{ color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.3px', fontWeight: '800' }}>
+                Return Logistics Notice:
+              </strong>{' '}
+              If a buyer declines or fails to accept a perfect, undamaged order matching the exact listed product specifications, the{' '}
+              <strong style={{ color: '#fca5a5' }}>
+                entire logistics cost, return transit coordination, and absolute platform responsibility lie solely on the Seller
+              </strong>.
+            </div>
+          </div>
+
+          {/* Seller Categories & Merchant Classifications */}
+          <div style={{ background: 'rgba(255, 255, 255, 0.025)', padding: '18px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+            <h3 style={{ color: '#38bdf8', fontSize: '0.95rem', margin: '0 0 12px 0', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Merchant Classifications & Seller Tiers
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#ffffff', marginBottom: '4px' }}>🏡 Home & Individual</div>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: '1.4', display: 'block' }}>Dispatching items crafted or stored at home. Flexible local operations.</span>
+              </div>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#ffffff', marginBottom: '4px' }}>🏬 Retail Shops & Local</div>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: '1.4', display: 'block' }}>Physical storefronts offering instant local city catalog pick & fast dispatch.</span>
+              </div>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#ffffff', marginBottom: '4px' }}>🏢 Corporate Brands</div>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: '1.4', display: 'block' }}>Scaled regional business entities with multi-city warehousing & shipping.</span>
+              </div>
+            </div>
+          </div>
+
           {/* Norm 1 */}
           <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
             <h3 style={{ color: '#60a5fa', fontSize: '0.98rem', margin: '0 0 6px 0', fontWeight: '600' }}>
@@ -169,6 +204,16 @@ export default function SellerNormsModal({ isOpen, onClose, onAccept }) {
             </h3>
             <p style={{ margin: 0 }}>
               Sellers are independent entities responsible for their own GST filings, state trade licensing, and product tax compliance. EMAHU acts solely as a matching software platform and holds no liability for seller tax obligations.
+            </p>
+          </div>
+
+          {/* Norm 7 - Return Logistics Policy */}
+          <div style={{ background: 'rgba(239, 68, 68, 0.06)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
+            <h3 style={{ color: '#f87171', fontSize: '0.98rem', margin: '0 0 6px 0', fontWeight: '700' }}>
+              7. Return Logistics & Undamaged Order Rejection Policy
+            </h3>
+            <p style={{ margin: 0, color: '#e2e8f0' }}>
+              If a buyer declines or fails to accept a perfect, undamaged order matching the exact listed product specifications, the entire logistics cost, return transit coordination, and absolute platform responsibility lie solely on the Seller.
             </p>
           </div>
         </div>

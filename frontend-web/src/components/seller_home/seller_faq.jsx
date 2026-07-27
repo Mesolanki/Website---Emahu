@@ -24,6 +24,14 @@ const faqs = [
     answer: 'Absolutely. Emahu offers shipping managed by the vendor. You have complete flexibility to configure your preferred logistics partners, specify custom shipping fees per region, and coordinate courier handovers.'
   },
   {
+    question: 'What is the Return Logistics Notice if a buyer declines an undamaged order?',
+    answer: 'Return Logistics Notice: If a buyer declines or fails to accept a perfect, undamaged order matching the exact listed product specifications, the entire logistics cost, return transit coordination, and absolute platform responsibility lie solely on the Seller.'
+  },
+  {
+    question: 'What are the Emahu Seller Categories & Tiers?',
+    answer: 'Sellers are structured into 3 operational classifications: (1) Home & Individual Sellers, (2) Retail Shops & Local Stores, and (3) Corporate Brands & Enterprises, with specialized fulfillment options for each tier.'
+  },
+  {
     question: 'Are there registration fees or monthly seller hub charges?',
     answer: 'None whatsoever. Listing products, store registration, and inventory management are 100% free. You only pay the nominal category commission rate when a customer places an order.'
   }

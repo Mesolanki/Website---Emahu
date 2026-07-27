@@ -750,6 +750,35 @@ export default function EmahuProDashboard() {
     `;
   };
 
+  // Reverse-geocode lat/lon → address fields using Nominatim
+  const reverseGeocodeAndFill = async (lat, lon) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`
+      );
+      const data = await res.json();
+      if (data && data.address) {
+        const a = data.address;
+        const road = a.road || a.pedestrian || a.footway || '';
+        const suburb = a.suburb || a.neighbourhood || a.quarter || '';
+        const county = a.county || a.state_district || '';
+        const streetLine = [road, suburb, county].filter(Boolean).join(', ') || data.display_name || '';
+        const city = a.city || a.town || a.village || a.municipality || '';
+        const state = a.state || '';
+        setSettingsForm(prev => ({
+          ...prev,
+          address: streetLine,
+          city,
+          state
+        }));
+        return { streetLine, city, state };
+      }
+    } catch (err) {
+      console.warn('Reverse geocoding failed:', err);
+    }
+    return null;
+  };
+
   // Update/draw Leaflet map centered on coordinates
   useEffect(() => {
     if (!leafletLoaded || typeof window === 'undefined' || !window.L) return;
@@ -837,35 +866,6 @@ export default function EmahuProDashboard() {
     activeTab,
     settingsSubTab
   ]);
-
-  // Reverse-geocode lat/lon → address fields using Nominatim
-  const reverseGeocodeAndFill = async (lat, lon) => {
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`
-      );
-      const data = await res.json();
-      if (data && data.address) {
-        const a = data.address;
-        const road = a.road || a.pedestrian || a.footway || '';
-        const suburb = a.suburb || a.neighbourhood || a.quarter || '';
-        const county = a.county || a.state_district || '';
-        const streetLine = [road, suburb, county].filter(Boolean).join(', ') || data.display_name || '';
-        const city = a.city || a.town || a.village || a.municipality || '';
-        const state = a.state || '';
-        setSettingsForm(prev => ({
-          ...prev,
-          address: streetLine,
-          city,
-          state
-        }));
-        return { streetLine, city, state };
-      }
-    } catch (err) {
-      console.warn('Reverse geocoding failed:', err);
-    }
-    return null;
-  };
 
   const detectSellerLocation = () => {
     if (typeof window !== 'undefined' && navigator.geolocation) {
@@ -4284,6 +4284,29 @@ export default function EmahuProDashboard() {
                 </div>
               </div>
 
+              {/* Return Logistics Notice Banner */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%)',
+                border: '1.5px dashed rgba(239, 68, 68, 0.35)',
+                borderRadius: '16px',
+                padding: '16px 20px',
+                display: 'flex',
+                gap: '14px',
+                alignItems: 'flex-start',
+                marginBottom: '24px'
+              }}>
+                <div style={{ fontSize: '1.35rem', color: '#ef4444', flexShrink: 0, marginTop: '2px' }}>🚨</div>
+                <div style={{ fontSize: '0.875rem', color: '#1e293b', lineHeight: '1.6' }}>
+                  <strong style={{ color: '#dc2626', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                    Return Logistics Notice:
+                  </strong>{' '}
+                  If a buyer declines or fails to accept a perfect, undamaged order matching the exact listed product specifications, the{' '}
+                  <strong style={{ color: '#991b1b' }}>
+                    entire logistics cost, return transit coordination, and absolute platform responsibility lie solely on the Seller
+                  </strong>.
+                </div>
+              </div>
+
               {/* STATS SUMMARY GRID */}
               <div className="stats-grid">
                 <div className="stat-card primary-theme">
@@ -5390,12 +5413,35 @@ export default function EmahuProDashboard() {
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                   {pendingOrdersCount > 0 && (
-                    <span className="order-stat-pill pending">â³ {pendingOrdersCount} Pending</span>
+                    <span className="order-stat-pill pending">⏳ {pendingOrdersCount} Pending</span>
                   )}
                   {orders.filter(o => o.status === 'APPROVED').length > 0 && (
                     <span className="order-stat-pill approved">✅ {orders.filter(o => o.status === 'APPROVED').length} Approved</span>
                   )}
                   <span className="order-stat-pill total">📦 {orders.length} Total Orders</span>
+                </div>
+              </div>
+
+              {/* Return Logistics Notice Banner */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%)',
+                border: '1.5px dashed rgba(239, 68, 68, 0.35)',
+                borderRadius: '16px',
+                padding: '14px 18px',
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'flex-start',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontSize: '1.25rem', color: '#ef4444', flexShrink: 0, marginTop: '2px' }}>🚨</div>
+                <div style={{ fontSize: '0.85rem', color: '#1e293b', lineHeight: '1.55' }}>
+                  <strong style={{ color: '#dc2626', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                    Return Logistics Notice:
+                  </strong>{' '}
+                  If a buyer declines or fails to accept a perfect, undamaged order matching the exact listed product specifications, the{' '}
+                  <strong style={{ color: '#991b1b' }}>
+                    entire logistics cost, return transit coordination, and absolute platform responsibility lie solely on the Seller
+                  </strong>.
                 </div>
               </div>
 
@@ -6864,7 +6910,7 @@ export default function EmahuProDashboard() {
                   </div>
                 ) : (
                   <div style={{ border: '1px dashed var(--border-color)', borderRadius: '8px', padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    This seller hasn't uploaded any product catalogue listings yet.
+                    This seller hasn&apos;t uploaded any product catalogue listings yet.
                   </div>
                 )}
               </div>

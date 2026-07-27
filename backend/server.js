@@ -1,4 +1,4 @@
-// Reloaded with Razorpay key: rzp_test_TEvQeouxI9yhKh
+// Reloaded with Razorpay key: rzp_live_TIU5Dx6JzUVZMX
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');

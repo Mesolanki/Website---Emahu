@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const getKeyId = () => {
   const val = process.env.RAZORPAY_KEY_ID;
   if (!val || val === 'undefined' || val.trim() === '') {
-    return 'rzp_test_TEYhKt96XRAfQq';
+    return 'rzp_live_TIU5Dx6JzUVZMX';
   }
   return val.trim();
 };
@@ -17,7 +17,7 @@ const getKeyId = () => {
 const getKeySecret = () => {
   const val = process.env.RAZORPAY_KEY_SECRET;
   if (!val || val === 'undefined' || val.trim() === '') {
-    return 'djjOQP7AOzoLy3KTJXoonu0g';
+    return 'dOzbZxJ9ePQwlZ4fsPrJUzh9';
   }
   return val.trim();
 };
