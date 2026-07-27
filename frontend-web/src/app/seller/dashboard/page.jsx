@@ -39,10 +39,7 @@ const resolveDocUrl = (url) => {
   if (clean.startsWith('/uploads/')) {
     let domain = 'http://127.0.0.1:5000';
     if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-        domain = 'https://emahu.com';
-      }
+      domain = window.location.origin;
     } else if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
       domain = 'https://emahu.com';
     }

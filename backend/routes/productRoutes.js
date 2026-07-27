@@ -14,8 +14,8 @@ const {
 const { protect, authorize } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
-// Image Upload route (Protected - Seller only)
-router.post('/upload', protect, authorize('seller'), upload.single('image'), (req, res) => {
+// Image Upload route (Protected - Seller or Admin)
+router.post('/upload', protect, authorize('seller', 'admin'), upload.single('image'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'Please upload an image file' });
@@ -46,20 +46,20 @@ router.post('/upload', protect, authorize('seller'), upload.single('image'), (re
 // Base routes
 router.route('/')
   .get(getProducts)
-  .post(protect, authorize('seller'), createProduct);
+  .post(protect, authorize('seller', 'admin'), createProduct);
 
 // Specific routes (Must be defined BEFORE /:id to prevent matching as id parameter)
 router.route('/my')
-  .get(protect, authorize('seller'), getMyProducts);
+  .get(protect, authorize('seller', 'admin'), getMyProducts);
 
 router.route('/admin/all')
   .get(protect, authorize('admin'), getAdminProducts);
 
 router.route('/:id/verify')
-  .put(protect, authorize('seller'), verifyProduct);
+  .put(protect, authorize('seller', 'admin'), verifyProduct);
 
 router.route('/:id/resubmit')
-  .put(protect, authorize('seller'), resubmitProduct);
+  .put(protect, authorize('seller', 'admin'), resubmitProduct);
 
 router.route('/:id/admin-decision')
   .put(protect, authorize('admin'), adminDecision);

@@ -719,7 +719,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     const formData = new FormData();
     formData.append('image', file);
     
-    const token = localStorage.getItem('emahu_seller_token');
+    const token = localStorage.getItem('emahu_seller_token') || localStorage.getItem('emahu_token') || localStorage.getItem('token');
     const baseUrl = (getApiBase ? getApiBase() : String(API_BASE)).replace(/\/$/, '');
     const res = await fetch(`${baseUrl}/api/products/upload`, {
       method: 'POST',
@@ -873,7 +873,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     setIsSubmitting(true);
 
     try {
-      const token = localStorage.getItem('emahu_seller_token');
+      const token = localStorage.getItem('emahu_seller_token') || localStorage.getItem('emahu_token') || localStorage.getItem('token');
       
       const serializedDescription = JSON.stringify({
         overview: descOverview,
