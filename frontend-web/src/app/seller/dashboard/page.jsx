@@ -1824,8 +1824,10 @@ export default function EmahuProDashboard() {
     setAvailablePartnersLoading(true);
     setAvailablePartnersError('');
     try {
-      const token = localStorage.getItem('emahu_seller_token');
-      const res = await fetch(`${getDynamicApiUrl()}/api/delivery/available-partners/${orderId}`, {
+      const token = localStorage.getItem('emahu_seller_token') || localStorage.getItem('emahu_token') || localStorage.getItem('token');
+      const apiTarget = (getApiBase() || '').replace(/\/$/, '');
+      const fetchUrl = `${apiTarget}/api/delivery/available-partners/${orderId}`;
+      const res = await fetch(fetchUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

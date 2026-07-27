@@ -87,6 +87,38 @@ const isRealImage = (img) => {
   );
 };
 
+const getProductMainImage = (p) => {
+  if (!p) return '';
+  if (p.image && isRealImage(p.image)) return cleanImageUrl(p.image);
+
+  let imgs = p.images;
+  if (typeof imgs === 'string') {
+    try {
+      const parsed = JSON.parse(imgs);
+      if (Array.isArray(parsed)) imgs = parsed;
+      else imgs = [imgs];
+    } catch (e) {
+      imgs = [imgs];
+    }
+  }
+  if (Array.isArray(imgs) && imgs.length > 0) {
+    const firstReal = imgs.find(img => isRealImage(img));
+    if (firstReal) return cleanImageUrl(firstReal);
+  }
+
+  if (Array.isArray(p.variants) && p.variants.length > 0) {
+    for (const v of p.variants) {
+      if (v.image && isRealImage(v.image)) return cleanImageUrl(v.image);
+      if (Array.isArray(v.images) && v.images.length > 0) {
+        const firstReal = v.images.find(img => isRealImage(img));
+        if (firstReal) return cleanImageUrl(firstReal);
+      }
+    }
+  }
+
+  return p.image || '';
+};
+
 function Stars({ rating }) {
   return (
     <div className="bp-card__stars">
@@ -350,8 +382,7 @@ export default function ProductsPage() {
         }
       }
 
-      const cleanedImg = cleanImageUrl(p.image);
-      const imageToShow = isRealImage(p.image) ? cleanedImg : (p.image || '📦');
+      const imageToShow = getProductMainImage(p);
 
       return {
         id: p.id || p._id,

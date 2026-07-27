@@ -1046,7 +1046,11 @@ exports.getDeliveryPartners = async (req, res) => {
 exports.getAvailablePartnersForOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const order = await Order.findOne({ orderId });
+    const query = { $or: [{ orderId }] };
+    if (mongoose.Types.ObjectId.isValid(orderId)) {
+      query.$or.push({ _id: orderId });
+    }
+    const order = await Order.findOne(query);
 
     let orderCity = '';
     let buyerLat, buyerLon, distance = 5;

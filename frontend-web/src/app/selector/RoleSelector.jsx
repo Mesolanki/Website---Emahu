@@ -140,6 +140,53 @@ const isRealImage = (img) => {
   );
 };
 
+const getProductMainImage = (p) => {
+  if (!p) return '';
+  if (p.image && isRealImage(p.image)) return cleanImageUrl(p.image);
+
+  let imgs = p.images;
+  if (typeof imgs === 'string') {
+    try {
+      const parsed = JSON.parse(imgs);
+      if (Array.isArray(parsed)) imgs = parsed;
+      else imgs = [imgs];
+    } catch (e) {
+      imgs = [imgs];
+    }
+  }
+  if (Array.isArray(imgs) && imgs.length > 0) {
+    const firstReal = imgs.find(img => isRealImage(img));
+    if (firstReal) return cleanImageUrl(firstReal);
+  }
+
+  if (Array.isArray(p.variants) && p.variants.length > 0) {
+    for (const v of p.variants) {
+      if (v.image && isRealImage(v.image)) return cleanImageUrl(v.image);
+      if (Array.isArray(v.images) && v.images.length > 0) {
+        const firstReal = v.images.find(img => isRealImage(img));
+        if (firstReal) return cleanImageUrl(firstReal);
+      }
+    }
+  }
+
+  return p.image || '';
+};
+
+const normalizeCat = (c) => {
+  if (!c) return '';
+  const str = String(c).toLowerCase().trim();
+  if (str.includes('tech') || str.includes('electronic') || str.includes('gadget') || str.includes('computer') || str.includes('mobile')) return 'tech';
+  if (str.includes('shoe') || str.includes('footwear') || str.includes('sneaker') || str.includes('boot')) return 'shoes';
+  if (str.includes('kitchen') || str.includes('dining') || str.includes('cookware')) return 'kitchen';
+  if (str.includes('apparel') || str.includes('fashion') || str.includes('clothing') || str.includes('wear') || str.includes('top') || str.includes('shirt')) return 'apparel';
+  if (str.includes('lifestyle') || str.includes('home') || str.includes('decor') || str.includes('furniture')) return 'lifestyle';
+  if (str.includes('beauty') || str.includes('cosmetics') || str.includes('skincare') || str.includes('makeup')) return 'beauty';
+  if (str.includes('sports') || str.includes('outdoor') || str.includes('fitness')) return 'sports';
+  if (str.includes('book') || str.includes('stationery') || str.includes('journal')) return 'books';
+  if (str.includes('grocery') || str.includes('essential') || str.includes('food') || str.includes('snack')) return 'grocery';
+  return str.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+};
+
 const sellerServesLocation = (seller, city) => {
   if (!seller) return true;
   const cityLower = (city || 'Ahmedabad').toLowerCase().trim();
@@ -557,16 +604,12 @@ export default function RoleSelector() {
   // Combine DB & static products
   const allProducts = useMemo(() => {
     const mappedDb = dbProducts.map(p => {
-      let cat = p.category ? p.category.toLowerCase() : '';
+      let cat = p.category ? normalizeCat(p.category) : '';
       if (categoryNameToId[cat]) {
         cat = categoryNameToId[cat];
-      } else if (cat === 'electronics') {
-        cat = 'tech';
-      } else if (cat === 'furniture' || cat === 'fitness') {
-        cat = 'lifestyle';
       }
 
-      const cleanedImg = cleanImageUrl(p.image);
+      const mainImg = getProductMainImage(p);
 
       return {
         id: p.id || p._id,
@@ -580,7 +623,7 @@ export default function RoleSelector() {
         reviews: p.reviews || 84,
         sellerName: p.seller?.name || 'Emahu Merchant',
         sellerStore: p.seller?.storeName || 'Emahu Store',
-        image: isRealImage(p.image) ? cleanedImg : (p.image || '📦'),
+        image: isRealImage(mainImg) ? mainImg : (mainImg || '📦'),
         stock: p.stock,
         seller: p.seller
       };
@@ -598,7 +641,7 @@ export default function RoleSelector() {
         id: p.id,
         name: p.name,
         brand: p.brand,
-        category: p.category,
+        category: normalizeCat(p.category),
         subcategory: p.subcategory || 'General',
         price: p.price,
         originalPrice: p.originalPrice || p.price,
@@ -630,7 +673,11 @@ export default function RoleSelector() {
   const uniqueSellers = useMemo(() => {
     if (!selectedCategory) return [];
 
-    const catProducts = allProducts.filter(p => p.category === selectedCategory.id);
+    const targetCat = normalizeCat(selectedCategory.id) || normalizeCat(selectedCategory.name);
+    const catProducts = allProducts.filter(p => {
+      const pCat = normalizeCat(p.category);
+      return pCat === targetCat || pCat.includes(targetCat) || targetCat.includes(pCat);
+    });
 
     const sellersMap = new Map();
     catProducts.forEach(p => {
@@ -649,12 +696,17 @@ export default function RoleSelector() {
   const filteredProducts = useMemo(() => {
     if (!selectedCategory) return [];
 
-    let base = allProducts.filter(p => p.category === selectedCategory.id);
+    const targetCat = normalizeCat(selectedCategory.id) || normalizeCat(selectedCategory.name);
+    let base = allProducts.filter(p => {
+      const pCat = normalizeCat(p.category);
+      return pCat === targetCat || pCat.includes(targetCat) || targetCat.includes(pCat);
+    });
 
     if (hasLocationPermission && selectedCity) {
-      base = base.filter(p => sellerServesLocation(p.seller, selectedCity));
-    } else {
-      base = base.slice(0, 8);
+      const locationFiltered = base.filter(p => sellerServesLocation(p.seller, selectedCity));
+      if (locationFiltered.length > 0) {
+        base = locationFiltered;
+      }
     }
 
     if (activeSubcategory !== 'All' && !activeSubcategory.startsWith('All')) {
