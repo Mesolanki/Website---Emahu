@@ -1408,6 +1408,9 @@ export default function RoleSelector() {
           transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
         >
           <p>© 2026 EMAHU Inc. All professional rights reserved.</p>
+          <p style={{ fontSize: '0.82rem', color: '#dc2626', fontWeight: '700', margin: '4px 0 2px 0', textAlign: 'center', maxWidth: '600px', lineHeight: '1.4' }}>
+            ⚠️ Notice: Check the order after receiving. After confirming the order, no refund and no legal issues will be entertained.
+          </p>
           <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
             Developed by <a href="https://sanmora.in" target="_blank" rel="noopener noreferrer" style={{ color: '#4169e1', fontWeight: '600', textDecoration: 'none' }}>sanmora.in</a>
           </p>

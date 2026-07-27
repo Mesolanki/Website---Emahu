@@ -1028,20 +1028,6 @@ export default function DeliveryPortal() {
               </button>
             </div>
             {errors.otp && <span className="form-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
-
-            {devOtp && (
-              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '8px' }}>
-                <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>📧 Code also shown here (check spam too):</div>
-                <div
-                  style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#fff', background: 'rgba(0,0,0,0.25)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
-                  onClick={() => setEmailOtp(devOtp)}
-                  title="Click to auto-fill"
-                >
-                  {devOtp}
-                </div>
-                <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
-              </div>
-            )}
           </div>
         )}
 
@@ -1699,20 +1685,6 @@ export default function DeliveryPortal() {
                               </button>
                             </div>
                             {errors.otp && <span className="form-error" style={{ display: 'block', marginTop: '4px' }}>{errors.otp}</span>}
-
-                            {devOtp && (
-                              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '8px' }}>
-                                <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>📱 Code also shown here:</div>
-                                <div
-                                  style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#fff', background: 'rgba(0,0,0,0.25)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
-                                  onClick={() => setEmailOtp(devOtp)}
-                                  title="Click to auto-fill"
-                                >
-                                  {devOtp}
-                                </div>
-                                <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
-                              </div>
-                            )}
                           </div>
                         )}
                         {isEmailVerified && (
@@ -2305,26 +2277,6 @@ export default function DeliveryPortal() {
                     </p>
                     <div style={{ padding: '12px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem', color: '#475569', display: 'inline-block' }}>
                       Registered Name: <strong>{user?.name}</strong> &nbsp;|&nbsp; City: <strong>{user?.currentCity}</strong> &nbsp;|&nbsp; Category: <strong>{user?.category === 'single_two_boy' ? 'Single/Two Boy' : user?.category === 'agency' ? 'Agency / Area / City / State Head' : 'Enterprise Partner'}</strong>
-                    </div>
-
-                    <div style={{ marginTop: '24px' }}>
-                      <button
-                        type="button"
-                        onClick={handleDevApprove}
-                        style={{
-                          background: 'linear-gradient(135deg, #319795 0%, #2c7a7b 100%)',
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '10px 20px',
-                          borderRadius: '8px',
-                          fontSize: '0.85rem',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(49, 151, 149, 0.2)'
-                        }}
-                      >
-                        ⚡ Simulator: Approve Application (Dev Mode)
-                      </button>
                     </div>
                   </>
                 )}
@@ -3300,29 +3252,6 @@ export default function DeliveryPortal() {
                 : <>We sent a 6-digit verification code to <strong style={{ color: '#0f172a' }}>{phoneNumber}</strong>. Please enter it below.</>
               }
             </p>
-
-            {devOtp && (
-              <div style={{
-                background: 'rgba(49, 151, 149, 0.08)',
-                border: '1px solid rgba(49, 151, 149, 0.15)',
-                color: '#319795',
-                padding: '12px',
-                borderRadius: '8px',
-                textAlign: 'center',
-                marginTop: '8px',
-                marginBottom: '20px'
-              }}>
-                <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>🔑 simulated code (check console too):</div>
-                <div
-                  style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#319795', background: 'rgba(0,0,0,0.04)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
-                  onClick={() => setEmailOtp(devOtp)}
-                  title="Click to auto-fill"
-                >
-                  {devOtp}
-                </div>
-                <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
-              </div>
-            )}
 
             {errors.otp && (
               <div style={{

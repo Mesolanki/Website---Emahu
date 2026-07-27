@@ -236,19 +236,9 @@ export default function BuyerSettingsPage() {
       if (!res.ok) {
         throw new Error(data.error || 'Failed to send OTP code.');
       }
-      if (data.devOtp) {
-        setMockOtpCode(data.devOtp);
-        setIsMockOtpActive(true);
-      } else {
-        setIsMockOtpActive(false);
-      }
     } catch (err) {
       console.error(err);
-      // Fallback code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setMockOtpCode(code);
-      setIsMockOtpActive(true);
-      setOtpError('Failed to send verification code. Falling back to simulated verification code.');
+      setOtpError('Failed to send verification code. Please try again.');
     } finally {
       setOtpLoading(false);
     }
@@ -508,12 +498,6 @@ export default function BuyerSettingsPage() {
             {otpError && (
               <div style={{ padding: '10px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#ef4444', fontSize: '0.78rem', marginBottom: '16px', fontWeight: '600' }}>
                 {otpError}
-              </div>
-            )}
-
-            {isMockOtpActive && mockOtpCode && (
-              <div style={{ padding: '10px', borderRadius: '8px', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', fontSize: '0.78rem', marginBottom: '16px', fontWeight: '700' }}>
-                🔑 Developer verification code: <span style={{ fontSize: '0.9rem', letterSpacing: '2px' }}>{mockOtpCode}</span>
               </div>
             )}
 

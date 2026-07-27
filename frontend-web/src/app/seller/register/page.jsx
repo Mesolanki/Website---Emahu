@@ -206,28 +206,15 @@ export default function SellerRegister() {
       }
 
       setOtpCooldown(60);
-      if (data.devOtp) {
-        setMockOtpCode(data.devOtp);
-        setOtpInput(data.devOtp);
-        setIsMockOtpActive(true);
-        setOtpError('');
+      if (isResend) {
+        setOtpError('Verification code resent successfully to your mobile number.');
       } else {
-        setIsMockOtpActive(false);
-        setMockOtpCode('');
-        if (isResend) {
-          setOtpError('Verification code resent successfully to your mobile number.');
-        }
+        setOtpError('');
       }
     } catch (err) {
       console.error('Send OTP Error:', err);
-
-      // Fallback
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setMockOtpCode(code);
-      setOtpInput(code);
-      setIsMockOtpActive(true);
       setOtpCooldown(60);
-      setOtpError('');
+      setOtpError('Error sending OTP. Please try again.');
     } finally {
       setOtpSending(false);
     }
@@ -1012,29 +999,6 @@ export default function SellerRegister() {
                 : <>We sent a 6-digit verification code to <strong style={{ color: '#0f172a' }}>{formData.phone}</strong>. Please enter it below.</>
               }
             </p>
-
-            {mockOtpCode && (
-              <div style={{
-                background: 'rgba(99, 102, 241, 0.08)',
-                border: '1px solid rgba(99, 102, 241, 0.15)',
-                color: '#6366f1',
-                padding: '12px',
-                borderRadius: '8px',
-                textAlign: 'center',
-                marginTop: '8px',
-                marginBottom: '20px'
-              }}>
-                <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>🔑 simulated code (check console too):</div>
-                <div
-                  style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#6366f1', background: 'rgba(0,0,0,0.04)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
-                  onClick={() => setOtpInput(mockOtpCode)}
-                  title="Click to auto-fill"
-                >
-                  {mockOtpCode}
-                </div>
-                <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
-              </div>
-            )}
 
 
             {otpError && (

@@ -414,8 +414,7 @@ exports.login = async (req, res) => {
         return res.status(200).json({
           success: true,
           requires2FA: true,
-          message: 'Admin 2FA verification code sent to your email',
-          ...(process.env.NODE_ENV === 'development' ? { devOtp: otpCode } : {})
+          message: 'Admin 2FA verification code sent to your email'
         });
       }
       
@@ -1450,9 +1449,7 @@ exports.sendOtp = async (req, res) => {
         console.log(`ℹ️ Resend Sandbox restriction detected for ${cleanEmail}. Falling back to on-screen OTP for testing.`);
         return res.status(200).json({
           success: true,
-          message: `Verification code generated. Resend Sandbox restriction: please check backend console or use the backup code shown below.`,
-          otpCode,
-          devOtp: otpCode,
+          message: `Verification code generated. Please check your inbox or mobile device.`,
           emailSent: false,
           isSandboxRestricted: true
         });
@@ -1468,8 +1465,6 @@ exports.sendOtp = async (req, res) => {
     res.status(200).json({
       success: true,
       message: `Verification code sent to ${cleanEmail}. Check your inbox (or spam folder).`,
-      otpCode,                   // Always returned — displayed in UI as backup
-      devOtp: otpCode,           // Always returned — backward compatibility for test scripts
       emailSent: true,
       isSandboxRestricted: false
     });
@@ -1669,16 +1664,14 @@ exports.sendPhoneOtp = async (req, res) => {
 
         return res.status(200).json({
           success: true,
-          message: `OTP verification code sent to ${cleanPhone} via Twilio Verify.`,
-          devOtp: otpCode
+          message: `OTP verification code sent to ${cleanPhone} via Twilio Verify.`
         });
       } catch (twilioErr) {
         console.error('Twilio Verify Send Error:', twilioErr);
         console.log(`⚠️ Twilio Verify failed. Falling back to simulated verification code.`);
         return res.status(200).json({
           success: true,
-          message: `OTP verification simulated. (Twilio error: ${twilioErr.message})`,
-          devOtp: otpCode
+          message: `OTP verification sent. (Twilio error: ${twilioErr.message})`
         });
       }
     }
@@ -1694,15 +1687,13 @@ exports.sendPhoneOtp = async (req, res) => {
       console.log(`⚠️ Twilio API failed with error: "${smsResult.error}". Falling back to simulated verification code.`);
       return res.status(200).json({
         success: true,
-        message: `OTP verification simulated. (Twilio error: ${smsResult.error})`,
-        devOtp: otpCode
+        message: `OTP verification processed. (Twilio error: ${smsResult.error})`
       });
     }
 
     res.status(200).json({
       success: true,
-      message: `OTP verification SMS sent successfully to ${cleanPhone}.`,
-      devOtp: otpCode
+      message: `OTP verification SMS sent successfully to ${cleanPhone}.`
     });
   } catch (error) {
     console.error('Send Phone OTP Error:', error);
@@ -1923,8 +1914,6 @@ exports.forgotPassword = async (req, res) => {
     res.status(200).json({
       success: true,
       message: `Reset code sent via SMS to your registered mobile number ending in ${user.phone.slice(-4)}.`,
-      otpCode,
-      devOtp: otpCode,
       emailSent: false,
       isSandboxRestricted: false
     });
@@ -2002,8 +1991,6 @@ exports.resendOtp = async (req, res) => {
     res.status(200).json({
       success: true,
       message: `Reset code re-sent via SMS to your registered mobile number ending in ${user.phone.slice(-4)}.`,
-      otpCode,
-      devOtp: otpCode,
       emailSent: false,
       isSandboxRestricted: false
     });

@@ -90,19 +90,24 @@ export default function SellerFooter() {
         </div>
 
         {/* Bottom Segment: Copyright & Social proofs */}
-        <div className="sff-bottom">
-          <p className="sff-copyright">
-            © {new Date().getFullYear()} Emahu Technologies Pvt. Ltd. All rights reserved. 
-            <span className="sff-copyright__terms">
-              <Link href="/">Privacy Policy</Link> · <Link href="/">Terms of Service</Link>
-            </span>
+        <div className="sff-bottom" style={{ flexDirection: 'column', gap: '10px', textAlign: 'center' }}>
+          <p style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: '700', margin: 0, lineHeight: '1.4' }}>
+            ⚠️ Notice: Check the order after receiving. After confirming the order, no refund and no legal issues will be entertained.
           </p>
-          
-          {/* Mock Social Media icons */}
-          <div className="sff-socials">
-            <Link href="/" aria-label="LinkedIn Profile">💼</Link>
-            <Link href="/" aria-label="Twitter Profile">🐦</Link>
-            <Link href="/" aria-label="YouTube Channel">📺</Link>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '12px' }}>
+            <p className="sff-copyright" style={{ margin: 0 }}>
+              © {new Date().getFullYear()} Emahu Technologies Pvt. Ltd. All rights reserved. · Developed by <a href="https://sanmora.in" target="_blank" rel="noopener noreferrer" style={{ color: '#4169e1', fontWeight: '600', textDecoration: 'none' }}>sanmora.in</a>
+              <span className="sff-copyright__terms" style={{ marginLeft: '8px' }}>
+                <Link href="/">Privacy Policy</Link> · <Link href="/">Terms of Service</Link>
+              </span>
+            </p>
+            
+            {/* Mock Social Media icons */}
+            <div className="sff-socials">
+              <Link href="/" aria-label="LinkedIn Profile">💼</Link>
+              <Link href="/" aria-label="Twitter Profile">🐦</Link>
+              <Link href="/" aria-label="YouTube Channel">📺</Link>
+            </div>
           </div>
         </div>
 

@@ -160,24 +160,9 @@ export default function BuyerRegister() {
       }
 
       setIsEmailOtpSent(true);
-      if (data.devOtp) {
-        setMockOtpCode(data.devOtp);
-        setEmailOtp(data.devOtp);
-        setIsMockOtpActive(true);
-        setErrors((prev) => ({ ...prev, phone: '', general: '' }));
-      } else {
-        setIsMockOtpActive(false);
-        setMockOtpCode('');
-        setErrors((prev) => ({ ...prev, phone: '', general: '' }));
-      }
+      setErrors((prev) => ({ ...prev, phone: '', general: '' }));
     } catch (err) {
       console.error('Send OTP Error:', err);
-
-      // Fallback
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setMockOtpCode(code);
-      setEmailOtp(code);
-      setIsMockOtpActive(true);
       setIsEmailOtpSent(true);
       setErrors((prev) => ({ ...prev, phone: '', general: '' }));
     } finally {
@@ -700,29 +685,6 @@ export default function BuyerRegister() {
                 : <>We sent a 6-digit verification code to <strong style={{ color: '#0f172a' }}>{formData.phone}</strong>. Please enter it below.</>
               }
             </p>
-
-            {mockOtpCode && (
-              <div style={{
-                background: 'rgba(65, 105, 225, 0.08)',
-                border: '1px solid rgba(65, 105, 225, 0.15)',
-                color: '#4169e1',
-                padding: '12px',
-                borderRadius: '8px',
-                textAlign: 'center',
-                marginTop: '8px',
-                marginBottom: '20px'
-              }}>
-                <div style={{ fontSize: '0.75rem', marginBottom: '5px', opacity: 0.85 }}>🔑 simulated code (check console too):</div>
-                <div
-                  style={{ letterSpacing: '6px', fontSize: '1.4rem', fontWeight: '800', color: '#4169e1', background: 'rgba(0,0,0,0.04)', padding: '5px 12px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
-                  onClick={() => setEmailOtp(mockOtpCode)}
-                  title="Click to auto-fill"
-                >
-                  {mockOtpCode}
-                </div>
-                <div style={{ fontSize: '0.7rem', opacity: 0.65, marginTop: '4px' }}>👆 Click to auto-fill</div>
-              </div>
-            )}
 
             {errors.otp && (
               <div style={{

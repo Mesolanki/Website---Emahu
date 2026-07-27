@@ -394,20 +394,6 @@ export default function ForgotPassword() {
               </div>
             </div>
 
-            {devOtp && isSandboxRestricted && (
-              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '12px', borderRadius: '10px', textAlign: 'center', marginBottom: '16px' }}>
-                <div style={{ fontSize: '0.8rem', marginBottom: '6px', opacity: 0.85 }}>📧 Code shown here because Resend domain is unverified (Sandbox):</div>
-                <div
-                  style={{ letterSpacing: '6px', fontSize: '1.5rem', fontWeight: '800', color: '#fff', background: 'rgba(0,0,0,0.25)', padding: '6px 14px', borderRadius: '6px', display: 'inline-block', cursor: 'pointer', userSelect: 'all' }}
-                  onClick={() => { const d=[...devOtp.split('')]; setOtpValues(d); }}
-                  title="Click to auto-fill"
-                >
-                  {devOtp}
-                </div>
-                <div style={{ marginTop: '5px', fontSize: '0.72rem', opacity: 0.7 }}>👆 Click to auto-fill</div>
-              </div>
-            )}
-
 
 
 
