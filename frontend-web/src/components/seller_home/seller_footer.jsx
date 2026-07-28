@@ -28,7 +28,7 @@ export default function SellerFooter() {
               </svg>
               <div className="sff-logo__text">
                 <span className="sff-logo__brand">EMAHU</span>
-                <span className="sff-logo__tag">Seller Hub</span>
+                <span className="sff-logo__tag">Seller Portal</span>
               </div>
             </Link>
             <p className="sff-brand__desc">

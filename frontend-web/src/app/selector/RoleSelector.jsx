@@ -1282,13 +1282,24 @@ export default function RoleSelector() {
               whileHover={{ y: -6, scale: 1.01, transition: { duration: 0.3 } }}
             >
               <div className="sel-portal-box__icon">🏪</div>
-              <h3 className="sel-portal-box__title">Shop/Seller/Manufacturer/Wholeseller   Portal</h3>
+              <h3 className="sel-portal-box__title">Seller Portal · Shops · Showrooms etc.</h3>
               <p className="sel-portal-box__desc">
-                Whether you sell from home or run a large business list your products, manage stock, set delivery charges, and start growing your sales on EMAHU today.
+                Whether you sell from home or run a large business, list your products and grow your sales on EMAHU today.
               </p>
+              {/* Seller type mini-tags */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', margin: '4px 0 14px 0' }}>
+                {['🏠 Home & Individual Sellers', '🏪 Retail Shops & Local Stores', '🏢 Corporate Brands & Enterprises'].map(tag => (
+                  <span key={tag} style={{
+                    fontSize: '0.72rem', fontWeight: '600', padding: '3px 10px',
+                    borderRadius: '20px', background: 'rgba(99,102,241,0.08)',
+                    border: '1px solid rgba(99,102,241,0.18)', color: '#6366f1',
+                    whiteSpace: 'nowrap'
+                  }}>{tag}</span>
+                ))}
+              </div>
               <motion.div whileHover={buttonHoverProps} whileTap={buttonTapProps}>
                 <Link href="/seller" className="sel-portal-btn sel-portal-btn--seller">
-                  <span>Enter Seller Hub</span>
+                  <span>Enter Seller Portal</span>
                   <motion.svg
                     width="16" height="16" viewBox="0 0 16 16" fill="none"
                     whileHover={{ x: 4 }}

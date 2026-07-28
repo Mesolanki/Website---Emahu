@@ -8,7 +8,7 @@ import SellerFaq from "@/components/seller_home/seller_faq";
 import SellerFooter from "@/components/seller_home/seller_footer";
 
 export const metadata = {
-  title: "EMAHU | Seller Hub",
+  title: "EMAHU | Seller Portal",
   description: "Sell your products online with 0% commission on EMAHU.",
 };
 

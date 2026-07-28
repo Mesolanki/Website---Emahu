@@ -5,7 +5,7 @@ import Link from 'next/link';
 import './seller_header.css';
 
 /**
- * Announcement bar alerts for the seller hub.
+ * Announcement bar alerts for the Seller Portal.
  */
 const announcements = [
   '🎉 Zero Commission for your first 3 months — Limited time offer!',
@@ -156,7 +156,7 @@ export default function SellerHeader() {
             </div>
             <div className="sh-logo__text">
               <span className="sh-logo__brand">EMAHU</span>
-              <span className="sh-logo__tag">Seller Hub</span>
+              <span className="sh-logo__tag">Seller Portal</span>
             </div>
           </Link>
 
