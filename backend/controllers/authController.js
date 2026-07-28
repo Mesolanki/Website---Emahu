@@ -555,7 +555,7 @@ exports.googleLogin = async (req, res) => {
 // @access  Public
 exports.refresh = async (req, res) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
     if (!refreshToken) {
       return res.status(401).json({
@@ -618,7 +618,7 @@ exports.refresh = async (req, res) => {
 // @access  Public
 exports.logout = async (req, res) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
     if (refreshToken) {
       // Remove refresh token from database so it is revoked permanently
@@ -626,11 +626,13 @@ exports.logout = async (req, res) => {
     }
 
     // Clear cookie
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax'
-    });
+    if (res.clearCookie) {
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax'
+      });
+    }
 
     return res.status(200).json({
       success: true,

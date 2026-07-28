@@ -179,10 +179,8 @@ io.on('connection', (socket) => {
   });
 });
 
-// Handle unhandled promise rejections safely
+// Handle unhandled promise rejections safely without crashing the server
 process.on('unhandledRejection', (err, promise) => {
-  console.error(`Unhandled Promise Rejection Error: ${err.message}`);
-  // Close server & exit process
-  server.close(() => process.exit(1));
+  console.error('Unhandled Promise Rejection Error:', err ? (err.message || err) : 'Unknown error');
 });
 // Trigger nodemon restart after freeing port 5000
