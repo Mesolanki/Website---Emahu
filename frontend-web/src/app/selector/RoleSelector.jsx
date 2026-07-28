@@ -1282,15 +1282,17 @@ export default function RoleSelector() {
               whileHover={{ y: -6, scale: 1.01, transition: { duration: 0.3 } }}
             >
               <div className="sel-portal-box__icon">🏪</div>
-              <h3 className="sel-portal-box__title">Seller Portal Shops Showrooms etc
+              <h3 className="sel-portal-box__title">Seller Portal Shops Showrooms etc.
+                <br />
                 home & indiviual sellers
                 Retail shops & local stores
+                <br />
                 Corporate brands enterprises</h3>
               <p className="sel-portal-box__desc">
                 Whether you sell from home or run a large business, list your products and grow your sales on EMAHU today.
               </p>
               {/* Seller type mini-tags */}
-              
+
               <motion.div whileHover={buttonHoverProps} whileTap={buttonTapProps}>
                 <Link href="/seller" className="sel-portal-btn sel-portal-btn--seller">
                   <span>Enter Seller Portal</span>
