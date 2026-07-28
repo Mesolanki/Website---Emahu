@@ -91,9 +91,6 @@ export default function SellerFooter() {
 
         {/* Bottom Segment: Copyright & Social proofs */}
         <div className="sff-bottom" style={{ flexDirection: 'column', gap: '10px', textAlign: 'center' }}>
-          <p style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: '700', margin: 0, lineHeight: '1.4' }}>
-            ⚠️ Notice: Check the order after receiving. After confirming the order, no refund and no legal issues will be entertained.
-          </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '12px' }}>
             <p className="sff-copyright" style={{ margin: 0 }}>
               © {new Date().getFullYear()} Emahu Technologies Pvt. Ltd. All rights reserved. · Developed by <a href="https://sanmora.in" target="_blank" rel="noopener noreferrer" style={{ color: '#4169e1', fontWeight: '600', textDecoration: 'none' }}>sanmora.in</a>
