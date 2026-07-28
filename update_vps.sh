@@ -14,9 +14,27 @@ echo "📦 [3/5] Building Admin Panel (manage.emahu.com)..."
 cd admin-emahu && npm run build && cd ..
 
 echo "🌐 [4/5] Updating Nginx configuration & static headers..."
-if [ -f /etc/nginx/sites-available/emahu.conf ]; then
-  sudo cp nginx_vps.conf /etc/nginx/sites-available/emahu.conf
-  sudo nginx -t && sudo systemctl reload nginx
+TARGET_CONF="/etc/nginx/sites-available/emahu.conf"
+if [ -f "$TARGET_CONF" ]; then
+  # Preserve existing SSL certificate configurations if already managed by Certbot
+  if ! grep -q "ssl_certificate" "$TARGET_CONF"; then
+    echo "  -> Applying base Nginx site configuration..."
+    sudo cp nginx_vps.conf "$TARGET_CONF"
+  else
+    echo "  -> Preserving existing SSL certificate directives in Nginx site config."
+  fi
+else
+  echo "  -> Installing initial Nginx site configuration..."
+  sudo cp nginx_vps.conf "$TARGET_CONF"
+  sudo ln -sf "$TARGET_CONF" /etc/nginx/sites-enabled/emahu.conf
+fi
+
+# Ensure Nginx syntax is valid before reloading
+if sudo nginx -t; then
+  echo "  -> Reloading Nginx service..."
+  sudo systemctl reload nginx
+else
+  echo "  ⚠️ Warning: Nginx syntax check failed! Check /etc/nginx/sites-available/emahu.conf"
 fi
 
 echo "🔄 [5/5] Restarting backend & frontend PM2 services..."
