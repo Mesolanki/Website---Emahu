@@ -91,19 +91,47 @@ export default function SellerHero() {
               </button>
             </div>
 
-            {/* Bullet value markers */}
-            <div className="sh-hero__props">
-              <div className="sh-prop-item">
-                <span className="sh-prop-icon">🛡️</span>
-                <span className="sh-prop-txt">Zero Commission</span>
-              </div>
-              <div className="sh-prop-item">
-                <span className="sh-prop-icon">💼</span>
-                <span className="sh-prop-txt">Direct Bank Settlement</span>
-              </div>
-              <div className="sh-prop-item">
-                <span className="sh-prop-icon">🚚</span>
-                <span className="sh-prop-txt">28,000+ Pin Codes</span>
+            {/* Seller Portal — Seller Type Cards */}
+            <div className="sh-hero__seller-portal">
+              <p className="sh-portal__label">Seller Portal · Open to All</p>
+              <div className="sh-portal__cards">
+
+                {/* Card 1: Home & Individual Sellers */}
+                <div className="sh-portal-card sh-portal-card--home">
+                  <div className="sh-portal-card__icon-wrap">
+                    <span className="sh-portal-card__icon">🏠</span>
+                  </div>
+                  <div className="sh-portal-card__body">
+                    <span className="sh-portal-card__title">Home &amp; Individual Sellers</span>
+                    <span className="sh-portal-card__sub">Sell from home — no GST required</span>
+                  </div>
+                  <span className="sh-portal-card__arrow">→</span>
+                </div>
+
+                {/* Card 2: Retail Shops & Local Stores */}
+                <div className="sh-portal-card sh-portal-card--retail">
+                  <div className="sh-portal-card__icon-wrap">
+                    <span className="sh-portal-card__icon">🏪</span>
+                  </div>
+                  <div className="sh-portal-card__body">
+                    <span className="sh-portal-card__title">Retail Shops &amp; Local Stores</span>
+                    <span className="sh-portal-card__sub">Expand your local store nationwide</span>
+                  </div>
+                  <span className="sh-portal-card__arrow">→</span>
+                </div>
+
+                {/* Card 3: Corporate Brands & Enterprises */}
+                <div className="sh-portal-card sh-portal-card--corporate">
+                  <div className="sh-portal-card__icon-wrap">
+                    <span className="sh-portal-card__icon">🏢</span>
+                  </div>
+                  <div className="sh-portal-card__body">
+                    <span className="sh-portal-card__title">Corporate Brands &amp; Enterprises</span>
+                    <span className="sh-portal-card__sub">Bulk listings, priority support &amp; SLA</span>
+                  </div>
+                  <span className="sh-portal-card__arrow">→</span>
+                </div>
+
               </div>
             </div>
           </div>
