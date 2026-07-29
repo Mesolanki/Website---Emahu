@@ -89,7 +89,7 @@ exports.createProduct = async (req, res) => {
       sizes: Array.isArray(req.body.sizes) ? req.body.sizes : [],
       colors: Array.isArray(req.body.colors) ? req.body.colors : [],
       seller: req.user.id,
-      approvalStatus: req.user.role === 'admin' ? 'approved' : 'pending',
+      approvalStatus: 'approved',
       adminCode: undefined,
       approvalAttempts: 0,
       
@@ -176,7 +176,7 @@ exports.createProduct = async (req, res) => {
 // @access  Public
 exports.getProducts = async (req, res) => {
   try {
-    const filter = { approvalStatus: 'approved' };
+    const filter = { approvalStatus: { $in: ['approved', 'pending'] } };
     
     // Support category filter (case-insensitive exact match)
     if (req.query.category) {
@@ -260,11 +260,8 @@ exports.getProductById = async (req, res) => {
       });
     }
 
-    // Restrict visibility for pending products without an admin code, or rejected products
-    if (
-      (product.approvalStatus === 'pending' && !product.adminCode) ||
-      product.approvalStatus === 'rejected'
-    ) {
+    // Restrict visibility for rejected products
+    if (product.approvalStatus === 'rejected') {
       let isAuthorized = false;
       const authHeader = req.headers.authorization;
       if (authHeader && authHeader.startsWith('Bearer')) {
@@ -281,7 +278,7 @@ exports.getProductById = async (req, res) => {
       if (!isAuthorized) {
         return res.status(403).json({
           success: false,
-          error: 'This product listing is not active or is pending administrator verification and cannot be viewed publicly'
+          error: 'This product listing was rejected and cannot be viewed publicly'
         });
       }
     }
