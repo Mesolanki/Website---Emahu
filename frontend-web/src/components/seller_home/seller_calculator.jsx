@@ -8,10 +8,10 @@ import './seller_calculator.css';
  * managed by Emahu platform admins.
  */
 const categories = [
-  { name: 'Electronics & Gadgets', rate: 5 },
-  { name: 'Apparel & Fashion', rate: 8 },
-  { name: 'Home & Kitchen Essentials', rate: 10 },
-  { name: 'Beauty & Personal Care', rate: 6 },
+  { name: 'Electronics & Gadgets', rate: 4 },
+  { name: 'Apparel & Fashion', rate: 4 },
+  { name: 'Home & Kitchen Essentials', rate: 4 },
+  { name: 'Beauty & Personal Care', rate: 4 },
   { name: 'Grocery & Gourmet Foods', rate: 4 },
 ];
 
