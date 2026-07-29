@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
+import DynamicProductForm from '@/components/seller_home/DynamicProductForm';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import { wakeupServer } from '@/utils/serverWakeup';
 import API_BASE from '@/utils/config';
@@ -206,6 +207,7 @@ export default function ProductsPage() {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [categoryTiles, setCategoryTiles] = useState(FALLBACK_CATEGORY_TILES);
   const [categoryParentMap, setCategoryParentMap] = useState({});
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Category Slider Scroll Hooks & Logic
   const catRowRef = useRef(null);
@@ -342,23 +344,25 @@ export default function ProductsPage() {
   }, []);
 
   // Fetch products from database
-  useEffect(() => {
-    const fetchDbProducts = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`${API_BASE}/api/products`);
-        const data = await res.json();
-        if (data.success) {
-          setDbProducts(data.products);
-        }
-      } catch (err) {
-        console.error('Error fetching backend products:', err);
-      } finally {
-        setLoading(false);
+  // Fetch products from database
+  const fetchDbProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/api/products`);
+      const data = await res.json();
+      if (data.success) {
+        setDbProducts(data.products || []);
       }
-    };
-    fetchDbProducts();
+    } catch (err) {
+      console.error('Error fetching backend products:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDbProducts();
+  }, [fetchDbProducts]);
 
   // Format database products to match buyer product dashboard structure
   const formattedDbProducts = useMemo(() => {
@@ -778,11 +782,34 @@ export default function ProductsPage() {
       </nav>
 
       {/* Hero + Category tiles */}
-      <div className="bp-hero">
-        <h1 className="bp-hero__title">
+      <div className="bp-hero" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+        <h1 className="bp-hero__title" style={{ margin: 0 }}>
           {category === 'All' ? 'All Products' : (categoryTiles.find(c => c.value === category)?.label || category)}
         </h1>
-
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          style={{
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '10px',
+            padding: '10px 20px',
+            fontWeight: '600',
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>Add Product</span>
+        </button>
       </div>
 
       {/* Theme-styled Full-Width Search Bar */}
@@ -1342,6 +1369,17 @@ export default function ProductsPage() {
           )}
         </main>
       </div>
+
+      {/* Add Product Modal for direct addition from Buyer Page on Vercel */}
+      <DynamicProductForm
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        products={dbProducts}
+        onSuccess={() => {
+          setIsAddModalOpen(false);
+          fetchDbProducts();
+        }}
+      />
     </div>
   );
 }

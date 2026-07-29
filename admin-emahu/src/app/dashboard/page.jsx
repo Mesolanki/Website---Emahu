@@ -1525,7 +1525,7 @@ export default function AdminDashboard() {
 
     refreshActiveTabData();
 
-    const interval = setInterval(refreshActiveTabData, 10000);
+    const interval = setInterval(refreshActiveTabData, 30000);
     return () => clearInterval(interval);
   }, [isAuthorized, activeTab]);
 

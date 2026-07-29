@@ -758,7 +758,7 @@ exports.adminDecision = async (req, res) => {
 exports.getAdminProducts = async (req, res) => {
   try {
     const products = await Product.find()
-      .select('name brand category price stock sku approvalStatus adminCode rejectionReason approvalAttempts createdAt seller image images variants')
+      .select('name brand category price stock sku approvalStatus adminCode rejectionReason approvalAttempts createdAt seller image')
       .populate('seller', 'name email phone storeName status')
       .lean();
     res.status(200).json({
