@@ -652,7 +652,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     return resolveDocUrl(img);
   };
 
-  const compressImageFile = (file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) => {
+  const compressImageFile = (file, maxWidth = 800, maxHeight = 800, quality = 0.70) => {
     return new Promise((resolve) => {
       if (!file || !file.type || !file.type.startsWith('image/')) {
         resolve(file);
@@ -735,7 +735,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
   const processFiles = (files) => {
     files.forEach(async (file) => {
       try {
-        const compressedFile = await compressImageFile(file, 1200, 1200, 0.85);
+        const compressedFile = await compressImageFile(file, 800, 800, 0.70);
         const reader = new FileReader();
         reader.onload = (event) => {
           const dataUrl = event.target.result;

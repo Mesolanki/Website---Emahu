@@ -57,15 +57,20 @@ app.use('/uploads', (req, res, next) => {
 
 // Ensure database connection is active on every API request
 app.use(async (req, res, next) => {
+  const mongoose = require('mongoose');
+
   // Allow root health check endpoint to respond even if DB is still warming up
-  if (req.path === '/') {
-    // Fire background connection attempt on ping
+  if (req.path === '/' || req.path === '/api/health') {
     connectDB().catch((err) => console.error('Background DB connect on ping error:', err.message));
     return next();
   }
 
+  // Instant fast path when connection is already warm (< 0.01ms)
+  if (mongoose.connection.readyState === 1) {
+    return next();
+  }
+
   try {
-    const mongoose = require('mongoose');
     const conn = await connectDB();
     if (!conn || mongoose.connection.readyState !== 1) {
       throw new Error('Database connection is not in ready state (readyState !== 1)');

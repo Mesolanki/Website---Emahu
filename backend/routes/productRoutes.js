@@ -14,28 +14,57 @@ const {
 const { protect, authorize } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
+const path = require('path');
+const fs = require('fs');
+
 // Image Upload route (Protected - Seller or Admin)
 router.post('/upload', protect, authorize('seller', 'admin'), upload.single('image'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'Please upload an image file' });
     }
-    const hostHeader = req.get('host') || '';
-    const isHttps = req.headers['x-forwarded-proto'] === 'https' || hostHeader.includes('emahu.com');
-    const protocol = isHttps ? 'https' : req.protocol;
-    
-    let publicBase = `${protocol}://${hostHeader}`;
-    if (process.env.PUBLIC_APP_URL) {
-      publicBase = process.env.PUBLIC_APP_URL;
+
+    let fileUrl = '';
+    const uploadsDir = path.join(__dirname, '../uploads');
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = path.extname(req.file.originalname || '.jpg').toLowerCase() || '.jpg';
+    const filename = `image-${uniqueSuffix}${ext}`;
+
+    let wroteToDisk = false;
+    if (req.file.buffer) {
+      try {
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        const filePath = path.join(uploadsDir, filename);
+        fs.writeFileSync(filePath, req.file.buffer);
+        wroteToDisk = true;
+
+        const hostHeader = req.get('host') || '';
+        const isHttps = req.headers['x-forwarded-proto'] === 'https' || hostHeader.includes('emahu.com');
+        const protocol = isHttps ? 'https' : req.protocol;
+        let publicBase = `${protocol}://${hostHeader}`;
+        if (process.env.PUBLIC_APP_URL) {
+          publicBase = process.env.PUBLIC_APP_URL;
+        }
+        fileUrl = `/uploads/${filename}`;
+      } catch (err) {
+        // Read-only filesystem on Vercel / serverless
+        wroteToDisk = false;
+      }
     }
-    const relativePath = `/uploads/${req.file.filename}`;
-    const fullUrl = `${publicBase}${relativePath}`;
+
+    // Fallback for Vercel/serverless environments where local disk write fails
+    if (!wroteToDisk && req.file.buffer) {
+      const mime = req.file.mimetype || 'image/jpeg';
+      fileUrl = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+    }
 
     res.status(200).json({
       success: true,
-      url: relativePath,
-      fullUrl: fullUrl,
-      relativePath: relativePath
+      url: fileUrl,
+      fullUrl: fileUrl,
+      relativePath: fileUrl
     });
   } catch (error) {
     console.error('File Upload Route Error:', error);

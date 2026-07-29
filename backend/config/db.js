@@ -6,7 +6,7 @@ let connectionPromise = null;
  * Connect to MongoDB Database with automatic retry and local/cloud fallback.
  * Works seamlessly on local development, VPS servers, and cloud hosts (Render/Vercel).
  */
-const connectDB = async (retries = 3, delayMs = 1200) => {
+const connectDB = async (retries = 2, delayMs = 300) => {
   // 1. If connection is already open (readyState === 1), return active connection immediately
   if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
@@ -26,10 +26,12 @@ const connectDB = async (retries = 3, delayMs = 1200) => {
 
   const opts = {
     maxPoolSize: 10,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
+    minPoolSize: 1,
+    serverSelectionTimeoutMS: 3000,
+    connectTimeoutMS: 5000,
+    socketTimeoutMS: 30000,
     family: 4,
-    bufferCommands: true,
+    bufferCommands: false,
   };
 
   const attemptConnect = async (attempt) => {
@@ -48,7 +50,6 @@ const connectDB = async (retries = 3, delayMs = 1200) => {
       console.error(`[DB] MongoDB Connection Error (Attempt ${attempt}/${retries}): ${error.message}`);
       
       if (attempt < retries) {
-        console.log(`[DB] Retrying connection in ${delayMs}ms...`);
         await new Promise((res) => setTimeout(res, delayMs));
         return attemptConnect(attempt + 1);
       }

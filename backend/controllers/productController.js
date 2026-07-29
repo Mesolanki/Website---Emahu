@@ -131,19 +131,25 @@ exports.createProduct = async (req, res) => {
       specifications: req.body.specifications || {}
     });
 
-    // Notify all admins in bulk of new pending product request
-    const User = require('../models/User');
-    const Notification = require('../models/Notification');
-    const admins = await User.find({ role: 'admin' }).select('_id');
-    if (admins.length > 0) {
-      const notifications = admins.map(admin => ({
-        recipient: admin._id,
-        title: 'New Product Pending Verification',
-        message: `Product "${product.name}" has been listed by seller "${req.user.name}" and requires admin approval.`,
-        type: 'warning'
-      }));
-      await Notification.insertMany(notifications);
-    }
+    // Notify all admins in bulk of new pending product request in background (non-blocking)
+    (async () => {
+      try {
+        const User = require('../models/User');
+        const Notification = require('../models/Notification');
+        const admins = await User.find({ role: 'admin' }).select('_id');
+        if (admins.length > 0) {
+          const notifications = admins.map(admin => ({
+            recipient: admin._id,
+            title: 'New Product Pending Verification',
+            message: `Product "${product.name}" has been listed by seller "${req.user.name || 'Seller'}" and requires admin approval.`,
+            type: 'warning'
+          }));
+          await Notification.insertMany(notifications);
+        }
+      } catch (err) {
+        console.error('Background admin notification error:', err.message);
+      }
+    })();
 
     res.status(201).json({
       success: true,

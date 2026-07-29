@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './dashboard.css';
@@ -1347,34 +1347,35 @@ export default function EmahuProDashboard() {
   const [products, setProducts] = useState([]);
 
   // Fetch seller's products from backend API
-  useEffect(() => {
-    const fetchSellerProducts = async () => {
-      try {
-        const token = localStorage.getItem('emahu_seller_token');
-        if (!token) return;
-        const res = await fetch(`${API_BASE}/api/products/my`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (res.status === 401) {
-          handleSessionExpired();
-          return;
+  const fetchSellerProducts = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('emahu_seller_token');
+      if (!token) return;
+      const res = await fetch(`${API_BASE}/api/products/my`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-        const data = await res.json();
-        if (data.success) {
-          setProducts(data.products);
-        } else {
-          console.error('Failed to fetch seller products:', data.error);
-        }
-      } catch (err) {
-        console.error('Error fetching seller products:', err);
+      });
+      if (res.status === 401) {
+        handleSessionExpired();
+        return;
       }
-    };
+      const data = await res.json();
+      if (data.success) {
+        setProducts(data.products || []);
+      } else {
+        console.error('Failed to fetch seller products:', data.error);
+      }
+    } catch (err) {
+      console.error('Error fetching seller products:', err);
+    }
+  }, []);
+
+  useEffect(() => {
     if (isAuthorized) {
       fetchSellerProducts();
     }
-  }, [isAuthorized]);
+  }, [isAuthorized, fetchSellerProducts]);
 
   // Dynamic Orders State
   const [orders, setOrders] = useState([]);
@@ -6981,7 +6982,7 @@ export default function EmahuProDashboard() {
               'success'
             );
           }
-          fetchProducts();
+          fetchSellerProducts();
         }}
       />
 
