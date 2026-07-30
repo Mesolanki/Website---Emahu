@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
+import { wakeupServer } from '@/utils/serverWakeup';
+import API_BASE from '@/utils/config';
 const ALL_PRODUCTS = [];
 const STATIC_RELATED = [];
 
@@ -247,9 +249,10 @@ export default function ProductDetailPage() {
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [reviewError, setReviewError] = useState('');
 
-  // Check buyer login session
+  // Check buyer login session & wake up server
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   useEffect(() => {
+    wakeupServer();
     setIsUserLoggedIn(!!localStorage.getItem('emahu_buyer_token'));
   }, []);
 
