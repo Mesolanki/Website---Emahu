@@ -12,7 +12,6 @@ import {
   floatVariant, modalOverlay, modalContent, scrollReveal,
 } from '@/animations/variants';
 import { useMouseParallax } from '@/animations/useAnimations';
-import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 
 // ─── DATA DEFINITIONS ───
 const CATEGORIES = [
@@ -689,7 +688,7 @@ export default function RoleSelector() {
     return lookup;
   }, [dbCategories, dbProducts]);
 
-  // Combine DB & static products
+  // Only real seller-added products from database
   const allProducts = useMemo(() => {
     const mappedDb = dbProducts.map(p => {
       let cat = p.category ? normalizeCat(p.category) : '';
@@ -719,37 +718,8 @@ export default function RoleSelector() {
       };
     });
 
-    const mappedStatic = (STATIC_PRODUCTS || []).map(p => {
-      let cat = p.category ? normalizeCat(p.category) : '';
-      if (categoryNameToId[cat]) {
-        cat = categoryNameToId[cat];
-      }
-
-      const mainImg = getProductMainImage(p);
-
-      return {
-        id: p.id,
-        name: p.name,
-        brand: p.brand || 'Emahu Brand',
-        rawCategory: p.category || '',
-        category: cat,
-        subcategory: p.subcategory || 'General',
-        rawSubcategory: p.subcategory || '',
-        price: p.price,
-        originalPrice: p.originalPrice || p.price,
-        rating: p.rating || 4.7,
-        reviews: p.reviews || 84,
-        sellerName: typeof p.seller === 'string' ? p.seller : (p.seller?.name || 'Emahu Merchant'),
-        sellerStore: typeof p.seller === 'string' ? p.seller : (p.seller?.storeName || 'Emahu Store'),
-        image: isRealImage(mainImg) ? mainImg : (mainImg || '📦'),
-        stock: 50,
-        seller: p.seller
-      };
-    });
-
-    const combined = [...mappedDb, ...mappedStatic];
     const seen = new Set();
-    return combined.filter(p => {
+    return mappedDb.filter(p => {
       if (!p || !p.id) return false;
       const pid = p.id.toString();
       if (seen.has(pid)) return false;
