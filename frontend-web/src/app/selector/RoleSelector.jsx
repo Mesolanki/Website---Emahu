@@ -625,8 +625,10 @@ export default function RoleSelector() {
         id: p.id || p._id,
         name: p.name,
         brand: p.brand || 'Emahu Brand',
+        rawCategory: p.category || '',
         category: cat,
         subcategory: p.subcategory || 'General',
+        rawSubcategory: p.subcategory || '',
         price: p.price,
         originalPrice: p.comparePrice || p.price,
         rating: p.rating || 4.7,
@@ -655,7 +657,7 @@ export default function RoleSelector() {
 
     const targetCat = normalizeCat(selectedCategory.id) || normalizeCat(selectedCategory.name);
     const catProducts = allProducts.filter(p => {
-      const pCat = normalizeCat(p.category);
+      const pCat = normalizeCat(p.category || p.rawCategory);
       return (
         pCat === targetCat ||
         pCat === selectedCategory.id ||
@@ -680,15 +682,38 @@ export default function RoleSelector() {
   const filteredProducts = useMemo(() => {
     if (!selectedCategory) return [];
 
-    const targetCatId = selectedCategory.id;
+    const targetCatId = (selectedCategory.id || '').toLowerCase().trim();
+    const targetCatName = (selectedCategory.name || '').toLowerCase().trim();
     const targetCatNorm = normalizeCat(selectedCategory.id) || normalizeCat(selectedCategory.name);
 
     let base = allProducts.filter(p => {
-      const pCatNorm = normalizeCat(p.category);
+      const pRawCat = (p.rawCategory || '').toLowerCase().trim();
+      const pCatNorm = normalizeCat(p.category || p.rawCategory);
+      const pSub = (p.subcategory || p.rawSubcategory || '').toLowerCase().trim();
+      const pName = (p.name || '').toLowerCase().trim();
+
+      // 1. Normalized category match
       if (pCatNorm === targetCatNorm || pCatNorm === targetCatId || p.category === targetCatId) return true;
       if (pCatNorm && targetCatNorm && (pCatNorm.includes(targetCatNorm) || targetCatNorm.includes(pCatNorm))) return true;
-      if (p.category && selectedCategory.name && p.category.toLowerCase().includes(selectedCategory.name.toLowerCase())) return true;
-      if (selectedCategory.name && p.name && p.name.toLowerCase().includes(selectedCategory.name.toLowerCase())) return true;
+
+      // 2. Raw category string match
+      if (pRawCat && (pRawCat === targetCatName || pRawCat === targetCatId || pRawCat.includes(targetCatName) || targetCatName.includes(pRawCat))) return true;
+
+      // 3. Subcategory match against selectedCategory.subcategories
+      if (Array.isArray(selectedCategory.subcategories)) {
+        for (const sub of selectedCategory.subcategories) {
+          const sLower = sub.toLowerCase().trim();
+          if (sLower === 'all' || sLower.startsWith('all ')) continue;
+          if (pSub && (pSub.includes(sLower) || sLower.includes(pSub) || pRawCat.includes(sLower))) return true;
+        }
+      }
+
+      // 4. Keyword match on category name words
+      if (selectedCategory.name) {
+        const words = selectedCategory.name.toLowerCase().split(/[\s&/_-]+/).filter(w => w.length > 2);
+        if (words.some(w => pRawCat.includes(w) || pName.includes(w) || pSub.includes(w))) return true;
+      }
+
       return false;
     });
 
