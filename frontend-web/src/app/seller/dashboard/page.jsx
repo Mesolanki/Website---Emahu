@@ -205,56 +205,7 @@ const decodeToken = (token) => {
   }
 };
 
-const INITIAL_PRODUCTS = [
-  {
-    id: 'prod-1',
-    name: 'Emahu Smart Luxe Chrono',
-    sku: 'EM-CHR-009',
-    category: 'Electronics',
-    price: 18999,
-    comparePrice: 24999,
-    stock: 45,
-    status: 'in-stock',
-    sales: 124,
-    image: '⌚'
-  },
-  {
-    id: 'prod-2',
-    name: 'SoundAura Pro Headphones',
-    sku: 'EM-SND-882',
-    category: 'Electronics',
-    price: 12500,
-    comparePrice: 15999,
-    stock: 8,
-    status: 'low-stock',
-    sales: 340,
-    image: '🎧'
-  },
-  {
-    id: 'prod-3',
-    name: 'Minimalist Solid Oak Desk',
-    sku: 'EM-DSK-310',
-    category: 'Furniture',
-    price: 28000,
-    comparePrice: 35000,
-    stock: 12,
-    status: 'in-stock',
-    sales: 68,
-    image: 'Desk'
-  },
-  {
-    id: 'prod-4',
-    name: 'AuraRing Smart Health Tracker',
-    sku: 'EM-RNG-041',
-    category: 'Fitness',
-    price: 9500,
-    comparePrice: 12000,
-    stock: 0,
-    status: 'out-of-stock',
-    sales: 198,
-    image: 'ðŸ’'
-  }
-];
+const INITIAL_PRODUCTS = [];
 
 
 
@@ -1498,83 +1449,6 @@ export default function EmahuProDashboard() {
 
           console.log('Filtered Orders count:', myOrders.length);
           console.groupEnd();
-
-          const disableMockData =
-            process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' ||
-            process.env.NODE_ENV === 'production';
-
-          if (myOrders.length === 0 && !disableMockData) {
-            // Seed multiple demo orders with different statuses so sellers can see the full workflow
-            const sellerRef = {
-              _id: sellerUser._id || sellerUser.id || 'mock_seller_id',
-              name: sellerUser.name || 'Pro Seller Inc.',
-              email: sellerUser.email || 'seller@emahu.com',
-              phone: sellerUser.phone || '+91 99999 99999'
-            };
-            const baseDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-            const baseTime = baseDate + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-            const seedOrders = [
-              {
-                orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
-                date: baseDate,
-                createdAt: new Date().toISOString(),
-                items: [{ productId: 'prod_mock_chrono', name: 'Emahu Smart Luxe Chrono', price: 18999, quantity: 1, brand: 'Emahu Brand', img: '⌚', seller: sellerRef }],
-                total: 22419,
-                status: 'PENDING_APPROVAL',
-                timeline: [{ status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: baseTime }],
-                deliveryAddress: { fullName: 'Rahul Sharma', phone: '+91 98765 43210', email: 'rahul@example.com', address: 'Flat 402, Royal Residency, Sector 15', city: 'Gandhinagar', stateName: 'Gujarat', pincode: '382016' },
-                shippingSpeed: 'express', EmahuMethod: 'wallet'
-              },
-              {
-                orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
-                date: baseDate,
-                createdAt: new Date().toISOString(),
-                items: [{ productId: 'prod_mock_headphones', name: 'SoundAura Pro Headphones', price: 12500, quantity: 1, brand: 'SoundAura', img: '🎧', seller: sellerRef }],
-                total: 14750,
-                status: 'PENDING_APPROVAL',
-                timeline: [{ status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: baseTime }],
-                deliveryAddress: { fullName: 'Priya Mehta', phone: '+91 87654 32100', email: 'priya@example.com', address: 'B-204, Sunrise Apartments', city: 'Pune', stateName: 'Maharashtra', pincode: '411001' },
-                shippingSpeed: 'standard', EmahuMethod: 'upi'
-              },
-              {
-                orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
-                date: baseDate,
-                createdAt: new Date().toISOString(),
-                items: [{ productId: 'prod_mock_tracker', name: 'AuraRing Smart Health Tracker', price: 9500, quantity: 2, brand: 'AuraRing', img: '💍', seller: sellerRef }],
-                total: 22420,
-                status: 'APPROVED',
-                sellerConfirmed: true,
-                timeline: [
-                  { status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: baseTime },
-                  { status: 'APPROVED', label: 'Seller Approved', desc: '✅ Order approved by seller.', date: baseTime }
-                ],
-                deliveryAddress: { fullName: 'Amit Kumar', phone: '+91 76543 21000', email: 'amit@example.com', address: '12, MG Road', city: 'Bangalore', stateName: 'Karnataka', pincode: '560001' },
-                shippingSpeed: 'standard', EmahuMethod: 'card'
-              },
-              {
-                orderId: `EMH_${Math.floor(100000 + Math.random() * 900000)}`,
-                date: baseDate,
-                createdAt: new Date().toISOString(),
-                items: [{ productId: 'prod_mock_desk', name: 'Minimalist Solid Oak Desk', price: 28000, quantity: 1, brand: 'WoodCraft', img: '🪵', seller: sellerRef }],
-                total: 33040,
-                status: 'REJECTED',
-                sellerRejected: true,
-                rejectionReason: 'Out of Stock',
-                timeline: [
-                  { status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: baseTime },
-                  { status: 'REJECTED', label: 'Seller Rejected', desc: '❌ Rejected: Out of Stock', date: baseTime }
-                ],
-                deliveryAddress: { fullName: 'Sneha Reddy', phone: '+91 65432 10000', email: 'sneha@example.com', address: '45, Jubilee Hills', city: 'Hyderabad', stateName: 'Telangana', pincode: '500033' },
-                shippingSpeed: 'express', EmahuMethod: 'wallet'
-              }
-            ];
-
-            seedOrders.forEach(o => parsed.push(o));
-            safeSetLocalStorageOrders(parsed);
-            window.dispatchEvent(new Event('storage'));
-            return;
-          }
 
           const formatted = myOrders.map(o => {
             // Only list items in the description that belong to this seller or default fallback

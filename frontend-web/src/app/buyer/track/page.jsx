@@ -214,44 +214,6 @@ function TrackOrderContent() {
       if (storedOrders) {
         const parsed = JSON.parse(storedOrders);
         setTimeout(() => setAllOrders(parsed), 0);
-      } else if (!disableMockData) {
-        const seedOrders = [
-          {
-            orderId: 'EMH_772918',
-            date: '24 May 2026',
-            createdAt: new Date('2026-05-24T00:00:00.000Z').toISOString(),
-            items: [
-              {
-                productId: 'prod_mock_sony',
-                name: 'Sony WH-1000XM5 Headphones',
-                price: 26999,
-                quantity: 1,
-                brand: 'Sony',
-                img: 'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=600&q=80',
-                seller: {
-                  name: 'Sony India Retail',
-                  email: 'retail@sony.co.in',
-                  phone: '+91 1800 103 7799'
-                }
-              }
-            ],
-            total: 31958,
-            status: '🔒 Emahu VAULT SECURED',
-            shippingSpeed: 'standard',
-            EmahuMethod: 'wallet',
-            deliveryAddress: {
-              fullName: 'Rahul Sharma',
-              phone: '+91 98765 43210',
-              email: 'rahul@example.com',
-              address: 'Block A, Apex Greens, Sector 45',
-              city: 'Noida',
-              stateName: 'Uttar Pradesh',
-              pincode: '201303'
-            }
-          }
-        ];
-        localStorage.setItem('emahu_orders', JSON.stringify(seedOrders));
-        setTimeout(() => setAllOrders(seedOrders), 0);
       } else {
         setTimeout(() => setAllOrders([]), 0);
       }

@@ -200,52 +200,6 @@ export default function OrdersPage() {
 
         let parsedOrders = JSON.parse(storedOrders);
 
-        const disableMockData =
-          process.env.NEXT_PUBLIC_DISABLE_MOCK_DATA === 'true' ||
-          process.env.NODE_ENV === 'production';
-
-        if (parsedOrders.length === 0 && !disableMockData) {
-          // Mock seed orders if none exist for a professional look (using current date so it is not filtered)
-          const todayDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-          const seedOrders = [
-            {
-              orderId: 'EMH_772918',
-              date: todayDate,
-              createdAt: new Date().toISOString(),
-              items: [
-                {
-                  productId: 'prod_mock_sony',
-                  name: 'Sony WH-1000XM5 Headphones',
-                  price: 26999,
-                  quantity: 1,
-                  brand: 'Sony',
-                  img: 'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=600&q=80',
-                  seller: {
-                    name: 'Sony India Retail',
-                    email: 'retail@sony.co.in',
-                    phone: '+91 1800 103 7799'
-                  }
-                }
-              ],
-              total: 31958, // Price + Tax + Shipping
-              status: '🔒 Emahu VAULT SECURED',
-              shippingSpeed: 'standard',
-              EmahuMethod: 'wallet',
-              deliveryAddress: {
-                fullName: 'Rahul Sharma',
-                phone: '+91 98765 43210',
-                email: 'rahul@example.com',
-                address: 'Block A, Apex Greens, Sector 45',
-                city: 'Noida',
-                stateName: 'Uttar Pradesh',
-                pincode: '201303'
-              }
-            }
-          ];
-          localStorage.setItem('emahu_orders', JSON.stringify(seedOrders));
-          parsedOrders = seedOrders;
-        }
-
         // 1. Filter out orders older than 1 month (30 days)
         const oneMonthAgo = new Date();
         oneMonthAgo.setDate(oneMonthAgo.getDate() - 30);
