@@ -733,16 +733,41 @@ export default function ProductsPage() {
     }
     if (category !== 'All') {
       const catTarget = category.toLowerCase().trim();
+      let synonyms = [catTarget];
+      if (catTarget.includes('electronics') || catTarget.includes('tech')) {
+        synonyms.push('tech', 'electronic', 'gadget', 'computer', 'mobile', 'mouse', 'mice', 'keyboard', 'audio', 'headphone');
+      }
+
       const filteredByCat = items.filter(p => {
         const pCat = (p.category || '').toLowerCase().trim();
-        return pCat === catTarget || pCat.includes(catTarget) || catTarget.includes(pCat);
+        const pSub = (p.subcategory || '').toLowerCase().trim();
+        const pName = (p.name || '').toLowerCase().trim();
+        return synonyms.some(s => pCat.includes(s) || s.includes(pCat) || pSub.includes(s) || pName.includes(s));
       });
       if (filteredByCat.length > 0) {
         items = filteredByCat;
       }
     }
     if (selectedShop !== 'All Shops')  items = items.filter(p => p.sellerStore === selectedShop || p.brand === selectedShop);
-    if (activeSubcategory !== 'All')   items = items.filter(p => p.subcategory === activeSubcategory);
+    if (activeSubcategory !== 'All' && !activeSubcategory.startsWith('All')) {
+      const subLower = activeSubcategory.toLowerCase().trim();
+      const syns = [subLower];
+      if (subLower === 'mice') syns.push('mouse');
+      if (subLower === 'mouse') syns.push('mice');
+      if (subLower.includes('audio') || subLower.includes('headphone')) syns.push('headphone', 'headset', 'audio', 'earphone', 'airpod');
+      if (subLower.includes('backpack')) syns.push('backpack', 'bag');
+      if (subLower.includes('smart')) syns.push('smart', 'watch', 'tracker', 'device');
+
+      const matchedBySub = items.filter(p => {
+        const pSub = (p.subcategory || '').toLowerCase().trim();
+        const pCat = (p.category || '').toLowerCase().trim();
+        const pName = (p.name || '').toLowerCase().trim();
+        return syns.some(s => pSub.includes(s) || pCat.includes(s) || pName.includes(s));
+      });
+      if (matchedBySub.length > 0) {
+        items = matchedBySub;
+      }
+    }
     if (showVerified)                  items = items.filter(p => p.verified);
     if (showOnSale)                    items = items.filter(p => p.onSale);
     if (showNew)                       items = items.filter(p => p.isNew);

@@ -224,6 +224,20 @@ async function seed() {
         image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80',
         seller: nationalSeller._id,
         approvalStatus: 'approved'
+      },
+      {
+        name: 'Logitech MX Master 3S Wireless Ergonomic Mouse',
+        brand: 'Logitech',
+        sku: 'TECH-LOGI-MX3S',
+        category: 'Tech',
+        subcategory: 'Mice',
+        price: 8995,
+        comparePrice: 10995,
+        stock: 35,
+        description: 'Performance wireless ergonomic mouse with 8K DPI any-surface tracking, quiet clicks, and fast MagSpeed electromagnetic scrolling.',
+        image: 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=600&q=80',
+        seller: nationalSeller._id,
+        approvalStatus: 'approved'
       }
     ];
 

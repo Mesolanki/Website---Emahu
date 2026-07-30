@@ -186,7 +186,7 @@ const normalizeCat = (c) => {
     str = String(c);
   }
   str = str.toLowerCase().trim();
-  if (str.includes('tech') || str.includes('electronic') || str.includes('gadget') || str.includes('computer') || str.includes('mobile')) return 'tech';
+  if (str.includes('tech') || str.includes('electronic') || str.includes('gadget') || str.includes('computer') || str.includes('mobile') || str.includes('mouse') || str.includes('mice') || str.includes('keyboard') || str.includes('audio') || str.includes('headphone')) return 'tech';
   if (str.includes('shoe') || str.includes('footwear') || str.includes('sneaker') || str.includes('boot')) return 'shoes';
   if (str.includes('kitchen') || str.includes('dining') || str.includes('cookware')) return 'kitchen';
   if (str.includes('apparel') || str.includes('fashion') || str.includes('clothing') || str.includes('wear') || str.includes('top') || str.includes('shirt')) return 'apparel';
@@ -717,11 +717,22 @@ export default function RoleSelector() {
     }
 
     if (activeSubcategory !== 'All' && !activeSubcategory.startsWith('All')) {
-      const exactMatches = base.filter(
-        p => p.subcategory && p.subcategory.toLowerCase() === activeSubcategory.toLowerCase()
-      );
-      if (exactMatches.length > 0) {
-        base = exactMatches;
+      const subLower = activeSubcategory.toLowerCase();
+      const syns = [subLower];
+      if (subLower === 'mice') syns.push('mouse');
+      if (subLower === 'mouse') syns.push('mice');
+      if (subLower.includes('audio') || subLower.includes('headphone')) syns.push('headphone', 'headset', 'audio', 'earphone', 'airpod');
+      if (subLower.includes('backpack')) syns.push('backpack', 'bag');
+      if (subLower.includes('smart')) syns.push('smart', 'watch', 'tracker', 'device');
+
+      const matched = base.filter(p => {
+        const pSub = (p.subcategory || '').toLowerCase();
+        const pCat = (p.category || '').toLowerCase();
+        const pName = (p.name || '').toLowerCase();
+        return syns.some(s => pSub.includes(s) || pCat.includes(s) || pName.includes(s));
+      });
+      if (matched.length > 0) {
+        base = matched;
       }
     }
 
