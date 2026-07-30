@@ -926,9 +926,10 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
         specifications
       };
 
+      const baseUrl = (getApiBase ? getApiBase() : String(API_BASE)).replace(/\/$/, '');
       const url = resubmitProductId
-        ? `${API_BASE}/api/products/${resubmitProductId}/resubmit`
-        : `${API_BASE}/api/products`;
+        ? `${baseUrl}/api/products/${resubmitProductId}/resubmit`
+        : `${baseUrl}/api/products`;
 
       const method = resubmitProductId ? 'PUT' : 'POST';
 

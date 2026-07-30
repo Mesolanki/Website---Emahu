@@ -3,6 +3,10 @@
  * Dynamically resolves backend target URL for local dev and live deployment (emahu.com / manage.emahu.com).
  */
 export function getApiBase() {
+  let envUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+    return envUrl.replace(/\/$/, '');
+  }
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     const protocol = window.location.protocol || 'https:';
@@ -10,11 +14,7 @@ export function getApiBase() {
       return `${protocol}//${hostname}`;
     }
   }
-  let envUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
-  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
-    return envUrl.replace(/\/$/, '');
-  }
-  return 'http://127.0.0.1:5000';
+  return envUrl || 'http://127.0.0.1:5000';
 }
 
 /**

@@ -87,9 +87,8 @@ exports.createProduct = async (req, res) => {
       image: primaryImage,
       images: allImages,
       sizes: Array.isArray(req.body.sizes) ? req.body.sizes : [],
-      colors: Array.isArray(req.body.colors) ? req.body.colors : [],
-      seller: req.user.id,
-      approvalStatus: 'approved',
+      seller: req.user.id || req.user._id,
+      approvalStatus: (req.user && req.user.role === 'admin') ? 'approved' : 'pending',
       adminCode: undefined,
       approvalAttempts: 0,
       
@@ -615,16 +614,18 @@ exports.adminDecision = async (req, res) => {
       product.rejectionReason = undefined;
       await product.save();
 
+      const adminUserId = req.user ? (req.user._id || req.user.id) : null;
+
       // Log history, audit, and notify seller in parallel
       Promise.all([
         ProductApprovalHistory.create({
           product: product._id,
-          admin: req.user._id,
+          admin: adminUserId,
           action: 'approve',
           feedback: `Approved with SKU: ${finalSku}`
         }),
         AuditLog.create({
-          admin: req.user._id,
+          admin: adminUserId,
           action: 'APPROVE_PRODUCT',
           targetType: 'Product',
           targetId: product._id,
@@ -645,6 +646,7 @@ exports.adminDecision = async (req, res) => {
       });
     } else if (decision === 'reject') {
       const attempts = (product.approvalAttempts || 0) + 1;
+      const adminUserId = req.user ? (req.user._id || req.user.id) : null;
       
       if (attempts >= 3) {
         await product.deleteOne();
@@ -652,12 +654,12 @@ exports.adminDecision = async (req, res) => {
         Promise.all([
           ProductApprovalHistory.create({
             product: product._id,
-            admin: req.user._id,
+            admin: adminUserId,
             action: 'reject',
             feedback: reason || 'Rejected 3 times'
           }),
           AuditLog.create({
-            admin: req.user._id,
+            admin: adminUserId,
             action: 'REJECT_PRODUCT',
             targetType: 'Product',
             targetId: product._id,
@@ -686,12 +688,12 @@ exports.adminDecision = async (req, res) => {
         Promise.all([
           ProductApprovalHistory.create({
             product: product._id,
-            admin: req.user._id,
+            admin: adminUserId,
             action: 'reject',
             feedback: reason || 'Rejected'
           }),
           AuditLog.create({
-            admin: req.user._id,
+            admin: adminUserId,
             action: 'REJECT_PRODUCT',
             targetType: 'Product',
             targetId: product._id,
@@ -715,16 +717,17 @@ exports.adminDecision = async (req, res) => {
       product.approvalStatus = 'changes_requested';
       product.rejectionReason = reason || 'Changes requested to title, description, or pricing.';
       await product.save();
+      const adminUserId = req.user ? (req.user._id || req.user.id) : null;
 
       Promise.all([
         ProductApprovalHistory.create({
           product: product._id,
-          admin: req.user._id,
+          admin: adminUserId,
           action: 'request_changes',
           feedback: reason
         }),
         AuditLog.create({
-          admin: req.user._id,
+          admin: adminUserId,
           action: 'REQUEST_CHANGES_PRODUCT',
           targetType: 'Product',
           targetId: product._id,
