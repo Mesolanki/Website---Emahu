@@ -12,6 +12,7 @@ import {
   floatVariant, modalOverlay, modalContent, scrollReveal,
 } from '@/animations/variants';
 import { useMouseParallax } from '@/animations/useAnimations';
+import { STATIC_PRODUCTS } from '@/utils/mockProducts';
 
 // ─── DATA DEFINITIONS ───
 const CATEGORIES = [
@@ -633,16 +634,45 @@ export default function RoleSelector() {
         originalPrice: p.comparePrice || p.price,
         rating: p.rating || 4.7,
         reviews: p.reviews || 84,
-        sellerName: p.seller?.name || 'Emahu Merchant',
-        sellerStore: p.seller?.storeName || 'Emahu Store',
+        sellerName: p.seller?.name || (typeof p.seller === 'string' ? p.seller : 'Emahu Merchant'),
+        sellerStore: p.seller?.storeName || (typeof p.seller === 'string' ? p.seller : 'Emahu Store'),
         image: isRealImage(mainImg) ? mainImg : (mainImg || '📦'),
         stock: p.stock,
         seller: p.seller
       };
     });
 
+    const mappedStatic = (STATIC_PRODUCTS || []).map(p => {
+      let cat = p.category ? normalizeCat(p.category) : '';
+      if (categoryNameToId[cat]) {
+        cat = categoryNameToId[cat];
+      }
+
+      const mainImg = getProductMainImage(p);
+
+      return {
+        id: p.id,
+        name: p.name,
+        brand: p.brand || 'Emahu Brand',
+        rawCategory: p.category || '',
+        category: cat,
+        subcategory: p.subcategory || 'General',
+        rawSubcategory: p.subcategory || '',
+        price: p.price,
+        originalPrice: p.originalPrice || p.price,
+        rating: p.rating || 4.7,
+        reviews: p.reviews || 84,
+        sellerName: typeof p.seller === 'string' ? p.seller : (p.seller?.name || 'Emahu Merchant'),
+        sellerStore: typeof p.seller === 'string' ? p.seller : (p.seller?.storeName || 'Emahu Store'),
+        image: isRealImage(mainImg) ? mainImg : (mainImg || '📦'),
+        stock: 50,
+        seller: p.seller
+      };
+    });
+
+    const combined = [...mappedDb, ...mappedStatic];
     const seen = new Set();
-    return mappedDb.filter(p => {
+    return combined.filter(p => {
       if (!p || !p.id) return false;
       const pid = p.id.toString();
       if (seen.has(pid)) return false;
@@ -750,11 +780,14 @@ export default function RoleSelector() {
       if (subLower.includes('backpack')) syns.push('backpack', 'bag');
       if (subLower.includes('smart')) syns.push('smart', 'watch', 'tracker', 'device');
 
+      const tokens = subLower.split(/[\s&/_-]+/).filter(t => t.length > 2 && t !== 'all' && t !== 'and');
+      syns.push(...tokens);
+
       const matched = base.filter(p => {
-        const pSub = (p.subcategory || '').toLowerCase();
-        const pCat = (p.category || '').toLowerCase();
+        const pSub = (p.subcategory || p.rawSubcategory || '').toLowerCase();
+        const pCat = (p.category || p.rawCategory || '').toLowerCase();
         const pName = (p.name || '').toLowerCase();
-        return syns.some(s => pSub.includes(s) || pCat.includes(s) || pName.includes(s));
+        return syns.some(s => pSub.includes(s) || pCat.includes(s) || pName.includes(s) || s.includes(pSub));
       });
       if (matched.length > 0) {
         base = matched;
