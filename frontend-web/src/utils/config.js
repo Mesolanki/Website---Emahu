@@ -11,10 +11,13 @@ export function getApiBase() {
     const hostname = window.location.hostname;
     const protocol = window.location.protocol || 'https:';
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      if (hostname.includes('vercel.app')) {
+        return 'https://website-emahu.onrender.com';
+      }
       return `${protocol}//${hostname}`;
     }
   }
-  return envUrl || 'http://127.0.0.1:5000';
+  return envUrl || ((process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') ? 'https://website-emahu.onrender.com' : 'http://127.0.0.1:5000');
 }
 
 /**

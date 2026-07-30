@@ -1495,9 +1495,11 @@ export default function AdminDashboard() {
     }
   };
 
-  // Live auto-fetching effect whenever activeTab changes OR on a 10-second live polling interval
+  // Single, unified tab change & auto-refresh effect (prevents duplicate parallel requests)
   useEffect(() => {
     if (!isAuthorized) return;
+
+    let isSubscribed = true;
 
     const refreshActiveTabData = async () => {
       try {
@@ -1525,70 +1527,15 @@ export default function AdminDashboard() {
 
     refreshActiveTabData();
 
-    const interval = setInterval(refreshActiveTabData, 30000);
-    return () => clearInterval(interval);
-  }, [isAuthorized, activeTab]);
+    const interval = setInterval(() => {
+      if (isSubscribed) refreshActiveTabData();
+    }, 60000);
 
-
-
-  // Refresh tab data when changing tabs (lazy: only fetch if not yet cached)
-  useEffect(() => {
-    if (!isAuthorized) return;
-    const tab = activeTab;
-
-    const fetchIfNeeded = async () => {
-      if (tab === 'sellers' || tab === 'new-sellers') {
-        if (!fetchedTabs.has('sellers')) {
-          await fetchSellers();
-          setFetchedTabs(prev => { const n = new Set(prev); n.add('sellers'); return n; });
-        } else {
-          // Always refresh sellers list when switching to it (ensures fresh data)
-          fetchSellers();
-        }
-      } else if (tab === 'products-hub') {
-        if (!fetchedTabs.has('products')) {
-          await fetchProducts();
-          setFetchedTabs(prev => { const n = new Set(prev); n.add('products'); return n; });
-        }
-      } else if (tab === 'stats') {
-        const promises = [];
-        if (!fetchedTabs.has('sellers')) { promises.push(fetchSellers()); }
-        if (!fetchedTabs.has('products')) { promises.push(fetchProducts()); }
-        if (!fetchedTabs.has('orders')) { promises.push(fetchOrders()); }
-        if (promises.length) {
-          await Promise.all(promises);
-          setFetchedTabs(prev => { const n = new Set(prev); n.add('sellers'); n.add('products'); n.add('orders'); return n; });
-        }
-      } else if (tab === 'orders') {
-        if (!fetchedTabs.has('orders')) {
-          await fetchOrders();
-          setFetchedTabs(prev => { const n = new Set(prev); n.add('orders'); return n; });
-        } else {
-          fetchOrders();
-        }
-      } else if (tab === 'delivery-partners') {
-        if (!fetchedTabs.has('delivery')) {
-          await fetchDeliveryPartners();
-          setFetchedTabs(prev => { const n = new Set(prev); n.add('delivery'); return n; });
-        }
-      } else if (tab === 'settings') {
-        if (!fetchedTabs.has('settings')) {
-          fetchDeliverySettings();
-          fetchPlatformSettings();
-          setFetchedTabs(prev => { const n = new Set(prev); n.add('settings'); return n; });
-        }
-      } else if (tab === 'notifications') {
-        fetchNotifications();
-      } else if (tab === 'categories-hub') {
-        if (!fetchedTabs.has('categories')) {
-          await fetchCategories();
-          setFetchedTabs(prev => { const n = new Set(prev); n.add('categories'); return n; });
-        }
-      }
+    return () => {
+      isSubscribed = false;
+      clearInterval(interval);
     };
-
-    fetchIfNeeded();
-  }, [activeTab]);
+  }, [isAuthorized, activeTab]);
 
   useEffect(() => {
     setTimeout(() => {

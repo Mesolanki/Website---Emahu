@@ -15,12 +15,14 @@ export function getApiBase() {
         return `${protocol}//manage.emahu.com`;
       } else if (hostname.includes('emahu.com')) {
         return `${protocol}//emahu.com`;
+      } else if (hostname.includes('vercel.app')) {
+        return 'https://website-emahu.onrender.com';
       } else {
         return `${protocol}//${hostname}`;
       }
     }
   }
-  return envUrl || ((process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') ? 'https://emahu.com' : 'http://127.0.0.1:5000');
+  return envUrl || ((process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') ? 'https://website-emahu.onrender.com' : 'http://127.0.0.1:5000');
 }
 
 /**
