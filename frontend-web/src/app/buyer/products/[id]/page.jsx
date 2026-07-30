@@ -7,6 +7,7 @@ import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import { wakeupServer } from '@/utils/serverWakeup';
 import API_BASE from '@/utils/config';
+import './product-detail.css';
 const ALL_PRODUCTS = [];
 const STATIC_RELATED = [];
 
