@@ -501,73 +501,138 @@ export default function RoleSelector() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Merge hardcoded + dynamic backend categories for the welcome screen.
+  // Merge hardcoded + dynamic backend categories + seller added categories for the welcome screen.
   const mergedCategories = useMemo(() => {
     // Start with a copy of the hardcoded categories
     const baseCategories = [...CATEGORIES];
-
-    if (!dbCategories || !dbCategories.length) {
-      return baseCategories;
-    }
-
     let accentIdx = 0;
 
-    dbCategories.forEach(dbCat => {
-      const nameLC = dbCat.name.toLowerCase();
-      const slug = dbCat.slug || nameLC.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    // 1. Process dbCategories if available
+    if (dbCategories && dbCategories.length > 0) {
+      dbCategories.forEach(dbCat => {
+        const nameLC = dbCat.name.toLowerCase();
+        const slug = dbCat.slug || nameLC.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
-      // Check if this category matches a hardcoded category by ID, slug, or name
-      const existingIdx = baseCategories.findIndex(hc =>
-        hc.id === slug ||
-        hc.name.toLowerCase() === nameLC ||
-        hc.name.toLowerCase().includes(nameLC) ||
-        nameLC.includes(hc.name.toLowerCase())
-      );
+        // Check if this category matches a hardcoded category by ID, slug, or name
+        const existingIdx = baseCategories.findIndex(hc =>
+          hc.id === slug ||
+          hc.name.toLowerCase() === nameLC ||
+          hc.name.toLowerCase().includes(nameLC) ||
+          nameLC.includes(hc.name.toLowerCase())
+        );
 
-      let icon = '📦';
-      for (const [key, emoji] of Object.entries(DYNAMIC_CATEGORY_ICONS)) {
-        if (nameLC.includes(key)) { icon = emoji; break; }
-      }
+        let icon = '📦';
+        for (const [key, emoji] of Object.entries(DYNAMIC_CATEGORY_ICONS)) {
+          if (nameLC.includes(key)) { icon = emoji; break; }
+        }
 
-      const accent = DYNAMIC_ACCENTS[accentIdx % DYNAMIC_ACCENTS.length];
-      accentIdx++;
-      const r = parseInt(accent.slice(1, 3), 16);
-      const g = parseInt(accent.slice(3, 5), 16);
-      const b = parseInt(accent.slice(5, 7), 16);
+        const accent = DYNAMIC_ACCENTS[accentIdx % DYNAMIC_ACCENTS.length];
+        accentIdx++;
+        const r = parseInt(accent.slice(1, 3), 16);
+        const g = parseInt(accent.slice(3, 5), 16);
+        const b = parseInt(accent.slice(5, 7), 16);
 
-      const subcats = ['All ' + dbCat.name];
-      if (dbCat.children && dbCat.children.length > 0) {
-        dbCat.children.forEach(child => subcats.push(child.name));
-      }
+        const subcats = ['All ' + dbCat.name];
+        if (dbCat.children && dbCat.children.length > 0) {
+          dbCat.children.forEach(child => subcats.push(child.name));
+        }
 
-      if (existingIdx !== -1) {
-        // Merge dynamic subcategories into the existing hardcoded category
-        const current = baseCategories[existingIdx];
-        const mergedSubcategories = Array.from(new Set([
-          ...current.subcategories,
-          ...subcats
-        ]));
+        if (existingIdx !== -1) {
+          // Merge dynamic subcategories into the existing hardcoded category
+          const current = baseCategories[existingIdx];
+          const mergedSubcategories = Array.from(new Set([
+            ...current.subcategories,
+            ...subcats
+          ]));
 
-        baseCategories[existingIdx] = {
-          ...current,
-          subcategories: mergedSubcategories
-        };
-      } else {
-        // Append as a new dynamic category
-        baseCategories.push({
-          id: slug,
-          name: dbCat.name,
-          icon,
-          desc: `Browse ${dbCat.name} products from verified sellers on EMAHU.`,
-          subcategories: subcats,
-          gradient: `linear-gradient(135deg, rgba(${r}, ${g}, ${b}, 0.08) 0%, rgba(${r}, ${g}, ${b}, 0.04) 100%)`,
-          accent
+          baseCategories[existingIdx] = {
+            ...current,
+            subcategories: mergedSubcategories
+          };
+        } else {
+          // Append as a new dynamic category
+          baseCategories.push({
+            id: slug,
+            name: dbCat.name,
+            icon,
+            desc: `Browse ${dbCat.name} products from verified sellers on EMAHU.`,
+            subcategories: subcats,
+            gradient: `linear-gradient(135deg, rgba(${r}, ${g}, ${b}, 0.08) 0%, rgba(${r}, ${g}, ${b}, 0.04) 100%)`,
+            accent
+          });
+        }
+      });
+    }
+
+    // 2. Auto-discover new categories & subcategories directly from seller added products (dbProducts)
+    if (dbProducts && dbProducts.length > 0) {
+      dbProducts.forEach(p => {
+        let catRaw = (typeof p.category === 'object' ? (p.category?.name || p.category?.title || p.category?.slug) : p.category) || '';
+        catRaw = String(catRaw).trim();
+        if (!catRaw) return;
+
+        const catNorm = normalizeCat(catRaw);
+        const catNameLC = catRaw.toLowerCase();
+
+        // Find match in baseCategories
+        const existingIdx = baseCategories.findIndex(hc => {
+          const hcIdNorm = normalizeCat(hc.id);
+          const hcNameLC = hc.name.toLowerCase();
+          return (
+            hc.id === catNorm ||
+            hcIdNorm === catNorm ||
+            hcNameLC === catNameLC ||
+            (catNorm && hcIdNorm && (hcIdNorm.includes(catNorm) || catNorm.includes(hcIdNorm))) ||
+            (hcNameLC && catNameLC && (hcNameLC.includes(catNameLC) || catNameLC.includes(hcNameLC)))
+          );
         });
-      }
-    });
+
+        const sub = (p.subcategory || '').trim();
+
+        if (existingIdx !== -1) {
+          if (sub && sub !== 'General') {
+            const currentSubcats = baseCategories[existingIdx].subcategories || [];
+            if (!currentSubcats.some(s => s.toLowerCase() === sub.toLowerCase())) {
+              baseCategories[existingIdx] = {
+                ...baseCategories[existingIdx],
+                subcategories: [...currentSubcats, sub]
+              };
+            }
+          }
+        } else {
+          const slug = catNorm || catNameLC.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+          let icon = '📦';
+          for (const [key, emoji] of Object.entries(DYNAMIC_CATEGORY_ICONS)) {
+            if (catNameLC.includes(key)) { icon = emoji; break; }
+          }
+
+          const accent = DYNAMIC_ACCENTS[accentIdx % DYNAMIC_ACCENTS.length];
+          accentIdx++;
+          const r = parseInt(accent.slice(1, 3), 16);
+          const g = parseInt(accent.slice(3, 5), 16);
+          const b = parseInt(accent.slice(5, 7), 16);
+
+          const title = catRaw.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          const subcats = ['All ' + title];
+          if (sub && sub !== 'General') {
+            subcats.push(sub);
+          }
+
+          baseCategories.push({
+            id: slug,
+            name: title,
+            icon,
+            desc: `Browse ${title} products from verified sellers on EMAHU.`,
+            subcategories: subcats,
+            gradient: `linear-gradient(135deg, rgba(${r}, ${g}, ${b}, 0.08) 0%, rgba(${r}, ${g}, ${b}, 0.04) 100%)`,
+            accent
+          });
+        }
+      });
+    }
 
     return baseCategories;
-  }, [dbCategories]);
+  }, [dbCategories, dbProducts]);
 
   // Build category name → root category ID lookup for product mapping
   const categoryNameToId = useMemo(() => {
@@ -578,7 +643,7 @@ export default function RoleSelector() {
     lookup['fitness'] = 'lifestyle';
 
     const dbRootToResolvedId = {};
-    dbCategories.forEach(dbCat => {
+    (dbCategories || []).forEach(dbCat => {
       const nameLC = dbCat.name.toLowerCase();
       const slug = dbCat.slug || nameLC.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       if (lookup[nameLC]) {
@@ -607,10 +672,22 @@ export default function RoleSelector() {
         }
       });
     };
-    mapTree(dbCategories, null);
+    mapTree(dbCategories || [], null);
+
+    // Also index seller product categories from dbProducts
+    (dbProducts || []).forEach(p => {
+      const catRaw = typeof p.category === 'object' ? (p.category?.name || p.category?.title) : p.category;
+      if (catRaw) {
+        const catLC = String(catRaw).toLowerCase().trim();
+        const norm = normalizeCat(catLC);
+        if (!lookup[catLC]) {
+          lookup[catLC] = norm;
+        }
+      }
+    });
 
     return lookup;
-  }, [dbCategories]);
+  }, [dbCategories, dbProducts]);
 
   // Combine DB & static products
   const allProducts = useMemo(() => {
