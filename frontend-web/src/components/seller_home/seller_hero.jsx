@@ -5,11 +5,19 @@ import './seller_hero.css';
 
 export default function SellerHero() {
   const [isVisible, setIsVisible] = useState(false);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [contactSubmitted, setContactSubmitted] = useState(false);
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
 
   useEffect(() => {
     const t = setTimeout(() => setIsVisible(true), 80);
     return () => clearTimeout(t);
   }, []);
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    setContactSubmitted(true);
+  };
 
   return (
     <section className={`sh-hero ${isVisible ? 'sh-hero--visible' : ''}`} id="seller-hero">
@@ -84,11 +92,37 @@ export default function SellerHero() {
               </button>
 
               <button
-                onClick={() => window.location.href = '/contact'}
+                onClick={() => {
+                  setIsContactModalOpen(true);
+                  setContactSubmitted(false);
+                }}
                 className="sh-btn sh-btn--secondary"
               >
                 Contact Us
               </button>
+            </div>
+
+            {/* Direct Seller Support Contact Info */}
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '14px',
+              margin: '14px 0 0 0',
+              padding: '10px 14px',
+              borderRadius: '10px',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              fontSize: '0.85rem'
+            }}>
+              <span style={{ color: '#94a3b8', fontWeight: '500' }}>Seller Support:</span>
+              <a href="mailto:emahu23072026@gmail.com" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                ✉️ emahu23072026@gmail.com
+              </a>
+              <span style={{ color: '#475569' }}>•</span>
+              <a href="tel:9081330134" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                📞 +91 9081330134
+              </a>
             </div>
 
             {/* Seller Portal — Seller Type Cards */}
@@ -210,6 +244,238 @@ export default function SellerHero() {
 
         </div>
       </div>
+
+      {/* ── INTERACTIVE CONTACT DETAILS MODAL ── */}
+      {isContactModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setIsContactModalOpen(false)}
+        >
+          <div
+            style={{
+              background: '#0f172a',
+              color: '#ffffff',
+              borderRadius: '24px',
+              width: '100%',
+              maxWidth: '520px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              maxHeight: '90vh'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '24px 28px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'rgba(255, 255, 255, 0.03)'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#f8fafc' }}>
+                  📞 EMAHU Contact Details
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
+                  Official Support Helpline & Email
+                </p>
+              </div>
+              <button
+                onClick={() => setIsContactModalOpen(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '10px',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '6px 12px',
+                  fontSize: '1rem',
+                  fontWeight: 'bold'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div style={{ padding: '24px 28px', overflowY: 'auto', flexGrow: 1 }}>
+              
+              {/* Direct Contact Cards Box */}
+              <div style={{
+                display: 'grid',
+                gap: '12px',
+                marginBottom: '24px'
+              }}>
+                {/* Email Box */}
+                <a
+                  href="mailto:emahu23072026@gmail.com"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    padding: '14px 18px',
+                    borderRadius: '14px',
+                    background: 'rgba(56, 189, 248, 0.08)',
+                    border: '1px solid rgba(56, 189, 248, 0.2)',
+                    textDecoration: 'none',
+                    color: '#ffffff'
+                  }}
+                >
+                  <div style={{ fontSize: '1.5rem' }}>✉️</div>
+                  <div style={{ flexGrow: 1 }}>
+                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase' }}>Email Support</span>
+                    <strong style={{ fontSize: '0.95rem', color: '#38bdf8' }}>emahu23072026@gmail.com</strong>
+                  </div>
+                  <span style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: '700' }}>Email Us →</span>
+                </a>
+
+                {/* Phone Box */}
+                <a
+                  href="tel:9081330134"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    padding: '14px 18px',
+                    borderRadius: '14px',
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    textDecoration: 'none',
+                    color: '#ffffff'
+                  }}
+                >
+                  <div style={{ fontSize: '1.5rem' }}>📞</div>
+                  <div style={{ flexGrow: 1 }}>
+                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase' }}>Helpline Number</span>
+                    <strong style={{ fontSize: '0.95rem', color: '#818cf8' }}>+91 9081330134</strong>
+                  </div>
+                  <span style={{ fontSize: '0.85rem', color: '#818cf8', fontWeight: '700' }}>Call Now →</span>
+                </a>
+
+                {/* WhatsApp Box */}
+                <a
+                  href="https://wa.me/919081330134"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    padding: '14px 18px',
+                    borderRadius: '14px',
+                    background: 'rgba(16, 185, 129, 0.08)',
+                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                    textDecoration: 'none',
+                    color: '#ffffff'
+                  }}
+                >
+                  <div style={{ fontSize: '1.5rem' }}>💬</div>
+                  <div style={{ flexGrow: 1 }}>
+                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase' }}>WhatsApp Chat</span>
+                    <strong style={{ fontSize: '0.95rem', color: '#34d399' }}>9081330134</strong>
+                  </div>
+                  <span style={{ fontSize: '0.85rem', color: '#34d399', fontWeight: '700' }}>WhatsApp →</span>
+                </a>
+              </div>
+
+              {/* Inquiry Form */}
+              {contactSubmitted ? (
+                <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>✅</div>
+                  <h4 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#34d399', margin: '0 0 6px 0' }}>Message Sent!</h4>
+                  <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>
+                    Thank you, <strong>{formData.name}</strong>. We will get back to you at <strong>emahu23072026@gmail.com</strong> or call <strong>+91 9081330134</strong>.
+                  </p>
+                  <button
+                    onClick={() => setIsContactModalOpen(false)}
+                    style={{
+                      marginTop: '16px',
+                      padding: '10px 24px',
+                      background: 'linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#cbd5e1' }}>Send Inquiry Directly:</div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Your Name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    style={{ height: '42px', padding: '0 14px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.12)', color: '#fff', fontSize: '0.875rem' }}
+                  />
+                  <input
+                    type="email"
+                    required
+                    placeholder="Your Email Address"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    style={{ height: '42px', padding: '0 14px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.12)', color: '#fff', fontSize: '0.875rem' }}
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Your Phone Number (e.g. 9081330134)"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    style={{ height: '42px', padding: '0 14px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.12)', color: '#fff', fontSize: '0.875rem' }}
+                  />
+                  <textarea
+                    required
+                    rows="3"
+                    placeholder="How can we help you?"
+                    value={formData.message}
+                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                    style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.12)', color: '#fff', fontSize: '0.875rem', fontFamily: 'inherit', resize: 'vertical' }}
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      height: '44px',
+                      background: 'linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontWeight: '700',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(56, 189, 248, 0.25)',
+                      marginTop: '4px'
+                    }}
+                  >
+                    Submit Inquiry
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

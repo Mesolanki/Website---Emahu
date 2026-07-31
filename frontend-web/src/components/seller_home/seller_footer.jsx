@@ -99,6 +99,16 @@ export default function SellerFooter() {
               </span>
             </p>
             
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', fontSize: '0.85rem', color: '#94a3b8' }}>
+              <a href="mailto:emahu23072026@gmail.com" style={{ color: '#60a5fa', textDecoration: 'none', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                ✉️ emahu23072026@gmail.com
+              </a>
+              <span>•</span>
+              <a href="tel:9081330134" style={{ color: '#60a5fa', textDecoration: 'none', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                📞 +91 9081330134
+              </a>
+            </div>
+
             {/* Mock Social Media icons */}
             <div className="sff-socials">
               <Link href="/" aria-label="LinkedIn Profile">💼</Link>

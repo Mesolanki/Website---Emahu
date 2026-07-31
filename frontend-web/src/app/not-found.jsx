@@ -111,6 +111,54 @@ export default function NotFound() {
             Browse Catalog
           </Link>
         </div>
+
+        {/* Contact Support Information Block */}
+        <div style={{
+          marginTop: '32px',
+          padding: '18px 24px',
+          borderRadius: '16px',
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+          backdropFilter: 'blur(12px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '10px'
+        }}>
+          <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Need Help? Contact EMAHU Support
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '16px', fontSize: '0.9rem' }}>
+            <a
+              href="mailto:emahu23072026@gmail.com"
+              style={{
+                color: '#38bdf8',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontWeight: '600'
+              }}
+            >
+              ✉️ emahu23072026@gmail.com
+            </a>
+            <span style={{ color: '#475569' }}>•</span>
+            <a
+              href="tel:9081330134"
+              style={{
+                color: '#38bdf8',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontWeight: '600'
+              }}
+            >
+              📞 +91 9081330134
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );

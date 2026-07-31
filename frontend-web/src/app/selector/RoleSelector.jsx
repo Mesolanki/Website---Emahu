@@ -1510,6 +1510,15 @@ export default function RoleSelector() {
           <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
             Developed by <a href="https://sanmora.in" target="_blank" rel="noopener noreferrer" style={{ color: '#4169e1', fontWeight: '600', textDecoration: 'none' }}>sanmora.in</a>
           </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '12px', fontSize: '0.82rem', color: '#475569', marginTop: '2px' }}>
+            <a href="mailto:emahu23072026@gmail.com" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              ✉️ emahu23072026@gmail.com
+            </a>
+            <span>•</span>
+            <a href="tel:9081330134" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              📞 +91 9081330134
+            </a>
+          </div>
           <div className="sel-footer__links" style={{ marginTop: '4px' }}>
             <a href="#" onClick={(e) => { e.preventDefault(); setIsSupportModalOpen(true); setSupportSubmitted(false); }} style={{ color: '#64748b', textDecoration: 'none', cursor: 'pointer', transition: 'color 0.2s' }}>Get Portal Support</a>
             <span className="sel-footer__dot" />
@@ -1570,7 +1579,9 @@ export default function RoleSelector() {
               }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800', color: '#0f172a' }}>🛠️ Portal Help & Support</h3>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>EMAHU Platform Services Center</p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                    Email: <a href="mailto:emahu23072026@gmail.com" style={{ color: '#2563eb', fontWeight: '600' }}>emahu23072026@gmail.com</a> | Call: <a href="tel:9081330134" style={{ color: '#2563eb', fontWeight: '600' }}>+91 9081330134</a>
+                  </p>
                 </div>
                 <motion.button
                   onClick={() => setIsSupportModalOpen(false)}
