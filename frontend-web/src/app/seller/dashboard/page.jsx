@@ -216,8 +216,7 @@ const getRandomWeightStr = () => `${(1.5 + Math.random() * 3).toFixed(2)} kg`;
 const generateNotificationId = () => `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
 const getDynamicApiUrl = () => {
-  let base = localApiUrl || '';
-  base = base.trim();
+  let base = String(localApiUrl || '').trim();
   // If it's a local address or empty, return an empty string to use Next.js server-side proxy rewrites
   if (!base || base.includes('localhost') || base.includes('127.0.0.1')) {
     return '';
@@ -1137,10 +1136,6 @@ export default function EmahuProDashboard() {
       if (!isApproved) {
         if (activeTab !== 'status' && activeTab !== 'requests') {
           setTimeout(() => setActiveTab('status'), 0);
-        }
-      } else {
-        if (activeTab === 'status') {
-          setTimeout(() => setActiveTab('overview'), 0);
         }
       }
     }
@@ -3835,7 +3830,39 @@ export default function EmahuProDashboard() {
                 <p style={{ color: 'var(--text-secondary)', marginTop: '8px' }}>Monitor onboarding progress and resubmit compliance credentials.</p>
               </div>
 
-              {sellerUser?.status === 'pending' && (
+              {(sellerUser?.status === 'approved' || isApproved) && (
+                <div style={{
+                  background: 'rgba(16, 185, 129, 0.05)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '16px',
+                  padding: '32px',
+                  textAlign: 'center',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
+                  backdropFilter: 'blur(10px)',
+                  marginBottom: '32px'
+                }}>
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 20px'
+                  }}>
+                    <span style={{ fontSize: '2rem' }}>✅</span>
+                  </div>
+                  <h3 style={{ fontSize: '1.4rem', color: '#065f46', fontWeight: '700', marginBottom: '12px' }}>
+                    Seller Account Verified & Approved
+                  </h3>
+                  <p style={{ color: '#047857', fontSize: '1rem', lineHeight: '1.6', margin: '0 auto', maxWidth: '600px', fontWeight: '600' }}>
+                    Your store verification has been successfully approved by the compliance team. All seller privileges, product management, and order fulfillment are fully unlocked.
+                  </p>
+                </div>
+              )}
+
+              {sellerUser?.status === 'pending' && !isApproved && (
                 <div style={{
                   background: 'rgba(245, 158, 11, 0.05)',
                   border: '1px solid rgba(245, 158, 11, 0.3)',

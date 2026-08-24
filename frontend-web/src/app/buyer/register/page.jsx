@@ -8,6 +8,7 @@ import { registerUser, saveAuthSession, googleLoginUser, fetchWithRetry } from '
 import { useGoogleAuth } from '@/utils/useGoogleAuth';
 import { wakeupServer } from '@/utils/serverWakeup';
 import API_BASE from '@/utils/config';
+import { indiaStatesCities } from '@/utils/indiaStatesCities';
 
 /**
  * Retail Buyer Registration Component
@@ -217,6 +218,18 @@ export default function BuyerRegister() {
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name] || errors.general) {
       setErrors((prev) => ({ ...prev, [name]: '', general: '' }));
+    }
+  };
+
+  const handleStateChange = (e) => {
+    const selectedState = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      state: selectedState,
+      city: '',
+    }));
+    if (errors.state || errors.city || errors.general) {
+      setErrors((prev) => ({ ...prev, state: '', city: '', general: '' }));
     }
   };
 
@@ -559,31 +572,45 @@ export default function BuyerRegister() {
                     </div>
 
                     <div className="br-field">
-                      <label className="br-label" htmlFor="city">City</label>
-                      <input
-                        type="text"
-                        id="city"
-                        name="city"
-                        className={`br-input ${errors.city ? 'br-input--error' : ''}`}
-                        placeholder="e.g. New Delhi"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                      />
-                      {errors.city && <span className="br-error">{errors.city}</span>}
+                      <label className="br-label" htmlFor="state">State / UT</label>
+                      <select
+                        id="state"
+                        name="state"
+                        className={`br-input br-select ${errors.state ? 'br-input--error' : ''}`}
+                        value={formData.state}
+                        onChange={handleStateChange}
+                      >
+                        <option value="">Select State / UT</option>
+                        {Object.keys(indiaStatesCities).sort().map((st) => (
+                          <option key={st} value={st}>
+                            {st}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.state && <span className="br-error">{errors.state}</span>}
                     </div>
 
                     <div className="br-field">
-                      <label className="br-label" htmlFor="state">State / UT</label>
-                      <input
-                        type="text"
-                        id="state"
-                        name="state"
-                        className={`br-input ${errors.state ? 'br-input--error' : ''}`}
-                        placeholder="e.g. Delhi"
-                        value={formData.state}
+                      <label className="br-label" htmlFor="city">City</label>
+                      <select
+                        id="city"
+                        name="city"
+                        className={`br-input br-select ${errors.city ? 'br-input--error' : ''}`}
+                        value={formData.city}
                         onChange={handleInputChange}
-                      />
-                      {errors.state && <span className="br-error">{errors.state}</span>}
+                        disabled={!formData.state}
+                      >
+                        <option value="">
+                          {formData.state ? 'Select City' : 'Select State first'}
+                        </option>
+                        {formData.state &&
+                          (indiaStatesCities[formData.state] || []).map((cityName) => (
+                            <option key={cityName} value={cityName}>
+                              {cityName}
+                            </option>
+                          ))}
+                      </select>
+                      {errors.city && <span className="br-error">{errors.city}</span>}
                     </div>
 
                     <div className="br-field br-field--full">
