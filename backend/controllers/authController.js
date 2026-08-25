@@ -1611,7 +1611,7 @@ exports.firebaseVerify = async (req, res) => {
 // @access  Public
 exports.sendPhoneOtp = async (req, res) => {
   try {
-    const { phone, role } = req.body;
+    const { phone, role, email } = req.body;
     if (!phone || !phone.toString().trim()) {
       return res.status(400).json({ success: false, error: 'Please provide a phone number' });
     }
@@ -1620,6 +1620,15 @@ exports.sendPhoneOtp = async (req, res) => {
     const cleanPhone = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
     if (!/^\d{10}$/.test(cleanPhone)) {
       return res.status(400).json({ success: false, error: 'Please provide a valid 10-digit phone number' });
+    }
+
+    if (email && email.toString().trim()) {
+      const emailQuery = { email: email.toString().trim().toLowerCase() };
+      if (role) emailQuery.role = role;
+      const existingEmailUser = await User.findOne(emailQuery);
+      if (existingEmailUser) {
+        return res.status(400).json({ success: false, error: 'A user with this email address already exists' });
+      }
     }
 
     // Check if user with this phone already exists
