@@ -105,47 +105,44 @@ export default function SellerRegister() {
 
   const [draftLoaded, setDraftLoaded] = useState(false);
 
-  // Load draft from localStorage on mount
+  // Restore draft on refresh in current session (so refreshing the page doesn't lose typed data)
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedData = localStorage.getItem('emahu_seller_register_draft');
-      if (savedData) {
-        try {
+      try {
+        const savedData = sessionStorage.getItem('emahu_seller_register_draft');
+        if (savedData) {
           const parsed = JSON.parse(savedData);
           setFormData((prev) => ({
             ...prev,
             ...parsed,
-            kycFile: null // file object cannot be serialized
+            kycFile: null
           }));
-        } catch (err) {
-          console.error('Failed to parse seller register draft:', err);
         }
-      }
-      const savedStep = localStorage.getItem('emahu_seller_register_step');
-      if (savedStep) {
-        const parsedStep = parseInt(savedStep, 10);
-        if (parsedStep >= 1 && parsedStep <= 3) {
-          setStep(parsedStep);
-        } else {
-          localStorage.removeItem('emahu_seller_register_step');
-          localStorage.removeItem('emahu_seller_register_draft');
-          setStep(1);
+        const savedStep = sessionStorage.getItem('emahu_seller_register_step');
+        if (savedStep) {
+          const parsedStep = parseInt(savedStep, 10);
+          if (parsedStep >= 1 && parsedStep <= 3) {
+            setStep(parsedStep);
+          }
         }
+      } catch (err) {
+        console.error('Failed to parse seller register draft:', err);
+      } finally {
+        setDraftLoaded(true);
       }
-      setDraftLoaded(true);
     }
   }, []);
 
-  // Save draft to localStorage on changes (only active form steps 1-3)
+  // Save draft to sessionStorage on changes
   useEffect(() => {
     if (!draftLoaded) return;
     if (step >= 1 && step <= 3) {
-      const { kycFile, password, ...serializableData } = formData;
-      localStorage.setItem('emahu_seller_register_draft', JSON.stringify(serializableData));
-      localStorage.setItem('emahu_seller_register_step', step.toString());
+      const { kycFile, ...serializableData } = formData;
+      sessionStorage.setItem('emahu_seller_register_draft', JSON.stringify(serializableData));
+      sessionStorage.setItem('emahu_seller_register_step', step.toString());
     } else {
-      localStorage.removeItem('emahu_seller_register_draft');
-      localStorage.removeItem('emahu_seller_register_step');
+      sessionStorage.removeItem('emahu_seller_register_draft');
+      sessionStorage.removeItem('emahu_seller_register_step');
     }
   }, [formData, step, draftLoaded]);
 
@@ -381,9 +378,11 @@ export default function SellerRegister() {
     }
     if (!formData.bankName.trim()) newErrors.bankName = 'Bank name is required';
 
-    // Optional GSTIN Validation (if field is filled)
-    if (formData.gstNumber.trim() && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gstNumber.toUpperCase().trim())) {
-      newErrors.gstNumber = 'Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5)';
+    // Ensure essential credentials from Step 1 are present
+    if (!formData.password || !formData.phone || (!formData.ownerName && !formData.storeName)) {
+      setStep(1);
+      setErrors({ general: 'Please confirm your password and phone number on Step 1 to complete registration.' });
+      return false;
     }
 
     setErrors(newErrors);
@@ -413,13 +412,13 @@ export default function SellerRegister() {
       setErrors({});
 
       try {
-        const fullAddress = `${formData.storeName} (${formData.category})`;
+        const fullAddress = `${formData.storeName || ''} (${formData.category || ''})`;
         const data = await registerUser({
-          name: formData.ownerName,
-          email: formData.email,
+          name: (formData.ownerName || formData.storeName || '').trim(),
+          email: (formData.email || '').trim(),
           password: formData.password,
           role: 'seller',
-          phone: formData.phone,
+          phone: (formData.phone || '').trim(),
           address: fullAddress,
           storeName: formData.storeName,
           category: formData.category,
@@ -431,6 +430,12 @@ export default function SellerRegister() {
           bankName: formData.bankName,
           gstNumber: formData.gstNumber
         });
+
+        // Clear registration draft from sessionStorage
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('emahu_seller_register_draft');
+          sessionStorage.removeItem('emahu_seller_register_step');
+        }
 
         setRegSuccessData(data);
 

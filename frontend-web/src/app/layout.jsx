@@ -18,6 +18,14 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "EMAHU | Choose Your Experience",
   description: "The next generation e-commerce platform.",
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico' }
+    ],
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 };
 
 export const viewport = {
@@ -70,6 +78,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="alternate icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/favicon.svg" />
         <script dangerouslySetInnerHTML={{ __html: interceptorScript }} />
       </head>
       <body>

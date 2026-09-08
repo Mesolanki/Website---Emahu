@@ -59,8 +59,20 @@ const sendTokenResponse = async (user, statusCode, req, res) => {
         role: user.role,
         phone: user.phone,
         address: user.address,
+        city: user.city,
+        state: user.state,
+        latitude: user.latitude,
+        longitude: user.longitude,
+        location: user.location,
         storeName: user.storeName,
         category: user.category,
+        kycType: user.kycType,
+        kycNumber: user.kycNumber,
+        bankHolder: user.bankHolder,
+        accountNumber: user.accountNumber,
+        ifscCode: user.ifscCode,
+        bankName: user.bankName,
+        gstNumber: user.gstNumber,
         status: user.status
       }
     });
@@ -661,6 +673,8 @@ exports.getMe = async (req, res) => {
         role: req.user.role,
         phone: req.user.phone,
         address: req.user.address,
+        city: req.user.city,
+        state: req.user.state,
         storeName: req.user.storeName,
         category: req.user.category,
         kycType: req.user.kycType,
@@ -673,6 +687,7 @@ exports.getMe = async (req, res) => {
         status: req.user.status,
         latitude: req.user.latitude,
         longitude: req.user.longitude,
+        location: req.user.location,
         createdAt: req.user.createdAt
       }
     });
@@ -703,15 +718,28 @@ exports.updateDetails = async (req, res) => {
       }
     }
 
+    const lat = req.body.latitude !== undefined ? req.body.latitude : req.user.latitude;
+    const lon = req.body.longitude !== undefined ? req.body.longitude : req.user.longitude;
+    const addr = req.body.address !== undefined ? req.body.address : req.user.address;
+
     const fieldsToUpdate = {
       name: req.body.name || req.user.name,
       phone: req.body.phone !== undefined ? req.body.phone : req.user.phone,
-      address: req.body.address !== undefined ? req.body.address : req.user.address,
+      address: addr,
       city: resolvedCity,
       state: resolvedState,
       storeName: req.body.storeName !== undefined ? req.body.storeName : req.user.storeName,
-      latitude: req.body.latitude !== undefined ? req.body.latitude : req.user.latitude,
-      longitude: req.body.longitude !== undefined ? req.body.longitude : req.user.longitude,
+      latitude: (lat !== undefined && lat !== null && lat !== '') ? Number(lat) : undefined,
+      longitude: (lon !== undefined && lon !== null && lon !== '') ? Number(lon) : undefined,
+      location: (lat !== undefined && lon !== undefined && lat !== null && lon !== null && lat !== '' && lon !== '') ? {
+        address: addr || '',
+        latitude: Number(lat),
+        longitude: Number(lon)
+      } : req.user.location,
+      locationPoint: (lat !== undefined && lon !== undefined && lat !== null && lon !== null && lat !== '' && lon !== '') ? {
+        type: 'Point',
+        coordinates: [Number(lon), Number(lat)]
+      } : req.user.locationPoint,
       bankHolder: req.body.bankHolder !== undefined ? req.body.bankHolder : req.user.bankHolder,
       accountNumber: req.body.accountNumber !== undefined ? req.body.accountNumber : req.user.accountNumber,
       ifscCode: req.body.ifscCode !== undefined ? req.body.ifscCode : req.user.ifscCode,

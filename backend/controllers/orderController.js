@@ -181,13 +181,32 @@ exports.createOrder = async (req, res) => {
     if (orderData.distanceKm !== undefined && orderData.distanceKm !== null && orderData.distanceKm > 0) {
       distanceKm = orderData.distanceKm;
     } else {
-      distanceKm = getHaversineDistance(bLat, bLon, sLat, sLon);
+      const { computeSingleRoadDistance } = require('../services/googleRoutesService');
+      const roadDistObj = await computeSingleRoadDistance(
+        { latitude: Number(bLat), longitude: Number(bLon) },
+        { latitude: Number(sLat), longitude: Number(sLon) }
+      );
+      distanceKm = roadDistObj ? roadDistObj.distanceKm : Number(getHaversineDistance(bLat, bLon, sLat, sLon).toFixed(2));
     }
 
 
 
 
-    const chargeResult = resolveCharge(distanceKm, productAmount, settings);
+    // Compute total order weight in KG
+    let totalWeightKg = 0;
+    if (Array.isArray(orderData.items)) {
+      for (const item of orderData.items) {
+        const prod = await Product.findById(item.productId || item.id);
+        if (prod) {
+          const itemWeightKg = prod.weightInKg !== undefined && prod.weightInKg !== null
+            ? prod.weightInKg
+            : (prod.weightUnit === 'g' ? ((prod.weight || 0) / 1000) : (prod.weight || 0.5));
+          totalWeightKg += itemWeightKg * (item.quantity || 1);
+        }
+      }
+    }
+
+    const chargeResult = resolveCharge(distanceKm, productAmount, totalWeightKg, settings);
     if (chargeResult.error) {
       return res.status(400).json({
         success: false,
@@ -196,6 +215,7 @@ exports.createOrder = async (req, res) => {
     }
 
     deliveryCharge = chargeResult.charge;
+    orderData.packageWeight = `${totalWeightKg.toFixed(2)} kg`;
 
     // Save audited details
     orderData.sellerLocation = {

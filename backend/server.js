@@ -16,6 +16,8 @@ const deliveryRoutes = require('./routes/deliveryRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 
 const paymentRoutes = require('./routes/paymentRoutes');
+const locationRoutes = require('./routes/locationRoutes');
+const { getNearbySellers } = require('./controllers/locationController');
 
 // Initialize app
 const app = express();
@@ -126,6 +128,10 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/reviews', reviewRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/payment', paymentRoutes);
+app.use('/api/location', locationRoutes);
+app.use('/location', locationRoutes);
+app.post('/api/sellers/nearby', getNearbySellers);
+app.post('/sellers/nearby', getNearbySellers);
 
 
 // 404 Route handler

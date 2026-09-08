@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import CategorySelector from './CategorySelector';
-import API_BASE from '@/utils/config';
+import API_BASE, { getApiBase } from '@/utils/config';
 import './DynamicProductForm.css';
 
 // Popular fallback suggestions if API config has no brands
@@ -72,6 +72,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
 
   // Shipping
   const [weight, setWeight] = useState('');
+  const [weightUnit, setWeightUnit] = useState('kg');
   const [length, setLength] = useState('');
   const [width, setWidth] = useState('');
   const [height, setHeight] = useState('');
@@ -436,6 +437,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
           setVideoUrl(prod.videoUrl || '');
           setAltText(prod.altText || '');
           setWeight(prod.weight !== undefined ? String(prod.weight) : '');
+          setWeightUnit(prod.weightUnit || 'kg');
           setLength(prod.length !== undefined ? String(prod.length) : '');
           setWidth(prod.width !== undefined ? String(prod.width) : '');
           setHeight(prod.height !== undefined ? String(prod.height) : '');
@@ -467,7 +469,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
         name, brand, category, subcategory, price, comparePrice, stock, description, images,
         descOverview, descSize, descColor, descMemory, descWarranty,
         shortTitle, modelNumber, sku, barcode, tax, hsnCode, moq, maxOrderQty, lowStockAlert,
-        backorderAllowed, warehouse, images360, videoUrl, altText, weight, length, width, height,
+        backorderAllowed, warehouse, images360, videoUrl, altText, weight, weightUnit, length, width, height,
         shippingCharges, freeShipping, deliveryTime, dynamicAttributes, seoTitle, metaDescription,
         metaKeywords, canonicalUrl, enableVariants, variantsList, specifications,
         timestamp: new Date().toLocaleTimeString()
@@ -481,7 +483,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
     name, brand, category, subcategory, price, comparePrice, stock, description, images,
     descOverview, descSize, descColor, descMemory, descWarranty,
     shortTitle, modelNumber, sku, barcode, tax, hsnCode, moq, maxOrderQty, lowStockAlert,
-    backorderAllowed, warehouse, images360, videoUrl, altText, weight, length, width, height,
+    backorderAllowed, warehouse, images360, videoUrl, altText, weight, weightUnit, length, width, height,
     shippingCharges, freeShipping, deliveryTime, dynamicAttributes, seoTitle, metaDescription,
     metaKeywords, canonicalUrl, enableVariants, variantsList, specifications, resubmitProductId, addVariantOfProductId
   ]);
@@ -518,6 +520,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
       setVideoUrl('');
       setAltText('');
       setWeight('');
+      setWeightUnit('kg');
       setLength('');
       setWidth('');
       setHeight('');
@@ -570,6 +573,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
         setVideoUrl(d.videoUrl || '');
         setAltText(d.altText || '');
         setWeight(d.weight || '');
+        setWeightUnit(d.weightUnit || 'kg');
         setLength(d.length || '');
         setWidth(d.width || '');
         setHeight(d.height || '');
@@ -914,6 +918,8 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
         backorderAllowed, warehouse, images360: images360.map(img => img.url),
         videoUrl, altText,
         weight: parseFloat(weight) || undefined,
+        weightUnit: weightUnit || 'kg',
+        weightInKg: weight ? (weightUnit === 'g' ? parseFloat(weight) / 1000 : parseFloat(weight)) : undefined,
         length: parseFloat(length) || undefined,
         width: parseFloat(width) || undefined,
         height: parseFloat(height) || undefined,
@@ -1031,7 +1037,16 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                 <h3 className="form-section-title">📂 Category & brand parameters</h3>
                 <div className="form-group">
                   <label className="form-label">Search & Select Category *</label>
-                  <CategorySelector value={category} onChange={setCategory} />
+                  <CategorySelector
+                    value={category}
+                    subcategoryValue={subcategory}
+                    onChange={(mainCat, subCat) => {
+                      setCategory(mainCat);
+                      if (subCat && subCat !== 'General') {
+                        setSubcategory(subCat);
+                      }
+                    }}
+                  />
                 </div>
 
                 <div className="form-grid-2">
@@ -1725,20 +1740,33 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
             {/* STEP 8: SHIPPING */}
             {currentStep === 8 && (
               <>
-                <h3 className="form-section-title">🚚 Box weight & dimensions</h3>
+                <h3 className="form-section-title">🚚 Box weight, unit & dimensions</h3>
                 
                 <div className="form-grid-2">
                   <div className="form-group">
-                    <label className="form-label">Package Weight (kg) *</label>
-                    <input 
-                      type="number" 
-                      step="0.01"
-                      className="form-input" 
-                      placeholder="e.g. 1.2"
-                      value={weight}
-                      onChange={e => setWeight(e.target.value)}
-                      required
-                    />
+                    <label className="form-label">Package Weight *</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input 
+                        type="number" 
+                        step={weightUnit === 'g' ? '1' : '0.01'}
+                        min="0"
+                        className="form-input" 
+                        style={{ flex: 2 }}
+                        placeholder={weightUnit === 'g' ? 'e.g. 500' : 'e.g. 1.5'}
+                        value={weight}
+                        onChange={e => setWeight(e.target.value)}
+                        required
+                      />
+                      <select 
+                        className="form-select" 
+                        style={{ flex: 1, minWidth: '110px' }}
+                        value={weightUnit} 
+                        onChange={e => setWeightUnit(e.target.value)}
+                      >
+                        <option value="kg">Kilogram (kg)</option>
+                        <option value="g">Gram (g)</option>
+                      </select>
+                    </div>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Estimated Delivery Time Window</label>
@@ -1749,6 +1777,38 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                     </select>
                   </div>
                 </div>
+
+                {/* Live Weight Surcharge Calculation Card */}
+                {weight && parseFloat(weight) > 0 && (
+                  <div style={{ 
+                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', 
+                    border: '1px solid #86efac', 
+                    borderRadius: '10px', 
+                    padding: '12px 16px', 
+                    marginBottom: '16px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '10px'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        ⚖️ Logistics Weight Surcharge (@ ₹60/KG)
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: '#15803d', marginTop: '2px' }}>
+                        Entered Weight: <strong>{weight} {weightUnit}</strong>
+                        {weightUnit === 'g' ? ` (${(parseFloat(weight) / 1000).toFixed(3)} kg)` : ` (${(parseFloat(weight) * 1000).toFixed(0)} g)`}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#166534', display: 'block', fontWeight: 600 }}>Weight Delivery Cost</span>
+                      <strong style={{ fontSize: '1.2rem', color: '#14532d', fontWeight: '800' }}>
+                        ₹{( (weightUnit === 'g' ? parseFloat(weight) / 1000 : parseFloat(weight)) * 60 ).toFixed(2)}
+                      </strong>
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                   <div className="form-group">

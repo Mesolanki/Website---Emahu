@@ -97,10 +97,10 @@ export default function DeliveryPortal() {
 
   const [draftLoaded, setDraftLoaded] = useState(false);
 
-  // Load draft on mount
+  // Load delivery registration draft from sessionStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedDraft = localStorage.getItem('emahu_delivery_register_draft');
+      const savedDraft = sessionStorage.getItem('emahu_delivery_register_draft');
       if (savedDraft) {
         try {
           const draft = JSON.parse(savedDraft);
@@ -133,7 +133,7 @@ export default function DeliveryPortal() {
     }
   }, []);
 
-  // Save delivery registration draft to localStorage
+  // Save delivery registration draft to sessionStorage
   useEffect(() => {
     if (!draftLoaded) return;
     if (typeof window !== 'undefined') {
@@ -160,7 +160,7 @@ export default function DeliveryPortal() {
         coveredCities,
         perKmRate
       };
-      localStorage.setItem('emahu_delivery_register_draft', JSON.stringify(draft));
+      sessionStorage.setItem('emahu_delivery_register_draft', JSON.stringify(draft));
     }
   }, [
     draftLoaded,
@@ -330,7 +330,7 @@ export default function DeliveryPortal() {
         const pendingJobs = jobs.filter(j => j.deliveryStatus !== 'delivered' && j.deliveryStatus !== 'rejected');
 
         const totalEarnings = deliveredJobs.reduce((acc, curr) => {
-          const cost = curr.deliveryCost !== undefined ? curr.deliveryCost : (curr.distanceKm || 0) * 2;
+          const cost = curr.deliveryCost !== undefined ? curr.deliveryCost : (curr.distanceKm || 0) * 4;
           return acc + cost;
         }, 0);
 
@@ -559,6 +559,7 @@ export default function DeliveryPortal() {
       setIsLoggedIn(true);
       setPortalMode('dashboard');
       if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('emahu_delivery_register_draft');
         localStorage.removeItem('emahu_delivery_register_draft');
       }
 
@@ -2204,7 +2205,7 @@ export default function DeliveryPortal() {
               <div className="benefit-card" style={{ padding: '24px' }}>
                 <span style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Earnings</span>
                 <h3 style={{ fontSize: '2rem', margin: '8px 0 0 0', color: '#319795' }}>₹{stats.earnings}</h3>
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>At rate ₹2/KM</span>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>At rate ₹4/KM</span>
               </div>
             </div>
           )}
@@ -2538,7 +2539,7 @@ export default function DeliveryPortal() {
                         </thead>
                         <tbody>
                           {assignedRequests.map((order) => {
-                            const payout = order.deliveryCharge || parseFloat(((order.distanceKm || 0) * 2).toFixed(2));
+                            const payout = order.deliveryCharge || parseFloat(((order.distanceKm || 0) * 4).toFixed(2));
                             return (
                               <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
                                 <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
@@ -2625,7 +2626,7 @@ export default function DeliveryPortal() {
                       </thead>
                       <tbody>
                         {availableOrders.map((order) => {
-                          const payout = parseFloat(((order.distanceKm || 0) * 2).toFixed(2));
+                          const payout = order.deliveryCharge || parseFloat(((order.distanceKm || 0) * 4).toFixed(2));
                           return (
                             <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
                               <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
@@ -2822,7 +2823,7 @@ export default function DeliveryPortal() {
                           💳 SELLER PAYMENT & PAYOUT SUMMARY
                         </div>
                         <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>
-                          Payout Amount: <span style={{ color: '#319795' }}>₹{activeOrder.deliveryCharge || parseFloat(((activeOrder.distanceKm || 0) * 2).toFixed(2))}</span>
+                          Payout Amount: <span style={{ color: '#319795' }}>₹{activeOrder.deliveryCharge || parseFloat(((activeOrder.distanceKm || 0) * 4).toFixed(2))}</span>
                         </div>
                       </div>
                       <div style={{ background: '#10b981', color: '#ffffff', padding: '6px 14px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 800 }}>
@@ -3090,7 +3091,7 @@ export default function DeliveryPortal() {
                     </thead>
                     <tbody>
                       {orders.filter(o => o.deliveryStatus === 'delivered').map((order) => {
-                        const cost = order.deliveryCost !== undefined ? order.deliveryCost : parseFloat(((order.distanceKm || 0) * 2).toFixed(2));
+                        const cost = order.deliveryCost !== undefined ? order.deliveryCost : parseFloat(((order.distanceKm || 0) * 4).toFixed(2));
                         const dateObj = order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : order.date;
                         return (
                           <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
@@ -3128,7 +3129,7 @@ export default function DeliveryPortal() {
                 <div style={{ padding: '20px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '16px' }}>
                   <div style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: '700' }}>TOTAL INCOME</div>
                   <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#16a34a', marginTop: '6px' }}>₹{stats.earnings}</div>
-                  <p style={{ fontSize: '0.75rem', color: '#16a34a', margin: '4px 0 0 0' }}>Flat ₹2 per KM rate applied on deliveries.</p>
+                  <p style={{ fontSize: '0.75rem', color: '#16a34a', margin: '4px 0 0 0' }}>Flat ₹4 per KM rate applied on deliveries.</p>
                 </div>
                 <div style={{ padding: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
                   <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: '700' }}>JOBS DELIVERED</div>
@@ -3155,12 +3156,12 @@ export default function DeliveryPortal() {
                     </thead>
                     <tbody>
                       {orders.filter(o => o.deliveryStatus === 'delivered').map((order) => {
-                        const cost = order.deliveryCost !== undefined ? order.deliveryCost : parseFloat(((order.distanceKm || 0) * 2).toFixed(2));
+                        const cost = order.deliveryCost !== undefined ? order.deliveryCost : parseFloat(((order.distanceKm || 0) * 4).toFixed(2));
                         return (
                           <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.88rem' }}>
                             <td style={{ padding: '12px', fontWeight: 600 }}>#{order.orderId}</td>
                             <td style={{ padding: '12px' }}>{order.distanceKm || 0} KM</td>
-                            <td style={{ padding: '12px' }}>₹2/KM</td>
+                            <td style={{ padding: '12px' }}>₹4/KM</td>
                             <td style={{ padding: '12px', fontWeight: 700, color: '#16a34a' }}>₹{cost}</td>
                           </tr>
                         );

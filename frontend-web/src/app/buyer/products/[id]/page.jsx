@@ -54,6 +54,7 @@ const cleanImageUrl = (img) => {
   return clean;
 };
 
+
 const isRealImage = (img) => {
   if (!img || typeof img !== 'string') return false;
   const clean = cleanImageUrl(img);
@@ -83,6 +84,8 @@ export default function ProductDetailPage() {
   const [activeSize, setActiveSize] = useState('');
   const [qty, setQty] = useState(1);
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
+  const [buyerLocation, setBuyerLocation] = useState(null);
+  const [roadDistance, setRoadDistance] = useState(null);
 
   const currentPrice = useMemo(() => {
     if (product && product.variants && product.variants[activeVariantIndex] && product.variants[activeVariantIndex].price) {
@@ -259,27 +262,91 @@ export default function ProductDetailPage() {
 
 
 
+  // Sync Buyer Location from localStorage and custom events
   useEffect(() => {
-    const syncCity = () => {
-      const storedCity = localStorage.getItem('emahu_buyer_city');
-      if (storedCity) {
-        setSelectedCity(storedCity);
-      } else {
-        const storedUser = localStorage.getItem('emahu_buyer_user');
-        if (storedUser) {
-          try {
-            const parsed = JSON.parse(storedUser);
-            if (parsed.city) {
-              setSelectedCity(parsed.city);
-            }
-          } catch (_) { }
+    const syncLocation = () => {
+      try {
+        const storedLoc = localStorage.getItem('emahu_buyer_location');
+        if (storedLoc) {
+          const parsed = JSON.parse(storedLoc);
+          if (parsed && parsed.latitude !== undefined && parsed.longitude !== undefined) {
+            setBuyerLocation(parsed);
+            if (parsed.city) setSelectedCity(parsed.city);
+            return;
+          }
         }
+
+        const storedCoords = localStorage.getItem('emahu_buyer_coordinates');
+        const storedCity = localStorage.getItem('emahu_buyer_city');
+        if (storedCoords) {
+          const coords = JSON.parse(storedCoords);
+          setBuyerLocation({
+            address: storedCity || 'Ahmedabad, Gujarat',
+            latitude: coords.latitude,
+            longitude: coords.longitude
+          });
+        }
+        if (storedCity) {
+          setSelectedCity(storedCity);
+        }
+      } catch (e) {
+        console.error('Location sync error in product detail:', e);
       }
     };
-    syncCity();
-    window.addEventListener('storage', syncCity);
-    return () => window.removeEventListener('storage', syncCity);
+
+    syncLocation();
+
+    const handleCustomLoc = (e) => {
+      if (e.detail && e.detail.latitude !== undefined) {
+        setBuyerLocation(e.detail);
+        if (e.detail.city) setSelectedCity(e.detail.city);
+      }
+    };
+
+    window.addEventListener('storage', syncLocation);
+    window.addEventListener('emahu_location_changed', handleCustomLoc);
+    return () => {
+      window.removeEventListener('storage', syncLocation);
+      window.removeEventListener('emahu_location_changed', handleCustomLoc);
+    };
   }, []);
+
+  // Calculate road distance to this product's seller
+  useEffect(() => {
+    const calculateDistance = async () => {
+      if (!product || !product.seller) return;
+      if (!buyerLocation || buyerLocation.latitude === undefined || buyerLocation.longitude === undefined) return;
+
+      const sellerObj = typeof product.seller === 'object' ? product.seller : null;
+      if (!sellerObj) return;
+
+      const sLat = parseFloat(sellerObj.latitude);
+      const sLon = parseFloat(sellerObj.longitude);
+      if (isNaN(sLat) || isNaN(sLon)) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/location/distance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            origin: { latitude: Number(buyerLocation.latitude), longitude: Number(buyerLocation.longitude) },
+            destination: { latitude: sLat, longitude: sLon }
+          })
+        });
+        const data = await res.json();
+        if (data.success && data.distanceKm !== undefined) {
+          setRoadDistance({
+            distanceKm: data.distanceKm,
+            distanceMeters: data.distanceMeters
+          });
+        }
+      } catch (err) {
+        console.warn('Error calculating road distance in product detail:', err);
+      }
+    };
+
+    calculateDistance();
+  }, [product, buyerLocation]);
 
   // Helper: check if seller serves the buyer location
   const sellerServesLocation = (seller, city) => {
@@ -840,6 +907,28 @@ export default function ProductDetailPage() {
               </>
             )}
           </p>
+
+          {/* Road Distance Badge */}
+          {roadDistance && roadDistance.distanceKm !== undefined && roadDistance.distanceKm > 0 && (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              color: '#047857',
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              padding: '3px 10px',
+              borderRadius: '16px',
+              marginBottom: '10px',
+              width: 'fit-content'
+            }}>
+              <span>📍</span>
+              <span>{roadDistance.distanceKm} km away from your location</span>
+            </div>
+          )}
+
           <h1 className="pd-info__name">{product.name}</h1>
 
           {/* Rating */}

@@ -192,9 +192,8 @@ export function useGoogleAuth(onSuccess, onError) {
         console.warn("[GIS_DIAGNOSTIC] Container element not found for rendering Google button:", elementId);
         return;
       }
-      if (!window.google?.accounts?.id) {
-        console.warn("[GIS_DIAGNOSTIC] google.accounts.id not loaded yet. Retrying standard button render...");
-        setTimeout(render, 150);
+      if (!window.google?.accounts?.id || !gisInitialized) {
+        setTimeout(render, 100);
         return;
       }
       // Prevent double-rendering: if the container already has Google button content, skip

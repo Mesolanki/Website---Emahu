@@ -5,12 +5,16 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './selector.css';
 import { motion, AnimatePresence } from 'framer-motion';
+import BuyerLocationModal from '@/components/buyer_home/BuyerLocationModal';
+import { detectLocationWithGPS } from '@/utils/location';
 import {
   heroContainer, heroWord, heroSubtitle, navbarReveal,
   staggerContainer, cardReveal, cardHoverProps, cardTapProps,
   howCardReveal, portalReveal, buttonHoverProps, buttonTapProps,
   floatVariant, modalOverlay, modalContent, scrollReveal,
 } from '@/animations/variants';
+
+
 import { useMouseParallax } from '@/animations/useAnimations';
 
 // ─── DATA DEFINITIONS ───
@@ -177,6 +181,64 @@ const getProductMainImage = (p) => {
   return p.image || '';
 };
 
+const SUBCATEGORY_TO_MAIN_SLUG = {
+  'smartphones & tablets': 'tech',
+  'smartphones': 'tech',
+  'tablets': 'tech',
+  'computers & accessories': 'tech',
+  'audio & headphones': 'tech',
+  'cameras & photo': 'tech',
+  'smart devices': 'tech',
+  'smart watches': 'tech',
+  'smart thermostats': 'tech',
+  "men's clothing": 'apparel',
+  "women's clothing": 'apparel',
+  "kids' clothing": 'apparel',
+  'jewelry & accessories': 'apparel',
+  'gym wear': 'apparel',
+  'outerwear': 'apparel',
+  'running shoes': 'shoes',
+  'hiking boots': 'shoes',
+  'sneakers': 'shoes',
+  'sandals': 'shoes',
+  'cookware': 'kitchen',
+  'teaware': 'kitchen',
+  'kitchen tools': 'kitchen',
+  'tableware': 'kitchen',
+  'furniture': 'lifestyle',
+  'home decor': 'lifestyle',
+  'aromatherapy': 'lifestyle',
+  'bedding & linen': 'lifestyle',
+  'skincare': 'beauty',
+  'makeup': 'beauty',
+  'fragrances': 'beauty',
+  'haircare': 'beauty',
+  'fitness gear': 'sports',
+  'activewear': 'sports',
+  'outdoor equipment': 'sports',
+  'camping & hiking': 'sports',
+  'fiction & literature': 'books',
+  'biographies': 'books',
+  'textbooks': 'books',
+  'stationery & journals': 'books',
+  'snacks & sweets': 'grocery',
+  'beverages': 'grocery',
+  'pantry staples': 'grocery',
+  'organic foods': 'grocery',
+  'board games': 'toys',
+  'puzzles': 'toys',
+  'educational toys': 'toys',
+  'vitamins & supplements': 'health',
+  'wellness devices': 'health',
+  'dog supplies': 'pets',
+  'cat supplies': 'pets',
+  'baby gear': 'baby',
+  'baby apparel': 'baby',
+  'baby toys': 'baby',
+  'car accessories': 'automotive',
+  'hand tools': 'automotive'
+};
+
 const normalizeCat = (c) => {
   if (!c) return '';
   let str = '';
@@ -186,19 +248,26 @@ const normalizeCat = (c) => {
     str = String(c);
   }
   str = str.toLowerCase().trim();
-  if (str.includes('tech') || str.includes('electronic') || str.includes('gadget') || str.includes('computer') || str.includes('mobile') || str.includes('mouse') || str.includes('mice') || str.includes('keyboard') || str.includes('audio') || str.includes('headphone')) return 'tech';
-  if (str.includes('shoe') || str.includes('footwear') || str.includes('sneaker') || str.includes('boot')) return 'shoes';
-  if (str.includes('kitchen') || str.includes('dining') || str.includes('cookware')) return 'kitchen';
-  if (str.includes('apparel') || str.includes('fashion') || str.includes('clothing') || str.includes('wear') || str.includes('top') || str.includes('shirt')) return 'apparel';
-  if (str.includes('lifestyle') || str.includes('home') || str.includes('decor') || str.includes('furniture')) return 'lifestyle';
-  if (str.includes('beauty') || str.includes('cosmetics') || str.includes('skincare') || str.includes('makeup')) return 'beauty';
-  if (str.includes('sports') || str.includes('outdoor') || str.includes('fitness')) return 'sports';
-  if (str.includes('book') || str.includes('stationery') || str.includes('journal')) return 'books';
-  if (str.includes('grocery') || str.includes('essential') || str.includes('food') || str.includes('snack')) return 'grocery';
+  if (SUBCATEGORY_TO_MAIN_SLUG[str]) return SUBCATEGORY_TO_MAIN_SLUG[str];
+
+  if (str.includes('tech') || str.includes('electronic') || str.includes('gadget') || str.includes('computer') || str.includes('mobile') || str.includes('phone') || str.includes('smartphone') || str.includes('tablet') || str.includes('mouse') || str.includes('mice') || str.includes('keyboard') || str.includes('audio') || str.includes('headphone')) return 'tech';
+  if (str.includes('shoe') || str.includes('footwear') || str.includes('sneaker') || str.includes('boot') || str.includes('sandal')) return 'shoes';
+  if (str.includes('kitchen') || str.includes('dining') || str.includes('cookware') || str.includes('teaware') || str.includes('tableware')) return 'kitchen';
+  if (str.includes('apparel') || str.includes('fashion') || str.includes('clothing') || str.includes('wear') || str.includes('top') || str.includes('shirt') || str.includes('dress') || str.includes('pants')) return 'apparel';
+  if (str.includes('lifestyle') || str.includes('home') || str.includes('decor') || str.includes('furniture') || str.includes('aromatherapy') || str.includes('bedding')) return 'lifestyle';
+  if (str.includes('beauty') || str.includes('cosmetics') || str.includes('skincare') || str.includes('makeup') || str.includes('fragrance') || str.includes('haircare')) return 'beauty';
+  if (str.includes('sports') || str.includes('outdoor') || str.includes('fitness') || str.includes('activewear') || str.includes('camping')) return 'sports';
+  if (str.includes('book') || str.includes('stationery') || str.includes('journal') || str.includes('fiction') || str.includes('biograph') || str.includes('textbook')) return 'books';
+  if (str.includes('grocery') || str.includes('essential') || str.includes('food') || str.includes('snack') || str.includes('pantry') || str.includes('beverage')) return 'grocery';
+  if (str.includes('health') || str.includes('wellness') || str.includes('supplement') || str.includes('vitamin')) return 'health';
+  if (str.includes('pet') || str.includes('dog') || str.includes('cat')) return 'pets';
+  if (str.includes('baby') || str.includes('infant') || str.includes('toddler')) return 'baby';
+  if (str.includes('auto') || str.includes('car') || str.includes('vehicle') || str.includes('tool')) return 'automotive';
+  if (str.includes('toy') || str.includes('game') || str.includes('puzzle')) return 'toys';
   return str.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 };
 
-const sellerServesLocation = (seller, city) => {
+const sellerServesLocation = (seller, city, buyerLoc) => {
   if (!seller) return true;
   const cityLower = (city || 'Ahmedabad').toLowerCase().trim();
 
@@ -231,31 +300,38 @@ const sellerServesLocation = (seller, city) => {
     return true;
   }
 
-  // 1. Calculate distance using coordinates from localStorage if available
+  // 1. Calculate distance using coordinates from buyerLoc or localStorage
   try {
-    const coordsStr = typeof window !== 'undefined' ? localStorage.getItem('emahu_buyer_coordinates') : null;
-    if (coordsStr) {
-      const coords = JSON.parse(coordsStr);
-      const bLat = parseFloat(coords.latitude);
-      const bLon = parseFloat(coords.longitude);
-      const sLat = parseFloat(sObj.latitude);
-      const sLon = parseFloat(sObj.longitude);
+    let bLat = buyerLoc?.latitude;
+    let bLon = buyerLoc?.longitude;
 
-      if (!isNaN(bLat) && !isNaN(bLon) && !isNaN(sLat) && !isNaN(sLon)) {
-        const R = 6371; // km
-        const dLat = (sLat - bLat) * Math.PI / 180;
-        const dLon = (sLon - bLon) * Math.PI / 180;
-        const a =
-          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) *
-          Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const distance = R * c;
-
-        if (distance <= 30) {
-          return true;
-        }
+    if (bLat === undefined || bLon === undefined) {
+      const coordsStr = typeof window !== 'undefined' ? localStorage.getItem('emahu_buyer_coordinates') : null;
+      if (coordsStr) {
+        const coords = JSON.parse(coordsStr);
+        bLat = coords.latitude;
+        bLon = coords.longitude;
       }
+    }
+
+    const sLat = parseFloat(sObj.latitude);
+    const sLon = parseFloat(sObj.longitude);
+    bLat = parseFloat(bLat);
+    bLon = parseFloat(bLon);
+
+    if (!isNaN(bLat) && !isNaN(bLon) && !isNaN(sLat) && !isNaN(sLon)) {
+      const R = 6371; // km
+      const dLat = (sLat - bLat) * Math.PI / 180;
+      const dLon = (sLon - bLon) * Math.PI / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
+
+      // Strictly 20 KM limit for hyperlocal sellers
+      return distance <= 20;
     }
   } catch (err) {
     console.warn('Failed to calculate distance in sellerServesLocation:', err);
@@ -268,36 +344,9 @@ const sellerServesLocation = (seller, city) => {
   // Buyer city specifically in covered cities
   if (coveredCities.includes(cityLower) || coveredCities.some(c => cityLower.includes(c) || c.includes(cityLower))) return true;
 
-  const AHMEDABAD_HUBS = ['ahmedabad', 'amdavad', 'ghatlodiya', 'bopal', 'maninagar', 'navrangpura', 'vastrapur', 'satellite', 'bodakdev', 'prahlad', 'chandkheda', 'motera', 'sabarmati', 'nikol', 'naranpura', 'gota', 'shela', 'thaltej', 'vastral', 'odhav', 'gandhinagar', 'sanand'];
-  const DELHI_HUBS = ['delhi', 'noida', 'gurugram', 'gurgaon', 'faridabad', 'ghaziabad', 'dwarka', 'rohini'];
-  const MUMBAI_HUBS = ['mumbai', 'bombay', 'thane', 'navi mumbai', 'bandra', 'andheri', 'dadar', 'kurla', 'mulund', 'worli', 'lower parel'];
-  const PUNE_HUBS = ['pune', 'pimpri', 'chinchwad', 'kothrud', 'hadapsar', 'wakad', 'aundh', 'baner'];
-  const BANGALORE_HUBS = ['bangalore', 'bengaluru', 'koramangala', 'indiranagar', 'whitefield', 'marathahalli', 'jayanagar', 'electronic city'];
-  const KOLKATA_HUBS = ['kolkata', 'calcutta', 'salt lake', 'howrah', 'jadavpur', 'new town'];
-  const HYDERABAD_HUBS = ['hyderabad', 'secunderabad', 'gachibowli', 'hitech city', 'kondapur', 'madhapur'];
-  const SURAT_HUBS = ['surat', 'adajan', 'vesu', 'katargam', 'varachha', 'althan'];
-  const VADODARA_HUBS = ['vadodara', 'baroda', 'alkapuri', 'manjalpur', 'waghodia'];
-  const RAJKOT_HUBS = ['rajkot', 'kalavad', 'gondal'];
-
-  const matchHub = (hubs) => {
-    const userInHub = hubs.some(h => cityLower.includes(h));
-    const sellerInHub = hubs.some(h => sellerCity.includes(h));
-    return userInHub && sellerInHub;
-  };
-
-  if (matchHub(AHMEDABAD_HUBS)) return true;
-  if (matchHub(DELHI_HUBS)) return true;
-  if (matchHub(MUMBAI_HUBS)) return true;
-  if (matchHub(PUNE_HUBS)) return true;
-  if (matchHub(BANGALORE_HUBS)) return true;
-  if (matchHub(KOLKATA_HUBS)) return true;
-  if (matchHub(HYDERABAD_HUBS)) return true;
-  if (matchHub(SURAT_HUBS)) return true;
-  if (matchHub(VADODARA_HUBS)) return true;
-  if (matchHub(RAJKOT_HUBS)) return true;
-
   return false;
 };
+
 
 // Default icon/accent palette for dynamically loaded categories
 const DYNAMIC_CATEGORY_ICONS = {
@@ -392,6 +441,8 @@ export default function RoleSelector() {
   const [supportSubmitted, setSupportSubmitted] = useState(false);
 
   const [selectedCity, setSelectedCity] = useState('');
+  const [buyerLocation, setBuyerLocation] = useState(null);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
 
   // Mouse parallax for background blobs
@@ -404,15 +455,21 @@ export default function RoleSelector() {
 
     const syncStates = () => {
       try {
-        const cart = localStorage.getItem('emahu_cart');
-        setCartCount(cart ? JSON.parse(cart).length : 0);
-
         const logged = localStorage.getItem('emahu_buyer_logged_in') === 'true' ||
           localStorage.getItem('emahu_buyer_registered') === 'true';
         setIsLoggedIn(logged);
 
+        if (!logged) {
+          localStorage.removeItem('emahu_cart');
+          localStorage.removeItem('emahu_wishlist');
+          setCartCount(0);
+        } else {
+          const cart = localStorage.getItem('emahu_cart');
+          setCartCount(cart ? JSON.parse(cart).length : 0);
+        }
+
         const userData = localStorage.getItem('emahu_buyer_user');
-        if (userData) {
+        if (userData && logged) {
           setUserProfile(JSON.parse(userData));
         } else {
           setUserProfile(null);
@@ -422,40 +479,77 @@ export default function RoleSelector() {
       }
     };
 
-    const syncCity = () => {
+    const syncLocationData = () => {
       try {
+        const storedLoc = localStorage.getItem('emahu_buyer_location');
+        if (storedLoc) {
+          const parsed = JSON.parse(storedLoc);
+          if (parsed && (parsed.address || parsed.latitude !== undefined)) {
+            setBuyerLocation(parsed);
+            if (parsed.city) setSelectedCity(parsed.city);
+            setHasLocationPermission(true);
+            return;
+          }
+        }
+
+        const coordsStr = localStorage.getItem('emahu_buyer_coordinates');
         const storedCity = localStorage.getItem('emahu_buyer_city');
+        if (coordsStr) {
+          const coords = JSON.parse(coordsStr);
+          setBuyerLocation({
+            address: storedCity || 'Ahmedabad, Gujarat',
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            city: storedCity || 'Ahmedabad'
+          });
+          setHasLocationPermission(true);
+        }
         if (storedCity) {
           setSelectedCity(storedCity);
           setHasLocationPermission(true);
-        } else {
-          const storedUser = localStorage.getItem('emahu_buyer_user');
-          if (storedUser) {
-            try {
-              const parsed = JSON.parse(storedUser);
-              if (parsed.city) {
-                setSelectedCity(parsed.city);
-                localStorage.setItem('emahu_buyer_city', parsed.city);
-                setHasLocationPermission(true);
-                return;
-              }
-            } catch (_) { }
-          }
         }
       } catch (e) {
-        console.error(e);
+        console.error('Location sync error:', e);
       }
     };
 
     syncStates();
-    syncCity();
+    syncLocationData();
+
+    // Automatically trigger browser's native location permission prompt on visitor entry
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      detectLocationWithGPS()
+        .then((loc) => {
+          if (loc) {
+            setBuyerLocation(loc);
+            if (loc.city) setSelectedCity(loc.city);
+            setHasLocationPermission(true);
+          }
+        })
+        .catch((err) => {
+          console.log('GPS prompt dismissed or denied:', err?.message || err);
+        });
+    }
+
+    const handleCustomLoc = (e) => {
+      if (e.detail) {
+        setBuyerLocation(e.detail);
+        if (e.detail.city) setSelectedCity(e.detail.city);
+        setHasLocationPermission(true);
+      }
+    };
+
+
     window.addEventListener('storage', syncStates);
-    window.addEventListener('storage', syncCity);
+    window.addEventListener('storage', syncLocationData);
+    window.addEventListener('emahu_location_changed', handleCustomLoc);
     return () => {
       window.removeEventListener('storage', syncStates);
-      window.removeEventListener('storage', syncCity);
+      window.removeEventListener('storage', syncLocationData);
+      window.removeEventListener('emahu_location_changed', handleCustomLoc);
     };
   }, []);
+
 
   // Fetch dbProducts from Backend API to support live seller items
   useEffect(() => {
@@ -589,15 +683,23 @@ export default function RoleSelector() {
         const sub = (p.subcategory || '').trim();
 
         if (existingIdx !== -1) {
-          if (sub && sub !== 'General') {
-            const currentSubcats = baseCategories[existingIdx].subcategories || [];
-            if (!currentSubcats.some(s => s.toLowerCase() === sub.toLowerCase())) {
-              baseCategories[existingIdx] = {
-                ...baseCategories[existingIdx],
-                subcategories: [...currentSubcats, sub]
-              };
-            }
+          const currentSubcats = baseCategories[existingIdx].subcategories || [];
+          const newSubcats = [...currentSubcats];
+
+          // If sub is a valid subcategory name, ensure it is in subcategories list
+          if (sub && sub !== 'General' && !newSubcats.some(s => s.toLowerCase() === sub.toLowerCase())) {
+            newSubcats.push(sub);
           }
+
+          // If catRaw itself was a subcategory (different from main category title), also ensure it is in subcategories list
+          if (catRaw && catRaw.toLowerCase() !== baseCategories[existingIdx].name.toLowerCase() && !newSubcats.some(s => s.toLowerCase() === catRaw.toLowerCase())) {
+            newSubcats.push(catRaw);
+          }
+
+          baseCategories[existingIdx] = {
+            ...baseCategories[existingIdx],
+            subcategories: newSubcats
+          };
         } else {
           const slug = catNorm || catNameLC.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
           let icon = '📦';
@@ -641,6 +743,13 @@ export default function RoleSelector() {
     lookup['furniture'] = 'lifestyle';
     lookup['fitness'] = 'lifestyle';
 
+    // Map all known subcategories directly to their root category ID
+    if (typeof SUBCATEGORY_TO_MAIN_SLUG === 'object') {
+      Object.entries(SUBCATEGORY_TO_MAIN_SLUG).forEach(([subName, rootSlug]) => {
+        lookup[subName.toLowerCase()] = rootSlug;
+      });
+    }
+
     const dbRootToResolvedId = {};
     (dbCategories || []).forEach(dbCat => {
       const nameLC = dbCat.name.toLowerCase();
@@ -662,7 +771,7 @@ export default function RoleSelector() {
       cats.forEach(cat => {
         const catSlug = cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         const nameLC = cat.name.toLowerCase();
-        const effectiveRootId = rootId || dbRootToResolvedId[catSlug] || catSlug;
+        const effectiveRootId = rootId || dbRootToResolvedId[catSlug] || normalizeCat(cat.name) || catSlug;
         if (!lookup[nameLC]) {
           lookup[nameLC] = effectiveRootId;
         }
@@ -811,8 +920,8 @@ export default function RoleSelector() {
     }
 
     // Location filter with graceful fallback
-    if (hasLocationPermission && selectedCity) {
-      const locationFiltered = base.filter(p => sellerServesLocation(p.seller, selectedCity));
+    if (hasLocationPermission && (selectedCity || buyerLocation)) {
+      const locationFiltered = base.filter(p => sellerServesLocation(p.seller, selectedCity, buyerLocation));
       if (locationFiltered.length > 0) {
         base = locationFiltered;
       }
@@ -863,7 +972,8 @@ export default function RoleSelector() {
     }
 
     return base;
-  }, [selectedCategory, activeSubcategory, selectedSeller, searchQuery, allProducts, selectedCity, hasLocationPermission]);
+  }, [selectedCategory, activeSubcategory, selectedSeller, searchQuery, allProducts, selectedCity, buyerLocation, hasLocationPermission]);
+
 
   const handleCategorySelect = (cat) => {
     setSelectedCategory(cat);
@@ -932,6 +1042,51 @@ export default function RoleSelector() {
             initial="hidden"
             animate="show"
           >
+            {/* 0. Live Location Selector Button (Accessible anytime without login/signup) */}
+            <motion.div variants={heroSubtitle} whileHover={buttonHoverProps} whileTap={buttonTapProps}>
+              <button
+                type="button"
+                onClick={() => {
+                  detectLocationWithGPS()
+                    .then((loc) => {
+                      if (loc) {
+                        setBuyerLocation(loc);
+                        setSelectedCity(loc.displayArea || loc.city);
+                        setHasLocationPermission(true);
+                      }
+                    })
+                    .catch(() => {
+                      setIsLocationModalOpen(true);
+                    });
+                }}
+                className="sel-nav-btn sel-nav-btn--location"
+                title={buyerLocation?.address || selectedCity || 'Enable Live Location'}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  maxWidth: '240px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                <span style={{ color: '#4169e1', fontSize: '1rem', flexShrink: 0 }}>📍</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {buyerLocation?.displayArea || buyerLocation?.area || (buyerLocation?.address ? buyerLocation.address.split(',')[0] : '') || (selectedCity && selectedCity !== 'Ahmedabad' ? selectedCity : '') || 'Enable Location'}
+                </span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ opacity: 0.6, flexShrink: 0 }}>
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+            </motion.div>
+
+
             {/* 1. Buyer Hub Button - only shown after user login/signup */}
             {isLoggedIn && (
               <motion.div variants={heroSubtitle} whileHover={buttonHoverProps} whileTap={buttonTapProps}>
@@ -945,20 +1100,23 @@ export default function RoleSelector() {
               </motion.div>
             )}
 
-            {/* 2. Cart Button with count badge */}
-            <motion.div variants={heroSubtitle} whileHover={buttonHoverProps} whileTap={buttonTapProps}>
-              <Link href="/buyer/cart" className="sel-nav-btn sel-nav-btn--cart">
-                <div className="sel-cart-icon-wrap">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                    <circle cx="9" cy="21" r="1" />
-                    <circle cx="20" cy="21" r="1" />
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                  </svg>
-                  {cartCount > 0 && <span className="sel-cart-badge">{cartCount}</span>}
-                </div>
-                <span>Cart</span>
-              </Link>
-            </motion.div>
+
+            {/* 2. Cart Button with count badge (only when logged in) */}
+            {isLoggedIn && (
+              <motion.div variants={heroSubtitle} whileHover={buttonHoverProps} whileTap={buttonTapProps}>
+                <Link href="/buyer/cart" className="sel-nav-btn sel-nav-btn--cart">
+                  <div className="sel-cart-icon-wrap">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <circle cx="9" cy="21" r="1" />
+                      <circle cx="20" cy="21" r="1" />
+                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                    </svg>
+                    {cartCount > 0 && <span className="sel-cart-badge">{cartCount}</span>}
+                  </div>
+                  <span>Cart</span>
+                </Link>
+              </motion.div>
+            )}
 
             {/* 3. Login/Signup Button */}
             <motion.div variants={heroSubtitle} whileHover={buttonHoverProps} whileTap={buttonTapProps}>
@@ -1431,7 +1589,7 @@ export default function RoleSelector() {
               whileHover={{ y: -6, scale: 1.01, transition: { duration: 0.3 } }}
             >
               <div className="sel-portal-box__icon">🚚</div>
-              <h3 className="sel-portal-box__title">Dehlivery Partner Portal</h3>
+              <h3 className="sel-portal-box__title">Delivery Partner Portal</h3>
               <p className="sel-portal-box__desc">
                 Register dispatch assets, coordinate local city orders, and manage last-mile transport logistics.
               </p>
@@ -1506,10 +1664,6 @@ export default function RoleSelector() {
           transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
         >
           <p>© 2026 EMAHU Inc. All professional rights reserved.</p>
-
-          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
-            Developed by <a href="https://sanmora.in" target="_blank" rel="noopener noreferrer" style={{ color: '#4169e1', fontWeight: '600', textDecoration: 'none' }}>sanmora.in</a>
-          </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '12px', fontSize: '0.82rem', color: '#475569', marginTop: '2px' }}>
             <a href="mailto:emahu23072026@gmail.com" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               ✉️ emahu23072026@gmail.com
@@ -1839,6 +1993,18 @@ export default function RoleSelector() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Global Buyer Live Location Selection Modal */}
+      <BuyerLocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        onLocationSelect={(loc) => {
+          setBuyerLocation(loc);
+          if (loc.city) setSelectedCity(loc.city);
+          setHasLocationPermission(true);
+        }}
+      />
     </div>
   );
 }
+

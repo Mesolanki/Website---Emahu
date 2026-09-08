@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './buyer-register.css';
@@ -24,9 +24,28 @@ export default function BuyerRegister() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [hasOpenedTerms, setHasOpenedTerms] = useState(false);
 
+  // Google Places Autocomplete States
+  const [placesSuggestions, setPlacesSuggestions] = useState([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const [showPlacesDropdown, setShowPlacesDropdown] = useState(false);
+  const [selectedLocationCoords, setSelectedLocationCoords] = useState({ latitude: null, longitude: null });
+  const placesDropdownRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
+
   useEffect(() => {
     // Pre-warm backend and database on landing to avoid cold start latency
     wakeupServer();
+  }, []);
+
+  // Close places dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (placesDropdownRef.current && !placesDropdownRef.current.contains(e.target)) {
+        setShowPlacesDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Form State Values
@@ -54,6 +73,59 @@ export default function BuyerRegister() {
   const [devOtp, setDevOtp] = useState('');
   const [mockOtpCode, setMockOtpCode] = useState('');
   const [isMockOtpActive, setIsMockOtpActive] = useState(false);
+
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
+  // Restore draft on refresh in current session (so refreshing the page doesn't lose typed data)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedData = sessionStorage.getItem('emahu_buyer_register_draft');
+        if (savedData) {
+          const parsed = JSON.parse(savedData);
+          setFormData((prev) => ({ ...prev, ...parsed }));
+        }
+        const savedStep = sessionStorage.getItem('emahu_buyer_register_step');
+        if (savedStep) {
+          const parsedStep = parseInt(savedStep, 10);
+          if (parsedStep === 1 || parsedStep === 2) {
+            setStep(parsedStep);
+          }
+        }
+        const savedVerified = sessionStorage.getItem('emahu_buyer_register_verified');
+        if (savedVerified === 'true') {
+          setIsEmailVerified(true);
+        }
+        const savedCoords = sessionStorage.getItem('emahu_buyer_register_coords');
+        if (savedCoords) {
+          setSelectedLocationCoords(JSON.parse(savedCoords));
+        }
+        const savedAgree = sessionStorage.getItem('emahu_buyer_register_terms');
+        if (savedAgree === 'true') {
+          setAgreeTerms(true);
+          setHasOpenedTerms(true);
+        }
+      } catch (err) {
+        console.error('Error loading session draft:', err);
+      } finally {
+        setDraftLoaded(true);
+      }
+    }
+  }, []);
+
+  // Save session draft on input changes
+  useEffect(() => {
+    if (!draftLoaded || success) return;
+    try {
+      sessionStorage.setItem('emahu_buyer_register_draft', JSON.stringify(formData));
+      sessionStorage.setItem('emahu_buyer_register_step', step.toString());
+      sessionStorage.setItem('emahu_buyer_register_verified', isEmailVerified ? 'true' : 'false');
+      sessionStorage.setItem('emahu_buyer_register_coords', JSON.stringify(selectedLocationCoords));
+      sessionStorage.setItem('emahu_buyer_register_terms', agreeTerms ? 'true' : 'false');
+    } catch (err) {
+      console.error('Error saving session draft:', err);
+    }
+  }, [formData, step, isEmailVerified, selectedLocationCoords, agreeTerms, draftLoaded, success]);
 
   // If already logged in, redirect directly to the buyer account marketplace home
   useEffect(() => {
@@ -121,10 +193,10 @@ export default function BuyerRegister() {
   const handleGoogleSignIn = () => triggerGoogleSignIn();
 
   useEffect(() => {
-    if (isGoogleEnabled) {
+    if (isGoogleEnabled && step === 1) {
       renderGoogleButton('google-signin-btn');
     }
-  }, [isGoogleEnabled, renderGoogleButton]);
+  }, [isGoogleEnabled, renderGoogleButton, step]);
 
 
 
@@ -204,6 +276,11 @@ export default function BuyerRegister() {
       setIsEmailVerified(true);
       setIsEmailOtpSent(false);
       setStep(2);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('emahu_buyer_register_step', '2');
+        localStorage.setItem('emahu_buyer_register_verified', 'true');
+        localStorage.setItem('emahu_buyer_register_draft', JSON.stringify(formData));
+      }
       setErrors((prev) => ({ ...prev, general: '' }));
     } catch (err) {
       console.error('Verify OTP Error:', err);
@@ -218,6 +295,89 @@ export default function BuyerRegister() {
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name] || errors.general) {
       setErrors((prev) => ({ ...prev, [name]: '', general: '' }));
+    }
+  };
+
+  const handleAddressSearch = (value) => {
+    setFormData((prev) => ({ ...prev, address: value }));
+    if (errors.address) {
+      setErrors((prev) => ({ ...prev, address: '' }));
+    }
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!value || value.trim().length < 2) {
+      setPlacesSuggestions([]);
+      setShowPlacesDropdown(false);
+      setPlacesLoading(false);
+      return;
+    }
+
+    setPlacesLoading(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/location/search?query=${encodeURIComponent(value.trim())}`);
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          setPlacesSuggestions(data.data);
+          setShowPlacesDropdown(true);
+        } else {
+          setPlacesSuggestions([]);
+          setShowPlacesDropdown(false);
+        }
+      } catch (err) {
+        console.error('Places search error:', err);
+        setPlacesSuggestions([]);
+        setShowPlacesDropdown(false);
+      } finally {
+        setPlacesLoading(false);
+      }
+    }, 280);
+  };
+
+  const handleSelectPlace = async (item) => {
+    setShowPlacesDropdown(false);
+    setPlacesLoading(true);
+
+    try {
+      let finalLat = item.latitude;
+      let finalLon = item.longitude;
+      let finalAddress = item.address || item.mainText || '';
+      let detectedCity = '';
+      let detectedState = '';
+      let detectedZip = '';
+
+      if (item.placeId && (!finalLat || !finalLon || item.placeId.startsWith('places/'))) {
+        const res = await fetch(`${API_BASE}/api/location/details?placeId=${encodeURIComponent(item.placeId)}`);
+        const detailsData = await res.json();
+        if (detailsData.success && detailsData.data) {
+          finalLat = detailsData.data.latitude || finalLat;
+          finalLon = detailsData.data.longitude || finalLon;
+          if (detailsData.data.address) finalAddress = detailsData.data.address;
+          if (detailsData.data.city) detectedCity = detailsData.data.city;
+          if (detailsData.data.state) detectedState = detailsData.data.state;
+          if (detailsData.data.zipCode) detectedZip = detailsData.data.zipCode;
+        }
+      }
+
+      setFormData((prev) => {
+        const next = { ...prev, address: finalAddress };
+        if (detectedCity) next.city = detectedCity;
+        if (detectedState) next.state = detectedState;
+        if (detectedZip) next.zipCode = detectedZip;
+        return next;
+      });
+
+      if (finalLat && finalLon) {
+        setSelectedLocationCoords({ latitude: finalLat, longitude: finalLon });
+      }
+    } catch (err) {
+      console.error('Error selecting place:', err);
+      setFormData((prev) => ({ ...prev, address: item.address || item.mainText }));
+    } finally {
+      setPlacesLoading(false);
     }
   };
 
@@ -296,6 +456,9 @@ export default function BuyerRegister() {
 
   const handlePrev = () => {
     setStep((prev) => Math.max(prev - 1, 1));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('emahu_buyer_register_step', '1');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -315,10 +478,36 @@ export default function BuyerRegister() {
           role: 'buyer',
           phone: formData.phone,
           address: fullAddress,
+          latitude: selectedLocationCoords.latitude,
+          longitude: selectedLocationCoords.longitude,
+          city: formData.city,
+          state: formData.state,
+          pincode: formData.zipCode
         });
 
         // Save session credentials
         saveAuthSession(data, 'buyer');
+
+        // Clear registration draft from sessionStorage
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('emahu_buyer_register_draft');
+          sessionStorage.removeItem('emahu_buyer_register_step');
+          sessionStorage.removeItem('emahu_buyer_register_verified');
+          sessionStorage.removeItem('emahu_buyer_register_coords');
+          sessionStorage.removeItem('emahu_buyer_register_terms');
+        }
+
+        // Persist buyer location coordinates for road distance calculations
+        if (selectedLocationCoords.latitude && selectedLocationCoords.longitude) {
+          const locObj = {
+            address: fullAddress,
+            latitude: selectedLocationCoords.latitude,
+            longitude: selectedLocationCoords.longitude
+          };
+          localStorage.setItem('emahu_buyer_location', JSON.stringify(locObj));
+          window.dispatchEvent(new Event('emahu_location_changed'));
+        }
+
         setLoading(false);
         setSuccess(true);
 
@@ -557,17 +746,62 @@ export default function BuyerRegister() {
                   </div>
 
                   <div className="br-form-grid">
-                    <div className="br-field br-field--full">
-                      <label className="br-label" htmlFor="address">Street Address, Building, Floor</label>
-                      <input
-                        type="text"
-                        id="address"
-                        name="address"
-                        className={`br-input ${errors.address ? 'br-input--error' : ''}`}
-                        placeholder="House No, Building, Floor, Street name"
-                        value={formData.address}
-                        onChange={handleInputChange}
-                      />
+                    <div className="br-field br-field--full" ref={placesDropdownRef}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label className="br-label" htmlFor="address">Street Address, Building, Floor</label>
+                        {selectedLocationCoords.latitude && (
+                          <span className="br-places-selected-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            Coordinates Linked
+                          </span>
+                        )}
+                      </div>
+                      <div className="br-places-wrapper">
+                        <div className="br-places-input-box">
+                          <svg className="br-places-pin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                            <circle cx="12" cy="10" r="3" />
+                          </svg>
+                          <input
+                            type="text"
+                            id="address"
+                            name="address"
+                            className={`br-input ${errors.address ? 'br-input--error' : ''}`}
+                            placeholder="Type complex, building, area or street address..."
+                            value={formData.address}
+                            onChange={(e) => handleAddressSearch(e.target.value)}
+                            onFocus={() => {
+                              if (placesSuggestions.length > 0) setShowPlacesDropdown(true);
+                            }}
+                            autoComplete="off"
+                          />
+                          {placesLoading && <div className="br-places-spinner" />}
+                        </div>
+
+                        {/* Downward Places Autocomplete Dropdown */}
+                        {showPlacesDropdown && placesSuggestions.length > 0 && (
+                          <div className="br-places-dropdown">
+                            {placesSuggestions.map((item) => (
+                              <div
+                                key={item.placeId}
+                                className="br-places-item"
+                                onClick={() => handleSelectPlace(item)}
+                              >
+                                <svg className="br-places-item-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                  <circle cx="12" cy="10" r="3" />
+                                </svg>
+                                <div className="br-places-item-content">
+                                  <div className="br-places-main">{item.mainText || item.address}</div>
+                                  {item.secondaryText && <div className="br-places-sub">{item.secondaryText}</div>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       {errors.address && <span className="br-error">{errors.address}</span>}
                     </div>
 

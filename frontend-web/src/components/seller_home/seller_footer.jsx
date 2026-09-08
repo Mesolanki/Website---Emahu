@@ -93,7 +93,7 @@ export default function SellerFooter() {
         <div className="sff-bottom" style={{ flexDirection: 'column', gap: '10px', textAlign: 'center' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '12px' }}>
             <p className="sff-copyright" style={{ margin: 0 }}>
-              © {new Date().getFullYear()} Emahu Technologies Pvt. Ltd. All rights reserved. · Developed by <a href="https://sanmora.in" target="_blank" rel="noopener noreferrer" style={{ color: '#4169e1', fontWeight: '600', textDecoration: 'none' }}>sanmora.in</a>
+              © {new Date().getFullYear()} Emahu Technologies Pvt. Ltd. All rights reserved.
               <span className="sff-copyright__terms" style={{ marginLeft: '8px' }}>
                 <Link href="/">Privacy Policy</Link> · <Link href="/">Terms of Service</Link>
               </span>

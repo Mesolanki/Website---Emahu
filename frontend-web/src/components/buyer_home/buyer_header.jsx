@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation';
 import './buyer_header.css';
 import { logoutUser, clearAuthSession } from '@/utils/auth';
 import { motion, AnimatePresence } from 'framer-motion';
+import BuyerLocationModal from './BuyerLocationModal';
+import { detectLocationWithGPS } from '@/utils/location';
+
 
 export default function BuyerHeader() {
   const router = useRouter();
@@ -20,10 +23,8 @@ export default function BuyerHeader() {
   const lastScrollY = useRef(0);
 
   const [selectedCity, setSelectedCity] = useState('Ahmedabad');
-  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
-  const locationDropdownRef = useRef(null);
-  const [detecting, setDetecting] = useState(false);
-  const [manualCity, setManualCity] = useState('');
+  const [buyerLocation, setBuyerLocation] = useState(null);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   const [cartCount, setCartCount] = useState(0);
   const [wishCount, setWishCount] = useState(0);
@@ -144,19 +145,45 @@ export default function BuyerHeader() {
     return () => window.removeEventListener('storage', checkLogin);
   }, []);
 
-  // Geolocation auto-detection on arrival & click outside listener
+  // Sync Buyer Location from localStorage and custom events
   useEffect(() => {
-    const syncCity = () => {
+    const syncLocation = () => {
       try {
+        const storedLoc = localStorage.getItem('emahu_buyer_location');
+        if (storedLoc) {
+          const parsed = JSON.parse(storedLoc);
+          if (parsed && parsed.address) {
+            setBuyerLocation(parsed);
+            if (parsed.city) setSelectedCity(parsed.city);
+            return;
+          }
+        }
+
         const storedCity = localStorage.getItem('emahu_buyer_city');
         if (storedCity) {
           setSelectedCity(storedCity);
         }
       } catch (e) {
-        console.error(e);
+        console.error('Location sync error:', e);
       }
     };
-    syncCity();
+
+    syncLocation();
+
+    // Automatically trigger browser's native location permission prompt on entry
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      detectLocationWithGPS()
+        .then((loc) => {
+          if (loc) {
+            setBuyerLocation(loc);
+            if (loc.city) setSelectedCity(loc.city);
+          }
+        })
+        .catch((err) => {
+          console.log('GPS prompt dismissed or denied in header:', err?.message || err);
+        });
+    }
+
 
     const handleClickOutside = (e) => {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
@@ -167,74 +194,22 @@ export default function BuyerHeader() {
       }
     };
 
-    window.addEventListener('storage', syncCity);
+    const handleCustomLocChange = (e) => {
+      if (e.detail) {
+        setBuyerLocation(e.detail);
+        if (e.detail.city) setSelectedCity(e.detail.city);
+      }
+    };
+
+    window.addEventListener('storage', syncLocation);
+    window.addEventListener('emahu_location_changed', handleCustomLocChange);
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      window.removeEventListener('storage', syncCity);
+      window.removeEventListener('storage', syncLocation);
+      window.removeEventListener('emahu_location_changed', handleCustomLocChange);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
-  const handleCityChange = (city) => {
-    setSelectedCity(city);
-    localStorage.setItem('emahu_buyer_city', city);
-    window.dispatchEvent(new Event('storage'));
-    setLocationDropdownOpen(false);
-  };
-
-  const promptManualCity = () => {
-    const manual = prompt("Enter your city name manually:");
-    if (manual && manual.trim()) {
-      const clean = manual.trim();
-      const capitalized = clean.charAt(0).toUpperCase() + clean.slice(1);
-      handleCityChange(capitalized);
-    }
-  };
-
-  const handleLocationButtonClick = () => {
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      const getPosOnClick = () => {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            try {
-              const lat = position.coords.latitude;
-              const lon = position.coords.longitude;
-              localStorage.setItem('emahu_buyer_coordinates', JSON.stringify({ latitude: lat, longitude: lon }));
-              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`);
-              const data = await res.json();
-              if (data && data.address) {
-                const cityVal = data.address.city || data.address.town || data.address.village || data.address.state_district || '';
-                if (cityVal) {
-                  const cleanCity = cityVal.replace(/District|Corporation/gi, '').trim();
-                  const capitalized = cleanCity.charAt(0).toUpperCase() + cleanCity.slice(1);
-                  handleCityChange(capitalized);
-                  alert(`Location updated to ${capitalized} automatically!`);
-                } else {
-                  promptManualCity();
-                }
-              } else {
-                promptManualCity();
-              }
-            } catch (err) {
-              console.warn('Geocoding failed, prompting manual:', err);
-              promptManualCity();
-            }
-          },
-          (geoErr) => {
-            console.warn('Geolocation failed, asking again:', geoErr);
-            if (confirm("Location access is denied. EMAHU needs your location to find local products. Try again?")) {
-              getPosOnClick();
-            } else {
-              promptManualCity();
-            }
-          }
-        );
-      };
-      getPosOnClick();
-    } else {
-      promptManualCity();
-    }
-  };
 
   // Lock body scroll when mobile menu is open
   useEffect(() => {
@@ -255,6 +230,8 @@ export default function BuyerHeader() {
     clearAuthSession('buyer');
     setIsLoggedIn(false);
     setUserProfile(null);
+    setCartCount(0);
+    setWishCount(0);
     setProfileDropdownOpen(false);
     setMobileMenuOpen(false);
     router.push('/');
@@ -281,16 +258,54 @@ export default function BuyerHeader() {
       >
         <div className="bh-header__container">
 
-          {/* Left Side: Logo */}
-          <Link href="/buyer/products" className="bh-logo" onClick={closeMobileMenu}>
-            <div className="bh-logo__icon-wrap">
-              <svg className="bh-logo__svg" width="28" height="28" viewBox="0 0 32 32" fill="none">
-                <rect width="32" height="32" rx="10" fill="#4169e1" />
-                <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-            </div>
-            <span className="bh-logo__text">EMAHU</span>
-          </Link>
+          {/* Left Side: Logo & Location Search */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <Link href="/buyer/products" className="bh-logo" onClick={closeMobileMenu}>
+              <div className="bh-logo__icon-wrap">
+                <svg className="bh-logo__svg" width="28" height="28" viewBox="0 0 32 32" fill="none">
+                  <rect width="32" height="32" rx="10" fill="#4169e1" />
+                  <path d="M8 12h16M8 16h12M8 20h14" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              </div>
+              <span className="bh-logo__text">EMAHU</span>
+            </Link>
+
+            {/* Location Selector Pill */}
+            <motion.button
+              type="button"
+              className="bh-loc-pill bh-action-icon--desktop"
+              onClick={() => setIsLocationModalOpen(true)}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(65, 105, 225, 0.08)',
+                border: '1px solid rgba(65, 105, 225, 0.22)',
+                borderRadius: '20px',
+                padding: '5px 12px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: '#1e293b',
+                cursor: 'pointer',
+                maxWidth: '220px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                transition: 'all 0.15s ease'
+              }}
+              title="Click to search and change location"
+            >
+              <span style={{ color: '#4169e1', fontSize: '0.9rem' }}>📍</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
+                {buyerLocation?.displayArea || buyerLocation?.area || (buyerLocation?.address ? buyerLocation.address.split(',')[0] : '') || (selectedCity && selectedCity !== 'Ahmedabad' ? selectedCity : '') || 'Enable Location'}
+              </span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5"><path d="M6 9l6 6 6-6" /></svg>
+            </motion.button>
+
+
+          </div>
 
 
 
@@ -543,6 +558,39 @@ export default function BuyerHeader() {
           </Link>
         </div>
 
+        {/* Location selector in Mobile Drawer */}
+        <div style={{ padding: '0 20px 12px' }}>
+          <button
+            type="button"
+            onClick={() => {
+              closeMobileMenu();
+              setIsLocationModalOpen(true);
+            }}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 14px',
+              borderRadius: '10px',
+              background: '#f1f5f9',
+              border: '1px solid #e2e8f0',
+              color: '#1e293b',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+              <span>📍</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {buyerLocation?.address ? buyerLocation.address.split(',')[0] : (selectedCity || 'Ahmedabad')}
+              </span>
+            </div>
+            <span style={{ fontSize: '0.72rem', color: '#4169e1', fontWeight: 700 }}>Change</span>
+          </button>
+        </div>
+
         {/* Nav Links */}
         <nav className="bh-mobile-drawer__nav">
           <Link href="/buyer/products" className="bh-mobile-drawer__link" onClick={closeMobileMenu}>
@@ -577,6 +625,16 @@ export default function BuyerHeader() {
           )}
         </div>
       </div>
+
+      {/* Buyer Location Search & Selection Modal */}
+      <BuyerLocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        onLocationSelect={(loc) => {
+          setBuyerLocation(loc);
+          if (loc.city) setSelectedCity(loc.city);
+        }}
+      />
     </>
   );
 }

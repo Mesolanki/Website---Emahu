@@ -95,7 +95,9 @@ export const parseNominatimAddress = (data) => {
   };
 };
 
-export const detectLocationWithGPS = () => {
+import API_BASE from './config';
+
+export const detectLocationWithGPS = (options = {}) => {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
       reject(new Error('Geolocation is not supported by your browser.'));
@@ -107,46 +109,79 @@ export const detectLocationWithGPS = () => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
         const coords = {
-          latitude: lat.toFixed(6),
-          longitude: lon.toFixed(6),
+          latitude: Number(lat.toFixed(6)),
+          longitude: Number(lon.toFixed(6)),
         };
 
+        let resolvedAddress = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+        let resolvedArea = '';
+        let resolvedCity = '';
+        let resolvedState = 'Gujarat';
+        let resolvedZip = '';
+
         try {
-          // Pass addressdetails=1 to Nominatim for full building/road breakdown
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`
-          );
+          // 1. Query backend reverse geocode (Google Maps / OSM)
+          const res = await fetch(`${API_BASE}/api/location/reverse?lat=${lat}&lon=${lon}`);
           const data = await res.json();
-          const parsed = parseNominatimAddress(data);
-
-          // Save to localStorage for application-wide persistence
-          localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
-          if (parsed.city) localStorage.setItem('emahu_buyer_city', parsed.city);
-          if (parsed.fullAddress) localStorage.setItem('emahu_buyer_address', parsed.fullAddress);
-
-          resolve({
-            coords,
-            ...parsed,
-            raw: data,
-          });
-        } catch (err) {
-          // If network fetch fails, still return coordinates
-          localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
-          resolve({
-            coords,
-            streetAddress: '',
-            city: '',
-            state: '',
-            pincode: '',
-            fullAddress: '',
-            raw: null,
-          });
+          if (data.success && data.data) {
+            resolvedAddress = data.data.address || resolvedAddress;
+            resolvedArea = data.data.area || data.data.sublocality || '';
+            resolvedCity = data.data.city || '';
+            resolvedState = data.data.state || resolvedState;
+            resolvedZip = data.data.zipCode || '';
+          }
+        } catch (backendErr) {
+          console.warn('Backend reverse geocoding fallback:', backendErr);
+          try {
+            const osmRes = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`
+            );
+            const osmData = await osmRes.json();
+            const parsed = parseNominatimAddress(osmData);
+            if (parsed.fullAddress) resolvedAddress = parsed.fullAddress;
+            if (parsed.streetAddress) resolvedArea = parsed.streetAddress.split(',')[0].trim();
+            if (parsed.city) resolvedCity = parsed.city;
+            if (parsed.state) resolvedState = parsed.state;
+            if (parsed.pincode) resolvedZip = parsed.pincode;
+          } catch (_) {}
         }
+
+        const displayArea = resolvedArea || (resolvedAddress ? resolvedAddress.split(',')[0].trim() : '') || resolvedCity || 'My Location';
+
+        const fullLoc = {
+          address: resolvedAddress,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          area: resolvedArea || displayArea,
+          city: resolvedCity || 'Ahmedabad',
+          displayArea,
+          state: resolvedState,
+          zipCode: resolvedZip
+        };
+
+        // Save to localStorage for application-wide persistence
+        localStorage.setItem('emahu_buyer_location', JSON.stringify(fullLoc));
+        localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
+        localStorage.setItem('emahu_buyer_city', displayArea);
+        localStorage.setItem('emahu_buyer_address', resolvedAddress);
+
+
+        // Dispatch global events for instant reactivity
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new CustomEvent('emahu_location_changed', { detail: fullLoc }));
+
+        resolve(fullLoc);
       },
       (error) => {
         reject(error);
       },
-      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
+      {
+        timeout: 15000,
+        maximumAge: 0,
+        enableHighAccuracy: true,
+        ...options
+      }
     );
   });
 };
+
