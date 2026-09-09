@@ -6,88 +6,118 @@ import API_BASE from '@/utils/config';
 
 // Fallback categories used when the backend API is unreachable (Vercel cold start, DB empty, etc.)
 const FALLBACK_CATEGORIES = [
-  { id: 'tech', name: 'Electronics & Tech', children: [
-    { id: 'smartphones', name: 'Smartphones & Tablets', children: [] },
-    { id: 'computers', name: 'Computers & Accessories', children: [] },
-    { id: 'audio', name: 'Audio & Headphones', children: [] },
-    { id: 'cameras', name: 'Cameras & Photo', children: [] },
-    { id: 'smart-devices', name: 'Smart Devices', children: [
-      { id: 'smart-watches', name: 'Smart Watches', children: [] },
-      { id: 'smart-thermostats', name: 'Smart Thermostats', children: [] }
-    ]}
-  ]},
-  { id: 'apparel', name: 'Apparel & Fashion', children: [
-    { id: 'mens-clothing', name: 'Men\'s Clothing', children: [] },
-    { id: 'womens-clothing', name: 'Women\'s Clothing', children: [] },
-    { id: 'kids-clothing', name: 'Kids\' Clothing', children: [] },
-    { id: 'jewelry-accessories', name: 'Jewelry & Accessories', children: [] },
-    { id: 'gym-wear', name: 'Gym Wear', children: [] },
-    { id: 'outerwear', name: 'Outerwear', children: [] }
-  ]},
-  { id: 'shoes', name: 'Shoes & Footwear', children: [
-    { id: 'running-shoes', name: 'Running Shoes', children: [] },
-    { id: 'hiking-boots', name: 'Hiking Boots', children: [] },
-    { id: 'sneakers', name: 'Sneakers', children: [] },
-    { id: 'sandals', name: 'Sandals', children: [] }
-  ]},
-  { id: 'kitchen', name: 'Kitchen & Dining', children: [
-    { id: 'cookware', name: 'Cookware', children: [] },
-    { id: 'teaware', name: 'Teaware', children: [] },
-    { id: 'kitchen-tools', name: 'Kitchen Tools', children: [] },
-    { id: 'tableware', name: 'Tableware', children: [] }
-  ]},
-  { id: 'lifestyle', name: 'Lifestyle & Home', children: [
-    { id: 'furniture', name: 'Furniture', children: [] },
-    { id: 'home-decor', name: 'Home Decor', children: [] },
-    { id: 'aromatherapy', name: 'Aromatherapy', children: [] },
-    { id: 'bedding-linen', name: 'Bedding & Linen', children: [] }
-  ]},
-  { id: 'beauty', name: 'Beauty & Cosmetics', children: [
-    { id: 'skincare', name: 'Skincare', children: [] },
-    { id: 'makeup', name: 'Makeup', children: [] },
-    { id: 'fragrances', name: 'Fragrances', children: [] },
-    { id: 'haircare', name: 'Haircare', children: [] }
-  ]},
-  { id: 'sports', name: 'Sports & Outdoors', children: [
-    { id: 'fitness-gear', name: 'Fitness Gear', children: [] },
-    { id: 'activewear', name: 'Activewear', children: [] },
-    { id: 'outdoor-equipment', name: 'Outdoor Equipment', children: [] },
-    { id: 'camping-hiking', name: 'Camping & Hiking', children: [] }
-  ]},
-  { id: 'books', name: 'Books & Stationery', children: [
-    { id: 'fiction-lit', name: 'Fiction & Literature', children: [] },
-    { id: 'biographies', name: 'Biographies', children: [] },
-    { id: 'textbooks', name: 'Textbooks', children: [] },
-    { id: 'stationery-journals', name: 'Stationery & Journals', children: [] }
-  ]},
-  { id: 'grocery', name: 'Grocery & Essentials', children: [
-    { id: 'snacks-sweets', name: 'Snacks & Sweets', children: [] },
-    { id: 'beverages', name: 'Beverages', children: [] },
-    { id: 'pantry-staples', name: 'Pantry Staples', children: [] },
-    { id: 'organic-foods', name: 'Organic Foods', children: [] }
-  ]},
-  { id: 'toys', name: 'Toys & Games', children: [
-    { id: 'board-games', name: 'Board Games', children: [] },
-    { id: 'puzzles', name: 'Puzzles', children: [] },
-    { id: 'educational-toys', name: 'Educational Toys', children: [] }
-  ]},
-  { id: 'health', name: 'Health & Wellness', children: [
-    { id: 'vitamins-supps', name: 'Vitamins & Supplements', children: [] },
-    { id: 'wellness-devices', name: 'Wellness Devices', children: [] }
-  ]},
-  { id: 'pets', name: 'Pet Supplies', children: [
-    { id: 'dog-supplies', name: 'Dog Supplies', children: [] },
-    { id: 'cat-supplies', name: 'Cat Supplies', children: [] }
-  ]},
-  { id: 'baby', name: 'Baby Care', children: [
-    { id: 'baby-gear', name: 'Baby Gear', children: [] },
-    { id: 'baby-apparel', name: 'Baby Apparel', children: [] },
-    { id: 'baby-toys', name: 'Baby Toys', children: [] }
-  ]},
-  { id: 'automotive', name: 'Automotive & Tools', children: [
-    { id: 'car-accessories', name: 'Car Accessories', children: [] },
-    { id: 'hand-tools', name: 'Hand Tools', children: [] }
-  ]}
+  {
+    id: 'tech', name: 'Electronics & Tech', children: [
+      { id: 'smartphones', name: 'Smartphones & Tablets', children: [] },
+      { id: 'computers', name: 'Computers & Accessories', children: [] },
+      { id: 'audio', name: 'Audio & Headphones', children: [] },
+      { id: 'cameras', name: 'Cameras & Photo', children: [] },
+      {
+        id: 'smart-devices', name: 'Smart Devices', children: [
+          { id: 'smart-watches', name: 'Smart Watches', children: [] },
+          { id: 'smart-thermostats', name: 'Smart Thermostats', children: [] }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'apparel', name: 'Apparel & Fashion', children: [
+      { id: 'mens-clothing', name: 'Men\'s Clothing', children: [] },
+      { id: 'womens-clothing', name: 'Women\'s Clothing', children: [] },
+      { id: 'kids-clothing', name: 'Kids\' Clothing', children: [] },
+      { id: 'jewelry-accessories', name: 'Jewelry & Accessories', children: [] },
+      { id: 'gym-wear', name: 'Gym Wear', children: [] },
+      { id: 'outerwear', name: 'Outerwear', children: [] }
+    ]
+  },
+  {
+    id: 'shoes', name: 'Shoes & Footwear', children: [
+      { id: 'running-shoes', name: 'Running Shoes', children: [] },
+      { id: 'hiking-boots', name: 'Hiking Boots', children: [] },
+      { id: 'sneakers', name: 'Sneakers', children: [] },
+      { id: 'sandals', name: 'Sandals', children: [] }
+    ]
+  },
+  {
+    id: 'kitchen', name: 'Kitchen & Dining', children: [
+      { id: 'cookware', name: 'Cookware', children: [] },
+      { id: 'teaware', name: 'Teaware', children: [] },
+      { id: 'kitchen-tools', name: 'Kitchen Tools', children: [] },
+      { id: 'tableware', name: 'Tableware', children: [] }
+    ]
+  },
+  {
+    id: 'lifestyle', name: 'Lifestyle & Home', children: [
+      { id: 'furniture', name: 'Furniture', children: [] },
+      { id: 'home-decor', name: 'Home Decor', children: [] },
+      { id: 'aromatherapy', name: 'Aromatherapy', children: [] },
+      { id: 'bedding-linen', name: 'Bedding & Linen', children: [] }
+    ]
+  },
+  {
+    id: 'beauty', name: 'Beauty & Cosmetics', children: [
+      { id: 'skincare', name: 'Skincare', children: [] },
+      { id: 'makeup', name: 'Makeup', children: [] },
+      { id: 'fragrances', name: 'Fragrances', children: [] },
+      { id: 'haircare', name: 'Haircare', children: [] }
+    ]
+  },
+  {
+    id: 'sports', name: 'Sports & Outdoors', children: [
+      { id: 'fitness-gear', name: 'Fitness Gear', children: [] },
+      { id: 'activewear', name: 'Activewear', children: [] },
+      { id: 'outdoor-equipment', name: 'Outdoor Equipment', children: [] },
+      { id: 'camping-hiking', name: 'Camping & Hiking', children: [] }
+    ]
+  },
+  {
+    id: 'books', name: 'Books & Stationery', children: [
+      { id: 'fiction-lit', name: 'Fiction & Literature', children: [] },
+      { id: 'biographies', name: 'Biographies', children: [] },
+      { id: 'textbooks', name: 'Textbooks', children: [] },
+      { id: 'stationery-journals', name: 'Stationery & Journals', children: [] }
+    ]
+  },
+  {
+    id: 'grocery', name: 'Grocery & Essentials', children: [
+      { id: 'snacks-sweets', name: 'Snacks & Sweets', children: [] },
+      { id: 'beverages', name: 'Beverages', children: [] },
+      { id: 'pantry-staples', name: 'Pantry Staples', children: [] },
+      { id: 'organic-foods', name: 'Organic Foods', children: [] }
+    ]
+  },
+  {
+    id: 'toys', name: 'Toys & Games', children: [
+      { id: 'board-games', name: 'Board Games', children: [] },
+      { id: 'puzzles', name: 'Puzzles', children: [] },
+      { id: 'educational-toys', name: 'Educational Toys', children: [] }
+    ]
+  },
+  {
+    id: 'health', name: 'Health & Wellness', children: [
+      { id: 'vitamins-supps', name: 'Vitamins & Supplements', children: [] },
+      { id: 'wellness-devices', name: 'Wellness Devices', children: [] }
+    ]
+  },
+  {
+    id: 'pets', name: 'Pet Supplies', children: [
+      { id: 'dog-supplies', name: 'Dog Supplies', children: [] },
+      { id: 'cat-supplies', name: 'Cat Supplies', children: [] }
+    ]
+  },
+  {
+    id: 'baby', name: 'Baby Care', children: [
+      { id: 'baby-gear', name: 'Baby Gear', children: [] },
+      { id: 'baby-apparel', name: 'Baby Apparel', children: [] },
+      { id: 'baby-toys', name: 'Baby Toys', children: [] }
+    ]
+  },
+  {
+    id: 'automotive', name: 'Automotive & Tools', children: [
+      { id: 'car-accessories', name: 'Car Accessories', children: [] },
+      { id: 'hand-tools', name: 'Hand Tools', children: [] }
+    ]
+  }
 ];
 
 /**
@@ -133,7 +163,7 @@ function flattenCategories(categoriesList) {
   return flat;
 }
 
-export default function CategorySelector({ value, onChange }) {
+export default function CategorySelector({ value, subcategoryValue, onChange }) {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPath, setSelectedPath] = useState([]);
@@ -149,7 +179,7 @@ export default function CategorySelector({ value, onChange }) {
   const filteredCategories = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const query = searchQuery.toLowerCase();
-    return flatCategories.filter(cat => 
+    return flatCategories.filter(cat =>
       cat.name.toLowerCase().includes(query)
     );
   }, [flatCategories, searchQuery]);
@@ -184,22 +214,37 @@ export default function CategorySelector({ value, onChange }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Sync selectedPath when external value changes or categories load
+  // Sync selectedPath when external value / subcategoryValue changes or categories load
   useEffect(() => {
-    if (categories.length > 0 && value) {
-      const path = tracePath(categories, value);
-      if (path) {
-        setTimeout(() => {
-          setSelectedPath(path);
-        }, 0);
+    if (categories.length === 0) return;
+
+    let target = null;
+    if (subcategoryValue && subcategoryValue !== 'General') {
+      target = subcategoryValue;
+    } else if (value) {
+      target = value;
+    }
+
+    if (target) {
+      const path = tracePath(categories, target);
+      if (path && path.length > 0) {
+        setSelectedPath(path);
+        return;
       }
     }
-  }, [value, categories]);
+
+    if (value) {
+      const path = tracePath(categories, value);
+      if (path && path.length > 0) {
+        setSelectedPath(path);
+      }
+    }
+  }, [value, subcategoryValue, categories]);
 
   // Compute the cascading levels to display
   const levels = useMemo(() => {
     const dropdownLevels = [];
-    
+
     // Level 0 options (Root categories)
     dropdownLevels.push({
       level: 0,
@@ -211,7 +256,7 @@ export default function CategorySelector({ value, onChange }) {
     for (let i = 0; i < selectedPath.length; i++) {
       const currentId = selectedPath[i];
       const currentNode = findCategoryNode(categories, currentId);
-      
+
       if (currentNode && currentNode.children && currentNode.children.length > 0) {
         dropdownLevels.push({
           level: i + 1,
@@ -233,16 +278,26 @@ export default function CategorySelector({ value, onChange }) {
 
     setSelectedPath(nextPath);
 
-    // Call onChange with the deepest selected category Name, or empty if none
-    const deepestId = nextPath[nextPath.length - 1] || '';
-    let deepestName = '';
-    if (deepestId) {
-      const node = findCategoryNode(categories, deepestId);
-      deepestName = node ? node.name : '';
+    if (nextPath.length === 0) {
+      if (onChange) onChange('', 'General');
+      return;
+    }
+
+    // Root node (Level 0) represents Main Category
+    const rootId = nextPath[0];
+    const rootNode = findCategoryNode(categories, rootId);
+    const mainCategoryName = rootNode ? rootNode.name : '';
+
+    // If sub-level is selected, that represents Subcategory
+    let subcategoryName = 'General';
+    if (nextPath.length > 1) {
+      const deepestSubId = nextPath[nextPath.length - 1];
+      const subNode = findCategoryNode(categories, deepestSubId);
+      subcategoryName = subNode ? subNode.name : 'General';
     }
 
     if (onChange) {
-      onChange(deepestName);
+      onChange(mainCategoryName, subcategoryName);
     }
   };
 
@@ -307,8 +362,16 @@ export default function CategorySelector({ value, onChange }) {
               <div
                 key={cat.id || cat._id}
                 onClick={() => {
+                  const targetId = cat.id || cat._id?.toString() || cat.name;
+                  const path = tracePath(categories, targetId) || [targetId];
+                  setSelectedPath(path);
+
+                  const rootNode = findCategoryNode(categories, path[0]);
+                  const mainCatName = rootNode ? rootNode.name : cat.name;
+                  const subCatName = path.length > 1 ? cat.name : 'General';
+
                   if (onChange) {
-                    onChange(cat.name);
+                    onChange(mainCatName, subCatName);
                   }
                   setSearchQuery('');
                 }}

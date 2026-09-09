@@ -188,6 +188,22 @@
   border: 1px solid transparent;
 }
 
+/* Location Button Style */
+.sel-nav-btn--location {
+  background: rgba(65, 105, 225, 0.07);
+  color: #1e293b;
+  border-color: rgba(65, 105, 225, 0.2);
+  cursor: pointer;
+}
+
+.sel-nav-btn--location:hover {
+  background: rgba(65, 105, 225, 0.14);
+  border-color: #4169e1;
+  color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(65, 105, 225, 0.12);
+}
+
 /* Buyer Hub Button Style */
 .sel-nav-btn--buyer {
   background: rgba(99, 102, 241, 0.06);
@@ -201,6 +217,7 @@
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
 }
+
 
 /* Cart Button Style */
 .sel-nav-btn--cart {

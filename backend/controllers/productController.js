@@ -1,4 +1,109 @@
 const Product = require('../models/Product');
+const Category = require('../models/Category');
+
+// Standard hierarchy mapping for instant resolution and fallback
+const SUBCATEGORY_TO_MAIN_MAP = {
+  'smartphones & tablets': 'Electronics & Tech',
+  'smartphones': 'Electronics & Tech',
+  'tablets': 'Electronics & Tech',
+  'computers & accessories': 'Electronics & Tech',
+  'audio & headphones': 'Electronics & Tech',
+  'cameras & photo': 'Electronics & Tech',
+  'smart devices': 'Electronics & Tech',
+  'smart watches': 'Electronics & Tech',
+  'smart thermostats': 'Electronics & Tech',
+  "men's clothing": 'Apparel & Fashion',
+  "women's clothing": 'Apparel & Fashion',
+  "kids' clothing": 'Apparel & Fashion',
+  'jewelry & accessories': 'Apparel & Fashion',
+  'gym wear': 'Apparel & Fashion',
+  'outerwear': 'Apparel & Fashion',
+  'running shoes': 'Shoes & Footwear',
+  'hiking boots': 'Shoes & Footwear',
+  'sneakers': 'Shoes & Footwear',
+  'sandals': 'Shoes & Footwear',
+  'cookware': 'Kitchen & Dining',
+  'teaware': 'Kitchen & Dining',
+  'kitchen tools': 'Kitchen & Dining',
+  'tableware': 'Kitchen & Dining',
+  'furniture': 'Lifestyle & Home',
+  'home decor': 'Lifestyle & Home',
+  'aromatherapy': 'Lifestyle & Home',
+  'bedding & linen': 'Lifestyle & Home',
+  'skincare': 'Beauty & Cosmetics',
+  'makeup': 'Beauty & Cosmetics',
+  'fragrances': 'Beauty & Cosmetics',
+  'haircare': 'Beauty & Cosmetics',
+  'fitness gear': 'Sports & Outdoors',
+  'activewear': 'Sports & Outdoors',
+  'outdoor equipment': 'Sports & Outdoors',
+  'camping & hiking': 'Sports & Outdoors',
+  'fiction & literature': 'Books & Stationery',
+  'biographies': 'Books & Stationery',
+  'textbooks': 'Books & Stationery',
+  'stationery & journals': 'Books & Stationery',
+  'snacks & sweets': 'Grocery & Essentials',
+  'beverages': 'Grocery & Essentials',
+  'pantry staples': 'Grocery & Essentials',
+  'organic foods': 'Grocery & Essentials',
+  'board games': 'Toys & Games',
+  'puzzles': 'Toys & Games',
+  'educational toys': 'Toys & Games',
+  'vitamins & supplements': 'Health & Wellness',
+  'wellness devices': 'Health & Wellness',
+  'dog supplies': 'Pet Supplies',
+  'cat supplies': 'Pet Supplies',
+  'baby gear': 'Baby Care',
+  'baby apparel': 'Baby Care',
+  'baby toys': 'Baby Care',
+  'car accessories': 'Automotive & Tools',
+  'hand tools': 'Automotive & Tools'
+};
+
+const resolveCategoryHierarchy = async (inputCategory, inputSubcategory) => {
+  let mainCat = (inputCategory || '').trim();
+  let subCat = (inputSubcategory || '').trim();
+
+  const mainLower = mainCat.toLowerCase();
+  const subLower = subCat.toLowerCase();
+
+  // If subcategory is empty or 'General', but main category is actually a subcategory:
+  if ((!subCat || subLower === 'general' || subCat === mainCat) && SUBCATEGORY_TO_MAIN_MAP[mainLower]) {
+    subCat = mainCat;
+    mainCat = SUBCATEGORY_TO_MAIN_MAP[mainLower];
+  } else if (SUBCATEGORY_TO_MAIN_MAP[mainLower] && (!inputSubcategory || inputSubcategory === 'General')) {
+    subCat = mainCat;
+    mainCat = SUBCATEGORY_TO_MAIN_MAP[mainLower];
+  }
+
+  // Also query DB Category collection if needed
+  try {
+    const catInDb = await Category.findOne({ name: new RegExp(`^${mainCat}$`, 'i') });
+    if (catInDb && catInDb.parentId) {
+      const parentInDb = await Category.findById(catInDb.parentId);
+      if (parentInDb) {
+        subCat = catInDb.name;
+        mainCat = parentInDb.name;
+      }
+    }
+  } catch (e) {
+    // ignore lookup error
+  }
+
+  if (!subCat) subCat = 'General';
+  return { category: mainCat, subcategory: subCat };
+};
+
+const normalizeProductCategories = (p) => {
+  if (!p) return p;
+  const mainLower = (p.category || '').toLowerCase().trim();
+  if (SUBCATEGORY_TO_MAIN_MAP[mainLower]) {
+    const origSub = p.subcategory && p.subcategory !== 'General' ? p.subcategory : p.category;
+    p.category = SUBCATEGORY_TO_MAIN_MAP[mainLower];
+    p.subcategory = origSub;
+  }
+  return p;
+};
 
 // @desc    Create a new product
 // @route   POST /api/products
@@ -62,6 +167,9 @@ exports.createProduct = async (req, res) => {
       });
     }
 
+    // Resolve hierarchical category and subcategory
+    const resolvedCats = await resolveCategoryHierarchy(category, req.body.subcategory);
+
     // Auto-generate temporary SKU (Seller doesn't generate official SKU)
     const tempSku = `EM-TEMP-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
 
@@ -78,8 +186,8 @@ exports.createProduct = async (req, res) => {
       name: name.trim(),
       brand: brand.trim(),
       sku: tempSku,
-      category,
-      subcategory: req.body.subcategory || 'General',
+      category: resolvedCats.category,
+      subcategory: resolvedCats.subcategory,
       price: parseFloat(price),
       comparePrice: parseFloat(comparePrice),
       stock: parseInt(stock),
@@ -115,6 +223,8 @@ exports.createProduct = async (req, res) => {
       images360: Array.isArray(images360) ? images360 : [],
       thumbnail: thumbnail || '',
       weight: weight ? parseFloat(weight) : undefined,
+      weightUnit: req.body.weightUnit === 'g' ? 'g' : 'kg',
+      weightInKg: weight ? (req.body.weightUnit === 'g' ? parseFloat(weight) / 1000 : parseFloat(weight)) : undefined,
       length: length ? parseFloat(length) : undefined,
       width: width ? parseFloat(width) : undefined,
       height: height ? parseFloat(height) : undefined,
@@ -188,7 +298,7 @@ exports.getProducts = async (req, res) => {
     if (req.query.select) {
       query = query.select(req.query.select);
     } else {
-      query = query.select('name brand category subcategory price comparePrice stock status image rating reviews seller approvalStatus isNew createdAt');
+      query = query.select('name brand category subcategory price comparePrice stock status image rating reviews seller approvalStatus isNew createdAt weight weightUnit weightInKg');
     }
     
     query = query.populate('seller', 'name email phone storeName latitude longitude address city state serviceAreaState serviceAreaCity coveredCities');
@@ -201,7 +311,8 @@ exports.getProducts = async (req, res) => {
       }
     }
     
-    const products = await query.lean();
+    let products = await query.lean();
+    products = products.map(p => normalizeProductCategories(p));
     
     res.status(200).json({
       success: true,
@@ -221,7 +332,8 @@ exports.getProducts = async (req, res) => {
 // @access  Private (Seller only)
 exports.getMyProducts = async (req, res) => {
   try {
-    const products = await Product.find({ seller: req.user.id });
+    let products = await Product.find({ seller: req.user.id }).lean();
+    products = products.map(p => normalizeProductCategories(p));
     res.status(200).json({
       success: true,
       products
@@ -245,11 +357,9 @@ exports.getProductById = async (req, res) => {
 
     // Check if the id is a valid ObjectId, otherwise query by SKU code
     if (mongoose.Types.ObjectId.isValid(req.params.id)) {
-      product = await Product.findById(req.params.id).populate('seller', 'name email phone storeName status latitude longitude address city state serviceAreaState serviceAreaCity coveredCities');
-    }
-    
-    if (!product) {
-      product = await Product.findOne({ sku: req.params.id.toUpperCase() }).populate('seller', 'name email phone storeName status latitude longitude address city state serviceAreaState serviceAreaCity coveredCities');
+      product = await Product.findById(req.params.id).populate('seller', 'name email phone storeName status latitude longitude address city state serviceAreaState serviceAreaCity coveredCities').lean();
+    } else {
+      product = await Product.findOne({ sku: req.params.id.toUpperCase() }).populate('seller', 'name email phone storeName status latitude longitude address city state serviceAreaState serviceAreaCity coveredCities').lean();
     }
 
     if (!product) {
@@ -258,6 +368,8 @@ exports.getProductById = async (req, res) => {
         error: 'Product not found'
       });
     }
+
+    product = normalizeProductCategories(product);
 
     // Restrict visibility for rejected products
     if (product.approvalStatus === 'rejected') {
@@ -473,6 +585,8 @@ exports.resubmitProduct = async (req, res) => {
       });
     }
 
+    const resolvedCats = await resolveCategoryHierarchy(category, req.body.subcategory);
+
     const {
       shortTitle, slug, bulletFeatures, highlights, packageContents, warrantyInfo,
       countryOfOrigin, manufacturer, modelNumber, barcode, mrp, tax, hsnCode,
@@ -486,8 +600,8 @@ exports.resubmitProduct = async (req, res) => {
     product.name = name.trim();
     product.brand = brand.trim();
     product.sku = finalSku.toUpperCase();
-    product.category = category;
-    product.subcategory = req.body.subcategory !== undefined ? req.body.subcategory : product.subcategory;
+    product.category = resolvedCats.category;
+    product.subcategory = resolvedCats.subcategory;
     product.price = parseFloat(price);
     product.comparePrice = parseFloat(comparePrice);
     product.stock = parseInt(stock);
@@ -520,6 +634,12 @@ exports.resubmitProduct = async (req, res) => {
     product.images360 = Array.isArray(images360) ? images360 : product.images360;
     product.thumbnail = thumbnail !== undefined ? thumbnail : product.thumbnail;
     product.weight = weight !== undefined ? parseFloat(weight) : product.weight;
+    if (req.body.weightUnit !== undefined) {
+      product.weightUnit = req.body.weightUnit === 'g' ? 'g' : 'kg';
+    }
+    if (weight !== undefined) {
+      product.weightInKg = (product.weightUnit === 'g') ? (parseFloat(weight) / 1000) : parseFloat(weight);
+    }
     product.length = length !== undefined ? parseFloat(length) : product.length;
     product.width = width !== undefined ? parseFloat(width) : product.width;
     product.height = height !== undefined ? parseFloat(height) : product.height;

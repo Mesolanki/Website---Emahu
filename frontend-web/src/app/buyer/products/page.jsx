@@ -123,12 +123,13 @@ const getProductMainImage = (p) => {
   return p.image || '';
 };
 
+
 function Stars({ rating }) {
   return (
     <div className="bp-card__stars">
-      {[1,2,3,4,5].map(s => (
+      {[1, 2, 3, 4, 5].map(s => (
         <svg key={s} className={`bp-star ${s <= Math.round(rating) ? '' : 'bp-star--empty'}`} viewBox="0 0 24 24">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
         </svg>
       ))}
     </div>
@@ -181,29 +182,32 @@ export default function ProductsPage() {
     }
   }, []);
 
-  const [category, setCategory]           = useState('All');
+  const [category, setCategory] = useState('All');
   const [activeSubcategory, setActiveSubcategory] = useState('All');
-  const [sortBy, setSortBy]               = useState('popular');
-  const [maxPrice, setMaxPrice]           = useState(160000);
+  const [sortBy, setSortBy] = useState('popular');
+  const [maxPrice, setMaxPrice] = useState(160000);
   const [maxPriceLimit, setMaxPriceLimit] = useState(160000);
-  const [brands, setBrands]               = useState([]);
-  const [showVerified, setShowVerified]   = useState(false);
-  const [showOnSale, setShowOnSale]       = useState(false);
-  const [showNew, setShowNew]             = useState(false);
-  const [viewMode, setViewMode]           = useState('grid');
-  const [wishlist, setWishlist]           = useState([]);
-  const [selectedCity, setSelectedCity]   = useState('Ahmedabad');
+  const [brands, setBrands] = useState([]);
+  const [showVerified, setShowVerified] = useState(false);
+  const [showOnSale, setShowOnSale] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [viewMode, setViewMode] = useState('grid');
+  const [wishlist, setWishlist] = useState([]);
+  const [selectedCity, setSelectedCity] = useState('Ahmedabad');
+  const [buyerLocation, setBuyerLocation] = useState(null);
+  const [sellerDistances, setSellerDistances] = useState({});
+  const [maxDistanceRadius, setMaxDistanceRadius] = useState(20);
   const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
-  const locationDropdownRef               = useRef(null);
-  const [selectedShop, setSelectedShop]   = useState('All Shops');
+  const locationDropdownRef = useRef(null);
+  const [selectedShop, setSelectedShop] = useState('All Shops');
   const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
-  const shopDropdownRef                   = useRef(null);
-  const [cartAdded, setCartAdded]         = useState([]);
-  const [searchQuery, setSearchQuery]     = useState('');
-  const [page, setPage]                   = useState(1);
-  const [dbProducts, setDbProducts]       = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [serverWaking, setServerWaking]   = useState(false);
+  const shopDropdownRef = useRef(null);
+  const [cartAdded, setCartAdded] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [dbProducts, setDbProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [serverWaking, setServerWaking] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [categoryTiles, setCategoryTiles] = useState(FALLBACK_CATEGORY_TILES);
   const [categoryParentMap, setCategoryParentMap] = useState({});
@@ -287,7 +291,7 @@ export default function ProductsPage() {
                 break;
               }
             }
-            
+
             // Normalize values so filtering is robust and aligns with products page categories
             let mappedValue = cat.name;
             const cleanCat = mappedValue.toLowerCase();
@@ -374,18 +378,22 @@ export default function ProductsPage() {
         mappedCategory = categoryParentMap[cleanCat];
       } else {
         const catLC = mappedCategory.toLowerCase();
-        if (catLC === 'electronics' || catLC === 'tech' || catLC === 'tech & gadgets') {
+        if (catLC === 'electronics' || catLC === 'tech' || catLC === 'tech & gadgets' || catLC.includes('computer') || catLC.includes('audio') || catLC.includes('phone') || catLC.includes('tablet') || catLC.includes('headphone')) {
           mappedCategory = 'Electronics & Tech';
-        } else if (catLC === 'apparel' || catLC === 'fashion') {
+        } else if (catLC === 'apparel' || catLC === 'fashion' || catLC.includes('cloth') || catLC.includes('wear')) {
           mappedCategory = 'Apparel & Fashion';
-        } else if (catLC === 'shoes') {
+        } else if (catLC === 'shoes' || catLC.includes('footwear') || catLC.includes('sneaker')) {
           mappedCategory = 'Shoes & Footwear';
-        } else if (catLC === 'kitchen') {
+        } else if (catLC === 'kitchen' || catLC.includes('dining') || catLC.includes('cookware')) {
           mappedCategory = 'Kitchen & Dining';
-        } else if (catLC === 'lifestyle' || catLC === 'fitness' || catLC === 'furniture') {
+        } else if (catLC === 'lifestyle' || catLC === 'fitness' || catLC === 'furniture' || catLC.includes('home')) {
           mappedCategory = 'Lifestyle & Home';
-        } else if (catLC === 'grocery' || catLC === 'groceries') {
+        } else if (catLC === 'grocery' || catLC === 'groceries' || catLC.includes('pantry') || catLC.includes('snack') || catLC.includes('sweet') || catLC.includes('food')) {
           mappedCategory = 'Grocery & Essentials';
+        } else if (catLC.includes('stationery') || catLC.includes('book') || catLC.includes('journal') || catLC.includes('paper')) {
+          mappedCategory = 'Books & Stationery';
+        } else if (catLC.includes('beauty') || catLC.includes('skin') || catLC.includes('cosmetic')) {
+          mappedCategory = 'Beauty & Cosmetics';
         }
       }
 
@@ -464,18 +472,18 @@ export default function ProductsPage() {
         const bLon = parseFloat(coords.longitude);
         const sLat = parseFloat(sObj.latitude);
         const sLon = parseFloat(sObj.longitude);
-        
+
         if (!isNaN(bLat) && !isNaN(bLon) && !isNaN(sLat) && !isNaN(sLon)) {
           const R = 6371; // km
           const dLat = (sLat - bLat) * Math.PI / 180;
           const dLon = (sLon - bLon) * Math.PI / 180;
-          const a = 
+          const a =
             Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) * 
+            Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) *
             Math.sin(dLon / 2) * Math.sin(dLon / 2);
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
           const distance = R * c;
-          
+
           if (distance <= 30) {
             return true;
           }
@@ -523,10 +531,10 @@ export default function ProductsPage() {
     return false;
   };
 
-  // Filter products by selected buyer location first
+  // Display all products in catalog for comprehensive marketplace browsing
   const locationFilteredProducts = useMemo(() => {
-    return allProductsCombined.filter(p => sellerServesLocation(p.seller, selectedCity));
-  }, [allProductsCombined, selectedCity]);
+    return allProductsCombined;
+  }, [allProductsCombined]);
 
   const uniqueShopsAndBrands = useMemo(() => {
     const shops = locationFilteredProducts.map(p => p.sellerStore).filter(Boolean);
@@ -549,7 +557,7 @@ export default function ProductsPage() {
       // Round up to nearest 10,000 for clean steps
       const roundedMax = Math.ceil(highestPrice / 10000) * 10000;
       const finalMaxLimit = roundedMax || 160000;
-      
+
       setMaxPriceLimit(finalMaxLimit);
       setMaxPrice(prev => {
         if (prev === 160000 || prev > finalMaxLimit) {
@@ -568,7 +576,7 @@ export default function ProductsPage() {
         const parsedWish = JSON.parse(storedWish);
         setTimeout(() => setWishlist(parsedWish), 0);
       }
-      
+
       const storedCart = localStorage.getItem('emahu_cart');
       if (storedCart) {
         const parsed = JSON.parse(storedCart);
@@ -593,26 +601,47 @@ export default function ProductsPage() {
     }
   }, []);
 
-  // Sync selected city on storage changes & close dropdown on click outside
+  // Sync selected location on storage changes & custom events
   useEffect(() => {
     const handleStorageChange = () => {
       try {
-        const storedCity = localStorage.getItem('emahu_buyer_city');
-        if (storedCity) {
-          setSelectedCity(storedCity);
-        } else {
-          const storedUser = localStorage.getItem('emahu_buyer_user');
-          if (storedUser) {
-            const parsed = JSON.parse(storedUser);
-            if (parsed.city) {
-              setSelectedCity(parsed.city);
-            }
+        const storedLoc = localStorage.getItem('emahu_buyer_location');
+        if (storedLoc) {
+          const parsed = JSON.parse(storedLoc);
+          if (parsed && parsed.latitude !== undefined && parsed.longitude !== undefined) {
+            setBuyerLocation(parsed);
+            if (parsed.displayArea || parsed.area || parsed.city) setSelectedCity(parsed.displayArea || parsed.area || parsed.city);
+            return;
           }
         }
+
+        const storedCoords = localStorage.getItem('emahu_buyer_coordinates');
+        const storedCity = localStorage.getItem('emahu_buyer_city');
+        if (storedCoords) {
+          const coords = JSON.parse(storedCoords);
+          setBuyerLocation({
+            address: storedCity || 'Current Location',
+            latitude: coords.latitude,
+            longitude: coords.longitude
+          });
+        }
+        if (storedCity) {
+          setSelectedCity(storedCity);
+        }
       } catch (e) {
-        console.error(e);
+        console.error('Storage location sync error in products page:', e);
       }
     };
+
+    handleStorageChange();
+
+    const handleCustomLoc = (e) => {
+      if (e.detail && e.detail.latitude !== undefined) {
+        setBuyerLocation(e.detail);
+        if (e.detail.displayArea || e.detail.area || e.detail.city) setSelectedCity(e.detail.displayArea || e.detail.area || e.detail.city);
+      }
+    };
+
 
     const handleClickOutside = (e) => {
       if (locationDropdownRef.current && !locationDropdownRef.current.contains(e.target)) {
@@ -624,12 +653,67 @@ export default function ProductsPage() {
     };
 
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('emahu_location_changed', handleCustomLoc);
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('emahu_location_changed', handleCustomLoc);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Fetch actual Road Distances from Buyer location to all active Sellers
+  useEffect(() => {
+    const calculateDistancesToSellers = async () => {
+      if (!buyerLocation || buyerLocation.latitude === undefined || buyerLocation.longitude === undefined) {
+        return;
+      }
+
+      const uniqueSellersMap = new Map();
+      allProductsCombined.forEach(p => {
+        const sellerObj = p.seller;
+        if (sellerObj) {
+          const sId = String(sellerObj._id || sellerObj.id || sellerObj);
+          const lat = parseFloat(sellerObj.latitude);
+          const lon = parseFloat(sellerObj.longitude);
+          if (!isNaN(lat) && !isNaN(lon) && !uniqueSellersMap.has(sId)) {
+            uniqueSellersMap.set(sId, { id: sId, latitude: lat, longitude: lon });
+          }
+        }
+      });
+
+      const sellersList = Array.from(uniqueSellersMap.values());
+      if (sellersList.length === 0) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/location/distance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            origin: { latitude: Number(buyerLocation.latitude), longitude: Number(buyerLocation.longitude) },
+            destinations: sellersList
+          })
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.results)) {
+          const distMap = {};
+          data.results.forEach(r => {
+            if (r.id) {
+              distMap[r.id] = {
+                distanceKm: r.distanceKm,
+                distanceMeters: r.distanceMeters
+              };
+            }
+          });
+          setSellerDistances(distMap);
+        }
+      } catch (err) {
+        console.warn('Road distance matrix calculation error:', err);
+      }
+    };
+
+    calculateDistancesToSellers();
+  }, [buyerLocation, allProductsCombined]);
 
   const handleCityChange = (city) => {
     setSelectedCity(city);
@@ -646,7 +730,7 @@ export default function ProductsPage() {
       return;
     }
     if (cartAdded.includes(id)) return;
-    
+
     setCartAdded(prev => [...prev, id]);
 
     try {
@@ -702,14 +786,14 @@ export default function ProductsPage() {
   /* Active tags for the pills row */
   const activeTags = useMemo(() => {
     const tags = [];
-    if (searchQuery.trim())  tags.push({ label: `Search: "${searchQuery}"`, clear: () => setSearchQuery('') });
+    if (searchQuery.trim()) tags.push({ label: `Search: "${searchQuery}"`, clear: () => setSearchQuery('') });
     if (category !== 'All') tags.push({ label: category, clear: () => setCategory('All') });
     if (selectedShop !== 'All Shops') tags.push({ label: `Store: ${selectedShop}`, clear: () => setSelectedShop('All Shops') });
-    if (showVerified)        tags.push({ label: 'Verified', clear: () => setShowVerified(false) });
-    if (showOnSale)          tags.push({ label: 'On Sale',  clear: () => setShowOnSale(false) });
-    if (showNew)             tags.push({ label: 'New In',   clear: () => setShowNew(false) });
+    if (showVerified) tags.push({ label: 'Verified', clear: () => setShowVerified(false) });
+    if (showOnSale) tags.push({ label: 'On Sale', clear: () => setShowOnSale(false) });
+    if (showNew) tags.push({ label: 'New In', clear: () => setShowNew(false) });
     brands.forEach(b => tags.push({ label: b, clear: () => toggleBrand(b) }));
-    if (maxPrice < maxPriceLimit)   tags.push({ label: `Under ₹${maxPrice.toLocaleString('en-IN')}`, clear: () => setMaxPrice(maxPriceLimit) });
+    if (maxPrice < maxPriceLimit) tags.push({ label: `Under ₹${maxPrice.toLocaleString('en-IN')}`, clear: () => setMaxPrice(maxPriceLimit) });
     return tags;
   }, [category, showVerified, showOnSale, showNew, brands, maxPrice, maxPriceLimit, searchQuery, selectedShop]);
 
@@ -748,7 +832,7 @@ export default function ProductsPage() {
         items = filteredByCat;
       }
     }
-    if (selectedShop !== 'All Shops')  items = items.filter(p => p.sellerStore === selectedShop || p.brand === selectedShop);
+    if (selectedShop !== 'All Shops') items = items.filter(p => p.sellerStore === selectedShop || p.brand === selectedShop);
     if (activeSubcategory !== 'All' && !activeSubcategory.startsWith('All')) {
       const subLower = activeSubcategory.toLowerCase().trim();
       const syns = [subLower];
@@ -768,22 +852,67 @@ export default function ProductsPage() {
         items = matchedBySub;
       }
     }
-    if (showVerified)                  items = items.filter(p => p.verified);
-    if (showOnSale)                    items = items.filter(p => p.onSale);
-    if (showNew)                       items = items.filter(p => p.isNew);
-    if (brands.length)                 items = items.filter(p => brands.includes(p.brand));
+    if (showVerified) items = items.filter(p => p.verified);
+    if (showOnSale) items = items.filter(p => p.onSale);
+    if (showNew) items = items.filter(p => p.isNew);
+    if (brands.length) items = items.filter(p => brands.includes(p.brand));
     items = items.filter(p => p.price <= maxPrice);
-    if (sortBy === 'price-asc')  items.sort((a,b) => a.price - b.price);
-    if (sortBy === 'price-desc') items.sort((a,b) => b.price - a.price);
-    if (sortBy === 'rating')     items.sort((a,b) => b.rating - a.rating);
-    if (sortBy === 'discount')   items.sort((a,b) => b.discount - a.discount);
-    if (sortBy === 'newest')     items.sort((a,b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+    // 20 KM Nearby Radius Filtering (Hyperlocal Sellers within 20km)
+    if (buyerLocation && buyerLocation.latitude !== undefined && maxDistanceRadius > 0) {
+      items = items.filter(p => {
+        const sId = String(p.seller?._id || p.seller?.id || p.seller || '');
+        const dist = sellerDistances[sId];
+        if (dist && dist.distanceKm !== undefined && dist.distanceKm !== null && dist.distanceKm > 0) {
+          return dist.distanceKm <= maxDistanceRadius;
+        }
+
+        // Coordinate / Haversine fallback if API matrix is pending
+        const sLat = parseFloat(p.seller?.latitude);
+        const sLon = parseFloat(p.seller?.longitude);
+        const bLat = parseFloat(buyerLocation.latitude);
+        const bLon = parseFloat(buyerLocation.longitude);
+        if (!isNaN(sLat) && !isNaN(sLon) && !isNaN(bLat) && !isNaN(bLon)) {
+          const R = 6371;
+          const dLat = (sLat - bLat) * Math.PI / 180;
+          const dLon = (sLon - bLon) * Math.PI / 180;
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(bLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const hDist = R * c;
+          return hDist <= maxDistanceRadius;
+        }
+
+        if (p.seller?.sellScope === 'all_india' || p.seller?.deliveryScope === 'all_india' || p.allIndia) {
+          return true;
+        }
+
+        return false;
+      });
+    }
+
+
+    if (sortBy === 'price-asc') items.sort((a, b) => a.price - b.price);
+    if (sortBy === 'price-desc') items.sort((a, b) => b.price - a.price);
+    if (sortBy === 'rating') items.sort((a, b) => b.rating - a.rating);
+    if (sortBy === 'discount') items.sort((a, b) => b.discount - a.discount);
+    if (sortBy === 'newest') items.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+    if (sortBy === 'distance') {
+      items.sort((a, b) => {
+        const aId = String(a.seller?._id || a.seller?.id || a.seller || '');
+        const bId = String(b.seller?._id || b.seller?.id || b.seller || '');
+        const aDist = sellerDistances[aId]?.distanceKm !== undefined ? sellerDistances[aId].distanceKm : 99999;
+        const bDist = sellerDistances[bId]?.distanceKm !== undefined ? sellerDistances[bId].distanceKm : 99999;
+        return aDist - bDist;
+      });
+    }
     return items;
-  }, [locationFilteredProducts, category, activeSubcategory, showVerified, showOnSale, showNew, brands, maxPrice, sortBy, searchQuery, selectedShop]);
+  }, [locationFilteredProducts, category, activeSubcategory, showVerified, showOnSale, showNew, brands, maxPrice, sortBy, searchQuery, selectedShop, sellerDistances, buyerLocation, maxDistanceRadius]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const paged      = filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
-  const catCount   = v => v === 'All' ? locationFilteredProducts.length : locationFilteredProducts.filter(p => p.category === v).length;
+  const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const catCount = v => v === 'All' ? locationFilteredProducts.length : locationFilteredProducts.filter(p => p.category === v).length;
 
   return (
     <div className="bp-page">
@@ -818,7 +947,7 @@ export default function ProductsPage() {
         <div className="theme-search-bar">
           <div className="theme-search-input-wrap">
             <svg className="theme-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
               type="text"
@@ -830,7 +959,7 @@ export default function ProductsPage() {
             {searchQuery && (
               <button className="theme-search-clear" onClick={() => { setSearchQuery(''); setPage(1); }} aria-label="Clear search">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             )}
@@ -842,9 +971,9 @@ export default function ProductsPage() {
 
         {/* Shop/Company Filter Dropdown right next to the search bar */}
         <div className="bp-location-selector-wrap" ref={shopDropdownRef}>
-          <button 
-            type="button" 
-            className="bp-location-btn" 
+          <button
+            type="button"
+            className="bp-location-btn"
             onClick={() => setShopDropdownOpen(!shopDropdownOpen)}
           >
             <span>🏪 {selectedShop === 'All Shops' ? 'All Shops / Companies' : selectedShop}</span>
@@ -852,12 +981,12 @@ export default function ProductsPage() {
               <path d="M6 9l6 6 6-6" />
             </svg>
           </button>
-          
+
           {shopDropdownOpen && (
             <div className="bp-location-dropdown">
               <div className="bp-location-dropdown-title">Select Shop / Brand</div>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className={`bp-location-item ${selectedShop === 'All Shops' ? 'bp-location-item--active' : ''}`}
                 onClick={() => { setSelectedShop('All Shops'); setShopDropdownOpen(false); setPage(1); }}
               >
@@ -865,9 +994,9 @@ export default function ProductsPage() {
               </button>
               <div className="bp-location-dropdown-divider" />
               {uniqueShopsAndBrands.map(shop => (
-                <button 
+                <button
                   key={shop}
-                  type="button" 
+                  type="button"
                   className={`bp-location-item ${selectedShop === shop ? 'bp-location-item--active' : ''}`}
                   onClick={() => { setSelectedShop(shop); setShopDropdownOpen(false); setPage(1); }}
                 >
@@ -891,13 +1020,14 @@ export default function ProductsPage() {
         <div className="bp-metabar__right">
           <button className="bp-filter-toggle-btn" onClick={() => setShowMobileFilters(true)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '6px' }}>
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
             </svg>
             Filters
           </button>
           <span className="bp-metabar__sort-label">Sort By</span>
           <select className="bp-sort-select" value={sortBy} onChange={e => { setSortBy(e.target.value); setPage(1); }}>
             <option value="popular">Relevance</option>
+            <option value="distance">Nearest First (Distance)</option>
             <option value="newest">Newest First</option>
             <option value="price-asc">Price: Low → High</option>
             <option value="price-desc">Price: High → Low</option>
@@ -906,22 +1036,22 @@ export default function ProductsPage() {
           </select>
           <div className="bp-view-toggle">
             <button
-              className={`bp-view-btn ${viewMode==='list'?'bp-view-btn--active':''}`}
+              className={`bp-view-btn ${viewMode === 'list' ? 'bp-view-btn--active' : ''}`}
               onClick={() => setViewMode('list')}
               title="List view"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
               </svg>
             </button>
             <button
-              className={`bp-view-btn ${viewMode==='grid'?'bp-view-btn--active':''}`}
+              className={`bp-view-btn ${viewMode === 'grid' ? 'bp-view-btn--active' : ''}`}
               onClick={() => setViewMode('grid')}
               title="Grid view"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+                <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
               </svg>
             </button>
           </div>
@@ -944,26 +1074,54 @@ export default function ProductsPage() {
             <button type="button" className="bp-sidebar-close-btn" onClick={() => setShowMobileFilters(false)}>×</button>
           </div>
 
+          {/* Nearby Stores / Hyperlocal Radius Filter (20 km default) */}
+          <div className="bp-filter-group">
+            <div className="bp-filter-group__head">
+              <span className="bp-filter-group__title">📍 Nearby Stores</span>
+              <span style={{ fontSize: '0.74rem', color: '#047857', fontWeight: 700 }}>
+                {maxDistanceRadius === 0 ? 'All India' : `Within ${maxDistanceRadius} km`}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
+              {[
+                { label: 'Within 20 km (Hyperlocal)', value: 20 },
+                { label: 'Within 50 km (City Region)', value: 50 },
+                { label: 'All Distances (Pan India)', value: 0 }
+              ].map(opt => (
+                <label key={opt.value} className="bp-check-item" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="radio"
+                    name="distanceRadius"
+                    checked={maxDistanceRadius === opt.value}
+                    onChange={() => { setMaxDistanceRadius(opt.value); setPage(1); }}
+                    style={{ accentColor: '#047857', cursor: 'pointer' }}
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
           {/* Availability */}
           <div className="bp-filter-group">
             <div className="bp-filter-group__head">
               <span className="bp-filter-group__title">Availability</span>
-              <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+              <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6" /></svg>
             </div>
             <label className="bp-check-item">
               <input type="checkbox" checked={showVerified} onChange={e => { setShowVerified(e.target.checked); setPage(1); }} />
               EMAHU Verified
-              <span className="bp-check-item__count">{locationFilteredProducts.filter(p=>p.verified).length}</span>
+              <span className="bp-check-item__count">{locationFilteredProducts.filter(p => p.verified).length}</span>
             </label>
             <label className="bp-check-item">
               <input type="checkbox" checked={showOnSale} onChange={e => { setShowOnSale(e.target.checked); setPage(1); }} />
               On Sale
-              <span className="bp-check-item__count">{locationFilteredProducts.filter(p=>p.onSale).length}</span>
+              <span className="bp-check-item__count">{locationFilteredProducts.filter(p => p.onSale).length}</span>
             </label>
             <label className="bp-check-item">
               <input type="checkbox" checked={showNew} onChange={e => { setShowNew(e.target.checked); setPage(1); }} />
               New Arrivals
-              <span className="bp-check-item__count">{locationFilteredProducts.filter(p=>p.isNew).length}</span>
+              <span className="bp-check-item__count">{locationFilteredProducts.filter(p => p.isNew).length}</span>
             </label>
           </div>
 
@@ -971,16 +1129,16 @@ export default function ProductsPage() {
           <div className="bp-filter-group">
             <div className="bp-filter-group__head">
               <span className="bp-filter-group__title">Category</span>
-              <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+              <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6" /></svg>
             </div>
             <div className="bp-filter-scroll-container">
               {[{ label: 'All Products', value: 'All' }, ...categoryTiles].map(item => (
-                <label key={item.value} className="bp-check-item" style={{ cursor:'pointer' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={category === item.value} 
-                    onChange={() => { setCategory(item.value); setActiveSubcategory('All'); setPage(1); }} 
-                    style={{ accentColor:'#0d0d0d', cursor: 'pointer' }} 
+                <label key={item.value} className="bp-check-item" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={category === item.value}
+                    onChange={() => { setCategory(item.value); setActiveSubcategory('All'); setPage(1); }}
+                    style={{ accentColor: '#0d0d0d', cursor: 'pointer' }}
                   />
                   {item.label}
                   <span className="bp-check-item__count">{catCount(item.value)}</span>
@@ -993,7 +1151,7 @@ export default function ProductsPage() {
           <div className="bp-filter-group">
             <div className="bp-filter-group__head">
               <span className="bp-filter-group__title">Price Range</span>
-              <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+              <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6" /></svg>
             </div>
             <div className="bp-price-vals">
               <span>₹0</span>
@@ -1010,7 +1168,7 @@ export default function ProductsPage() {
             <div className="bp-filter-group">
               <div className="bp-filter-group__head">
                 <span className="bp-filter-group__title">Subcategory</span>
-                <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+                <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6" /></svg>
               </div>
               <div className="bp-filter-scroll-container">
                 <label className="bp-check-item" style={{ cursor: 'pointer' }}>
@@ -1047,14 +1205,14 @@ export default function ProductsPage() {
           <div className="bp-filter-group">
             <div className="bp-filter-group__head">
               <span className="bp-filter-group__title">Brand</span>
-              <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+              <svg className="bp-filter-group__arrow bp-filter-group__arrow--open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6" /></svg>
             </div>
             <div className="bp-filter-scroll-container">
               {Array.from(new Set(locationFilteredProducts.map(p => p.brand).filter(Boolean))).slice(0, 30).map(b => (
                 <label key={b} className="bp-check-item">
                   <input type="checkbox" checked={brands.includes(b)} onChange={() => { toggleBrand(b); setPage(1); }} />
                   {b}
-                  <span className="bp-check-item__count">{locationFilteredProducts.filter(p=>p.brand===b).length}</span>
+                  <span className="bp-check-item__count">{locationFilteredProducts.filter(p => p.brand === b).length}</span>
                 </label>
               ))}
             </div>
@@ -1085,7 +1243,7 @@ export default function ProductsPage() {
           )}
 
           {/* Grid */}
-          <div className={`bp-grid ${viewMode==='list' ? 'bp-grid--list' : ''}`}>
+          <div className={`bp-grid ${viewMode === 'list' ? 'bp-grid--list' : ''}`}>
             {loading ? (
               <>
                 <style>{`
@@ -1209,13 +1367,13 @@ export default function ProductsPage() {
             ) : paged.length === 0 ? (
               <div className="bp-empty">
                 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
-                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
                 </svg>
                 <h3>No products found</h3>
-                <p>Try adjusting your filters or <button onClick={clearAll} style={{background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>clear all</button></p>
+                <p>Try adjusting your filters or <button onClick={clearAll} style={{ background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>clear all</button></p>
               </div>
             ) : paged.map(p => (
-              <Link key={p.id} href={`/buyer/products/${p.id}`} className="bp-card" style={{textDecoration:'none',color:'inherit'}}>
+              <Link key={p.id} href={`/buyer/products/${p.id}`} className="bp-card" style={{ textDecoration: 'none', color: 'inherit' }}>
                 <div className="bp-card__img-wrap">
                   {!isRealImage(p.img) ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', fontSize: '4.5rem', background: '#f4f4f5' }}>
@@ -1247,7 +1405,7 @@ export default function ProductsPage() {
                   <span className="bp-card__cat-chip">{p.category}</span>
 
                   {/* Sale badge — only if no wishlist overlap */}
-                  {p.onSale && <span className="bp-card__sale-badge" style={{right: p.onSale ? '46px' : '10px'}}>−{p.discount}%</span>}
+                  {p.onSale && <span className="bp-card__sale-badge" style={{ right: p.onSale ? '46px' : '10px' }}>−{p.discount}%</span>}
 
                   {/* Out of Stock badge */}
                   {p.stock <= 0 && (
@@ -1263,7 +1421,7 @@ export default function ProductsPage() {
                     aria-label="Wishlist"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill={wishlist.includes(p.id) ? '#ef4444' : 'none'} stroke={wishlist.includes(p.id) ? '#ef4444' : '#374151'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                     </svg>
                   </button>
                 </div>
@@ -1280,6 +1438,35 @@ export default function ProductsPage() {
                       </>
                     )}
                   </p>
+
+                  {/* Road Distance Indicator */}
+                  {(() => {
+                    const sId = String(p.seller?._id || p.seller?.id || p.seller || '');
+                    const dist = sellerDistances[sId];
+                    if (dist && dist.distanceKm !== undefined && dist.distanceKm !== null && dist.distanceKm > 0) {
+                      return (
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          color: '#047857',
+                          background: 'rgba(16, 185, 129, 0.1)',
+                          border: '1px solid rgba(16, 185, 129, 0.25)',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          margin: '2px 0 4px',
+                          width: 'fit-content'
+                        }}>
+                          <span>📍</span>
+                          <span>{dist.distanceKm} km away</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   <p className="bp-card__name">{p.name}</p>
                   {p.subcategory && p.subcategory !== 'General' && (
                     <span style={{
@@ -1308,7 +1495,7 @@ export default function ProductsPage() {
                   </div>
                   {p.verified && (
                     <span className="bp-card__verified">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#12b7b2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#12b7b2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                       EMAHU Verified
                     </span>
                   )}
@@ -1325,12 +1512,12 @@ export default function ProductsPage() {
                     'Out of Stock'
                   ) : cartAdded.includes(p.id) ? (
                     <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                       Added to Cart!
                     </>
                   ) : (
                     <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" /></svg>
                       Add to Cart
                     </>
                   )}
@@ -1342,8 +1529,8 @@ export default function ProductsPage() {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="bp-pagination">
-              <button className="bp-page-btn" onClick={() => setPage(p=>p-1)} disabled={page===1}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+              <button className="bp-page-btn" onClick={() => setPage(p => p - 1)} disabled={page === 1}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
               </button>
               {getPaginationRange(page, totalPages).map((n, idx) => {
                 if (n === '...') {
@@ -1356,15 +1543,15 @@ export default function ProductsPage() {
                 return (
                   <button
                     key={`page-${n}`}
-                    className={`bp-page-btn ${page===n?'bp-page-btn--active':''}`}
+                    className={`bp-page-btn ${page === n ? 'bp-page-btn--active' : ''}`}
                     onClick={() => setPage(n)}
                   >
                     {n}
                   </button>
                 );
               })}
-              <button className="bp-page-btn" onClick={() => setPage(p=>p+1)} disabled={page===totalPages}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
+              <button className="bp-page-btn" onClick={() => setPage(p => p + 1)} disabled={page === totalPages}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
               </button>
             </div>
           )}

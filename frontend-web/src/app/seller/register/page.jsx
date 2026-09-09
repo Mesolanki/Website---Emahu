@@ -105,44 +105,46 @@ export default function SellerRegister() {
 
   const [draftLoaded, setDraftLoaded] = useState(false);
 
-  // Load draft from localStorage on mount
+  // Restore draft on refresh in current session (so refreshing the page doesn't lose typed data)
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedData = localStorage.getItem('emahu_seller_register_draft');
-      if (savedData) {
-        try {
+      try {
+        const savedData = sessionStorage.getItem('emahu_seller_register_draft');
+        if (savedData) {
           const parsed = JSON.parse(savedData);
           setFormData((prev) => ({
             ...prev,
             ...parsed,
-            kycFile: null // file object cannot be serialized
+            kycFile: null
           }));
-        } catch (err) {
-          console.error('Failed to parse seller register draft:', err);
         }
-      }
-      const savedStep = localStorage.getItem('emahu_seller_register_step');
-      if (savedStep) {
-        const parsedStep = parseInt(savedStep, 10);
-        if (parsedStep >= 1 && parsedStep <= 4) {
-          setStep(parsedStep);
+        const savedStep = sessionStorage.getItem('emahu_seller_register_step');
+        if (savedStep) {
+          const parsedStep = parseInt(savedStep, 10);
+          if (parsedStep >= 1 && parsedStep <= 3) {
+            setStep(parsedStep);
+          }
         }
+      } catch (err) {
+        console.error('Failed to parse seller register draft:', err);
+      } finally {
+        setDraftLoaded(true);
       }
-      setDraftLoaded(true);
     }
   }, []);
 
-  // Save draft to localStorage on changes
+  // Save draft to sessionStorage on changes
   useEffect(() => {
     if (!draftLoaded) return;
-    const { kycFile, password, ...serializableData } = formData;
-    localStorage.setItem('emahu_seller_register_draft', JSON.stringify(serializableData));
-  }, [formData, draftLoaded]);
-
-  useEffect(() => {
-    if (!draftLoaded) return;
-    localStorage.setItem('emahu_seller_register_step', step.toString());
-  }, [step, draftLoaded]);
+    if (step >= 1 && step <= 3) {
+      const { kycFile, ...serializableData } = formData;
+      sessionStorage.setItem('emahu_seller_register_draft', JSON.stringify(serializableData));
+      sessionStorage.setItem('emahu_seller_register_step', step.toString());
+    } else {
+      sessionStorage.removeItem('emahu_seller_register_draft');
+      sessionStorage.removeItem('emahu_seller_register_step');
+    }
+  }, [formData, step, draftLoaded]);
 
 
   // If already logged in, redirect directly to the seller dashboard
@@ -183,10 +185,14 @@ export default function SellerRegister() {
 
 
   const triggerSendOtp = async (isResend = false) => {
-    setIsOtpVerifying(true); // Open the popup immediately!
     setOtpSending(true);
     setOtpError('');
     setDevEmailOtp('');
+
+    if (isResend) {
+      setIsOtpVerifying(true);
+    }
+
     try {
       let cleanPhone = formData.phone.trim();
       if (cleanPhone.startsWith('+91')) {
@@ -198,13 +204,31 @@ export default function SellerRegister() {
       const res = await fetchWithRetry(`${API_BASE}/api/auth/send-phone-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone, role: 'seller' })
+        body: JSON.stringify({
+          phone: cleanPhone,
+          email: formData.email ? formData.email.trim() : undefined,
+          role: 'seller'
+        })
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to send OTP code.');
+        const errorMsg = data.error || 'Failed to send verification OTP.';
+        if (!isResend) {
+          setIsOtpVerifying(false);
+          if (errorMsg.toLowerCase().includes('phone')) {
+            setErrors(prev => ({ ...prev, phone: errorMsg }));
+          } else if (errorMsg.toLowerCase().includes('email')) {
+            setErrors(prev => ({ ...prev, email: errorMsg }));
+          } else {
+            setErrors(prev => ({ ...prev, general: errorMsg }));
+          }
+        } else {
+          setOtpError(errorMsg);
+        }
+        return;
       }
 
+      setIsOtpVerifying(true);
       setOtpCooldown(60);
       if (isResend) {
         setOtpError('Verification code resent successfully to your mobile number.');
@@ -212,9 +236,13 @@ export default function SellerRegister() {
         setOtpError('');
       }
     } catch (err) {
-      console.error('Send OTP Error:', err);
-      setOtpCooldown(60);
-      setOtpError('Error sending OTP. Please try again.');
+      const errorMsg = err.message || 'Error sending OTP. Please try again.';
+      if (!isResend) {
+        setIsOtpVerifying(false);
+        setErrors(prev => ({ ...prev, phone: errorMsg }));
+      } else {
+        setOtpError(errorMsg);
+      }
     } finally {
       setOtpSending(false);
     }
@@ -247,13 +275,13 @@ export default function SellerRegister() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to verify OTP.');
+        setOtpError(data.error || 'Failed to verify OTP.');
+        return;
       }
 
       setIsOtpVerifying(false);
       setStep(2);
     } catch (err) {
-      console.error('Verify OTP Error:', err);
       setOtpError(err.message || 'Invalid or expired verification code. Please try again.');
     } finally {
       setLoading(false);
@@ -350,9 +378,11 @@ export default function SellerRegister() {
     }
     if (!formData.bankName.trim()) newErrors.bankName = 'Bank name is required';
 
-    // Optional GSTIN Validation (if field is filled)
-    if (formData.gstNumber.trim() && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gstNumber.toUpperCase().trim())) {
-      newErrors.gstNumber = 'Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5)';
+    // Ensure essential credentials from Step 1 are present
+    if (!formData.password || !formData.phone || (!formData.ownerName && !formData.storeName)) {
+      setStep(1);
+      setErrors({ general: 'Please confirm your password and phone number on Step 1 to complete registration.' });
+      return false;
     }
 
     setErrors(newErrors);
@@ -382,13 +412,13 @@ export default function SellerRegister() {
       setErrors({});
 
       try {
-        const fullAddress = `${formData.storeName} (${formData.category})`;
+        const fullAddress = `${formData.storeName || ''} (${formData.category || ''})`;
         const data = await registerUser({
-          name: formData.ownerName,
-          email: formData.email,
+          name: (formData.ownerName || formData.storeName || '').trim(),
+          email: (formData.email || '').trim(),
           password: formData.password,
           role: 'seller',
-          phone: formData.phone,
+          phone: (formData.phone || '').trim(),
           address: fullAddress,
           storeName: formData.storeName,
           category: formData.category,
@@ -400,6 +430,12 @@ export default function SellerRegister() {
           bankName: formData.bankName,
           gstNumber: formData.gstNumber
         });
+
+        // Clear registration draft from sessionStorage
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('emahu_seller_register_draft');
+          sessionStorage.removeItem('emahu_seller_register_step');
+        }
 
         setRegSuccessData(data);
 
@@ -449,8 +485,38 @@ export default function SellerRegister() {
   const handleGoToDashboard = () => {
     if (regSuccessData) {
       saveAuthSession(regSuccessData, 'seller');
+      router.replace('/seller/dashboard');
+    } else if (localStorage.getItem('emahu_seller_logged_in') === 'true') {
+      router.replace('/seller/dashboard');
+    } else {
+      router.replace('/seller/login');
     }
-    router.replace('/seller/dashboard');
+  };
+
+  const handleStartNewRegistration = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('emahu_seller_register_draft');
+      localStorage.removeItem('emahu_seller_register_step');
+    }
+    setFormData({
+      storeName: '',
+      ownerName: '',
+      email: '',
+      phone: '',
+      password: '',
+      category: '',
+      kycType: 'pan',
+      kycNumber: '',
+      kycFile: null,
+      bankHolder: '',
+      accountNumber: '',
+      ifscCode: '',
+      bankName: '',
+      gstNumber: '',
+    });
+    setErrors({});
+    setRegSuccessData(null);
+    setStep(1);
   };
 
   return (
@@ -700,15 +766,24 @@ export default function SellerRegister() {
               <div className="sr-form-actions">
                 <button
                   type="button"
-                  className="sr-btn sr-btn--primary"
+                  className={`sr-btn sr-btn--primary ${otpSending ? 'sr-btn--loading' : ''}`}
                   onClick={handleNext}
-                  disabled={!agreeTerms}
+                  disabled={!agreeTerms || otpSending}
                   style={!agreeTerms ? { opacity: 0.5, cursor: 'not-allowed', background: '#4b5563' } : {}}
                 >
-                  <span>Continue</span>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  {otpSending ? (
+                    <>
+                      <span className="sr-btn__spinner" />
+                      <span>Sending OTP...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue</span>
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -938,9 +1013,27 @@ export default function SellerRegister() {
                 </ul>
               </div>
 
-              <div className="sr-success-actions">
+              <div className="sr-success-actions" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button type="button" onClick={handleGoToDashboard} className="sr-btn sr-btn--primary" style={{ width: '100%', cursor: 'pointer', textAlign: 'center', display: 'block' }}>
                   Go to Dashboard Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStartNewRegistration}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#475569',
+                    fontWeight: '600',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  Register Another Store / Start Fresh
                 </button>
               </div>
             </div>

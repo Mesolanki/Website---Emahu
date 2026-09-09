@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { changeUserRole, clearAuthSession, saveAuthSession, logoutUser } from '@/utils/auth';
 import API_BASE from '@/utils/config';
+import { detectLocationWithGPS } from '@/utils/location';
 import './buyer_settings.css';
 
 export default function BuyerSettingsPage() {
@@ -29,11 +30,14 @@ export default function BuyerSettingsPage() {
     phone: '',
     address: '',
     city: '',
-    state: ''
+    state: '',
+    latitude: '',
+    longitude: ''
   });
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [detectingLocation, setDetectingLocation] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
@@ -159,16 +163,114 @@ export default function BuyerSettingsPage() {
           phone: parsed.phone || '',
           address: parsed.address || '',
           city: parsed.city || '',
-          state: parsed.state || ''
+          state: parsed.state || '',
+          latitude: parsed.latitude !== undefined && parsed.latitude !== null ? parsed.latitude : '',
+          longitude: parsed.longitude !== undefined && parsed.longitude !== null ? parsed.longitude : ''
         });
+
+        // Load and display the user's saved address and profile details
       } catch (e) {
         console.error('Error parsing buyer user', e);
       }
     }
+
     if (storedToken) {
       setToken(storedToken);
+      // Fetch latest profile details from server
+      fetch(`${API_BASE}/api/auth/me`, {
+        headers: { 'Authorization': `Bearer ${storedToken}` }
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.user) {
+            setUser(data.user);
+            localStorage.setItem('emahu_buyer_user', JSON.stringify(data.user));
+            setProfileForm({
+              name: data.user.name || '',
+              email: data.user.email || '',
+              phone: data.user.phone || '',
+              address: data.user.address || '',
+              city: data.user.city || '',
+              state: data.user.state || '',
+              latitude: data.user.latitude !== undefined && data.user.latitude !== null ? data.user.latitude : '',
+              longitude: data.user.longitude !== undefined && data.user.longitude !== null ? data.user.longitude : ''
+            });
+          }
+        })
+        .catch((err) => console.warn('Could not refresh user profile from server:', err));
     }
   }, [router]);
+
+  const detectBuyerLocation = async (manualClick = true, activeToken = null) => {
+    setDetectingLocation(true);
+    setSuccessMsg('');
+    setErrorMsg('');
+    try {
+      const result = await detectLocationWithGPS();
+      const newLat = result.coords.latitude;
+      const newLon = result.coords.longitude;
+      const newAddress = result.streetAddress || result.fullAddress || '';
+      const newCity = result.city || '';
+      const newState = result.state || '';
+
+      setProfileForm((prev) => ({
+        ...prev,
+        latitude: newLat,
+        longitude: newLon,
+        address: newAddress || prev.address,
+        city: newCity || prev.city,
+        state: newState || prev.state
+      }));
+
+      // Store in localStorage for buyer coordinate persistence
+      localStorage.setItem('emahu_buyer_coordinates', JSON.stringify({
+        latitude: parseFloat(newLat),
+        longitude: parseFloat(newLon)
+      }));
+      if (newCity) localStorage.setItem('emahu_buyer_city', newCity);
+      if (newAddress) localStorage.setItem('emahu_buyer_address', newAddress);
+
+      const authToken = activeToken || token;
+      if (authToken) {
+        try {
+          const syncRes = await fetch(`${API_BASE}/api/auth/update-details`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+              address: newAddress || profileForm.address,
+              city: newCity || profileForm.city,
+              state: newState || profileForm.state,
+              latitude: parseFloat(newLat),
+              longitude: parseFloat(newLon)
+            })
+          });
+          const syncData = await syncRes.json();
+          if (syncData.success && syncData.user) {
+            localStorage.setItem('emahu_buyer_user', JSON.stringify(syncData.user));
+            setUser(syncData.user);
+          }
+        } catch (err) {
+          console.warn('Auto-sync buyer location to server error:', err);
+        }
+      }
+
+      window.dispatchEvent(new Event('storage'));
+
+      if (manualClick) {
+        setSuccessMsg(`Location detected successfully! Pinned to: ${newCity || newLat}, ${newState || newLon}`);
+      }
+    } catch (err) {
+      console.error('Buyer GPS detection failed:', err);
+      if (manualClick) {
+        setErrorMsg('Failed to auto-detect location. Please allow browser location access or fill coordinates manually.');
+      }
+    } finally {
+      setDetectingLocation(false);
+    }
+  };
 
   // Fetch orders and calculate stats
   useEffect(() => {
@@ -275,13 +377,24 @@ export default function BuyerSettingsPage() {
   const saveProfileData = async () => {
     setLoading(true);
     try {
+      const payload = {
+        name: profileForm.name,
+        email: profileForm.email,
+        phone: profileForm.phone,
+        address: profileForm.address,
+        city: profileForm.city,
+        state: profileForm.state,
+        latitude: profileForm.latitude !== '' && profileForm.latitude !== undefined && profileForm.latitude !== null ? parseFloat(profileForm.latitude) : undefined,
+        longitude: profileForm.longitude !== '' && profileForm.longitude !== undefined && profileForm.longitude !== null ? parseFloat(profileForm.longitude) : undefined
+      };
+
       const res = await fetch(`${API_BASE}/api/auth/update-details`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(profileForm)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
 
@@ -289,6 +402,15 @@ export default function BuyerSettingsPage() {
         // Sync user details to localStorage
         const updatedUser = { ...user, ...data.user };
         localStorage.setItem('emahu_buyer_user', JSON.stringify(updatedUser));
+        if (data.user.latitude && data.user.longitude) {
+          localStorage.setItem('emahu_buyer_coordinates', JSON.stringify({
+            latitude: data.user.latitude,
+            longitude: data.user.longitude
+          }));
+        }
+        if (data.user.city) {
+          localStorage.setItem('emahu_buyer_city', data.user.city);
+        }
         setUser(updatedUser);
         setProfileForm({
           name: data.user.name || '',
@@ -296,12 +418,14 @@ export default function BuyerSettingsPage() {
           phone: data.user.phone || '',
           address: data.user.address || '',
           city: data.user.city || '',
-          state: data.user.state || ''
+          state: data.user.state || '',
+          latitude: data.user.latitude !== undefined && data.user.latitude !== null ? data.user.latitude : '',
+          longitude: data.user.longitude !== undefined && data.user.longitude !== null ? data.user.longitude : ''
         });
 
-        // Dispatch local event to sync header name
+        // Dispatch local event to sync header name and location
         window.dispatchEvent(new Event('storage'));
-        setSuccessMsg('Your profile has been updated successfully!');
+        setSuccessMsg('Your profile and location coordinates have been saved successfully!');
       } else {
         setErrorMsg(data.error || 'Failed to update profile.');
       }
@@ -369,20 +493,33 @@ export default function BuyerSettingsPage() {
         {/* Settings Form Section */}
         <section className="profile-edit-section">
           <div className="glass-card settings-card">
-            <h2 className="section-title">Update Contact & Shipping Profile</h2>
-            <p className="section-subtitle" style={{ marginBottom: '24px' }}>These details will be prefilled automatically during checkouts to streamline shipping and transit calculations.</p>
+            <div className="settings-section-header">
+              <div>
+                <h2 className="section-title" style={{ margin: 0 }}>Update Contact & Shipping Profile</h2>
+                <p className="section-subtitle" style={{ margin: '4px 0 0 0' }}>These details will be used to dynamically calculate distance between seller and buyer for orders.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => detectBuyerLocation(true)}
+                className="gps-detect-btn"
+                disabled={detectingLocation}
+              >
+                <span>📍</span>
+                <span>{detectingLocation ? 'Detecting Location...' : 'Use Current Location'}</span>
+              </button>
+            </div>
 
-            {successMsg && <div className="settings-alert-success">✓ {successMsg}</div>}
-            {errorMsg && <div className="settings-alert-error">⚠️ {errorMsg}</div>}
+            {successMsg && <div className="settings-alert-success" style={{ marginTop: '16px' }}>✓ {successMsg}</div>}
+            {errorMsg && <div className="settings-alert-error" style={{ marginTop: '16px' }}>⚠️ {errorMsg}</div>}
 
-            <form onSubmit={handleProfileSubmit} className="profile-form">
+            <form onSubmit={handleProfileSubmit} className="profile-form" style={{ marginTop: '20px' }}>
               <div className="form-grid">
                 <div className="form-group">
                   <label className="form-label">Full Account Name</label>
                   <input
                     type="text"
                     className="form-input"
-                    value={profileForm.name}
+                    value={profileForm.name ?? ''}
                     onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
                     required
                     placeholder="e.g. Rahul Sharma"
@@ -393,7 +530,7 @@ export default function BuyerSettingsPage() {
                   <input
                     type="text"
                     className="form-input"
-                    value={profileForm.phone}
+                    value={profileForm.phone ?? ''}
                     onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                     required
                     placeholder="e.g. 9876543210"
@@ -406,7 +543,7 @@ export default function BuyerSettingsPage() {
                 <input
                   type="email"
                   className="form-input"
-                  value={profileForm.email}
+                  value={profileForm.email ?? ''}
                   onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
                   required
                   placeholder="e.g. name@example.com"
@@ -418,7 +555,7 @@ export default function BuyerSettingsPage() {
                 <input
                   type="text"
                   className="form-input"
-                  value={profileForm.address}
+                  value={profileForm.address ?? ''}
                   onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
                   required
                   placeholder="Enter flat number, building name, sector, and street..."
@@ -431,10 +568,10 @@ export default function BuyerSettingsPage() {
                   <input
                     type="text"
                     className="form-input"
-                    value={profileForm.city}
+                    value={profileForm.city ?? ''}
                     onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
                     required
-                    placeholder="e.g. Noida"
+                    placeholder="e.g. Ahmedabad"
                   />
                 </div>
                 <div className="form-group">
@@ -442,16 +579,49 @@ export default function BuyerSettingsPage() {
                   <input
                     type="text"
                     className="form-input"
-                    value={profileForm.state}
+                    value={profileForm.state ?? ''}
                     onChange={(e) => setProfileForm({ ...profileForm, state: e.target.value })}
                     required
-                    placeholder="e.g. Uttar Pradesh"
+                    placeholder="e.g. Gujarat"
                   />
                 </div>
               </div>
 
+              <div className="form-grid" style={{ marginTop: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Latitude</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={profileForm.latitude ?? ''}
+                    onChange={(e) => setProfileForm({ ...profileForm, latitude: e.target.value })}
+                    placeholder="e.g. 23.063013"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Longitude</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={profileForm.longitude ?? ''}
+                    onChange={(e) => setProfileForm({ ...profileForm, longitude: e.target.value })}
+                    placeholder="e.g. 72.532466"
+                  />
+                </div>
+              </div>
+
+              {(profileForm.address || profileForm.city || profileForm.latitude) && (
+                <div className="location-badge">
+                  <span>✓</span>
+                  <span>
+                    {[profileForm.address, profileForm.city, profileForm.state].filter(Boolean).join(', ') ||
+                     `${profileForm.latitude}, ${profileForm.longitude}`}
+                  </span>
+                </div>
+              )}
+
               <button type="submit" className="settings-submit-btn" disabled={loading}>
-                {loading ? 'Saving Profile Settings...' : 'Update Account Profile'}
+                {loading ? 'Saving Profile Details...' : 'Save Profile Details'}
               </button>
             </form>
           </div>

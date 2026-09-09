@@ -216,8 +216,7 @@ const getRandomWeightStr = () => `${(1.5 + Math.random() * 3).toFixed(2)} kg`;
 const generateNotificationId = () => `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
 const getDynamicApiUrl = () => {
-  let base = localApiUrl || '';
-  base = base.trim();
+  let base = String(localApiUrl || '').trim();
   // If it's a local address or empty, return an empty string to use Next.js server-side proxy rewrites
   if (!base || base.includes('localhost') || base.includes('127.0.0.1')) {
     return '';
@@ -525,6 +524,7 @@ export default function EmahuProDashboard() {
     return 'status';
   });
   const [newProductCategory, setNewProductCategory] = useState('Electronics & Tech');
+  const [newProductSubcategory, setNewProductSubcategory] = useState('General');
   const [sellerUser, setSellerUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [sellerDocuments, setSellerDocuments] = useState([]);
@@ -616,6 +616,133 @@ export default function EmahuProDashboard() {
     latitude: '',
     longitude: ''
   });
+
+  const [sellerLocSearch, setSellerLocSearch] = useState('');
+  const [sellerLocSuggestions, setSellerLocSuggestions] = useState([]);
+  const [loadingSellerLoc, setLoadingSellerLoc] = useState(false);
+  const [sellerLocError, setSellerLocError] = useState('');
+  const [isChangingSellerLoc, setIsChangingSellerLoc] = useState(false);
+  const sellerLocDebounce = useRef(null);
+
+  // Debounced search for Seller Business Location via Google Places API (New)
+  useEffect(() => {
+    if (!sellerLocSearch.trim()) {
+      setSellerLocSuggestions([]);
+      setLoadingSellerLoc(false);
+      return;
+    }
+
+    if (sellerLocDebounce.current) clearTimeout(sellerLocDebounce.current);
+
+    sellerLocDebounce.current = setTimeout(async () => {
+      try {
+        setLoadingSellerLoc(true);
+        setSellerLocError('');
+        const res = await fetch(`${API_BASE}/api/location/search?query=${encodeURIComponent(sellerLocSearch.trim())}`);
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setSellerLocSuggestions(data.data);
+          if (data.data.length === 0) {
+            setSellerLocError('Unable to find this location. Try another search term.');
+          }
+        } else {
+          setSellerLocError(data.error || 'Unable to find this location.');
+          setSellerLocSuggestions([]);
+        }
+      } catch (err) {
+        console.error('Seller location search error:', err);
+        setSellerLocError('Unable to find location.');
+      } finally {
+        setLoadingSellerLoc(false);
+      }
+    }, 280);
+
+    return () => {
+      if (sellerLocDebounce.current) clearTimeout(sellerLocDebounce.current);
+    };
+  }, [sellerLocSearch]);
+
+  const handleSelectSellerPlace = async (item) => {
+    try {
+      setLoadingSellerLoc(true);
+      setSellerLocError('');
+
+      let placeDetails = {
+        address: item.address,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        city: item.city || '',
+        state: item.state || ''
+      };
+
+      if (placeDetails.latitude === undefined || placeDetails.longitude === undefined) {
+        const res = await fetch(`${API_BASE}/api/location/details?placeId=${encodeURIComponent(item.placeId)}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          placeDetails = data.data;
+        } else {
+          throw new Error('Failed to retrieve coordinates for this place.');
+        }
+      }
+
+      const updatedLocation = {
+        address: placeDetails.address,
+        city: placeDetails.city || (sellerUser?.city || ''),
+        state: placeDetails.state || (sellerUser?.state || ''),
+        latitude: placeDetails.latitude,
+        longitude: placeDetails.longitude
+      };
+
+      setSettingsForm(prev => ({
+        ...prev,
+        ...updatedLocation
+      }));
+
+      setSellerUser(prev => {
+        const next = prev ? { ...prev, ...updatedLocation } : { ...updatedLocation };
+        try {
+          localStorage.setItem('emahu_seller_user', JSON.stringify(next));
+        } catch (_) {}
+        return next;
+      });
+
+      // Instantly persist to backend database so refresh retains chosen location
+      const token = localStorage.getItem('emahu_seller_token');
+      if (token) {
+        fetch(`${API_BASE}/api/auth/update-details`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            address: updatedLocation.address,
+            city: updatedLocation.city,
+            state: updatedLocation.state,
+            latitude: updatedLocation.latitude,
+            longitude: updatedLocation.longitude
+          })
+        }).then(r => r.json()).then(data => {
+          if (data.success && data.user) {
+            setSellerUser(data.user);
+            localStorage.setItem('emahu_seller_user', JSON.stringify(data.user));
+          }
+        }).catch(err => {
+          console.error('Auto-persisting business location error:', err);
+        });
+      }
+
+      setSellerLocSearch('');
+      setSellerLocSuggestions([]);
+      setIsChangingSellerLoc(false);
+      triggerToast('Location Saved', `Business address saved: ${placeDetails.address}`, 'success');
+    } catch (err) {
+      console.error('Error selecting place:', err);
+      setSellerLocError('Could not obtain coordinates. Please try again.');
+    } finally {
+      setLoadingSellerLoc(false);
+    }
+  };
 
   const [adminDeliverySettings, setAdminDeliverySettings] = useState({
     maxDeliveryDistance: 100,
@@ -852,14 +979,30 @@ export default function EmahuProDashboard() {
       const token = localStorage.getItem('emahu_seller_token');
       if (!token) return;
 
+      const latVal = settingsForm.latitude !== '' && settingsForm.latitude !== undefined && settingsForm.latitude !== null
+        ? parseFloat(settingsForm.latitude)
+        : undefined;
+      const lonVal = settingsForm.longitude !== '' && settingsForm.longitude !== undefined && settingsForm.longitude !== null
+        ? parseFloat(settingsForm.longitude)
+        : undefined;
+
+      if (latVal !== undefined && (isNaN(latVal) || latVal < -90 || latVal > 90)) {
+        triggerToast('Invalid Latitude', 'Latitude must be between -90 and 90 degrees.', 'danger');
+        return;
+      }
+      if (lonVal !== undefined && (isNaN(lonVal) || lonVal < -180 || lonVal > 180)) {
+        triggerToast('Invalid Longitude', 'Longitude must be between -180 and 180 degrees.', 'danger');
+        return;
+      }
+
       const payload = {
         storeName: settingsForm.storeName,
         phone: settingsForm.phone,
         address: settingsForm.address,
         city: settingsForm.city,
         state: settingsForm.state,
-        latitude: settingsForm.latitude !== '' ? parseFloat(settingsForm.latitude) : undefined,
-        longitude: settingsForm.longitude !== '' ? parseFloat(settingsForm.longitude) : undefined
+        latitude: latVal,
+        longitude: lonVal
       };
 
       const res = await fetch(`${API_BASE}/api/auth/update-details`, {
@@ -1040,62 +1183,6 @@ export default function EmahuProDashboard() {
           setTimeout(() => setSellerUser(res.user), 0);
           localStorage.setItem('emahu_seller_user', JSON.stringify(res.user));
 
-          // Auto-detect & save location on login/sign-in every time using GPS
-          if (typeof window !== 'undefined' && navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              async (position) => {
-                const lat = position.coords.latitude.toFixed(6);
-                const lon = position.coords.longitude.toFixed(6);
-
-                try {
-                  const geoRes = await fetch(
-                    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`
-                  );
-                  const geoData = await geoRes.json();
-                  if (geoData && geoData.address) {
-                    const a = geoData.address;
-                    const road = a.road || a.pedestrian || a.footway || '';
-                    const suburb = a.suburb || a.neighbourhood || a.quarter || '';
-                    const county = a.county || a.state_district || '';
-                    const streetLine = [road, suburb, county].filter(Boolean).join(', ') || geoData.display_name || '';
-                    const city = a.city || a.town || a.village || a.municipality || '';
-                    const state = a.state || '';
-
-                    const payload = {
-                      storeName: res.user.storeName,
-                      phone: res.user.phone,
-                      address: streetLine,
-                      city,
-                      state,
-                      latitude: parseFloat(lat),
-                      longitude: parseFloat(lon)
-                    };
-
-                    const updateRes = await fetch(`${API_BASE}/api/auth/update-details`, {
-                      method: 'PUT',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                      },
-                      body: JSON.stringify(payload)
-                    });
-                    const updateData = await updateRes.json();
-                    if (updateData.success && updateData.user) {
-                      setTimeout(() => setSellerUser(updateData.user), 0);
-                      localStorage.setItem('emahu_seller_user', JSON.stringify(updateData.user));
-                      console.log('GPS Seller location auto-synchronized successfully');
-                    }
-                  }
-                } catch (geoErr) {
-                  console.error('Auto GPS geocoding/update failed:', geoErr);
-                }
-              },
-              (geoErr) => {
-                console.warn('GPS auto-detection skipped/failed:', geoErr);
-              },
-              { timeout: 8000 }
-            );
-          }
         }
       } catch (err) {
         console.error('Error syncing profile:', err);
@@ -1137,10 +1224,6 @@ export default function EmahuProDashboard() {
       if (!isApproved) {
         if (activeTab !== 'status' && activeTab !== 'requests') {
           setTimeout(() => setActiveTab('status'), 0);
-        }
-      } else {
-        if (activeTab === 'status') {
-          setTimeout(() => setActiveTab('overview'), 0);
         }
       }
     }
@@ -2418,6 +2501,8 @@ export default function EmahuProDashboard() {
   const [newProductPrice, setNewProductPrice] = useState('');
   const [newProductComparePrice, setNewProductComparePrice] = useState('');
   const [newProductStock, setNewProductStock] = useState('');
+  const [newProductWeight, setNewProductWeight] = useState('');
+  const [newProductWeightUnit, setNewProductWeightUnit] = useState('kg');
   const [newProductDescription, setNewProductDescription] = useState('');
   const [newProductImage, setNewProductImage] = useState('');
   const [newProductImages, setNewProductImages] = useState([]);
@@ -2533,9 +2618,13 @@ export default function EmahuProDashboard() {
           name: newProductName.trim(),
           brand: newProductBrand.trim(),
           category: newProductCategory,
+          subcategory: newProductSubcategory || 'General',
           price: priceNum,
           comparePrice: comparePriceNum,
           stock: stockNum,
+          weight: newProductWeight ? parseFloat(newProductWeight) : undefined,
+          weightUnit: newProductWeightUnit || 'kg',
+          weightInKg: newProductWeight ? (newProductWeightUnit === 'g' ? parseFloat(newProductWeight) / 1000 : parseFloat(newProductWeight)) : undefined,
           image: newProductImage.trim(),
           images: newProductImages,
           description: newProductDescription.trim(),
@@ -2616,10 +2705,13 @@ export default function EmahuProDashboard() {
       }
     }
     setNewProductCategory(defaultCat);
+    setNewProductSubcategory('General');
 
     setNewProductPrice('');
     setNewProductComparePrice('');
     setNewProductStock('');
+    setNewProductWeight('');
+    setNewProductWeightUnit('kg');
     setNewProductDescription('');
     setNewProductImage('');
     setNewProductImages([]);
@@ -2683,10 +2775,13 @@ export default function EmahuProDashboard() {
     setNewProductName(product.name);
     setNewProductBrand(product.brand || '');
     setNewProductSku(product.sku);
-    setNewProductCategory(product.category);
+    setNewProductCategory(product.category || 'Electronics & Tech');
+    setNewProductSubcategory(product.subcategory || 'General');
     setNewProductPrice(product.price.toString());
     setNewProductComparePrice(product.comparePrice ? product.comparePrice.toString() : '');
     setNewProductStock(product.stock.toString());
+    setNewProductWeight(product.weight !== undefined && product.weight !== null ? product.weight.toString() : '');
+    setNewProductWeightUnit(product.weightUnit || 'kg');
     setNewProductDescription(product.description || '');
 
     const mainImg = getProductMainImage(product);
@@ -3835,7 +3930,39 @@ export default function EmahuProDashboard() {
                 <p style={{ color: 'var(--text-secondary)', marginTop: '8px' }}>Monitor onboarding progress and resubmit compliance credentials.</p>
               </div>
 
-              {sellerUser?.status === 'pending' && (
+              {(sellerUser?.status === 'approved' || isApproved) && (
+                <div style={{
+                  background: 'rgba(16, 185, 129, 0.05)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '16px',
+                  padding: '32px',
+                  textAlign: 'center',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
+                  backdropFilter: 'blur(10px)',
+                  marginBottom: '32px'
+                }}>
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 20px'
+                  }}>
+                    <span style={{ fontSize: '2rem' }}>✅</span>
+                  </div>
+                  <h3 style={{ fontSize: '1.4rem', color: '#065f46', fontWeight: '700', marginBottom: '12px' }}>
+                    Seller Account Verified & Approved
+                  </h3>
+                  <p style={{ color: '#047857', fontSize: '1rem', lineHeight: '1.6', margin: '0 auto', maxWidth: '600px', fontWeight: '600' }}>
+                    Your store verification has been successfully approved by the compliance team. All seller privileges, product management, and order fulfillment are fully unlocked.
+                  </p>
+                </div>
+              )}
+
+              {sellerUser?.status === 'pending' && !isApproved && (
                 <div style={{
                   background: 'rgba(245, 158, 11, 0.05)',
                   border: '1px solid rgba(245, 158, 11, 0.3)',
@@ -4755,7 +4882,11 @@ export default function EmahuProDashboard() {
                           <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Category *</label>
                           <CategorySelector
                             value={newProductCategory}
-                            onChange={setNewProductCategory}
+                            subcategoryValue={newProductSubcategory}
+                            onChange={(mainCat, subCat) => {
+                              setNewProductCategory(mainCat);
+                              setNewProductSubcategory(subCat || 'General');
+                            }}
                           />
                         </div>
 
@@ -4786,18 +4917,77 @@ export default function EmahuProDashboard() {
                           </div>
                         </div>
 
-                        <div className="form-group">
-                          <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Inventory *</label>
-                          <input
-                            type="number"
-                            className="form-input"
-                            style={{ height: '36px', fontSize: '0.85rem' }}
-                            placeholder="20"
-                            value={newProductStock}
-                            onChange={(e) => setNewProductStock(e.target.value)}
-                            required
-                          />
+                        <div className="form-grid-2-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div className="form-group">
+                            <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Inventory *</label>
+                            <input
+                              type="number"
+                              className="form-input"
+                              style={{ height: '36px', fontSize: '0.85rem' }}
+                              placeholder="20"
+                              value={newProductStock}
+                              onChange={(e) => setNewProductStock(e.target.value)}
+                              required
+                            />
+                          </div>
+
+                          <div className="form-group">
+                            <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Product Weight *</label>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <input
+                                type="number"
+                                step={newProductWeightUnit === 'g' ? '1' : '0.01'}
+                                min="0"
+                                className="form-input"
+                                style={{ height: '36px', fontSize: '0.85rem', flex: 2 }}
+                                placeholder={newProductWeightUnit === 'g' ? 'e.g. 500' : 'e.g. 1.2'}
+                                value={newProductWeight}
+                                onChange={(e) => setNewProductWeight(e.target.value)}
+                                required
+                              />
+                              <select
+                                className="form-select"
+                                style={{ height: '36px', fontSize: '0.8rem', flex: 1, minWidth: '95px' }}
+                                value={newProductWeightUnit}
+                                onChange={(e) => setNewProductWeightUnit(e.target.value)}
+                              >
+                                <option value="kg">kg</option>
+                                <option value="g">g</option>
+                              </select>
+                            </div>
+                          </div>
                         </div>
+
+                        {/* Live Weight Surcharge Calculation Banner */}
+                        {newProductWeight && parseFloat(newProductWeight) > 0 && (
+                          <div style={{
+                            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                            border: '1px solid #86efac',
+                            borderRadius: '8px',
+                            padding: '10px 14px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '8px',
+                            margin: '4px 0 8px 0'
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                ⚖️ Logistics Weight Surcharge (@ ₹60/KG)
+                              </div>
+                              <div style={{ fontSize: '0.78rem', color: '#15803d', marginTop: '2px' }}>
+                                {newProductWeight} {newProductWeightUnit}
+                                {newProductWeightUnit === 'g' ? ` = ${(parseFloat(newProductWeight) / 1000).toFixed(3)} kg` : ` = ${(parseFloat(newProductWeight) * 1000).toFixed(0)} g`}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{ fontSize: '0.7rem', color: '#166534', display: 'block', fontWeight: 600 }}>Weight Delivery Cost</span>
+                              <div style={{ fontSize: '1.05rem', color: '#14532d', fontWeight: '800' }}>
+                                ₹{((newProductWeightUnit === 'g' ? parseFloat(newProductWeight) / 1000 : parseFloat(newProductWeight)) * 60).toFixed(2)}
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                         <div className="form-group">
                           {renderMultiImageSelector()}
@@ -5155,7 +5345,10 @@ export default function EmahuProDashboard() {
                                     </div>
                                   </td>
                                   <td style={{ padding: '12px 10px' }}>
-                                    <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{product.category}</div>
+                                    <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{product.category}</div>
+                                    {product.subcategory && product.subcategory !== 'General' && product.subcategory !== product.category && (
+                                      <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '2px' }}>{product.subcategory}</div>
+                                    )}
                                   </td>
                                   <td style={{ padding: '12px 10px' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -5834,80 +6027,123 @@ export default function EmahuProDashboard() {
                         </div>
                       </div>
 
-                      <div className="form-group" style={{ marginTop: '16px' }}>
-                        <label className="form-label">Registered Shop Address</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={settingsForm.address}
-                          onChange={(e) => setSettingsForm(prev => ({ ...prev, address: e.target.value }))}
-                          placeholder="Enter street, building, and landmark..."
-                        />
-                      </div>
-
-                      <div className="form-grid-2" style={{ marginTop: '16px' }}>
-                        <div className="form-group">
-                          <label className="form-label">City</label>
-                          <input
-                            type="text"
-                            className="form-input"
-                            value={settingsForm.city}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, city: e.target.value }))}
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">State</label>
-                          <input
-                            type="text"
-                            className="form-input"
-                            value={settingsForm.state}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, state: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-grid-2" style={{ marginTop: '16px' }}>
-                        <div className="form-group">
-                          <label className="form-label">Latitude</label>
-                          <input
-                            type="number"
-                            step="any"
-                            className="form-input"
-                            value={settingsForm.latitude}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, latitude: e.target.value }))}
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Longitude</label>
-                          <input
-                            type="number"
-                            step="any"
-                            className="form-input"
-                            value={settingsForm.longitude}
-                            onChange={(e) => setSettingsForm(prev => ({ ...prev, longitude: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-
-                      <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {/* GPS Detect + current location preview */}
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                          {/* Live address badge */}
-                          {(settingsForm.address || settingsForm.city) && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(65,105,225,0.08)', border: '1px solid rgba(65,105,225,0.2)', borderRadius: '8px', padding: '6px 14px', fontSize: '0.8rem', color: '#4169e1', fontWeight: 600, maxWidth: '360px' }}>
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4169e1" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {[settingsForm.address, settingsForm.city, settingsForm.state].filter(Boolean).join(', ')}
-                              </span>
-                            </div>
+                      {/* BUSINESS LOCATION SECTION (Google Places API New - No Map) */}
+                      <div style={{ marginTop: '24px', padding: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>📍</span> Business Location
+                            </h4>
+                            <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                              Used as the source of truth for accurate road distance calculation between your store and buyers.
+                            </p>
+                          </div>
+                          {(settingsForm.address || settingsForm.latitude) && !isChangingSellerLoc && (
+                            <button
+                              type="button"
+                              onClick={() => setIsChangingSellerLoc(true)}
+                              className="btn-secondary"
+                              style={{ height: '34px', fontSize: '0.78rem', padding: '0 12px' }}
+                            >
+                              🔄 Change Location
+                            </button>
                           )}
                         </div>
 
-                        {/* Map container has been removed from the seller dashboard settings per user request */}
+                        {/* Selected Location State Banner */}
+                        {(settingsForm.address || settingsForm.latitude) && !isChangingSellerLoc ? (
+                          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.5px' }}>
+                              Selected Business Address:
+                            </div>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>
+                              {settingsForm.address || `${settingsForm.city || ''}, ${settingsForm.state || ''}`}
+                            </div>
+                            <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '0.78rem', color: '#475569' }}>
+                              <span><strong>Latitude:</strong> {settingsForm.latitude !== undefined && settingsForm.latitude !== '' ? Number(settingsForm.latitude).toFixed(4) : 'Not set'}</span>
+                              <span><strong>Longitude:</strong> {settingsForm.longitude !== undefined && settingsForm.longitude !== '' ? Number(settingsForm.longitude).toFixed(4) : 'Not set'}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            {/* Search Input for Places */}
+                            <div style={{ position: 'relative', marginBottom: '10px' }}>
+                              <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Search business address... (e.g. Maninagar Ahmedabad, 380001)"
+                                value={sellerLocSearch}
+                                onChange={(e) => setSellerLocSearch(e.target.value)}
+                                style={{
+                                  height: '44px',
+                                  fontSize: '0.9rem',
+                                  padding: '0 12px',
+                                  borderRadius: '8px',
+                                  border: '1.5px solid #4169e1',
+                                  background: '#ffffff'
+                                }}
+                              />
+                              {loadingSellerLoc && (
+                                <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: '#64748b' }}>
+                                  Searching...
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Error text if any */}
+                            {sellerLocError && (
+                              <div style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: '8px' }}>
+                                {sellerLocError}
+                              </div>
+                            )}
+
+                            {/* Suggestions List */}
+                            {sellerLocSuggestions.length > 0 && (
+                              <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', marginBottom: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                                {sellerLocSuggestions.map((item, idx) => (
+                                  <div
+                                    key={item.placeId || idx}
+                                    onClick={() => handleSelectSellerPlace(item)}
+                                    style={{
+                                      padding: '10px 14px',
+                                      borderBottom: idx < sellerLocSuggestions.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'flex-start',
+                                      gap: '8px'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                                  >
+                                    <span style={{ fontSize: '0.9rem', marginTop: '1px' }}>📍</span>
+                                    <div>
+                                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0f172a' }}>
+                                        {item.mainText || item.address.split(',')[0]}
+                                      </div>
+                                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                        {item.secondaryText || item.address}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {isChangingSellerLoc && (
+                              <button
+                                type="button"
+                                onClick={() => setIsChangingSellerLoc(false)}
+                                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.78rem', textDecoration: 'underline', cursor: 'pointer', marginTop: '4px' }}
+                              >
+                                Cancel change
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <div style={{ marginTop: '24px' }}>
-                        <button className="btn-primary" onClick={handleSaveSettings}>Save Profile Details</button>
+                        <button className="btn-primary" onClick={handleSaveSettings}>Save Location &amp; Profile</button>
                       </div>
                     </div>
                   )}
@@ -7026,7 +7262,7 @@ export default function EmahuProDashboard() {
                             {partner.coveredCities && partner.coveredCities.length > 0 && (
                               <div><strong>Covered Cities:</strong> {partner.coveredCities.join(', ')}</div>
                             )}
-                            <div><strong>Rate:</strong> ₹2/KM</div>
+                            <div><strong>Rate:</strong> ₹4/KM</div>
                           </div>
                           <div style={{ display: 'flex', gap: '5px' }} onClick={e => e.stopPropagation()}>
                             {partner.latitude && partner.longitude && (

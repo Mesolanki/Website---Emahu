@@ -81,7 +81,7 @@ const getAdminProductMainImage = (p) => {
       const parsed = JSON.parse(imgs);
       if (Array.isArray(parsed)) imgs = parsed;
       else imgs = [imgs];
-    } catch(e) {
+    } catch (e) {
       imgs = [imgs];
     }
   }

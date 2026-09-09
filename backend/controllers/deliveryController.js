@@ -88,33 +88,29 @@ function detectCityAndState(address) {
   return { city: '', state: '' };
 }
 
-// Google Maps Distance Matrix API call with Haversine fallback
+const { computeSingleRoadDistance } = require('../services/googleRoutesService');
+
+// Google Maps Routes API / Road distance service with Haversine fallback
 async function getGoogleMapsDistance(originLat, originLon, destLat, destLon) {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey) {
+  if (originLat === undefined || originLon === undefined || destLat === undefined || destLon === undefined) {
     return null;
   }
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1000); // 1 second timeout limit
-
-    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${originLat},${originLon}&destinations=${destLat},${destLon}&key=${apiKey}`;
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    const data = await res.json();
-    if (data.rows && data.rows[0] && data.rows[0].elements && data.rows[0].elements[0]) {
-      const el = data.rows[0].elements[0];
-      if (el.status === 'OK') {
-        const distanceKm = el.distance.value / 1000; // Value is in meters
-        const durationSec = el.duration.value;
-        return { distanceKm, durationSec };
-      }
+    const res = await computeSingleRoadDistance(
+      { latitude: Number(originLat), longitude: Number(originLon) },
+      { latitude: Number(destLat), longitude: Number(destLon) }
+    );
+    if (res && res.distanceKm !== undefined) {
+      return {
+        distanceKm: res.distanceKm,
+        durationSec: Math.round(res.distanceKm * 120)
+      };
     }
   } catch (err) {
-    console.warn('Google Maps Distance Matrix call failed, falling back to Haversine:', err);
+    console.warn('Road distance calculation error, fallback to Haversine:', err);
   }
-  return null;
+  const fallbackKm = Number(getHaversineDistance(originLat, originLon, destLat, destLon).toFixed(2));
+  return { distanceKm: fallbackKm, durationSec: Math.round(fallbackKm * 120) };
 }
 
 // @desc    Get delivery settings (slabs, threshold)
@@ -192,10 +188,18 @@ exports.updateDeliverySettings = async (req, res) => {
   }
 };
 
-// Helper function to resolve delivery charge based on settings and distance/amount
-function resolveCharge(distance, productTotal, settings) {
-  const charge = parseFloat((distance * 2).toFixed(2));
-  return { charge, free: false };
+// Helper function to resolve delivery charge based on distance (₹4/KM) and weight (₹60/KG)
+function resolveCharge(distance, productTotal, totalWeightKg = 0, settings) {
+  const distanceCharge = parseFloat(((distance || 0) * 4).toFixed(2));
+  const weightCharge = parseFloat(((totalWeightKg || 0) * 60).toFixed(2));
+  const charge = parseFloat((distanceCharge + weightCharge).toFixed(2));
+  return {
+    charge,
+    distanceCharge,
+    weightCharge,
+    totalWeightKg: parseFloat((totalWeightKg || 0).toFixed(3)),
+    free: false
+  };
 }
 
 exports.resolveCharge = resolveCharge;
@@ -270,12 +274,23 @@ exports.calculateDeliveryCharge = async (req, res) => {
       }
 
       const qty = item.quantity || 1;
+      const itemWeightKg = product.weightInKg !== undefined && product.weightInKg !== null
+        ? product.weightInKg
+        : (product.weightUnit === 'g' ? ((product.weight || 0) / 1000) : (product.weight || 0.5));
+      const totalItemWeight = itemWeightKg * qty;
+
+      if (!sellerGroups[sId].totalWeightKg) sellerGroups[sId].totalWeightKg = 0;
+      sellerGroups[sId].totalWeightKg += totalItemWeight;
+
       sellerGroups[sId].subtotal += product.price * qty;
       sellerGroups[sId].items.push({
         productId: prodId,
         name: product.name,
         price: product.price,
-        quantity: qty
+        quantity: qty,
+        weight: product.weight,
+        weightUnit: product.weightUnit || 'kg',
+        weightKg: itemWeightKg
       });
     }
 
@@ -290,8 +305,8 @@ exports.calculateDeliveryCharge = async (req, res) => {
       const sLat = group.sellerLat !== undefined ? group.sellerLat : 23.0225;
       const sLon = group.sellerLon !== undefined ? group.sellerLon : 72.5714;
 
-      const googleDist = await getGoogleMapsDistance(sLat, sLon, buyerLat, buyerLon);
-      const distance = googleDist ? googleDist.distanceKm : getHaversineDistance(buyerLat, buyerLon, sLat, sLon);
+      const googleDist = await getGoogleMapsDistance(buyerLat, buyerLon, sLat, sLon);
+      const distance = googleDist ? googleDist.distanceKm : Number(getHaversineDistance(buyerLat, buyerLon, sLat, sLon).toFixed(2));
       sellerDistances[sId] = distance;
       if (distance > maxDistance) {
         maxDistance = distance;
@@ -304,7 +319,7 @@ exports.calculateDeliveryCharge = async (req, res) => {
       const group = sellerGroups[sId];
       const distance = sellerDistances[sId];
 
-      const chargeResult = resolveCharge(distance, group.subtotal, settings);
+      const chargeResult = resolveCharge(distance, group.subtotal, group.totalWeightKg, settings);
       if (chargeResult.error) {
         return res.status(400).json({
           success: false,
@@ -319,6 +334,9 @@ exports.calculateDeliveryCharge = async (req, res) => {
         sellerId: sId,
         sellerName: group.sellerName,
         distanceKm: parseFloat(distance.toFixed(2)),
+        weightKg: parseFloat((group.totalWeightKg || 0).toFixed(3)),
+        distanceCharge: chargeResult.distanceCharge,
+        weightCharge: chargeResult.weightCharge,
         deliveryCharge: sellerCharge,
         subtotal: group.subtotal,
         items: group.items
@@ -428,8 +446,8 @@ exports.assignOrderToPartner = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Delivery partner not found' });
     }
 
-    // Calculate cost based on per KM rate of ₹2/KM
-    const perKmRate = 2;
+    // Calculate cost based on per KM rate of ₹4/KM
+    const perKmRate = 4;
     const totalCost = parseFloat(((order.distanceKm || 5) * perKmRate).toFixed(2));
 
     // Update Order
@@ -1133,7 +1151,7 @@ exports.getAvailablePartnersForOrder = async (req, res) => {
         isRadiusMatch = distToBuyer <= (partner.serviceRadius || 15);
       }
 
-      const perKmRate = 2;
+      const perKmRate = 4;
       const totalCost = parseFloat((distance * perKmRate).toFixed(2));
 
       availablePartners.push({
@@ -2238,7 +2256,7 @@ async function autoAssignOrderInternal(order) {
       const bestPartner = eligiblePartners[0].partner;
       const deliveryPartnerId = bestPartner._id;
 
-      const perKmRate = 2;
+      const perKmRate = 4;
       const totalCost = parseFloat(((order.distanceKm || 5) * perKmRate).toFixed(2));
 
       order.deliveryPartnerId = deliveryPartnerId;
@@ -2370,7 +2388,7 @@ async function autoAssignPendingOrdersToPartner(partner) {
 
       if (isRadiusMatch) {
         const deliveryPartnerId = partner._id;
-        const perKmRate = 2;
+        const perKmRate = 4;
         const totalCost = parseFloat(((order.distanceKm || 5) * perKmRate).toFixed(2));
 
         order.deliveryPartnerId = deliveryPartnerId;

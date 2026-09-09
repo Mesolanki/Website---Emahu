@@ -30,7 +30,6 @@ router.post('/upload', protect, authorize('seller', 'admin'), upload.single('ima
     const ext = path.extname(req.file.originalname || '.jpg').toLowerCase() || '.jpg';
     const filename = `image-${uniqueSuffix}${ext}`;
 
-    let wroteToDisk = false;
     if (req.file.buffer) {
       try {
         if (!fs.existsSync(uploadsDir)) {
@@ -38,24 +37,10 @@ router.post('/upload', protect, authorize('seller', 'admin'), upload.single('ima
         }
         const filePath = path.join(uploadsDir, filename);
         fs.writeFileSync(filePath, req.file.buffer);
-        wroteToDisk = true;
-
-        const hostHeader = req.get('host') || '';
-        const isHttps = req.headers['x-forwarded-proto'] === 'https' || hostHeader.includes('emahu.com');
-        const protocol = isHttps ? 'https' : req.protocol;
-        let publicBase = `${protocol}://${hostHeader}`;
-        if (process.env.PUBLIC_APP_URL) {
-          publicBase = process.env.PUBLIC_APP_URL;
-        }
-        fileUrl = `/uploads/${filename}`;
       } catch (err) {
-        // Read-only filesystem on Vercel / serverless
-        wroteToDisk = false;
+        // Ignore disk write errors in serverless/read-only environments
       }
-    }
 
-    // Fallback for Vercel/serverless environments where local disk write fails
-    if (!wroteToDisk && req.file.buffer) {
       const mime = req.file.mimetype || 'image/jpeg';
       fileUrl = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
     }
@@ -64,7 +49,7 @@ router.post('/upload', protect, authorize('seller', 'admin'), upload.single('ima
       success: true,
       url: fileUrl,
       fullUrl: fileUrl,
-      relativePath: fileUrl
+      relativePath: `/uploads/${filename}`
     });
   } catch (error) {
     console.error('File Upload Route Error:', error);

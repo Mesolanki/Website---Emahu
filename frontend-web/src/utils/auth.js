@@ -173,6 +173,12 @@ export function clearAuthSession(role) {
   localStorage.removeItem(`${keyPrefix}_token`);
   localStorage.removeItem(`${keyPrefix}_user`);
 
+  // If clearing buyer session, also clear cart and wishlist data
+  if (role === 'buyer' || !role) {
+    localStorage.removeItem('emahu_cart');
+    localStorage.removeItem('emahu_wishlist');
+  }
+
   // Dispatch global storage event so Next.js header component receives update instantly
   window.dispatchEvent(new Event('storage'));
 }

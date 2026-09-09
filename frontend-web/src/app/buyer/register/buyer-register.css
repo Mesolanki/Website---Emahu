@@ -349,6 +349,25 @@
   background: #fef2f2 !important;
 }
 
+.br-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+  padding-right: 40px;
+  cursor: pointer;
+}
+
+.br-select:disabled {
+  background-color: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+  border-color: #e2e8f0;
+}
+
 .br-error {
   font-size: 12px;
   color: #dc2626;
@@ -520,3 +539,126 @@
     width: 100%;
   }
 }
+
+/* ─────────────────────────────────────────────
+   GOOGLE PLACES AUTOCOMPLETE DROPDOWN
+   ───────────────────────────────────────────── */
+.br-places-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.br-places-input-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.br-places-input-box .br-input {
+  padding-left: 38px;
+  padding-right: 36px;
+}
+
+.br-places-pin-icon {
+  position: absolute;
+  left: 12px;
+  color: #3b82f6;
+  pointer-events: none;
+}
+
+.br-places-spinner {
+  position: absolute;
+  right: 12px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: brSpin 0.7s linear infinite;
+}
+
+@keyframes brSpin {
+  to { transform: rotate(360deg); }
+}
+
+.br-places-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 100;
+  animation: brDropdownFade 0.2s ease-out;
+}
+
+@keyframes brDropdownFade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.br-places-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.15s ease;
+}
+
+.br-places-item:last-child {
+  border-bottom: none;
+}
+
+.br-places-item:hover {
+  background: #f8fafc;
+}
+
+.br-places-item-icon {
+  color: #64748b;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.br-places-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.br-places-main {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.br-places-sub {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.br-places-selected-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 4px 10px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #059669;
+  font-weight: 500;
+}
+

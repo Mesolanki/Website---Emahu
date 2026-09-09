@@ -26,9 +26,20 @@ export function getApiBase() {
 const API_BASE = {
   toString: () => getApiBase(),
   valueOf: () => getApiBase(),
+  [Symbol.toPrimitive]: () => getApiBase(),
   replace: (...args) => getApiBase().replace(...args),
   startsWith: (...args) => getApiBase().startsWith(...args),
-  includes: (...args) => getApiBase().includes(...args)
+  endsWith: (...args) => getApiBase().endsWith(...args),
+  includes: (...args) => getApiBase().includes(...args),
+  trim: (...args) => getApiBase().trim(...args),
+  toLowerCase: (...args) => getApiBase().toLowerCase(...args),
+  toUpperCase: (...args) => getApiBase().toUpperCase(...args),
+  slice: (...args) => getApiBase().slice(...args),
+  substring: (...args) => getApiBase().substring(...args),
+  indexOf: (...args) => getApiBase().indexOf(...args),
+  lastIndexOf: (...args) => getApiBase().lastIndexOf(...args),
+  match: (...args) => getApiBase().match(...args),
+  split: (...args) => getApiBase().split(...args)
 };
 
 export default API_BASE;

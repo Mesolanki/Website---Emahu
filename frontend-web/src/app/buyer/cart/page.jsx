@@ -172,6 +172,7 @@ export default function CartPage() {
   const [buyerCoordinates, setBuyerCoordinates] = useState({ latitude: '', longitude: '' });
   const [gpsLoading, setGpsLoading] = useState(false);
   const [buyerCity, setBuyerCity] = useState('');
+  const [buyerAddress, setBuyerAddress] = useState('');
   const [hasDeliveredOrder, setHasDeliveredOrder] = useState(false);
   const [deliveredOrderId, setDeliveredOrderId] = useState('');
   const [showTaxBreakdown, setShowTaxBreakdown] = useState(false);
@@ -231,21 +232,63 @@ export default function CartPage() {
     fetchSettings();
   }, []);
 
-  // ── Load Coordinates on mount ──
+  // ── Load & Synchronize Coordinates on mount and on storage/custom events ──
   useEffect(() => {
-    const storedCoords = localStorage.getItem('emahu_buyer_coordinates');
-    if (storedCoords) {
+    const syncLocation = () => {
       try {
-        const parsed = JSON.parse(storedCoords);
-        if (parsed.latitude && parsed.longitude) {
-          setBuyerCoordinates(parsed);
-          const storedCity = localStorage.getItem('emahu_buyer_city');
-          if (storedCity) {
-            setBuyerCity(storedCity);
+        const storedLoc = localStorage.getItem('emahu_buyer_location');
+        if (storedLoc) {
+          const parsed = JSON.parse(storedLoc);
+          if (parsed && parsed.latitude !== undefined && parsed.longitude !== undefined) {
+            setBuyerCoordinates({
+              latitude: parsed.latitude,
+              longitude: parsed.longitude
+            });
+            if (parsed.city) setBuyerCity(parsed.city);
+            if (parsed.address) setBuyerAddress(parsed.address);
+            return;
           }
         }
-      } catch (e) { }
-    }
+
+        const storedCoords = localStorage.getItem('emahu_buyer_coordinates');
+        const storedCity = localStorage.getItem('emahu_buyer_city');
+        const storedAddress = localStorage.getItem('emahu_buyer_address');
+        if (storedCoords) {
+          const parsed = JSON.parse(storedCoords);
+          if (parsed && parsed.latitude && parsed.longitude) {
+            setBuyerCoordinates(parsed);
+          }
+        }
+        if (storedCity) {
+          setBuyerCity(storedCity);
+        }
+        if (storedAddress) {
+          setBuyerAddress(storedAddress);
+        }
+      } catch (e) {
+        console.error('Location sync error in cart page:', e);
+      }
+    };
+
+    syncLocation();
+
+    const handleCustomLoc = (e) => {
+      if (e.detail && e.detail.latitude !== undefined && e.detail.longitude !== undefined) {
+        setBuyerCoordinates({
+          latitude: e.detail.latitude,
+          longitude: e.detail.longitude
+        });
+        if (e.detail.city) setBuyerCity(e.detail.city);
+        if (e.detail.address) setBuyerAddress(e.detail.address);
+      }
+    };
+
+    window.addEventListener('storage', syncLocation);
+    window.addEventListener('emahu_location_changed', handleCustomLoc);
+    return () => {
+      window.removeEventListener('storage', syncLocation);
+      window.removeEventListener('emahu_location_changed', handleCustomLoc);
+    };
   }, []);
 
   // ── Load Cart items on mount ──
@@ -275,6 +318,9 @@ export default function CartPage() {
             reviews: p.reviews || 84,
             img: imageToShow,
             stock: typeof p.stock === 'number' ? p.stock : 99, // ← STOCK FIELD
+            weight: p.weight,
+            weightUnit: p.weightUnit || 'kg',
+            weightInKg: p.weightInKg !== undefined ? p.weightInKg : (p.weightUnit === 'g' ? ((p.weight || 0) / 1000) : (p.weight || 0.5)),
             verified: true,
             isNew: true,
             isHot: false,
@@ -563,11 +609,43 @@ export default function CartPage() {
 
   // ── Totals ──
   const subtotal = cartItems.reduce((acc, p) => acc + (p.price * p.quantity), 0);
-  const shippingFee = (subtotal === 0 || subtotal > 150) ? 0 : deliveryCharge;
-  const taxAmount = Math.round(subtotal * 0.18);
-  const cgstAmount = Math.round(taxAmount / 2);
-  const sgstAmount = taxAmount - cgstAmount;
-  const grandTotal = subtotal + shippingFee + taxAmount;
+
+  const totalWeightKg = useMemo(() => {
+    if (deliveryBreakdown.length > 0) {
+      const breakdownWeight = deliveryBreakdown.reduce((sum, b) => sum + (b.weightKg || 0), 0);
+      if (breakdownWeight > 0) return breakdownWeight;
+    }
+    let sum = 0;
+    cartItems.forEach(item => {
+      const w = (item.weightInKg !== undefined && item.weightInKg !== null && item.weightInKg > 0)
+        ? item.weightInKg
+        : (item.weight !== undefined && item.weight !== null && item.weight > 0
+            ? (item.weightUnit === 'g' ? (item.weight / 1000) : item.weight)
+            : 0.5);
+      sum += (w * (item.quantity || 1));
+    });
+    return sum;
+  }, [deliveryBreakdown, cartItems]);
+
+  const totalDistanceCharge = useMemo(() => {
+    if (deliveryBreakdown.length > 0) {
+      return deliveryBreakdown.reduce((sum, b) => sum + (b.distanceCharge !== undefined ? b.distanceCharge : (b.distanceKm * 4)), 0);
+    }
+    return parseFloat(((deliveryDistance || 0) * 4).toFixed(2));
+  }, [deliveryBreakdown, deliveryDistance]);
+
+  const totalWeightCharge = useMemo(() => {
+    if (deliveryBreakdown.length > 0) {
+      return deliveryBreakdown.reduce((sum, b) => sum + (b.weightCharge !== undefined ? b.weightCharge : (b.weightKg * 60)), 0);
+    }
+    return parseFloat(((totalWeightKg || 0) * 60).toFixed(2));
+  }, [deliveryBreakdown, totalWeightKg]);
+
+  const shippingFee = subtotal === 0 ? 0 : parseFloat((totalDistanceCharge + totalWeightCharge).toFixed(2));
+  const taxAmount = parseFloat((subtotal * 0.18).toFixed(2));
+  const cgstAmount = parseFloat((subtotal * 0.09).toFixed(2));
+  const sgstAmount = parseFloat((taxAmount - cgstAmount).toFixed(2));
+  const grandTotal = parseFloat((subtotal + shippingFee + taxAmount).toFixed(2));
 
   // ── Quick checkout (guest) ──
   const handleSecureCheckout = () => {
@@ -785,11 +863,33 @@ export default function CartPage() {
                         ✓ In Stock ({p.stock} available)
                       </span>
                     )}
-                    {p.verified && (
-                      <span className="cart-item-row__verified" style={{ marginTop: '4px', width: 'fit-content' }}>
-                        🛡️ 100% EMAHU Hub Verified
-                      </span>
-                    )}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                      {p.verified && (
+                        <span className="cart-item-row__verified" style={{ margin: 0, width: 'fit-content' }}>
+                          🛡️ 100% EMAHU Hub Verified
+                        </span>
+                      )}
+                      {(() => {
+                        let itemWt = p.weight ? `${p.weight} ${p.weightUnit || 'kg'}` : null;
+                        if (!itemWt && deliveryBreakdown.length > 0) {
+                          for (const b of deliveryBreakdown) {
+                            const found = (b.items || []).find(it => (it.productId || '').toString() === (p.id || '').toString());
+                            if (found && found.weight) {
+                              itemWt = `${found.weight} ${found.weightUnit || 'kg'}`;
+                              break;
+                            } else if (found && found.weightKg) {
+                              itemWt = `${found.weightKg} kg`;
+                              break;
+                            }
+                          }
+                        }
+                        return (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.7rem', color: '#475569', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '5px', padding: '2px 7px', fontWeight: '600' }}>
+                            ⚖️ {itemWt || (p.weightInKg ? `${p.weightInKg} kg` : (totalWeightKg > 0 ? `${totalWeightKg.toFixed(2)} kg` : '0.50 kg'))}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
 
                   {/* Quantity controls — capped at stock */}
@@ -908,32 +1008,49 @@ export default function CartPage() {
                   <strong>₹{subtotal.toLocaleString('en-IN')}</strong>
                 </div>
 
-                {/* Delivery charge row */}
+                {/* 1. Distance Shipping Row */}
                 <div className="cart-summary-row">
                   <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span>Certified Inspection & Transit Shipping</span>
-                    {deliveryDistance > 0 && (
-                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                        📏 Distance: {deliveryDistance.toFixed(1)} KM
-                      </span>
-                    )}
+                    <span>Distance Shipping (@ ₹4/KM)</span>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      📏 Distance: {deliveryDistance > 0 ? `${parseFloat(deliveryDistance.toFixed(2))} KM` : '0.0 KM (Local Hub)'}
+                    </span>
                   </span>
                   <strong>
                     {deliveryCalculating ? (
                       <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>calculating...</span>
                     ) : (
-                      shippingFee === 0 ? <span style={{ color: '#16a34a', fontWeight: '700' }}>FREE Delivery</span> : `₹${shippingFee}`
+                      `₹${Number(totalDistanceCharge).toFixed(2)}`
                     )}
                   </strong>
                 </div>
 
-                {/* Per-seller breakdown */}
+                {/* 2. Product Weight Shipping Row */}
+                <div className="cart-summary-row">
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span>Product Weight Shipping (@ ₹60/KG)</span>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      ⚖️ Package Weight: {totalWeightKg > 0 ? `${totalWeightKg.toFixed(2)} kg` : '0.50 kg'}
+                    </span>
+                  </span>
+                  <strong>
+                    {deliveryCalculating ? (
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>calculating...</span>
+                    ) : (
+                      `₹${Number(totalWeightCharge).toFixed(2)}`
+                    )}
+                  </strong>
+                </div>
+
+
+
+                {/* Per-seller breakdown if multiple packages */}
                 {shippingFee > 0 && deliveryBreakdown.length > 1 && (
-                  <div style={{ background: 'rgba(100,116,139,0.05)', borderRadius: '8px', padding: '10px', marginTop: '-4px', marginBottom: '4px' }}>
+                  <div style={{ background: 'rgba(100,116,139,0.05)', borderRadius: '8px', padding: '10px', marginTop: '2px', marginBottom: '4px' }}>
                     <p style={{ fontSize: '0.71rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Seller Breakdown</p>
                     {deliveryBreakdown.map((b, i) => (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#475569', padding: '3px 0' }}>
-                        <span>{b.sellerName} — {b.distanceKm} km</span>
+                        <span>{b.sellerName} — {b.distanceKm} km {b.weightKg > 0 ? `· ⚖️ ${b.weightKg} kg` : ''}</span>
                         <span style={{ fontWeight: '600' }}>₹{b.deliveryCharge}</span>
                       </div>
                     ))}
@@ -948,18 +1065,18 @@ export default function CartPage() {
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     Service Fees {showTaxBreakdown ? '▲' : '▼'}
                   </span>
-                  <strong>₹{taxAmount.toLocaleString('en-IN')}</strong>
+                  <strong>₹{Number(taxAmount).toFixed(2)}</strong>
                 </div>
 
                 {showTaxBreakdown && (
                   <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 12px', marginTop: '-4px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', padding: '3px 0' }}>
                       <span>CGST (9%)</span>
-                      <strong style={{ fontWeight: '600' }}>₹{cgstAmount.toLocaleString('en-IN')}</strong>
+                      <strong style={{ fontWeight: '600' }}>₹{Number(cgstAmount).toFixed(2)}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', padding: '3px 0' }}>
                       <span>SGST (9%)</span>
-                      <strong style={{ fontWeight: '600' }}>₹{sgstAmount.toLocaleString('en-IN')}</strong>
+                      <strong style={{ fontWeight: '600' }}>₹{Number(sgstAmount).toFixed(2)}</strong>
                     </div>
                   </div>
                 )}
@@ -968,7 +1085,7 @@ export default function CartPage() {
 
                 <div className="cart-summary-row cart-summary-row--total">
                   <span>Total Amount</span>
-                  <strong>₹{grandTotal.toLocaleString('en-IN')}</strong>
+                  <strong>₹{Number(grandTotal).toFixed(2)}</strong>
                 </div>
               </div>
 

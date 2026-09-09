@@ -62,6 +62,21 @@ const userSchema = new mongoose.Schema(
     longitude: {
       type: Number
     },
+    location: {
+      address: { type: String, trim: true },
+      latitude: { type: Number },
+      longitude: { type: Number }
+    },
+    locationPoint: {
+      type: {
+        type: String,
+        enum: ['Point']
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude] per GeoJSON specification
+        index: '2dsphere'
+      }
+    },
     category: {
       type: String,
       trim: true
@@ -246,8 +261,24 @@ const userSchema = new mongoose.Schema(
 // Define compound unique index on the schema directly for performance
 userSchema.index({ email: 1, role: 1 }, { unique: true });
 
-// Encrypt password using bcrypt before saving user
+// Sync location and GeoJSON locationPoint before saving user
 userSchema.pre('save', async function (next) {
+  if (this.latitude !== undefined && this.longitude !== undefined && this.latitude !== null && this.longitude !== null) {
+    const lat = Number(this.latitude);
+    const lon = Number(this.longitude);
+    if (!isNaN(lat) && !isNaN(lon)) {
+      this.location = {
+        address: this.address || '',
+        latitude: lat,
+        longitude: lon
+      };
+      this.locationPoint = {
+        type: 'Point',
+        coordinates: [lon, lat] // GeoJSON requires [longitude, latitude]
+      };
+    }
+  }
+
   if (!this.isModified('password')) {
     return next();
   }

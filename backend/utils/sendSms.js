@@ -25,7 +25,7 @@ const sendSms = async (options) => {
       const otpMatch = body.match(/\b\d{6}\b/);
       const otpCode = otpMatch ? otpMatch[0] : '';
       
-      // 2Factor.in requires numeric phone format without '+' sign (e.g., 919876543210 or 9876543210)
+      // 2Factor.in expects clean digits (10-digit or 91XXXXXXXXXX) without '+' sign
       let formattedPhone = cleanPhone.replace(/\D/g, '');
       if (formattedPhone.length === 10) {
         formattedPhone = `91${formattedPhone}`;
