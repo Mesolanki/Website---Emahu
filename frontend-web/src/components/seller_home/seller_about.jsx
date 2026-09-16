@@ -18,13 +18,7 @@ const aboutModules = [
     desc: 'Never worry about missing or delayed payouts. Our automated Emahu vault monitors buyer payments and routes them through a strict, multi-layer admin verification cycle for direct Friday settlement.',
     badge: '100% Protected',
   },
-  {
-    id: 'catalog',
-    title: 'AI Catalog Automator',
-    tagline: 'Smart Product Listings in Seconds',
-    desc: 'Upload a basic product image, and our embedded AI engine auto-enhances the visuals, extracts precise specifications, generates SEO-optimized descriptions, and publishes your listing instantly.',
-    badge: 'Hyper-Fast Listing',
-  },
+
   {
     id: 'logistics',
     title: 'Smart Logistics Grid',
@@ -72,14 +66,7 @@ export default function SellerAbout() {
         </svg>
       );
     }
-    if (id === 'catalog') {
-      return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.3-6.3l-.7.7M6.7 17.3l-.7.7m12.6 0l-.7-.7M6.7 6.7l-.7-.7N12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />
-          <path d="M5 3L4 4.5 2.5 5 4 5.5 5 7l.5-1.5L7 5l-1.5-.5L5 3z" />
-        </svg>
-      );
-    }
+
     if (id === 'logistics') {
       return (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -250,42 +237,6 @@ export default function SellerAbout() {
                   </div>
                 )}
 
-                {/* ⚡ TAB 3: AI CATALOG AUTOMATOR */}
-                {activeTab === 'catalog' && (
-                  <div className="sa-vis sa-vis--catalog">
-                    <div className="sa-ai-studio">
-                      {/* Left Side: Upload Input */}
-                      <div className="sa-studio__input">
-                        <span className="sa-input__badge">INPUT PHOTO</span>
-                        <div className="sa-input__photo">
-                          <span className="sa-input__icon">👟</span>
-                          <div className="sa-input__scan-line" />
-                        </div>
-                      </div>
-
-                      {/* Transition Sparkle Arrow */}
-                      <div className="sa-studio__divider">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="sa-divider__spark">
-                          <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.3-6.3l-.7.7M6.7 17.3l-.7.7m12.6 0l-.7-.7M6.7 6.7l-.7-.7" />
-                        </svg>
-                      </div>
-
-                      {/* Right Side: Enhanced Output */}
-                      <div className="sa-studio__output">
-                        <div className="sa-output__header">
-                          <span className="sa-output__badge">AI GENERATED</span>
-                          <span className="sa-output__score">99.4% SEO</span>
-                        </div>
-                        <span className="sa-output__title">AirFlow Pro Sneakers (Onyx Black)</span>
-                        <p className="sa-output__desc">High-performance running shoes designed for ultimate comfort and ventilation...</p>
-                        <div className="sa-output__tags">
-                          <span>#Performance</span>
-                          <span>#Sneakers</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* 🚚 TAB 4: SMART LOGISTICS GRID */}
                 {activeTab === 'logistics' && (
@@ -306,7 +257,7 @@ export default function SellerAbout() {
                             <span className="sa-carrier__name">BlueDart Premium</span>
                             <span className="sa-carrier__perf">98.4% On-Time • Auto-Assigned</span>
                           </div>
-                          <span className="sa-carrier__price">₹62/kg</span>
+
                         </div>
 
                         <div className="sa-carrier-card sa-carrier-card--inactive">
@@ -314,7 +265,7 @@ export default function SellerAbout() {
                             <span className="sa-carrier__name">Delhivery Express</span>
                             <span className="sa-carrier__perf">94.2% On-Time • Standby</span>
                           </div>
-                          <span className="sa-carrier__price">₹68/kg</span>
+
                         </div>
                       </div>
 

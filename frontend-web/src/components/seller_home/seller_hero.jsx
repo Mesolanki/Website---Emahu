@@ -40,11 +40,6 @@ export default function SellerHero() {
              LEFT COLUMN: VALUE PROPOSITION & ACTIONS
              ========================================== */}
           <div className="sh-hero__left">
-            {/* Active Trust Badge */}
-            <div className="sh-hero__badge">
-              <span className="sh-badge__dot" />
-              Trusted by 10,000+ Active Vendors Across India
-            </div>
 
             {/* Title with sleek text mask gradient */}
             <h1 className="sh-hero__headline">
@@ -176,68 +171,83 @@ export default function SellerHero() {
           <div className="sh-hero__right">
             <div className="sh-mockup-stack">
 
-              {/* Card 1: Sales Analytics Widget */}
+              {/* Card 1: Emahu Features Showcase */}
               <div className="sh-widget sh-widget--revenue">
                 <div className="sh-widget__header">
                   <div className="sh-widget__title-block">
-                    <span className="sh-widget__lbl">STORE METRICS</span>
-                    <h4 className="sh-widget__title">Live Dashboard</h4>
+                    <span className="sh-widget__lbl">PLATFORM HIGHLIGHTS</span>
+                    <h4 className="sh-widget__title">Why Sell on Emahu?</h4>
                   </div>
-                  <span className="sh-widget__trend">+14.2% Growth</span>
+                  <span className="sh-widget__trend" style={{ color: '#22c55e' }}>✦ Trusted</span>
                 </div>
 
-                <div className="sh-widget__body">
-                  <div className="sh-widget__metric">
-                    <span className="sh-widget__amt">₹1,82,450.00</span>
-                    <span className="sh-widget__sub">Total Revenue Generated</span>
-                  </div>
-
-                  {/* High-Fidelity Interactive SVG Line Graph */}
-                  <div className="sh-widget__chart">
-                    <svg viewBox="0 0 300 80" className="sh-chart-svg">
-                      <defs>
-                        <linearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#2563eb" stopOpacity="0.25" />
-                          <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
-                        </linearGradient>
-                      </defs>
-                      {/* Area Fill */}
-                      <path d="M 0 60 Q 50 35 100 45 T 200 15 T 300 5 L 300 80 L 0 80 Z" fill="url(#chartGlow)" />
-                      {/* Curve Stroke */}
-                      <path d="M 0 60 Q 50 35 100 45 T 200 15 T 300 5" fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" className="sh-chart-path" />
-                      {/* Pulse Dot */}
-                      <circle cx="200" cy="15" r="5" fill="#2563eb" stroke="#ffffff" strokeWidth="2" className="sh-chart-dot" />
-                    </svg>
-                  </div>
+                <div className="sh-widget__body" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {[
+                    {
+                      icon: (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                      ),
+                      color: 'rgba(59,130,246,0.12)',
+                      border: 'rgba(59,130,246,0.2)',
+                      iconBg: 'rgba(59,130,246,0.15)',
+                      label: 'Zero Commission',
+                      sub: 'Keep every rupee you earn',
+                    },
+                    {
+                      icon: (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                      ),
+                      color: 'rgba(167,139,250,0.10)',
+                      border: 'rgba(167,139,250,0.18)',
+                      iconBg: 'rgba(167,139,250,0.15)',
+                      label: 'Secure Weekly Payouts',
+                      sub: 'Admin-verified Friday transfers',
+                    },
+                    {
+                      icon: (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                        </svg>
+                      ),
+                      color: 'rgba(34,197,94,0.10)',
+                      border: 'rgba(34,197,94,0.18)',
+                      iconBg: 'rgba(34,197,94,0.15)',
+                      label: 'Smart Logistics Grid',
+                      sub: 'Auto courier routing nationwide',
+                    },
+                    {
+                      icon: (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      ),
+                      color: 'rgba(245,158,11,0.10)',
+                      border: 'rgba(245,158,11,0.18)',
+                      iconBg: 'rgba(245,158,11,0.15)',
+                      label: 'EMAHU Verified Badge',
+                      sub: 'Build instant buyer trust',
+                    },
+                  ].map(({ icon, color, border, iconBg, label, sub }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: color, border: `1px solid ${border}`, borderRadius: '10px', padding: '9px 12px' }}>
+                      <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {icon}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#e2e8f0' }}>{label}</div>
+                        <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '1px' }}>{sub}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Card 2: Payout Verification Alert */}
-              <div className="sh-widget sh-widget--Emahu">
-                <div className="sh-Emahu-badge">
-                  <div className="sh-Emahu-badge__circle">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
-                  </div>
-                  <div className="sh-Emahu-badge__txt">
-                    <span className="sh-Emahu-badge__title">FRIDAY SETTLEMENT LOCKED</span>
-                    <span className="sh-Emahu-badge__sub">Direct Transfer to HDFC Bank Secure</span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Card 3: Transit Status HUD */}
-              <div className="sh-widget sh-widget--delivery">
-                <div className="sh-delivery-hud">
-                  <span className="sh-delivery-hud__indicator" />
-                  <div className="sh-delivery-hud__details">
-                    <span className="sh-delivery-hud__awb">AWB #829104829</span>
-                    <span className="sh-delivery-hud__status">BlueDart Premium • Out for Doorstep Pick-up</span>
-                  </div>
-                </div>
-              </div>
+
 
             </div>
           </div>

@@ -1670,7 +1670,7 @@ export default function EmahuProDashboard() {
     } catch (err) {
       console.error('OTP Verification Error:', err);
       setOtpVerifyError(err.message || 'Verification failed.');
-    } finally {
+    } finally { 
       setIsOtpSubmitting(false);
     }
   };

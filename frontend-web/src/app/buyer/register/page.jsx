@@ -58,6 +58,7 @@ export default function BuyerRegister() {
     confirmPassword: '',
     // Step 2: Shipping details
     address: '',
+    houseNumber: '',
     city: '',
     state: '',
     zipCode: '',
@@ -803,6 +804,19 @@ export default function BuyerRegister() {
                         )}
                       </div>
                       {errors.address && <span className="br-error">{errors.address}</span>}
+                    </div>
+
+                    <div className="br-field br-field--full">
+                      <label className="br-label" htmlFor="houseNumber">House / Flat No.</label>
+                      <input
+                        type="text"
+                        id="houseNumber"
+                        name="houseNumber"
+                        className="br-input"
+                        placeholder="e.g. Flat 4B, House No. 12"
+                        value={formData.houseNumber}
+                        onChange={handleInputChange}
+                      />
                     </div>
 
                     <div className="br-field">

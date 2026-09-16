@@ -645,7 +645,10 @@ export default function CartPage() {
   const taxAmount = parseFloat((subtotal * 0.18).toFixed(2));
   const cgstAmount = parseFloat((subtotal * 0.09).toFixed(2));
   const sgstAmount = parseFloat((taxAmount - cgstAmount).toFixed(2));
-  const grandTotal = parseFloat((subtotal + shippingFee + taxAmount).toFixed(2));
+  const baseBillAmount = parseFloat((subtotal + shippingFee + taxAmount).toFixed(2));
+  const emahuFee = subtotal === 0 ? 0 : parseFloat((baseBillAmount * 0.04).toFixed(2));
+  const handlingFee = parseFloat((taxAmount + emahuFee).toFixed(2));
+  const grandTotal = parseFloat((baseBillAmount + emahuFee).toFixed(2));
 
   // ── Quick checkout (guest) ──
   const handleSecureCheckout = () => {
@@ -1008,36 +1011,14 @@ export default function CartPage() {
                   <strong>₹{subtotal.toLocaleString('en-IN')}</strong>
                 </div>
 
-                {/* 1. Distance Shipping Row */}
+                {/* Delivery Charge Row */}
                 <div className="cart-summary-row">
-                  <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span>Distance Shipping (@ ₹4/KM)</span>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                      📏 Distance: {deliveryDistance > 0 ? `${parseFloat(deliveryDistance.toFixed(2))} KM` : '0.0 KM (Local Hub)'}
-                    </span>
-                  </span>
+                  <span>Delivery Charge</span>
                   <strong>
                     {deliveryCalculating ? (
                       <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>calculating...</span>
                     ) : (
-                      `₹${Number(totalDistanceCharge).toFixed(2)}`
-                    )}
-                  </strong>
-                </div>
-
-                {/* 2. Product Weight Shipping Row */}
-                <div className="cart-summary-row">
-                  <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span>Product Weight Shipping (@ ₹60/KG)</span>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                      ⚖️ Package Weight: {totalWeightKg > 0 ? `${totalWeightKg.toFixed(2)} kg` : '0.50 kg'}
-                    </span>
-                  </span>
-                  <strong>
-                    {deliveryCalculating ? (
-                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>calculating...</span>
-                    ) : (
-                      `₹${Number(totalWeightCharge).toFixed(2)}`
+                      `₹${Number(shippingFee).toFixed(2)}`
                     )}
                   </strong>
                 </div>
@@ -1057,29 +1038,10 @@ export default function CartPage() {
                   </div>
                 )}
 
-                <div
-                  className="cart-summary-row"
-                  onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
-                  style={{ cursor: 'pointer', userSelect: 'none' }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    Service Fees {showTaxBreakdown ? '▲' : '▼'}
-                  </span>
-                  <strong>₹{Number(taxAmount).toFixed(2)}</strong>
+                <div className="cart-summary-row">
+                  <span>Handling Fees</span>
+                  <strong>₹{Number(handlingFee).toFixed(2)}</strong>
                 </div>
-
-                {showTaxBreakdown && (
-                  <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 12px', marginTop: '-4px', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', padding: '3px 0' }}>
-                      <span>CGST (9%)</span>
-                      <strong style={{ fontWeight: '600' }}>₹{Number(cgstAmount).toFixed(2)}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', padding: '3px 0' }}>
-                      <span>SGST (9%)</span>
-                      <strong style={{ fontWeight: '600' }}>₹{Number(sgstAmount).toFixed(2)}</strong>
-                    </div>
-                  </div>
-                )}
 
                 <div className="cart-summary-divider" />
 

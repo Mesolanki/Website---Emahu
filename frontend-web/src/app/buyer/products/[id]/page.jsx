@@ -953,7 +953,6 @@ export default function ProductDetailPage() {
               <span className="pd-price-off">{currentDiscount}% off</span>
             </>}
           </div>
-          <p className="pd-price-note">Inclusive of all taxes</p>
 
           <div className="pd-divider" />
 
@@ -1161,7 +1160,6 @@ export default function ProductDetailPage() {
             {[
               { icon: '🚚', title: 'Express Delivery', sub: 'Estimated by Tomorrow, 10 AM', tag: null },
               { icon: '✅', title: 'EMAHU Quality Checked', sub: 'Physical inspection completed. Seal verified.', tag: null },
-              { icon: '🔄', title: '30-Day Easy Returns', sub: 'No questions asked return policy', tag: null },
               { icon: '🔒', title: 'Secure Emahu Payment', sub: 'Money released only after you confirm receipt', tag: null },
             ].map((item, i) => (
               <div key={i} className="pd-delivery-card">

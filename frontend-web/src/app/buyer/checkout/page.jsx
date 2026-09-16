@@ -267,6 +267,7 @@ export default function CheckoutPage() {
   const [deliveryBreakdown, setDeliveryBreakdown] = useState([]);
   const [maxDistanceExceeded, setMaxDistanceExceeded] = useState(false);
   const [deliveryCalculationError, setDeliveryCalculationError] = useState('');
+  const [deliveryCalculating, setDeliveryCalculating] = useState(false);
   const STATES_WITH_PARTNERS = ['Gujarat', 'Maharashtra', 'Delhi', 'Karnataka', 'Tamil Nadu', 'Uttar Pradesh'];
   const [buyerCoordinates, setBuyerCoordinates] = useState({ latitude: '', longitude: '' });
   const [deliverySettings, setDeliverySettings] = useState({
@@ -537,12 +538,26 @@ export default function CheckoutPage() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleConfirmManualAddress = () => {
+  const handleConfirmManualAddress = async () => {
     if (validateManualAddress()) {
       setManualConfirmed(true);
       setLocationMode('manual');
       setLocationConfirmed(true);
       setAddressType('manual');
+
+      // Geocode to dynamically update coordinates & recalculate delivery
+      try {
+        const query = [address, city, stateName, pincode, 'India'].filter(Boolean).join(', ');
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          const coords = { latitude: parseFloat(data[0].lat).toFixed(6), longitude: parseFloat(data[0].lon).toFixed(6) };
+          setBuyerCoordinates(coords);
+          localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
+        }
+      } catch (err) {
+        console.warn('Geocoding manual address failed:', err);
+      }
     }
   };
 
@@ -596,6 +611,7 @@ export default function CheckoutPage() {
         return;
       }
 
+      setDeliveryCalculating(true);
       try {
         const res = await fetch(`${API_BASE}/api/delivery/calculate`, {
           method: 'POST',
@@ -643,32 +659,93 @@ export default function CheckoutPage() {
         setDeliveryDistance(0);
         setDeliveryBreakdown([]);
         setMaxDistanceExceeded(false);
+      } finally {
+        setDeliveryCalculating(false);
       }
     };
 
     calculateCharge();
   }, [buyerCoordinates.latitude, buyerCoordinates.longitude, cartItems, shippingSpeed, deliverySettings]);
 
+  // Synchronize location changes dynamically from header, cart, and storage
+  useEffect(() => {
+    const syncLocation = () => {
+      try {
+        const storedLoc = localStorage.getItem('emahu_buyer_location');
+        if (storedLoc) {
+          const parsed = JSON.parse(storedLoc);
+          if (parsed && parsed.latitude !== undefined && parsed.longitude !== undefined) {
+            setBuyerCoordinates({
+              latitude: parsed.latitude.toString(),
+              longitude: parsed.longitude.toString()
+            });
+            return;
+          }
+        }
+
+        const storedCoords = localStorage.getItem('emahu_buyer_coordinates');
+        if (storedCoords) {
+          const parsed = JSON.parse(storedCoords);
+          if (parsed && parsed.latitude && parsed.longitude) {
+            setBuyerCoordinates({
+              latitude: parsed.latitude.toString(),
+              longitude: parsed.longitude.toString()
+            });
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Location sync error in checkout page:', e);
+      }
+    };
+
+    const handleCustomLoc = (e) => {
+      if (e.detail && e.detail.latitude !== undefined && e.detail.longitude !== undefined) {
+        setBuyerCoordinates({
+          latitude: e.detail.latitude.toString(),
+          longitude: e.detail.longitude.toString()
+        });
+      }
+    };
+
+    window.addEventListener('storage', syncLocation);
+    window.addEventListener('emahu_location_changed', handleCustomLoc);
+    return () => {
+      window.removeEventListener('storage', syncLocation);
+      window.removeEventListener('emahu_location_changed', handleCustomLoc);
+    };
+  }, []);
+
   // Load items from localstorage and backend
   const loadCheckoutData = useCallback(async () => {
     try {
       // Retrieve saved coordinates from localStorage if available
+      let foundCoords = false;
       const storedLoc = localStorage.getItem('emahu_buyer_location');
       if (storedLoc) {
         try {
           const parsed = JSON.parse(storedLoc);
           if (parsed && parsed.latitude !== undefined && parsed.longitude !== undefined) {
             setBuyerCoordinates({
-              latitude: parsed.latitude,
-              longitude: parsed.longitude
+              latitude: parsed.latitude.toString(),
+              longitude: parsed.longitude.toString()
             });
+            foundCoords = true;
           }
         } catch (e) { }
-      } else {
+      }
+      if (!foundCoords) {
         const storedCoords = localStorage.getItem('emahu_buyer_coordinates');
         if (storedCoords) {
           try {
-            setBuyerCoordinates(JSON.parse(storedCoords));
+            const parsed = JSON.parse(storedCoords);
+            if (parsed && parsed.latitude && parsed.longitude) {
+              setBuyerCoordinates({
+                latitude: parsed.latitude.toString(),
+                longitude: parsed.longitude.toString()
+              });
+              foundCoords = true;
+            }
           } catch (e) { }
         }
       }
@@ -764,7 +841,7 @@ export default function CheckoutPage() {
           setAddress(user.address || '');
           if (user.city) setCity(user.city);
           if (user.state) setStateName(user.state);
-          if (user.latitude && user.longitude) {
+          if (!foundCoords && user.latitude && user.longitude) {
             setBuyerCoordinates({
               latitude: user.latitude.toString(),
               longitude: user.longitude.toString()
@@ -846,7 +923,10 @@ export default function CheckoutPage() {
   const taxAmount = parseFloat((subtotal * 0.18).toFixed(2)); // 18% Emahu Tax
   const cgstAmount = parseFloat((subtotal * 0.09).toFixed(2));
   const sgstAmount = parseFloat((taxAmount - cgstAmount).toFixed(2));
-  const grandTotal = parseFloat((subtotal + shippingFee + taxAmount).toFixed(2));
+  const baseBillAmount = parseFloat((subtotal + shippingFee + taxAmount).toFixed(2));
+  const emahuFee = subtotal === 0 ? 0 : parseFloat((baseBillAmount * 0.04).toFixed(2));
+  const handlingFee = parseFloat((taxAmount + emahuFee).toFixed(2));
+  const grandTotal = parseFloat((baseBillAmount + emahuFee).toFixed(2));
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
@@ -947,7 +1027,9 @@ export default function CheckoutPage() {
       }
 
       const itemTaxAmount = Math.round(itemSubtotal * 0.18);
-      const itemGrandTotal = itemSubtotal + itemDeliveryFee + itemTaxAmount;
+      const itemBase = itemSubtotal + itemDeliveryFee + itemTaxAmount;
+      const itemEmahuFee = parseFloat((itemBase * 0.04).toFixed(2));
+      const itemGrandTotal = parseFloat((itemBase + itemEmahuFee).toFixed(2));
 
       let sellerId = 'default_seller';
       let sellerEmail = null;
@@ -1229,7 +1311,7 @@ export default function CheckoutPage() {
               {[
                 { label: 'Products Subtotal', val: `₹${subtotal.toLocaleString('en-IN')}` },
                 { label: 'Delivery Charges', val: shippingFee === 0 ? 'FREE' : `₹${shippingFee}` },
-                { label: `GST (CGST 9% + SGST 9%)`, val: `₹${taxAmount.toLocaleString('en-IN')}` },
+                { label: 'Handling Fees', val: `₹${Number(handlingFee).toFixed(2)}` },
               ].map(({ label, val }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b', marginBottom: '8px' }}>
                   <span>{label}</span><strong style={{ color: '#334155' }}>{val}</strong>
@@ -1639,84 +1721,38 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="co-breakdown-row">
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span>Distance Shipping (@ ₹4/KM)</span>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                        📏 {deliveryDistance > 0 ? `${deliveryDistance.toFixed(1)} KM` : '0.0 KM (Local Hub)'}
-                      </span>
-                    </span>
-                    <strong>₹{Number(totalDistanceCharge).toFixed(2)}</strong>
+                    <span>Delivery Charge</span>
+                    <strong>
+                      {deliveryCalculating ? (
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>calculating...</span>
+                      ) : (
+                        `₹${Number(shippingFee).toFixed(2)}`
+                      )}
+                    </strong>
                   </div>
 
-                  <div className="co-breakdown-row">
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span>Product Weight Shipping (@ ₹60/KG)</span>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                        ⚖️ {totalWeightKg > 0 ? `${totalWeightKg.toFixed(2)} kg` : '0.50 kg'}
-                      </span>
-                    </span>
-                    <strong>₹{Number(totalWeightCharge).toFixed(2)}</strong>
-                  </div>
-
-
-
-                  {deliveryBreakdown.length > 0 && (
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 12px', marginTop: '-4px', marginBottom: '4px' }}>
-                      <p style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                        {deliveryBreakdown.length > 1 ? 'Delivery per Package' : 'Delivery Detail'}
-                      </p>
+                  {shippingFee > 0 && deliveryBreakdown.length > 1 && (
+                    <div style={{ background: 'rgba(100,116,139,0.05)', borderRadius: '8px', padding: '10px', marginTop: '2px', marginBottom: '4px' }}>
+                      <p style={{ fontSize: '0.71rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Seller Breakdown</p>
                       {deliveryBreakdown.map((b, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: i < deliveryBreakdown.length - 1 ? '1px dashed #e2e8f0' : 'none' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                            <span style={{ fontSize: '0.76rem', fontWeight: '600', color: '#1e293b' }}>
-                              {deliveryBreakdown.length > 1 ? `📦 Package ${i + 1}` : '📦 Package'}
-                            </span>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                              {b.sellerName} · {b.distanceKm} km ({b.distanceCharge !== undefined ? `₹${b.distanceCharge}` : ''}) {b.weightKg > 0 ? `· ⚖️ ${b.weightKg} kg (₹${b.weightCharge})` : ''}
-                            </span>
-                          </div>
-                          <span style={{ fontSize: '0.82rem', fontWeight: '700', color: b.distanceKm > 20 ? '#dc2626' : '#059669' }}>
-                            {shippingFee === 0 ? 'FREE' : `₹${Number(b.deliveryCharge).toFixed(2)}`}
-                          </span>
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#475569', padding: '3px 0' }}>
+                          <span>{b.sellerName} — {b.distanceKm} km {b.weightKg > 0 ? `· ⚖️ ${b.weightKg} kg` : ''}</span>
+                          <span style={{ fontWeight: '600' }}>₹{b.deliveryCharge}</span>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  <div
-                    className="co-breakdown-row"
-                    onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                  >
-                    <span>Service Fees {showTaxBreakdown ? '▲' : '▼'}</span>
-                    <strong>₹{Number(taxAmount).toFixed(2)}</strong>
+                  <div className="co-breakdown-row">
+                    <span>Handling Fees</span>
+                    <strong>₹{Number(handlingFee).toFixed(2)}</strong>
                   </div>
-
-                  {showTaxBreakdown && (
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 12px', marginTop: '-4px', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', padding: '3px 0' }}>
-                        <span>CGST (9%)</span>
-                        <strong style={{ fontWeight: '600' }}>₹{Number(cgstAmount).toFixed(2)}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', padding: '3px 0' }}>
-                        <span>SGST (9%)</span>
-                        <strong style={{ fontWeight: '600' }}>₹{Number(sgstAmount).toFixed(2)}</strong>
-                      </div>
-                    </div>
-                  )}
-
-                  {deliveryDistance > 0 && (
-                    <div className="co-breakdown-row">
-                      <span>{deliveryBreakdown.length > 1 ? 'Max Package Distance' : 'Delivery Distance'}</span>
-                      <strong style={{ color: '#4169e1' }}>{deliveryDistance.toFixed(2)} km</strong>
-                    </div>
-                  )}
 
                   <div className="co-summary-divider" style={{ margin: '16px 0' }} />
 
                   <div className="co-breakdown-row co-breakdown-row--total">
                     <span>Total Amount</span>
-                    <strong>₹{grandTotal.toLocaleString('en-IN')}</strong>
+                    <strong>₹{grandTotal.toFixed(2)}</strong>
                   </div>
                 </div>
 
