@@ -166,6 +166,14 @@ exports.register = async (req, res) => {
       finalEmail = `${phone.trim()}@emahu.com`;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (finalEmail && !emailRegex.test(finalEmail)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a valid email address'
+      });
+    }
+
     // Admin role authorization verification passcode check
     if (role === 'admin') {
       const allowedAdminSecret = process.env.ADMIN_SIGNUP_SECRET || 'emahu_admin_secret_key_2026';
@@ -1391,6 +1399,10 @@ exports.sendOtp = async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid email address' });
+    }
     
     // Check if a registered user already exists with this email
     const query = { email: cleanEmail };

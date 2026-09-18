@@ -43,9 +43,10 @@ const sendEmail = async (options) => {
   const toEmail = cleanTo.toLowerCase();
   const isTestDomain = toEmail.endsWith('@emahu.com') || toEmail.endsWith('@example.com') || toEmail.endsWith('@test.com');
   const simulateFlag = process.env.SIMULATE_EMAIL === 'true';
+  const isDummyKey = !apiKey || apiKey === 're_123456789' || apiKey.includes('your_resend_api_key');
 
-  // If no API key is configured OR test domain OR SIMULATE_EMAIL is enabled → simulate send
-  if (!apiKey || isTestDomain || simulateFlag) {
+  // If no API key is configured OR dummy key OR test domain OR SIMULATE_EMAIL is enabled → simulate send
+  if (isDummyKey || isTestDomain || simulateFlag) {
     console.log(`ℹ️  Simulating email send (dev/test mode) to: ${options.to}`);
     return { success: true, simulated: true };
   }
@@ -69,6 +70,12 @@ const sendEmail = async (options) => {
 
     if (error) {
       console.error('❌ Resend API Error:', error);
+      const isInvalidKey = error.statusCode === 401 || (error.message || '').toLowerCase().includes('api key');
+      if (isInvalidKey) {
+        console.warn(`⚠️ RESEND_API_KEY is invalid or unauthorized. Simulating fallback email send for: ${options.to}`);
+        return { success: true, simulated: true, sandboxRestricted: true, warning: 'Invalid Resend API key' };
+      }
+
       const isSandbox = (error.message || '').includes('You can only send testing emails to your own email address') 
         || error.statusCode === 403 
         || (error.message || '').includes('Unable to fetch data')
@@ -86,6 +93,12 @@ const sendEmail = async (options) => {
 
   } catch (err) {
     console.error('❌ Resend SDK Exception:', err.message);
+    const isInvalidKey = (err.message || '').toLowerCase().includes('api key');
+    if (isInvalidKey) {
+      console.warn(`⚠️ RESEND_API_KEY exception: invalid key. Simulating fallback email send for: ${options.to}`);
+      return { success: true, simulated: true, sandboxRestricted: true, warning: 'Invalid Resend API key' };
+    }
+
     const isSandbox = (err.message || '').includes('You can only send testing emails to your own email address')
       || (err.message || '').includes('Unable to fetch data')
       || (err.message || '').includes('could not be resolved')
