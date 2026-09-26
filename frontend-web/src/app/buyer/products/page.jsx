@@ -30,6 +30,55 @@ const CATEGORY_IMAGES = {
   'automotive & tools': 'https://images.unsplash.com/photo-1530047139112-0494193b0148?w=400&q=80'
 };
 
+const STATIC_PARENT_MAP = {
+  'smartphones & tablets': 'Electronics & Tech',
+  'smartphones': 'Electronics & Tech',
+  'tablets': 'Electronics & Tech',
+  'computers & accessories': 'Electronics & Tech',
+  'computers': 'Electronics & Tech',
+  'audio & headphones': 'Electronics & Tech',
+  'audio': 'Electronics & Tech',
+  'cameras & photo': 'Electronics & Tech',
+  'smart devices': 'Electronics & Tech',
+  'men\'s clothing': 'Apparel & Fashion',
+  'women\'s clothing': 'Apparel & Fashion',
+  'kids\' clothing': 'Apparel & Fashion',
+  'jewelry & accessories': 'Apparel & Fashion',
+  'gym wear': 'Apparel & Fashion',
+  'outerwear': 'Apparel & Fashion',
+  'running shoes': 'Shoes & Footwear',
+  'hiking boots': 'Shoes & Footwear',
+  'sneakers': 'Shoes & Footwear',
+  'sandals': 'Shoes & Footwear',
+  'cookware': 'Kitchen & Dining',
+  'teaware': 'Kitchen & Dining',
+  'kitchen tools': 'Kitchen & Dining',
+  'tableware': 'Kitchen & Dining',
+  'furniture': 'Lifestyle & Home',
+  'home decor': 'Lifestyle & Home',
+  'aromatherapy': 'Lifestyle & Home',
+  'bedding & linen': 'Lifestyle & Home',
+  'skincare': 'Beauty & Cosmetics',
+  'makeup': 'Beauty & Cosmetics',
+  'fragrances': 'Beauty & Cosmetics',
+  'haircare': 'Beauty & Cosmetics',
+  'fitness gear': 'Sports & Outdoors',
+  'activewear': 'Sports & Outdoors',
+  'outdoor equipment': 'Sports & Outdoors',
+  'camping & hiking': 'Sports & Outdoors',
+  'fiction & literature': 'Books & Stationery',
+  'biographies': 'Books & Stationery',
+  'textbooks': 'Books & Stationery',
+  'stationery & journals': 'Books & Stationery',
+  'snacks & sweets': 'Grocery & Essentials',
+  'beverages': 'Grocery & Essentials',
+  'pantry staples': 'Grocery & Essentials',
+  'organic foods': 'Grocery & Essentials',
+  'board games': 'Toys & Games',
+  'puzzles': 'Toys & Games',
+  'educational toys': 'Toys & Games'
+};
+
 const FALLBACK_CATEGORY_TILES = [
   { label: 'Electronics & Tech', value: 'Electronics & Tech', img: CATEGORY_IMAGES['electronics & tech'] },
   { label: 'Apparel & Fashion', value: 'Apparel & Fashion', img: CATEGORY_IMAGES['apparel & fashion'] },
@@ -210,7 +259,7 @@ export default function ProductsPage() {
   const [serverWaking, setServerWaking] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [categoryTiles, setCategoryTiles] = useState(FALLBACK_CATEGORY_TILES);
-  const [categoryParentMap, setCategoryParentMap] = useState({});
+  const [categoryParentMap, setCategoryParentMap] = useState(STATIC_PARENT_MAP);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Category Slider Scroll Hooks & Logic
@@ -269,7 +318,7 @@ export default function ProductsPage() {
         const data = await res.json();
         if (data.success && data.data && data.data.length > 0) {
           // Dynamic category-parent mapping traversal
-          const parentMap = {};
+          const parentMap = { ...STATIC_PARENT_MAP };
           const traverse = (cats, rootName) => {
             cats.forEach(cat => {
               parentMap[cat.name.toLowerCase()] = rootName || cat.name;
@@ -371,29 +420,39 @@ export default function ProductsPage() {
   // Format database products to match buyer product dashboard structure
   const formattedDbProducts = useMemo(() => {
     return dbProducts.map(p => {
-      // Smart category mapping to align dynamic categories
-      let mappedCategory = p.category || 'Lifestyle & Home';
-      const cleanCat = mappedCategory.toLowerCase();
-      if (categoryParentMap[cleanCat]) {
+      // Smart category mapping to align dynamic categories accurately
+      let mappedCategory = p.category;
+
+      const cleanSub = (p.subcategory || '').toLowerCase().trim();
+      const cleanCat = (p.category || '').toLowerCase().trim();
+
+      // Prioritize subcategory mapping to find root category if subcategory is specific
+      if (cleanSub && cleanSub !== 'general' && categoryParentMap[cleanSub]) {
+        mappedCategory = categoryParentMap[cleanSub];
+      } else if (cleanCat && categoryParentMap[cleanCat]) {
         mappedCategory = categoryParentMap[cleanCat];
       } else {
-        const catLC = mappedCategory.toLowerCase();
-        if (catLC === 'electronics' || catLC === 'tech' || catLC === 'tech & gadgets' || catLC.includes('computer') || catLC.includes('audio') || catLC.includes('phone') || catLC.includes('tablet') || catLC.includes('headphone')) {
+        const catLC = (p.category || p.subcategory || '').toLowerCase();
+        if (catLC.includes('electronics') || catLC.includes('tech') || catLC.includes('computer') || catLC.includes('audio') || catLC.includes('phone') || catLC.includes('tablet') || catLC.includes('headphone')) {
           mappedCategory = 'Electronics & Tech';
-        } else if (catLC === 'apparel' || catLC === 'fashion' || catLC.includes('cloth') || catLC.includes('wear')) {
+        } else if (catLC.includes('apparel') || catLC.includes('fashion') || catLC.includes('cloth') || catLC.includes('wear')) {
           mappedCategory = 'Apparel & Fashion';
-        } else if (catLC === 'shoes' || catLC.includes('footwear') || catLC.includes('sneaker')) {
+        } else if (catLC.includes('shoes') || catLC.includes('footwear') || catLC.includes('sneaker')) {
           mappedCategory = 'Shoes & Footwear';
-        } else if (catLC === 'kitchen' || catLC.includes('dining') || catLC.includes('cookware')) {
+        } else if (catLC.includes('kitchen') || catLC.includes('dining') || catLC.includes('cookware')) {
           mappedCategory = 'Kitchen & Dining';
-        } else if (catLC === 'lifestyle' || catLC === 'fitness' || catLC === 'furniture' || catLC.includes('home')) {
+        } else if (catLC.includes('lifestyle') || catLC.includes('furniture') || catLC.includes('decor')) {
           mappedCategory = 'Lifestyle & Home';
-        } else if (catLC === 'grocery' || catLC === 'groceries' || catLC.includes('pantry') || catLC.includes('snack') || catLC.includes('sweet') || catLC.includes('food')) {
+        } else if (catLC.includes('grocery') || catLC.includes('groceries') || catLC.includes('pantry') || catLC.includes('snack') || catLC.includes('sweet') || catLC.includes('food')) {
           mappedCategory = 'Grocery & Essentials';
         } else if (catLC.includes('stationery') || catLC.includes('book') || catLC.includes('journal') || catLC.includes('paper')) {
           mappedCategory = 'Books & Stationery';
         } else if (catLC.includes('beauty') || catLC.includes('skin') || catLC.includes('cosmetic')) {
           mappedCategory = 'Beauty & Cosmetics';
+        } else if (catLC.includes('toy') || catLC.includes('game')) {
+          mappedCategory = 'Toys & Games';
+        } else if (!mappedCategory) {
+          mappedCategory = 'General';
         }
       }
 
@@ -819,18 +878,26 @@ export default function ProductsPage() {
       const catTarget = category.toLowerCase().trim();
       let synonyms = [catTarget];
       if (catTarget.includes('electronics') || catTarget.includes('tech')) {
-        synonyms.push('tech', 'electronic', 'gadget', 'computer', 'mobile', 'mouse', 'mice', 'keyboard', 'audio', 'headphone');
+        synonyms.push('electronics & tech', 'tech', 'electronic', 'gadget', 'computer', 'mobile', 'mouse', 'mice', 'keyboard', 'audio', 'headphone', 'phone', 'tablet', 'smartphone', 'smartphones & tablets');
+      } else if (catTarget.includes('beauty') || catTarget.includes('cosmetics')) {
+        synonyms.push('beauty & cosmetics', 'beauty', 'cosmetics', 'makeup', 'skincare', 'fragrance');
+      } else if (catTarget.includes('books') || catTarget.includes('stationery')) {
+        synonyms.push('books & stationery', 'books', 'stationery', 'paper', 'journal');
+      } else if (catTarget.includes('grocery') || catTarget.includes('essentials')) {
+        synonyms.push('grocery & essentials', 'grocery', 'groceries', 'pantry', 'snack', 'food');
+      } else if (catTarget.includes('lifestyle') || catTarget.includes('home')) {
+        synonyms.push('lifestyle & home', 'lifestyle', 'home', 'furniture', 'decor');
+      } else if (catTarget.includes('shoes') || catTarget.includes('footwear')) {
+        synonyms.push('shoes & footwear', 'shoes', 'footwear', 'sneakers', 'sandals');
+      } else if (catTarget.includes('apparel') || catTarget.includes('fashion')) {
+        synonyms.push('apparel & fashion', 'apparel', 'fashion', 'clothing', 'wear');
       }
 
-      const filteredByCat = items.filter(p => {
+      items = items.filter(p => {
         const pCat = (p.category || '').toLowerCase().trim();
         const pSub = (p.subcategory || '').toLowerCase().trim();
-        const pName = (p.name || '').toLowerCase().trim();
-        return synonyms.some(s => pCat.includes(s) || s.includes(pCat) || pSub.includes(s) || pName.includes(s));
+        return synonyms.some(s => pCat.includes(s) || s.includes(pCat) || pSub.includes(s) || s.includes(pSub));
       });
-      if (filteredByCat.length > 0) {
-        items = filteredByCat;
-      }
     }
     if (selectedShop !== 'All Shops') items = items.filter(p => p.sellerStore === selectedShop || p.brand === selectedShop);
     if (activeSubcategory !== 'All' && !activeSubcategory.startsWith('All')) {

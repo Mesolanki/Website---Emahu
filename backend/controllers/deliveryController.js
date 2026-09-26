@@ -188,10 +188,12 @@ exports.updateDeliverySettings = async (req, res) => {
   }
 };
 
-// Helper function to resolve delivery charge based on distance (₹4/KM) and weight (₹60/KG)
+// Helper function to resolve delivery charge based on distance (₹4/KM) and weight
 function resolveCharge(distance, productTotal, totalWeightKg = 0, settings) {
   const distanceCharge = parseFloat(((distance || 0) * 4).toFixed(2));
-  const weightCharge = parseFloat(((totalWeightKg || 0) * 60).toFixed(2));
+  // Weight surcharge only applies if total shipment weight exceeds 3kg heavy threshold
+  const excessWeightKg = Math.max(0, (totalWeightKg || 0) - 3);
+  const weightCharge = parseFloat((excessWeightKg * 20).toFixed(2));
   const charge = parseFloat((distanceCharge + weightCharge).toFixed(2));
   return {
     charge,
@@ -241,6 +243,8 @@ exports.calculateDeliveryCharge = async (req, res) => {
 
     // Process items. Group them by seller for distance-based delivery charge
     const sellerGroups = {};
+    let totalCartSubtotal = 0;
+    let totalCartWeightKg = 0;
 
     for (const item of cartItems) {
       const prodId = item.productId || item.id;
@@ -281,8 +285,12 @@ exports.calculateDeliveryCharge = async (req, res) => {
 
       if (!sellerGroups[sId].totalWeightKg) sellerGroups[sId].totalWeightKg = 0;
       sellerGroups[sId].totalWeightKg += totalItemWeight;
+      totalCartWeightKg += totalItemWeight;
 
-      sellerGroups[sId].subtotal += product.price * qty;
+      const itemSubtotal = product.price * qty;
+      sellerGroups[sId].subtotal += itemSubtotal;
+      totalCartSubtotal += itemSubtotal;
+
       sellerGroups[sId].items.push({
         productId: prodId,
         name: product.name,
@@ -295,13 +303,10 @@ exports.calculateDeliveryCharge = async (req, res) => {
     }
 
     let maxDistance = 0;
-    let maxDistanceSellerId = null;
     const sellerDistances = {};
 
     for (const sId in sellerGroups) {
       const group = sellerGroups[sId];
-
-      // Default fallback if seller has no coordinates: Ahmedabad (23.0225, 72.5714)
       const sLat = group.sellerLat !== undefined ? group.sellerLat : 23.0225;
       const sLon = group.sellerLon !== undefined ? group.sellerLon : 72.5714;
 
@@ -313,31 +318,25 @@ exports.calculateDeliveryCharge = async (req, res) => {
       }
     }
 
-    let totalDeliveryCharge = 0;
+    // Single unified shipment delivery charge
+    const overallChargeResult = resolveCharge(maxDistance, totalCartSubtotal, totalCartWeightKg, settings);
+    const totalDeliveryCharge = overallChargeResult.charge;
+
+    const numSellers = Object.keys(sellerGroups).length || 1;
+    const perSellerCharge = parseFloat((totalDeliveryCharge / numSellers).toFixed(2));
 
     for (const sId in sellerGroups) {
       const group = sellerGroups[sId];
       const distance = sellerDistances[sId];
-
-      const chargeResult = resolveCharge(distance, group.subtotal, group.totalWeightKg, settings);
-      if (chargeResult.error) {
-        return res.status(400).json({
-          success: false,
-          error: `Delivery calculation failed for seller "${group.sellerName}": ${chargeResult.error}`
-        });
-      }
-
-      const sellerCharge = chargeResult.charge;
-      totalDeliveryCharge += sellerCharge;
 
       results.push({
         sellerId: sId,
         sellerName: group.sellerName,
         distanceKm: parseFloat(distance.toFixed(2)),
         weightKg: parseFloat((group.totalWeightKg || 0).toFixed(3)),
-        distanceCharge: chargeResult.distanceCharge,
-        weightCharge: chargeResult.weightCharge,
-        deliveryCharge: sellerCharge,
+        distanceCharge: overallChargeResult.distanceCharge,
+        weightCharge: overallChargeResult.weightCharge,
+        deliveryCharge: perSellerCharge,
         subtotal: group.subtotal,
         items: group.items
       });

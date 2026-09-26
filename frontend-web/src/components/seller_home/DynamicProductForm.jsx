@@ -989,6 +989,38 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
           </div>
         </div>
 
+        {/* Admin Feedback / Requested Changes Banner */}
+        {resubmitProductId && (() => {
+          const prodToEdit = products.find(p => String(p.id || p._id) === String(resubmitProductId));
+          if (prodToEdit && prodToEdit.rejectionReason) {
+            const isReqChanges = prodToEdit.approvalStatus === 'changes_requested';
+            return (
+              <div style={{
+                background: isReqChanges ? 'rgba(245, 158, 11, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                borderBottom: isReqChanges ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
+                color: isReqChanges ? '#f59e0b' : '#ef4444',
+                padding: '12px 24px',
+                fontSize: '0.88rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <span style={{ fontSize: '1.2rem' }}>{isReqChanges ? '📝' : '⚠️'}</span>
+                <div>
+                  <strong style={{ fontWeight: '700' }}>
+                    {isReqChanges ? 'Requested Changes from Admin:' : 'Reason for Rejection:'}
+                  </strong>{' '}
+                  {prodToEdit.rejectionReason}
+                  <div style={{ fontSize: '0.78rem', marginTop: '2px', opacity: 0.9 }}>
+                    Please review and update the listing details below, then click "Submit Listing" to send it back to Admin for review.
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
+
         {/* Restore draft banner */}
         {restoreDraftBanner && (
           <div style={{ background: '#f59e0b', color: '#000', padding: '10px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>

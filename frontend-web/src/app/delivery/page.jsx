@@ -33,6 +33,11 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
 
 export default function DeliveryPortal() {
   const formSectionRef = useRef(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // --- Session State ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -288,6 +293,40 @@ export default function DeliveryPortal() {
     }
   }, []);
 
+  // Sync delivery user profile with backend periodically so admin approvals update status live
+  useEffect(() => {
+    const syncProfile = async () => {
+      const storedToken = typeof window !== 'undefined' ? localStorage.getItem('emahu_delivery_token') : null;
+      if (!storedToken) return;
+      try {
+        const res = await fetch(`${getDynamicApiUrl()}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${storedToken}`
+          }
+        });
+        const data = await res.json();
+        if (data.success && data.user) {
+          setUser(data.user);
+          localStorage.setItem('emahu_delivery_user', JSON.stringify(data.user));
+          if (!isLoggedIn) {
+            setIsLoggedIn(true);
+            setToken(storedToken);
+            setPortalMode('dashboard');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to sync delivery user profile:', err);
+      }
+    };
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('emahu_delivery_token') : null;
+    if (isLoggedIn || token) {
+      syncProfile();
+      const interval = setInterval(syncProfile, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn]);
+
   // Leaflet CDNs lazy loader
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -314,32 +353,83 @@ export default function DeliveryPortal() {
     if (!userToken) return;
     setDashLoading(true);
     try {
-      const res = await fetch(`${getDynamicApiUrl()}/api/delivery/my-orders`, {
-        headers: {
-          'Authorization': `Bearer ${userToken}`
+      let apiJobs = [];
+      let apiAvailable = [];
+      try {
+        const res = await fetch(`${getDynamicApiUrl()}/api/delivery/my-orders`, {
+          headers: {
+            'Authorization': `Bearer ${userToken}`
+          }
+        });
+        const data = await res.json();
+        if (data.success) {
+          apiJobs = data.orders || [];
+          apiAvailable = data.availableOrders || [];
+        }
+      } catch (err) {
+        console.warn('API delivery my-orders failed:', err);
+      }
+
+      // Check localStorage 'emahu_orders' for real-time seller requests & buyer orders
+      let localOrders = [];
+      try {
+        const rawLocal = localStorage.getItem('emahu_orders');
+        if (rawLocal) localOrders = JSON.parse(rawLocal);
+      } catch (e) {}
+
+      // Combine API jobs with localOrders without duplicate orderId
+      const jobsMap = new Map();
+      apiJobs.forEach(j => jobsMap.set(j.orderId, j));
+
+      localOrders.forEach(o => {
+        if (!o.orderId) return;
+        const currentPartnerId = user?._id || user?.id || '';
+        const isAssignedToMe = (o.deliveryPartnerId && currentPartnerId && o.deliveryPartnerId.toString() === currentPartnerId.toString()) ||
+          (o.carrier && (o.carrier.toLowerCase().includes(user?.name?.toLowerCase() || 'partner') || o.carrier.toLowerCase().includes('sd')));
+
+        if (isAssignedToMe || jobsMap.has(o.orderId)) {
+          const existing = jobsMap.get(o.orderId) || {};
+          const mergedObj = {
+            ...o,
+            ...existing,
+            deliveryStatus: existing.deliveryStatus || o.deliveryStatus || 'assigned',
+            assignmentStatus: existing.assignmentStatus || o.assignmentStatus || 'assigned'
+          };
+          jobsMap.set(o.orderId, mergedObj);
         }
       });
-      const data = await res.json();
-      if (data.success) {
-        const jobs = data.orders || [];
-        setOrders(jobs);
-        setAvailableOrders(data.availableOrders || []);
 
-        // Calculate Stats
-        const deliveredJobs = jobs.filter(j => j.deliveryStatus === 'delivered');
-        const pendingJobs = jobs.filter(j => j.deliveryStatus !== 'delivered' && j.deliveryStatus !== 'rejected');
+      const mergedJobs = Array.from(jobsMap.values());
+      setOrders(mergedJobs);
 
-        const totalEarnings = deliveredJobs.reduce((acc, curr) => {
-          const cost = curr.deliveryCost !== undefined ? curr.deliveryCost : (curr.distanceKm || 0) * 4;
-          return acc + cost;
-        }, 0);
+      // Process Available Orders (unassigned orders)
+      const availMap = new Map();
+      apiAvailable.forEach(a => availMap.set(a.orderId, a));
 
-        setStats({
-          total: jobs.length,
-          pending: pendingJobs.length,
-          earnings: parseFloat(totalEarnings.toFixed(2))
-        });
-      }
+      localOrders.forEach(o => {
+        if (!o.orderId) return;
+        const isUnassigned = !o.deliveryPartnerId && (o.deliveryStatus === 'unassigned' || !o.deliveryStatus);
+        const isAvailableStatus = ['APPROVED', 'LABEL_GENERATED', 'READY_FOR_PICKUP', 'PENDING_APPROVAL'].includes(o.status);
+        if (isUnassigned && isAvailableStatus && !jobsMap.has(o.orderId)) {
+          availMap.set(o.orderId, o);
+        }
+      });
+      setAvailableOrders(Array.from(availMap.values()));
+
+      // Calculate Stats
+      const deliveredJobs = mergedJobs.filter(j => j.deliveryStatus === 'delivered' || j.deliveryStatus === 'completed');
+      const pendingJobs = mergedJobs.filter(j => j.deliveryStatus !== 'delivered' && j.deliveryStatus !== 'completed' && j.deliveryStatus !== 'rejected');
+
+      const totalEarnings = deliveredJobs.reduce((acc, curr) => {
+        const cost = curr.deliveryCharge !== undefined ? curr.deliveryCharge : (curr.deliveryCost !== undefined ? curr.deliveryCost : (curr.distanceKm || 0) * 4);
+        return acc + cost;
+      }, 0);
+
+      setStats({
+        total: mergedJobs.length,
+        pending: pendingJobs.length,
+        earnings: parseFloat(totalEarnings.toFixed(2))
+      });
     } catch (err) {
       console.error('Fetch dashboard jobs failed:', err);
     } finally {
@@ -347,10 +437,15 @@ export default function DeliveryPortal() {
     }
   };
 
-  // Socket.io integration for real-time order alerts
+  // Socket.io & LocalStorage integration for real-time order alerts
   useEffect(() => {
     if (!token) return;
     fetchDashboardData(token);
+
+    const handleStorage = () => {
+      fetchDashboardData(token);
+    };
+    window.addEventListener('storage', handleStorage);
 
     const getSocketUrl = () => {
       return localApiUrl;
@@ -362,11 +457,11 @@ export default function DeliveryPortal() {
 
     socket.on('delivery-status-changed', (payload) => {
       console.log('Received socket status update:', payload);
-      // Refresh dashboard
       fetchDashboardData(token);
     });
 
     return () => {
+      window.removeEventListener('storage', handleStorage);
       socket.disconnect();
     };
   }, [token]);
@@ -622,16 +717,16 @@ export default function DeliveryPortal() {
 
     // Category-specific validations
     if (regCategory === 'single_two_boy') {
-      if (!deliveryName.trim()) newErrors.deliveryName = 'Driver Name is required';
+      if (!deliveryName.trim()) newErrors.deliveryName = 'Driver Name / Company Name is required';
       if (!vehicleNumber.trim()) newErrors.vehicleNumber = 'Vehicle registration number is required';
     } else if (regCategory === 'agency') {
-      if (!deliveryName.trim()) newErrors.deliveryName = 'Agency Name is required';
+      if (!deliveryName.trim()) newErrors.deliveryName = 'Driver Name / Company Name is required';
       if (!ownerName.trim()) newErrors.ownerName = 'Owner/Manager Name is required';
       if (!fleetSize.trim() || isNaN(fleetSize) || Number(fleetSize) <= 0) {
         newErrors.fleetSize = 'Enter a valid number of employees';
       }
     } else if (regCategory === 'partner') {
-      if (!deliveryName.trim()) newErrors.deliveryName = 'Company Name is required';
+      if (!deliveryName.trim()) newErrors.deliveryName = 'Driver Name / Company Name is required';
       if (!contactName.trim()) newErrors.contactName = 'Corporate Contact Name is required';
       if (!gstNumber.trim()) newErrors.gstNumber = 'GSTIN is required';
       if (!fleetSize.trim() || isNaN(fleetSize) || Number(fleetSize) < 50) {
@@ -685,16 +780,16 @@ export default function DeliveryPortal() {
 
     // Category-specific validations
     if (regCategory === 'single_two_boy') {
-      if (!deliveryName.trim()) newErrors.deliveryName = 'Driver Name is required';
+      if (!deliveryName.trim()) newErrors.deliveryName = 'Driver Name / Company Name is required';
       if (!vehicleNumber.trim()) newErrors.vehicleNumber = 'Vehicle registration number is required';
     } else if (regCategory === 'agency') {
-      if (!deliveryName.trim()) newErrors.deliveryName = 'Agency Name is required';
+      if (!deliveryName.trim()) newErrors.deliveryName = 'Driver Name / Company Name is required';
       if (!ownerName.trim()) newErrors.ownerName = 'Owner/Manager Name is required';
       if (!fleetSize.trim() || isNaN(fleetSize) || Number(fleetSize) <= 0) {
         newErrors.fleetSize = 'Enter a valid number of employees';
       }
     } else if (regCategory === 'partner') {
-      if (!deliveryName.trim()) newErrors.deliveryName = 'Company Name is required';
+      if (!deliveryName.trim()) newErrors.deliveryName = 'Driver Name / Company Name is required';
       if (!contactName.trim()) newErrors.contactName = 'Corporate Contact Name is required';
       if (!gstNumber.trim()) newErrors.gstNumber = 'GSTIN is required';
       if (!fleetSize.trim() || isNaN(fleetSize) || Number(fleetSize) < 50) {
@@ -1420,8 +1515,18 @@ export default function DeliveryPortal() {
   }, [leafletLoaded, activeOrder?._id, simCoordinates, user?.latitude, user?.longitude, activeTab]);
 
   // --- Rendering ---
+  if (!isMounted) {
+    return (
+      <div className="lp-wrapper" suppressHydrationWarning={true}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#64748b' }}>
+          Loading Delivery Portal...
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="lp-wrapper">
+    <div className="lp-wrapper" suppressHydrationWarning={true}>
       <div className="lp-glow lp-glow--1" />
       <div className="lp-glow lp-glow--2" />
 
@@ -1449,6 +1554,7 @@ export default function DeliveryPortal() {
             ) : (
               <>
                 <button
+                  suppressHydrationWarning={true}
                   onClick={() => setPortalMode(portalMode === 'register' ? 'login' : 'register')}
                   className="lp-nav-link-btn active"
                   style={{
@@ -1485,6 +1591,7 @@ export default function DeliveryPortal() {
               <div className="category-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '24px', background: '#f1f5f9', padding: '6px', borderRadius: '12px' }}>
                 <button
                   type="button"
+                  suppressHydrationWarning={true}
                   onClick={() => setRegCategory('single_two_boy')}
                   style={{
                     flex: 1,
@@ -1505,6 +1612,7 @@ export default function DeliveryPortal() {
                 </button>
                 <button
                   type="button"
+                  suppressHydrationWarning={true}
                   onClick={() => setRegCategory('agency')}
                   style={{
                     flex: 2,
@@ -1525,6 +1633,7 @@ export default function DeliveryPortal() {
                 </button>
                 <button
                   type="button"
+                  suppressHydrationWarning={true}
                   onClick={() => setRegCategory('partner')}
                   style={{
                     flex: 1,
@@ -1546,7 +1655,7 @@ export default function DeliveryPortal() {
               </div>
 
               {!submitted ? (
-                <form className="lp-form" onSubmit={handleRegisterSubmit} noValidate>
+                <form className="lp-form" onSubmit={handleRegisterSubmit} noValidate suppressHydrationWarning={true}>
                   {errors.apiError && (
                     <div className="form-alert-error">⚠️ {errors.apiError}</div>
                   )}
@@ -1566,15 +1675,15 @@ export default function DeliveryPortal() {
                     <div className="form-grid">
                       <div className="form-group">
                         <label className="form-label" htmlFor="deliveryName">
-                          {regCategory === 'single_two_boy' ? 'Driver Name' :
-                            regCategory === 'agency' ? 'Agency / Area / City / State Head Name' : 'Company Name'}
+                          Driver Name / Company Name
                         </label>
                         <input
+                          suppressHydrationWarning={true}
                           type="text"
                           id="deliveryName"
                           className={`form-input ${errors.deliveryName ? 'form-input--error' : ''}`}
                           placeholder={
-                            regCategory === 'single_two_boy' ? 'e.g. Rahul Sharma' :
+                            regCategory === 'single_two_boy' ? 'e.g. Rahul Sharma / Express Logistics' :
                               regCategory === 'agency' ? 'e.g. Express Agency / Area Head' : 'e.g. EmahuXpress Enterprise'
                           }
                           value={deliveryName}
@@ -1588,6 +1697,7 @@ export default function DeliveryPortal() {
                         <div className="form-group">
                           <label className="form-label" htmlFor="ownerName">Owner / Manager Name</label>
                           <input
+                            suppressHydrationWarning={true}
                             type="text"
                             id="ownerName"
                             className={`form-input ${errors.ownerName ? 'form-input--error' : ''}`}
@@ -1604,6 +1714,7 @@ export default function DeliveryPortal() {
                         <div className="form-group">
                           <label className="form-label" htmlFor="contactName">Corporate Contact Name</label>
                           <input
+                            suppressHydrationWarning={true}
                             type="text"
                             id="contactName"
                             className={`form-input ${errors.contactName ? 'form-input--error' : ''}`}
@@ -1620,6 +1731,7 @@ export default function DeliveryPortal() {
                         <div className="form-group">
                           <label className="form-label" htmlFor="gstNumber">GSTIN / Business Reg Number</label>
                           <input
+                            suppressHydrationWarning={true}
                             type="text"
                             id="gstNumber"
                             className={`form-input ${errors.gstNumber ? 'form-input--error' : ''}`}
@@ -1638,6 +1750,7 @@ export default function DeliveryPortal() {
                         </label>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <input
+                            suppressHydrationWarning={true}
                             type="text"
                             id="phoneNumber"
                             className={`form-input ${errors.phoneNumber ? 'form-input--error' : ''}`}
@@ -1651,6 +1764,7 @@ export default function DeliveryPortal() {
                           {!isEmailVerified && (
                             <button
                               type="button"
+                              suppressHydrationWarning={true}
                               className="form-btn"
                               style={{ padding: '0 12px', height: '40px', fontSize: '0.78rem', background: '#319795', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap', width: 'auto', margin: 0 }}
                               onClick={handleSendEmailOtp}
@@ -1668,6 +1782,7 @@ export default function DeliveryPortal() {
                             <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>Verification Code</label>
                             <div style={{ display: 'flex', gap: '8px' }}>
                               <input
+                                suppressHydrationWarning={true}
                                 type="text"
                                 className="form-input"
                                 placeholder="Enter 6-digit OTP"
@@ -1677,6 +1792,7 @@ export default function DeliveryPortal() {
                               />
                               <button
                                 type="button"
+                                suppressHydrationWarning={true}
                                 className="form-btn"
                                 style={{ padding: '0 12px', height: '36px', fontSize: '0.78rem', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', width: 'auto', margin: 0 }}
                                 onClick={handleVerifyEmailOtp}
@@ -1702,6 +1818,7 @@ export default function DeliveryPortal() {
                             {regCategory === 'partner' ? 'Number of Employees (Min 50+ Required)' : 'Number of Employees'}
                           </label>
                           <input
+                            suppressHydrationWarning={true}
                             type="text"
                             inputMode="numeric"
                             id="fleetSize"
@@ -1717,6 +1834,7 @@ export default function DeliveryPortal() {
                       <div className="form-group">
                         <label className="form-label" htmlFor="password">Create a Password</label>
                         <input
+                          suppressHydrationWarning={true}
                           type="password"
                           id="password"
                           className={`form-input ${errors.password ? 'form-input--error' : ''}`}
@@ -1730,6 +1848,7 @@ export default function DeliveryPortal() {
                       <div className="form-group">
                         <label className="form-label" htmlFor="email">Email Address</label>
                         <input
+                          suppressHydrationWarning={true}
                           type="email"
                           id="email"
                           className={`form-input ${errors.email ? 'form-input--error' : ''}`}
@@ -1743,6 +1862,7 @@ export default function DeliveryPortal() {
                       <div className="form-group form-group--full">
                         <label className="form-label" htmlFor="address">Street Address (HQ / Office)</label>
                         <input
+                          suppressHydrationWarning={true}
                           type="text"
                           id="address"
                           className={`form-input ${errors.address ? 'form-input--error' : ''}`}
@@ -1798,6 +1918,7 @@ export default function DeliveryPortal() {
                       <div className="form-group">
                         <label className="form-label" htmlFor="deliveryScope">Delivery Partner Category</label>
                         <select
+                          suppressHydrationWarning={true}
                           id="deliveryScope"
                           className="form-input"
                           value={deliveryScope}
@@ -1823,6 +1944,7 @@ export default function DeliveryPortal() {
                           </label>
                           {regCategory === 'single_two_boy' ? (
                             <select
+                              suppressHydrationWarning={true}
                               id="serviceAreaState"
                               className={`form-input ${errors.serviceAreaState ? 'form-input--error' : ''}`}
                               value={serviceAreaState}
@@ -1838,6 +1960,7 @@ export default function DeliveryPortal() {
                             </select>
                           ) : (
                             <select
+                              suppressHydrationWarning={true}
                               id="serviceAreaState"
                               className={`form-input ${errors.serviceAreaState ? 'form-input--error' : ''}`}
                               value=""
@@ -1864,6 +1987,7 @@ export default function DeliveryPortal() {
                                   {st}
                                   <button
                                     type="button"
+                                    suppressHydrationWarning={true}
                                     onClick={() => {
                                       const updatedStates = selectedStates.filter(s => s !== st);
                                       setSelectedStates(updatedStates);
@@ -1889,6 +2013,7 @@ export default function DeliveryPortal() {
                           </label>
                           {regCategory === 'single_two_boy' ? (
                             <select
+                              suppressHydrationWarning={true}
                               id="citySelect"
                               className={`form-input ${errors.coveredCities ? 'form-input--error' : ''}`}
                               value={coveredCities[0] || ""}
@@ -1909,6 +2034,7 @@ export default function DeliveryPortal() {
                             </select>
                           ) : (
                             <select
+                              suppressHydrationWarning={true}
                               id="citySelect"
                               className={`form-input ${errors.coveredCities ? 'form-input--error' : ''}`}
                               value=""
@@ -1946,6 +2072,7 @@ export default function DeliveryPortal() {
                                   {city}
                                   <button
                                     type="button"
+                                    suppressHydrationWarning={true}
                                     onClick={() => setCoveredCities(coveredCities.filter(c => c !== city))}
                                     style={{ border: 'none', background: 'transparent', color: '#feb2b2', cursor: 'pointer', fontSize: '0.75rem', padding: 0, marginLeft: '2px', fontWeight: 'bold' }}
                                   >
@@ -1961,6 +2088,7 @@ export default function DeliveryPortal() {
                       <div className="form-group">
                         <label className="form-label" htmlFor="currentArea">Service Area</label>
                         <input
+                          suppressHydrationWarning={true}
                           type="text"
                           id="currentArea"
                           className={`form-input ${errors.currentArea ? 'form-input--error' : ''}`}
@@ -1974,6 +2102,7 @@ export default function DeliveryPortal() {
                       <div className="form-group">
                         <label className="form-label" htmlFor="pincode">Pincode</label>
                         <input
+                          suppressHydrationWarning={true}
                           type="text"
                           id="pincode"
                           className={`form-input ${errors.pincode ? 'form-input--error' : ''}`}
@@ -1990,6 +2119,7 @@ export default function DeliveryPortal() {
                             regCategory === 'agency' ? 'Max Service Radius (KM)' : 'Coverage Radius (KM)'}
                         </label>
                         <input
+                          suppressHydrationWarning={true}
                           type="text"
                           inputMode="numeric"
                           id="serviceRadius"
@@ -2004,6 +2134,7 @@ export default function DeliveryPortal() {
                       <div className="form-group">
                         <label className="form-label" htmlFor="perKmRate">Rate per Kilometer (₹)</label>
                         <input
+                          suppressHydrationWarning={true}
                           type="text"
                           inputMode="numeric"
                           id="perKmRate"
@@ -2022,6 +2153,7 @@ export default function DeliveryPortal() {
                             regCategory === 'agency' ? 'Agency Remarks & Capacity Notes' : 'Corporate Remarks & SLA Notes'}
                         </label>
                         <textarea
+                          suppressHydrationWarning={true}
                           id="dispatchNotes"
                           className={`form-textarea ${errors.dispatchNotes ? 'form-input--error' : ''}`}
                           placeholder={
@@ -2539,25 +2671,36 @@ export default function DeliveryPortal() {
                         </thead>
                         <tbody>
                           {assignedRequests.map((order) => {
-                            const payout = order.deliveryCharge || parseFloat(((order.distanceKm || 0) * 4).toFixed(2));
+                            const payout = order.deliveryCharge !== undefined ? order.deliveryCharge : parseFloat(((order.distanceKm || 0) * 4).toFixed(2));
+                            const distance = order.distanceKm !== undefined ? order.distanceKm : (order.deliveryCharge ? parseFloat((order.deliveryCharge / 4).toFixed(2)) : 2.18);
+                            const sellerShopName = order.sellerLocation?.shopName || order.sellerName || order.sellerEmail || 'Seller Store';
+                            const sellerShopAddr = order.sellerLocation?.address || order.sellerAddress || 'Seller Hub Address';
+                            const buyerName = order.deliveryAddress?.fullName || 'Customer';
+                            const buyerFullAddr = [
+                              order.deliveryAddress?.address,
+                              order.deliveryAddress?.city,
+                              order.deliveryAddress?.stateName,
+                              order.deliveryAddress?.pincode
+                            ].filter(Boolean).join(', ') || order.buyerLocation?.address || 'Customer Dropoff Address';
+
                             return (
                               <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
                                 <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
                                 <td style={{ padding: '12px' }}>
                                   <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: '600' }}>
-                                    <strong>Pickup (Merchant):</strong> {order.sellerName || order.sellerLocation?.shopName || 'Seller Store'}
+                                    <strong>Pickup (Merchant):</strong> {sellerShopName}
                                   </div>
                                   <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                                    {order.sellerLocation?.address || 'Seller Hub Address'}
+                                    {sellerShopAddr}
                                   </div>
                                   <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: '600', marginTop: '6px' }}>
-                                    <strong>Dropoff (Customer):</strong> {order.deliveryAddress?.fullName || 'Customer'}
+                                    <strong>Dropoff (Customer):</strong> {buyerName}
                                   </div>
                                   <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                                    {order.deliveryAddress?.address || order.buyerLocation?.address}
+                                    {buyerFullAddr}
                                   </div>
                                 </td>
-                                <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
+                                <td style={{ padding: '12px', fontWeight: 600 }}>{distance} KM</td>
                                 <td style={{ padding: '12px' }}>
                                   <div style={{ fontWeight: 800, color: '#319795', fontSize: '0.95rem' }}>₹{payout}</div>
                                   <div style={{ fontSize: '0.7rem', color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #bbf7d0', padding: '2px 7px', borderRadius: '4px', display: 'inline-block', marginTop: '4px', fontWeight: '700' }}>
@@ -2567,7 +2710,7 @@ export default function DeliveryPortal() {
                                 <td style={{ padding: '12px', textAlign: 'right' }}>
                                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
                                     <button
-                                      onClick={() => setSelectedJobForAccept({ ...order, payout })}
+                                      onClick={() => setSelectedJobForAccept({ ...order, distanceKm: distance, payout, sellerName: sellerShopName, sellerLocation: { ...order.sellerLocation, shopName: sellerShopName, address: sellerShopAddr }, deliveryAddress: { ...order.deliveryAddress, fullName: buyerName, address: buyerFullAddr } })}
                                       className="lp-btn lp-btn--primary"
                                       disabled={!!activeOrder}
                                       style={{
@@ -2626,25 +2769,36 @@ export default function DeliveryPortal() {
                       </thead>
                       <tbody>
                         {availableOrders.map((order) => {
-                          const payout = order.deliveryCharge || parseFloat(((order.distanceKm || 0) * 4).toFixed(2));
+                          const payout = order.deliveryCharge !== undefined ? order.deliveryCharge : parseFloat(((order.distanceKm || 0) * 4).toFixed(2));
+                          const distance = order.distanceKm !== undefined ? order.distanceKm : (order.deliveryCharge ? parseFloat((order.deliveryCharge / 4).toFixed(2)) : 2.18);
+                          const sellerShopName = order.sellerLocation?.shopName || order.sellerName || order.sellerEmail || 'Seller Store';
+                          const sellerShopAddr = order.sellerLocation?.address || order.sellerAddress || 'Seller Hub Address';
+                          const buyerName = order.deliveryAddress?.fullName || 'Customer';
+                          const buyerFullAddr = [
+                            order.deliveryAddress?.address,
+                            order.deliveryAddress?.city,
+                            order.deliveryAddress?.stateName,
+                            order.deliveryAddress?.pincode
+                          ].filter(Boolean).join(', ') || order.buyerLocation?.address || 'Customer Dropoff Address';
+
                           return (
                             <tr key={order.orderId} style={{ borderBottom: '1px solid #edf2f7', fontSize: '0.9rem' }}>
                               <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>#{order.orderId}</td>
                               <td style={{ padding: '12px' }}>
                                 <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: '600' }}>
-                                  <strong>Pickup (Merchant):</strong> {order.sellerName || order.sellerLocation?.shopName || 'Seller Store'}
+                                  <strong>Pickup (Merchant):</strong> {sellerShopName}
                                 </div>
                                 <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                                  {order.sellerLocation?.address || 'Seller Hub Address'}
+                                  {sellerShopAddr}
                                 </div>
                                 <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: '600', marginTop: '6px' }}>
-                                  <strong>Dropoff (Customer):</strong> {order.deliveryAddress?.fullName || 'Customer'}
+                                  <strong>Dropoff (Customer):</strong> {buyerName}
                                 </div>
                                 <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                                  {order.deliveryAddress?.address || order.buyerLocation?.address}
+                                  {buyerFullAddr}
                                 </div>
                               </td>
-                              <td style={{ padding: '12px', fontWeight: 600 }}>{order.distanceKm || 0} KM</td>
+                              <td style={{ padding: '12px', fontWeight: 600 }}>{distance} KM</td>
                               <td style={{ padding: '12px' }}>
                                 <div style={{ fontWeight: 800, color: '#319795', fontSize: '0.95rem' }}>₹{payout}</div>
                                 <div style={{ fontSize: '0.7rem', color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #bbf7d0', padding: '2px 7px', borderRadius: '4px', display: 'inline-block', marginTop: '4px', fontWeight: '700' }}>
@@ -2653,7 +2807,7 @@ export default function DeliveryPortal() {
                               </td>
                               <td style={{ padding: '12px', textAlign: 'right' }}>
                                 <button
-                                  onClick={() => setSelectedJobForAccept({ ...order, payout })}
+                                  onClick={() => setSelectedJobForAccept({ ...order, distanceKm: distance, payout, sellerName: sellerShopName, sellerLocation: { ...order.sellerLocation, shopName: sellerShopName, address: sellerShopAddr }, deliveryAddress: { ...order.deliveryAddress, fullName: buyerName, address: buyerFullAddr } })}
                                   className="lp-btn lp-btn--primary"
                                   disabled={!!activeOrder}
                                   style={{

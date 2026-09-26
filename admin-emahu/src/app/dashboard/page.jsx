@@ -4235,17 +4235,27 @@ export default function AdminDashboard() {
                 <div className="ad-detail-info-section">
                   <h4>Total Value Summary</h4>
                   <div className="ad-detail-row">
-                    <span className="ad-detail-row-label">Emahu Lockup Total</span>
-                    <span className="ad-detail-row-val" style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.05rem' }}>
-                      ₹{selectedDetailOrder.total?.toLocaleString('en-IN')}
+                    <span className="ad-detail-row-label">Products Subtotal (Earnings)</span>
+                    <span className="ad-detail-row-val">₹{selectedDetailOrder.productAmount !== undefined ? selectedDetailOrder.productAmount : selectedDetailOrder.total}</span>
+                  </div>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Delivery Charge</span>
+                    <span className="ad-detail-row-val">₹{selectedDetailOrder.deliveryCharge !== undefined ? selectedDetailOrder.deliveryCharge : (selectedDetailOrder.deliveryCost || 0)}</span>
+                  </div>
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Handling Fees (Tax + Platform Fee)</span>
+                    <span className="ad-detail-row-val">
+                      {selectedDetailOrder.handlingFee !== undefined
+                        ? `₹${selectedDetailOrder.handlingFee}`
+                        : `₹${(Math.max(0, (selectedDetailOrder.totalPaid || selectedDetailOrder.total || 0) - ((selectedDetailOrder.productAmount || 0) + (selectedDetailOrder.deliveryCharge || 0)))).toFixed(2)}`}
                     </span>
                   </div>
-                  {selectedDetailOrder.deliveryCost && (
-                    <div className="ad-detail-row">
-                      <span className="ad-detail-row-label">Estimated Delivery Cost</span>
-                      <span className="ad-detail-row-val">₹{selectedDetailOrder.deliveryCost}</span>
-                    </div>
-                  )}
+                  <div className="ad-detail-row">
+                    <span className="ad-detail-row-label">Total Paid by Buyer</span>
+                    <span className="ad-detail-row-val" style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.05rem' }}>
+                      ₹{(selectedDetailOrder.totalPaid !== undefined ? selectedDetailOrder.totalPaid : selectedDetailOrder.total || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
                   <div className="ad-detail-row">
                     <span className="ad-detail-row-label">Emahu Release Method</span>
                     <span className="ad-detail-row-val">{selectedDetailOrder.EmahuMethod || 'Standard Emahu Vault'}</span>

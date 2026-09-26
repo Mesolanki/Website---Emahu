@@ -239,6 +239,35 @@ export default function CheckoutPage() {
   const [orderSellers, setOrderSellers] = useState([]);
   const [placedOrderObjects, setPlacedOrderObjects] = useState([]);
 
+  const successSubtotal = useMemo(() => {
+    if (!placedOrderObjects || placedOrderObjects.length === 0) return 0;
+    return placedOrderObjects.reduce((sum, order) => {
+      if (order.productAmount !== undefined && order.productAmount !== null) {
+        return sum + Number(order.productAmount);
+      }
+      const itemsSum = (order.items || []).reduce((iSum, item) => iSum + (Number(item.price || 0) * Number(item.quantity || 1)), 0);
+      return sum + itemsSum;
+    }, 0);
+  }, [placedOrderObjects]);
+
+  const successDeliveryCharge = useMemo(() => {
+    if (!placedOrderObjects || placedOrderObjects.length === 0) return 0;
+    return placedOrderObjects.reduce((sum, order) => sum + Number(order.deliveryCharge || 0), 0);
+  }, [placedOrderObjects]);
+
+  const successGrandTotal = useMemo(() => {
+    if (!placedOrderObjects || placedOrderObjects.length === 0) return 0;
+    return placedOrderObjects.reduce((sum, order) => sum + Number(order.totalPaid || order.total || 0), 0);
+  }, [placedOrderObjects]);
+
+  const successHandlingFee = useMemo(() => {
+    if (!placedOrderObjects || placedOrderObjects.length === 0) return 0;
+    const explicitSum = placedOrderObjects.reduce((sum, order) => sum + Number(order.handlingFee || 0), 0);
+    if (explicitSum > 0) return explicitSum;
+    const diff = successGrandTotal - (successSubtotal + successDeliveryCharge);
+    return diff > 0 ? diff : 0;
+  }, [placedOrderObjects, successSubtotal, successDeliveryCharge, successGrandTotal]);
+
   // ── LOCATION GATE ── (manual address by default)
   const [locationConfirmed, setLocationConfirmed] = useState(true);
   const [locationMode, setLocationMode] = useState('manual');
@@ -582,16 +611,19 @@ export default function CheckoutPage() {
 
   const totalDistanceCharge = useMemo(() => {
     if (deliveryBreakdown.length > 0) {
-      return deliveryBreakdown.reduce((sum, b) => sum + (b.distanceCharge !== undefined ? b.distanceCharge : (b.distanceKm * 4)), 0);
+      const firstB = deliveryBreakdown[0];
+      return parseFloat((firstB.distanceCharge !== undefined ? firstB.distanceCharge : ((deliveryDistance || 0) * 4)).toFixed(2));
     }
     return parseFloat(((deliveryDistance || 0) * 4).toFixed(2));
   }, [deliveryBreakdown, deliveryDistance]);
 
   const totalWeightCharge = useMemo(() => {
     if (deliveryBreakdown.length > 0) {
-      return deliveryBreakdown.reduce((sum, b) => sum + (b.weightCharge !== undefined ? b.weightCharge : (b.weightKg * 60)), 0);
+      const firstB = deliveryBreakdown[0];
+      return parseFloat((firstB.weightCharge !== undefined ? firstB.weightCharge : 0).toFixed(2));
     }
-    return parseFloat(((totalWeightKg || 0) * 60).toFixed(2));
+    const excessWeight = Math.max(0, (totalWeightKg || 0) - 3);
+    return parseFloat((excessWeight * 20).toFixed(2));
   }, [deliveryBreakdown, totalWeightKg]);
 
   // Dynamic delivery charge calculation
@@ -919,7 +951,7 @@ export default function CheckoutPage() {
     }
   };
 
-  const shippingFee = subtotal === 0 ? 0 : parseFloat((totalDistanceCharge + totalWeightCharge).toFixed(2));
+  const shippingFee = subtotal === 0 ? 0 : (deliveryCharge > 0 ? deliveryCharge : parseFloat((totalDistanceCharge + totalWeightCharge).toFixed(2)));
   const taxAmount = parseFloat((subtotal * 0.18).toFixed(2)); // 18% Emahu Tax
   const cgstAmount = parseFloat((subtotal * 0.09).toFixed(2));
   const sgstAmount = parseFloat((taxAmount - cgstAmount).toFixed(2));
@@ -1002,34 +1034,46 @@ export default function CheckoutPage() {
       const itemSubtotal = item.price * item.quantity;
       const bLat = parseFloat(buyerCoordinates.latitude);
       const bLon = parseFloat(buyerCoordinates.longitude);
-
-      let itemDistance = 0;
-      let itemDeliveryFee = 99;
-
       const sellerObj = item.seller || null;
       const sLat = (sellerObj && sellerObj.latitude !== undefined && sellerObj.latitude !== null) ? sellerObj.latitude : 23.0225;
       const sLon = (sellerObj && sellerObj.longitude !== undefined && sellerObj.longitude !== null) ? sellerObj.longitude : 72.5714;
 
-      if (subtotal > 150) {
-        itemDeliveryFee = (shippingSpeed === 'express') ? (deliverySettings.expressDeliverySurcharge || 100) : 0;
-      } else if (!isNaN(bLat) && !isNaN(bLon)) {
-        itemDistance = getHaversineDistance(bLat, bLon, sLat, sLon);
-        const matchedSlab = deliverySettings.slabs?.find(slab => itemDistance >= slab.fromKm && itemDistance < slab.toKm);
-        itemDeliveryFee = matchedSlab ? matchedSlab.charge : 99;
-        if (shippingSpeed === 'express') {
-          itemDeliveryFee += deliverySettings.expressDeliverySurcharge || 100;
-        }
-      } else {
-        itemDeliveryFee = 99;
-        if (shippingSpeed === 'express') {
-          itemDeliveryFee += 100;
-        }
+      let itemDistance = 0;
+      if (!isNaN(bLat) && !isNaN(bLon)) {
+        itemDistance = parseFloat(getHaversineDistance(bLat, bLon, sLat, sLon).toFixed(2));
       }
 
-      const itemTaxAmount = Math.round(itemSubtotal * 0.18);
+      let itemDeliveryFee = 0;
+      const matchedBreakdown = deliveryBreakdown.find(b => {
+        const sId = (sellerObj && (sellerObj._id || sellerObj.id)) || 'default_seller';
+        return b.sellerId && b.sellerId.toString() === sId.toString();
+      });
+
+      if (matchedBreakdown && matchedBreakdown.deliveryCharge !== undefined) {
+        itemDeliveryFee = matchedBreakdown.deliveryCharge;
+        if (matchedBreakdown.distanceKm !== undefined) {
+          itemDistance = matchedBreakdown.distanceKm;
+        }
+      } else if (cartItems.length === 1) {
+        itemDeliveryFee = shippingFee;
+      } else {
+        const itemRatio = subtotal > 0 ? (itemSubtotal / subtotal) : (1 / cartItems.length);
+        itemDeliveryFee = parseFloat((shippingFee * itemRatio).toFixed(2));
+      }
+
+      if (subtotal > 150) {
+        itemDeliveryFee = (shippingSpeed === 'express') ? (deliverySettings.expressDeliverySurcharge || 100) : 0;
+      } else if (shippingSpeed === 'express') {
+        itemDeliveryFee += deliverySettings.expressDeliverySurcharge || 100;
+      }
+
+      const itemTaxAmount = parseFloat((itemSubtotal * 0.18).toFixed(2));
+      const itemCgstAmount = parseFloat((itemSubtotal * 0.09).toFixed(2));
+      const itemSgstAmount = parseFloat((itemTaxAmount - itemCgstAmount).toFixed(2));
       const itemBase = itemSubtotal + itemDeliveryFee + itemTaxAmount;
       const itemEmahuFee = parseFloat((itemBase * 0.04).toFixed(2));
-      const itemGrandTotal = parseFloat((itemBase + itemEmahuFee).toFixed(2));
+      const itemHandlingFee = parseFloat((itemTaxAmount + itemEmahuFee).toFixed(2));
+      const itemGrandTotal = parseFloat((itemSubtotal + itemDeliveryFee + itemHandlingFee).toFixed(2));
 
       let sellerId = 'default_seller';
       let sellerEmail = null;
@@ -1091,6 +1135,11 @@ export default function CheckoutPage() {
         distanceKm: parseFloat(itemDistance.toFixed(2)),
         deliveryCharge: itemDeliveryFee,
         productAmount: itemSubtotal,
+        taxAmount: itemTaxAmount,
+        cgstAmount: itemCgstAmount,
+        sgstAmount: itemSgstAmount,
+        emahuFee: itemEmahuFee,
+        handlingFee: itemHandlingFee,
         totalPaid: itemGrandTotal
       };
 
@@ -1309,9 +1358,9 @@ export default function CheckoutPage() {
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px', marginBottom: '20px' }}>
               <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Payment Breakdown</div>
               {[
-                { label: 'Products Subtotal', val: `₹${subtotal.toLocaleString('en-IN')}` },
-                { label: 'Delivery Charges', val: shippingFee === 0 ? 'FREE' : `₹${shippingFee}` },
-                { label: 'Handling Fees', val: `₹${Number(handlingFee).toFixed(2)}` },
+                { label: 'Products Subtotal', val: `₹${successSubtotal.toLocaleString('en-IN')}` },
+                { label: 'Delivery Charges', val: successDeliveryCharge === 0 ? 'FREE' : `₹${successDeliveryCharge.toFixed(2)}` },
+                { label: 'Handling Fees', val: `₹${Number(successHandlingFee).toFixed(2)}` },
               ].map(({ label, val }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b', marginBottom: '8px' }}>
                   <span>{label}</span><strong style={{ color: '#334155' }}>{val}</strong>
@@ -1319,7 +1368,7 @@ export default function CheckoutPage() {
               ))}
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '1.05rem', fontWeight: '800', color: '#0f172a' }}>
                 <span>Total Paid</span>
-                <span style={{ color: '#4169e1' }}>₹{grandTotal.toLocaleString('en-IN')}</span>
+                <span style={{ color: '#4169e1' }}>₹{successGrandTotal.toLocaleString('en-IN')}</span>
               </div>
             </div>
 

@@ -239,9 +239,21 @@ exports.createOrder = async (req, res) => {
       orderData.deliveryCharge = deliveryCharge;
     }
 
-    // Recalculate Emahu grand total (subtotal + deliveryCharge + 18% GST of subtotal)
-    const taxAmount = Math.round(productAmount * 0.18);
-    orderData.total = productAmount + deliveryCharge + taxAmount;
+    // Recalculate financial breakdown (subtotal + deliveryCharge + handlingFee)
+    const taxAmount = parseFloat((productAmount * 0.18).toFixed(2));
+    const cgstAmount = parseFloat((productAmount * 0.09).toFixed(2));
+    const sgstAmount = parseFloat((taxAmount - cgstAmount).toFixed(2));
+    const baseBill = productAmount + deliveryCharge + taxAmount;
+    const emahuFee = parseFloat((baseBill * 0.04).toFixed(2));
+    const handlingFee = parseFloat((taxAmount + emahuFee).toFixed(2));
+    const calculatedTotal = parseFloat((productAmount + deliveryCharge + handlingFee).toFixed(2));
+
+    orderData.taxAmount = orderData.taxAmount !== undefined ? orderData.taxAmount : taxAmount;
+    orderData.cgstAmount = orderData.cgstAmount !== undefined ? orderData.cgstAmount : cgstAmount;
+    orderData.sgstAmount = orderData.sgstAmount !== undefined ? orderData.sgstAmount : sgstAmount;
+    orderData.emahuFee = orderData.emahuFee !== undefined ? orderData.emahuFee : emahuFee;
+    orderData.handlingFee = orderData.handlingFee !== undefined ? orderData.handlingFee : handlingFee;
+    orderData.total = orderData.totalPaid || orderData.total || calculatedTotal;
     orderData.totalPaid = orderData.total;
 
     // Log payment response/order payload as required

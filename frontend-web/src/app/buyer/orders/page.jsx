@@ -294,8 +294,17 @@ export default function OrdersPage() {
             overallStatus = 'PENDING_APPROVAL';
           }
 
+          const subtotal = group.ordersList.reduce((sum, o) => sum + (o.productAmount !== undefined && o.productAmount !== null ? Number(o.productAmount) : (o.items || []).reduce((iSum, item) => iSum + (item.price * item.quantity), 0)), 0);
+          const deliveryCharge = group.ordersList.reduce((sum, o) => sum + Number(o.deliveryCharge || 0), 0);
+          const totalPaid = group.ordersList.reduce((sum, o) => sum + Number(o.totalPaid || o.total || 0), 0);
+          const handlingFee = group.ordersList.reduce((sum, o) => sum + Number(o.handlingFee || 0), 0) || Math.max(0, parseFloat((totalPaid - (subtotal + deliveryCharge)).toFixed(2)));
+
           return {
             ...group,
+            subtotal,
+            deliveryCharge,
+            handlingFee,
+            totalPaid,
             status: overallStatus,
             hasDelivered: group.ordersList.some(o => o.status === 'DELIVERED'),
             hasArrived: group.ordersList.some(o => o.status === 'ARRIVED' || o.deliveryStatus === 'arrived'),
@@ -649,12 +658,24 @@ export default function OrdersPage() {
                                 <strong>{totalDistance.toFixed(2)} KM</strong>
                               </div>
                             )}
-                            {totalDeliveryCharge > 0 && (
+                            {ord.subtotal !== undefined && (
                               <div>
-                                <span>Delivery Fee Paid</span>
-                                <strong style={{ color: '#16a34a' }}>₹{totalDeliveryCharge}</strong>
+                                <span>Products Subtotal</span>
+                                <strong>₹{ord.subtotal.toLocaleString('en-IN')}</strong>
                               </div>
                             )}
+                            <div>
+                              <span>Delivery Charge</span>
+                              <strong>₹{ord.deliveryCharge}</strong>
+                            </div>
+                            <div>
+                              <span>Handling Fees</span>
+                              <strong>₹{ord.handlingFee}</strong>
+                            </div>
+                            <div>
+                              <span>Total Paid</span>
+                              <strong style={{ color: '#16a34a' }}>₹{ord.totalPaid.toLocaleString('en-IN')}</strong>
+                            </div>
                             <div className="grid-full-width">
                               <span>Secured Address</span>
                               <strong>{ord.deliveryAddress.address}, {ord.deliveryAddress.city}, {ord.deliveryAddress.stateName} - {ord.deliveryAddress.pincode}</strong>

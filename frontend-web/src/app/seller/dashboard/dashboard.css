@@ -804,7 +804,7 @@ body {
 
 .pro-table {
   width: 100%;
-  min-width: 1280px;
+  min-width: 100%;
   table-layout: auto;
   border-collapse: collapse;
   text-align: left;
@@ -813,11 +813,11 @@ body {
 
 .pro-table th {
   background-color: rgba(0, 0, 0, 0.02);
-  padding: 14px 16px;
-  font-size: 0.75rem;
+  padding: 12px 10px;
+  font-size: 0.73rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border-color);
   white-space: nowrap;
@@ -825,17 +825,17 @@ body {
 
 .pro-table th:first-child,
 .pro-table td:first-child {
-  padding-left: 24px;
+  padding-left: 16px;
 }
 
 .pro-table th:last-child,
 .pro-table td:last-child {
-  padding-right: 24px;
+  padding-right: 16px;
 }
 
 .pro-table td {
-  padding: 14px 16px;
-  font-size: 0.85rem;
+  padding: 12px 10px;
+  font-size: 0.83rem;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-color);
   vertical-align: middle;
@@ -2324,4 +2324,114 @@ body {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   RESPONSIVE ORDERS MANAGEMENT STYLES
+   ============================================ */
+
+.desktop-orders-table-wrapper {
+  display: block;
+}
+
+.mobile-orders-list {
+  display: none;
+}
+
+.mobile-order-card {
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-order-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.metric-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.metric-lbl {
+  font-size: 0.64rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.metric-val {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 2px;
+}
+
+.metric-val.green {
+  color: #16a34a;
+}
+
+.metric-val.bold {
+  color: #0f172a;
+}
+
+@media (max-width: 768px) {
+  .desktop-orders-table-wrapper {
+    display: none !important;
+  }
+
+  .mobile-orders-list {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .view-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .view-header > div:last-child {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .order-filter-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    padding-bottom: 4px;
+  }
+
+  .order-tab-btn {
+    padding: 9px 14px !important;
+    font-size: 0.8rem !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .mobile-order-metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
 }

@@ -76,7 +76,7 @@ const getProductMainImage = (p) => {
       const parsed = JSON.parse(imgs);
       if (Array.isArray(parsed)) imgs = parsed;
       else imgs = [imgs];
-    } catch(e) {
+    } catch (e) {
       imgs = [imgs];
     }
   }
@@ -390,6 +390,24 @@ function LiveTrackingMap({ orderId, trackingData, leafletLoaded }) {
   );
 }
 
+const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
+  if (lat1 === undefined || lon1 === undefined || lat2 === undefined || lon2 === undefined) return null;
+  const nLat1 = Number(lat1);
+  const nLon1 = Number(lon1);
+  const nLat2 = Number(lat2);
+  const nLon2 = Number(lon2);
+  if (isNaN(nLat1) || isNaN(nLon1) || isNaN(nLat2) || isNaN(nLon2)) return null;
+  const R = 6371; // Earth radius in KM
+  const dLat = (nLat2 - nLat1) * (Math.PI / 180);
+  const dLon = (nLon2 - nLon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(nLat1 * (Math.PI / 180)) * Math.cos(nLat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return parseFloat((R * c).toFixed(2));
+};
+
 export default function EmahuProDashboard() {
   const router = useRouter();
 
@@ -418,6 +436,7 @@ export default function EmahuProDashboard() {
       createdAt: o.createdAt || '',
       status: o.status || 'PENDING_APPROVAL',
       total: o.total || 0,
+      totalPaid: o.totalPaid || o.total || 0,
       productAmount: o.productAmount,
       deliveryCharge: o.deliveryCharge,
       distanceKm: o.distanceKm,
@@ -702,7 +721,7 @@ export default function EmahuProDashboard() {
         const next = prev ? { ...prev, ...updatedLocation } : { ...updatedLocation };
         try {
           localStorage.setItem('emahu_seller_user', JSON.stringify(next));
-        } catch (_) {}
+        } catch (_) { }
         return next;
       });
 
@@ -1196,6 +1215,8 @@ export default function EmahuProDashboard() {
     };
 
     syncProfile();
+    const syncInterval = setInterval(syncProfile, 8000);
+    return () => clearInterval(syncInterval);
   }, [router]);
 
   // Set default category value based on seller category
@@ -1560,17 +1581,64 @@ export default function EmahuProDashboard() {
 
             // Sum of this seller's items
             const sellerItemsTotal = itemsList.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            const totalSum = (o.items || []).reduce((s, i) => s + (i.price * i.quantity), 0);
-            const proportionalTotal = (o.total && totalSum > 0) ? Math.round(sellerItemsTotal * (o.total / totalSum)) : sellerItemsTotal;
+
+            // Dynamic calculations for distance, delivery fee, seller earnings, total paid
+            let distance = o.distanceKm;
+            if (distance === undefined || distance === null || isNaN(Number(distance))) {
+              if (o.sellerLocation?.latitude && o.buyerLocation?.latitude) {
+                distance = calculateDistanceKm(
+                  o.sellerLocation.latitude, o.sellerLocation.longitude,
+                  o.buyerLocation.latitude, o.buyerLocation.longitude
+                );
+              }
+              if (distance === undefined || distance === null || isNaN(Number(distance))) {
+                if (o.deliveryCharge !== undefined && o.deliveryCharge !== null && Number(o.deliveryCharge) > 0) {
+                  distance = parseFloat((Number(o.deliveryCharge) / 4).toFixed(2));
+                } else {
+                  distance = 0.1;
+                }
+              }
+            } else {
+              distance = Number(distance);
+            }
+
+            let deliveryFee = o.deliveryCharge;
+            if (deliveryFee === undefined || deliveryFee === null || isNaN(Number(deliveryFee))) {
+              deliveryFee = Math.max(30, Math.round(distance * 4));
+            } else {
+              deliveryFee = Number(deliveryFee);
+            }
+
+            let earnings = (o.productAmount !== undefined && o.productAmount !== null && !isNaN(Number(o.productAmount)))
+              ? Number(o.productAmount)
+              : (sellerItemsTotal > 0 ? sellerItemsTotal : Math.max(0, (Number(o.total || 0)) - deliveryFee));
+
+            let totalPaid = (o.totalPaid !== undefined && o.totalPaid !== null && !isNaN(Number(o.totalPaid)))
+              ? Number(o.totalPaid)
+              : (o.total !== undefined && o.total !== null && Number(o.total) > 0 ? Number(o.total) : earnings + deliveryFee);
+
+            let handlingFee = (o.handlingFee !== undefined && o.handlingFee !== null && !isNaN(Number(o.handlingFee)))
+              ? Number(o.handlingFee)
+              : Math.max(0, parseFloat((totalPaid - (earnings + deliveryFee)).toFixed(2)));
+
+            const updatedRaw = {
+              ...o,
+              distanceKm: distance,
+              deliveryCharge: deliveryFee,
+              productAmount: earnings,
+              handlingFee: handlingFee,
+              totalPaid: totalPaid,
+              total: totalPaid
+            };
 
             return {
               id: o.orderId,
               customer: o.deliveryAddress?.fullName || 'Emahu Customer',
               product: productName,
-              amount: proportionalTotal,
+              amount: totalPaid,
               status: o.status || 'PENDING_APPROVAL',
               time: o.date || 'Just now',
-              raw: o
+              raw: updatedRaw
             };
           });
           // Set real orders only
@@ -1670,7 +1738,7 @@ export default function EmahuProDashboard() {
     } catch (err) {
       console.error('OTP Verification Error:', err);
       setOtpVerifyError(err.message || 'Verification failed.');
-    } finally { 
+    } finally {
       setIsOtpSubmitting(false);
     }
   };
@@ -2694,14 +2762,20 @@ export default function EmahuProDashboard() {
     let defaultCat = 'Electronics & Tech';
     if (sellerUser?.category) {
       const storeCat = sellerUser.category.toLowerCase();
-      if (storeCat === 'electronics') {
+      if (storeCat.includes('electronics') || storeCat.includes('tech')) {
         defaultCat = 'Electronics & Tech';
-      } else if (storeCat === 'fashion') {
+      } else if (storeCat.includes('fashion') || storeCat.includes('apparel')) {
         defaultCat = 'Apparel & Fashion';
-      } else if (storeCat === 'home') {
+      } else if (storeCat.includes('kitchen') || storeCat.includes('home')) {
         defaultCat = 'Kitchen & Dining';
+      } else if (storeCat.includes('beauty') || storeCat.includes('cosmetic')) {
+        defaultCat = 'Beauty & Cosmetics';
+      } else if (storeCat.includes('book') || storeCat.includes('stationery')) {
+        defaultCat = 'Books & Stationery';
+      } else if (storeCat.includes('grocery') || storeCat.includes('food')) {
+        defaultCat = 'Grocery & Essentials';
       } else {
-        defaultCat = 'Lifestyle & Home';
+        defaultCat = 'Electronics & Tech';
       }
     }
     setNewProductCategory(defaultCat);
@@ -2990,7 +3064,7 @@ export default function EmahuProDashboard() {
     const uploadImageFile = async (file) => {
       const formData = new FormData();
       formData.append('image', file);
-      
+
       const token = localStorage.getItem('emahu_seller_token') || localStorage.getItem('emahu_token') || localStorage.getItem('token');
       const baseUrl = (getApiBase ? getApiBase() : String(API_BASE)).replace(/\/$/, '');
       const res = await fetch(`${baseUrl}/api/products/upload`, {
@@ -3000,11 +3074,11 @@ export default function EmahuProDashboard() {
         },
         body: formData
       });
-      
+
       if (!res.ok) {
         throw new Error('Image upload failed');
       }
-      
+
       const data = await res.json();
       if (!data.success) {
         throw new Error(data.error || 'Image upload failed');
@@ -4074,20 +4148,18 @@ export default function EmahuProDashboard() {
                     </div>
                   </div>
 
-                  {sellerUser?.verificationFeedback && (
-                    <div style={{
-                      background: 'rgba(59, 130, 246, 0.05)',
-                      border: '1px solid rgba(59, 130, 246, 0.2)',
-                      padding: '16px',
-                      borderRadius: '8px',
-                      color: '#1e3a8a',
-                      fontSize: '0.9rem',
-                      marginBottom: '24px'
-                    }}>
-                      <strong style={{ color: '#2563eb', display: 'block', marginBottom: '4px' }}>Auditor Feedback:</strong>
-                      {sellerUser.verificationFeedback}
-                    </div>
-                  )}
+                  <div style={{
+                    background: 'rgba(59, 130, 246, 0.05)',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    color: '#1e3a8a',
+                    fontSize: '0.9rem',
+                    marginBottom: '24px'
+                  }}>
+                    <strong style={{ color: '#2563eb', display: 'block', marginBottom: '4px' }}>Auditor Feedback:</strong>
+                    {sellerUser?.verificationFeedback || 'Please provide additional details or verify your uploaded documents.'}
+                  </div>
 
                   {/* Document resubmission form */}
                   <SellerDocumentResubmissionForm
@@ -4657,6 +4729,7 @@ export default function EmahuProDashboard() {
                         const isApproved = product.approvalStatus === 'approved';
                         const isPending = product.approvalStatus === 'pending';
                         const isRejected = product.approvalStatus === 'rejected';
+                        const isChangesRequested = product.approvalStatus === 'changes_requested';
 
                         return (
                           <tr key={product.id || product._id}>
@@ -4714,12 +4787,19 @@ export default function EmahuProDashboard() {
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <span className={`status-badge ${isApproved ? 'in-stock' :
                                   (isPending && product.adminCode) ? 'low-stock' :
-                                    isPending ? 'draft' : 'out-of-stock'
-                                  }`}>
+                                    isPending ? 'draft' :
+                                      isChangesRequested ? 'warning-badge' : 'out-of-stock'
+                                  }`} style={isChangesRequested ? { background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' } : {}}>
                                   {isApproved ? 'Approved & Live' :
                                     (isPending && product.adminCode) ? 'Pending Activation' :
-                                      isPending ? 'Under Admin Review' : 'Rejected'}
+                                      isPending ? 'Under Admin Review' :
+                                        isChangesRequested ? 'Changes Requested' : 'Rejected'}
                                 </span>
+                                {isChangesRequested && product.rejectionReason && (
+                                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', maxWidth: '200px', wordBreak: 'break-word', display: 'inline-block', fontWeight: '500' }}>
+                                    Requested Changes: {product.rejectionReason}
+                                  </span>
+                                )}
                                 {isRejected && product.rejectionReason && (
                                   <span style={{ fontSize: '0.75rem', color: '#ef4444', maxWidth: '200px', wordBreak: 'break-word', display: 'inline-block' }}>
                                     Reason: {product.rejectionReason}
@@ -4772,6 +4852,25 @@ export default function EmahuProDashboard() {
                             </td>
                             <td>
                               <div className="action-buttons-group" style={{ justifyContent: 'center' }}>
+                                {(isChangesRequested || isRejected) && (
+                                  <button
+                                    className="company-portal-btn"
+                                    style={{
+                                      height: '28px',
+                                      fontSize: '0.75rem',
+                                      padding: '0 8px',
+                                      background: '#f59e0b',
+                                      borderColor: '#f59e0b',
+                                      color: '#fff',
+                                      whiteSpace: 'nowrap',
+                                      cursor: 'pointer',
+                                      fontWeight: '600'
+                                    }}
+                                    onClick={() => handleOpenResubmitModal(product)}
+                                  >
+                                    ✏️ Fix & Resubmit
+                                  </button>
+                                )}
                                 <button className="action-btn" title="Edit Properties" onClick={() => {
                                   handleOpenResubmitModal(product);
                                 }}>
@@ -5040,112 +5139,112 @@ export default function EmahuProDashboard() {
                                   </div>
 
                                   <div className="form-group" style={{ margin: 0, position: 'relative' }}>
-                                     {!variant.linkedProductId ? (
-                                       <>
-                                         <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>🔗 Link to Existing Product (Search...)</label>
-                                         <input
-                                           type="text"
-                                           className="form-input"
-                                           style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px', marginBottom: '4px' }}
-                                           placeholder="Search by product name to link..."
-                                           value={variant.searchQuery || ''}
-                                           onChange={(e) => {
-                                             const updated = [...newProductVariants];
-                                             updated[index].searchQuery = e.target.value;
-                                             setNewProductVariants(updated);
-                                           }}
-                                         />
-                                         {variant.searchQuery && (
-                                           <div style={{
-                                             position: 'absolute',
-                                             top: '100%',
-                                             left: 0,
-                                             right: 0,
-                                             background: '#ffffff',
-                                             border: '1px solid #cbd5e1',
-                                             borderRadius: '8px',
-                                             boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                                             zIndex: 100,
-                                             maxHeight: '160px',
-                                             overflowY: 'auto'
-                                           }}>
-                                             {products
-                                               .filter(p =>
-                                                 p.name.toLowerCase().includes(variant.searchQuery.toLowerCase()) &&
-                                                 String(p.id || p._id) !== String(resubmitProductId)
-                                               )
-                                               .map(p => (
-                                                 <div
-                                                   key={p.id || p._id}
-                                                   onClick={() => {
-                                                     const updated = [...newProductVariants];
-                                                     updated[index].linkedProductId = p.id || p._id;
-                                                     updated[index].name = p.name;
-                                                     updated[index].sku = p.sku || '';
-                                                     updated[index].description = p.description || '';
-                                                     updated[index].price = p.price.toString();
-                                                     updated[index].stock = p.stock.toString();
-                                                     updated[index].image = p.image || '';
-                                                     updated[index].images = p.images || (p.image ? [p.image] : []);
-                                                     updated[index].searchQuery = '';
-                                                     setNewProductVariants(updated);
-                                                   }}
-                                                   style={{
-                                                     display: 'flex',
-                                                     alignItems: 'center',
-                                                     gap: '8px',
-                                                     padding: '8px',
-                                                     cursor: 'pointer',
-                                                     borderBottom: '1px solid #f1f5f9',
-                                                     fontSize: '0.78rem'
-                                                   }}
-                                                   onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                                                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                                 >
-                                                   <div style={{ width: '24px', height: '24px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
-                                                     {p.image && (p.image.startsWith('http') || p.image.startsWith('data:')) ? (
-                                                       <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                     ) : (
-                                                       <span>{p.image || '📦'}</span>
-                                                     )}
-                                                   </div>
-                                                   <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                     <strong>{p.name}</strong> <span style={{ color: '#64748b' }}>(₹{p.price})</span>
-                                                   </div>
-                                                 </div>
-                                               ))}
-                                           </div>
-                                         )}
-                                       </>
-                                     ) : (
-                                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '6px', marginBottom: '8px' }}>
-                                         <div style={{ width: '28px', height: '28px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
-                                           {variant.image && (variant.image.startsWith('http') || variant.image.startsWith('data:')) ? (
-                                             <img src={variant.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                           ) : (
-                                             <span>{variant.image || '📦'}</span>
-                                           )}
-                                         </div>
-                                         <div style={{ flex: 1, fontSize: '0.72rem', color: '#4f46e5', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                           🔗 Linked: {variant.name}
-                                         </div>
-                                         <button
-                                           type="button"
-                                           onClick={() => {
-                                             const updated = [...newProductVariants];
-                                             updated[index].linkedProductId = '';
-                                             updated[index].image = '';
-                                             updated[index].images = [];
-                                             updated[index].searchQuery = '';
-                                             setNewProductVariants(updated);
-                                           }}
-                                           style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.72rem', padding: 0 }}
-                                         >
-                                           Unlink
-                                         </button>
-                                       </div>
-                                     )}
-                                   </div>
+                                    {!variant.linkedProductId ? (
+                                      <>
+                                        <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>🔗 Link to Existing Product (Search...)</label>
+                                        <input
+                                          type="text"
+                                          className="form-input"
+                                          style={{ height: '30px', fontSize: '0.8rem', padding: '0 8px', marginBottom: '4px' }}
+                                          placeholder="Search by product name to link..."
+                                          value={variant.searchQuery || ''}
+                                          onChange={(e) => {
+                                            const updated = [...newProductVariants];
+                                            updated[index].searchQuery = e.target.value;
+                                            setNewProductVariants(updated);
+                                          }}
+                                        />
+                                        {variant.searchQuery && (
+                                          <div style={{
+                                            position: 'absolute',
+                                            top: '100%',
+                                            left: 0,
+                                            right: 0,
+                                            background: '#ffffff',
+                                            border: '1px solid #cbd5e1',
+                                            borderRadius: '8px',
+                                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                            zIndex: 100,
+                                            maxHeight: '160px',
+                                            overflowY: 'auto'
+                                          }}>
+                                            {products
+                                              .filter(p =>
+                                                p.name.toLowerCase().includes(variant.searchQuery.toLowerCase()) &&
+                                                String(p.id || p._id) !== String(resubmitProductId)
+                                              )
+                                              .map(p => (
+                                                <div
+                                                  key={p.id || p._id}
+                                                  onClick={() => {
+                                                    const updated = [...newProductVariants];
+                                                    updated[index].linkedProductId = p.id || p._id;
+                                                    updated[index].name = p.name;
+                                                    updated[index].sku = p.sku || '';
+                                                    updated[index].description = p.description || '';
+                                                    updated[index].price = p.price.toString();
+                                                    updated[index].stock = p.stock.toString();
+                                                    updated[index].image = p.image || '';
+                                                    updated[index].images = p.images || (p.image ? [p.image] : []);
+                                                    updated[index].searchQuery = '';
+                                                    setNewProductVariants(updated);
+                                                  }}
+                                                  style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    padding: '8px',
+                                                    cursor: 'pointer',
+                                                    borderBottom: '1px solid #f1f5f9',
+                                                    fontSize: '0.78rem'
+                                                  }}
+                                                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                                                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                                >
+                                                  <div style={{ width: '24px', height: '24px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
+                                                    {p.image && (p.image.startsWith('http') || p.image.startsWith('data:')) ? (
+                                                      <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                      <span>{p.image || '📦'}</span>
+                                                    )}
+                                                  </div>
+                                                  <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    <strong>{p.name}</strong> <span style={{ color: '#64748b' }}>(₹{p.price})</span>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                          </div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '6px', marginBottom: '8px' }}>
+                                        <div style={{ width: '28px', height: '28px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', flexShrink: 0 }}>
+                                          {variant.image && (variant.image.startsWith('http') || variant.image.startsWith('data:')) ? (
+                                            <img src={variant.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                          ) : (
+                                            <span>{variant.image || '📦'}</span>
+                                          )}
+                                        </div>
+                                        <div style={{ flex: 1, fontSize: '0.72rem', color: '#4f46e5', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          🔗 Linked: {variant.name}
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const updated = [...newProductVariants];
+                                            updated[index].linkedProductId = '';
+                                            updated[index].image = '';
+                                            updated[index].images = [];
+                                            updated[index].searchQuery = '';
+                                            setNewProductVariants(updated);
+                                          }}
+                                          style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.72rem', padding: 0 }}
+                                        >
+                                          Unlink
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
 
                                   <div className="form-group" style={{ margin: 0 }}>
                                     <label style={{ fontSize: '0.7rem', fontWeight: '600', color: '#475569', marginBottom: '4px', display: 'block' }}>Variant Name / Option *</label>
@@ -5294,177 +5393,190 @@ export default function EmahuProDashboard() {
                     </h3>
 
                     <div style={{ overflowX: 'auto', maxHeight: '550px', overflowY: 'auto', width: '100%' }}>
-                        <table className="portal-table" style={{ width: '100%', minWidth: '500px', fontSize: '0.85rem' }}>
-                          <thead>
-                            <tr>
-                              <th style={{ textAlign: 'left', padding: '10px' }}>Product</th>
-                              <th style={{ textAlign: 'left', padding: '10px' }}>Category</th>
-                              <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
-                              <th style={{ textAlign: 'left', padding: '10px' }}>Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {products.map((product) => {
-                              const isApproved = product.approvalStatus === 'approved';
-                              const isPending = product.approvalStatus === 'pending';
-                              const isRejected = product.approvalStatus === 'rejected';
+                      <table className="portal-table" style={{ width: '100%', minWidth: '500px', fontSize: '0.85rem' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: 'left', padding: '10px' }}>Product</th>
+                            <th style={{ textAlign: 'left', padding: '10px' }}>Category</th>
+                            <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
+                            <th style={{ textAlign: 'left', padding: '10px' }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {products.map((product) => {
+                            const isApproved = product.approvalStatus === 'approved';
+                            const isPending = product.approvalStatus === 'pending';
+                            const isRejected = product.approvalStatus === 'rejected';
+                            const isChangesRequested = product.approvalStatus === 'changes_requested';
 
-                              return (
-                                <tr key={product.id || product._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                  <td style={{ padding: '12px 10px' }}>
-                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                      <div style={{
-                                        width: '32px',
-                                        height: '32px',
-                                        borderRadius: '6px',
-                                        overflow: 'hidden',
-                                        border: '1px solid var(--border-color)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        backgroundColor: 'rgba(0,0,0,0.05)',
-                                        flexShrink: 0
-                                      }}>
-                                        {isRealImage(product.image) ? (
-                                          <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        ) : (
-                                          <span style={{ fontSize: '1.2rem' }}>{cleanImageUrl(product.image) || '📦'}</span>
+                            return (
+                              <tr key={product.id || product._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '12px 10px' }}>
+                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <div style={{
+                                      width: '32px',
+                                      height: '32px',
+                                      borderRadius: '6px',
+                                      overflow: 'hidden',
+                                      border: '1px solid var(--border-color)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      backgroundColor: 'rgba(0,0,0,0.05)',
+                                      flexShrink: 0
+                                    }}>
+                                      {isRealImage(product.image) ? (
+                                        <img src={cleanImageUrl(product.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      ) : (
+                                        <span style={{ fontSize: '1.2rem' }}>{cleanImageUrl(product.image) || '📦'}</span>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{product.name}</div>
+                                        {product.variants && product.variants.length > 0 && (
+                                          <span style={{ fontSize: '0.62rem', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', color: '#6366f1', padding: '0.5px 4px', borderRadius: '3px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                                            {product.variants.length} options
+                                          </span>
                                         )}
                                       </div>
-                                      <div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                          <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{product.name}</div>
-                                          {product.variants && product.variants.length > 0 && (
-                                            <span style={{ fontSize: '0.62rem', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', color: '#6366f1', padding: '0.5px 4px', borderRadius: '3px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                                              {product.variants.length} options
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>₹{product.price.toLocaleString('en-IN')}</div>
-                                      </div>
+                                      <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>₹{product.price.toLocaleString('en-IN')}</div>
                                     </div>
-                                  </td>
-                                  <td style={{ padding: '12px 10px' }}>
-                                    <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{product.category}</div>
-                                    {product.subcategory && product.subcategory !== 'General' && product.subcategory !== product.category && (
-                                      <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '2px' }}>{product.subcategory}</div>
-                                    )}
-                                  </td>
-                                  <td style={{ padding: '12px 10px' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <span className={`status-badge ${isApproved ? 'in-stock' :
-                                        (isPending && product.adminCode) ? 'low-stock' :
-                                          isPending ? 'draft' : 'out-of-stock'
-                                        }`} style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
-                                        {isApproved ? 'Approved & Live' :
-                                          (isPending && product.adminCode) ? 'Pending Activation' :
-                                            isPending ? 'Under Review' : 'Rejected'}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '12px 10px' }}>
+                                  <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{product.category}</div>
+                                  {product.subcategory && product.subcategory !== 'General' && product.subcategory !== product.category && (
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '2px' }}>{product.subcategory}</div>
+                                  )}
+                                </td>
+                                <td style={{ padding: '12px 10px' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <span className={`status-badge ${isApproved ? 'in-stock' :
+                                      (isPending && product.adminCode) ? 'low-stock' :
+                                        isPending ? 'draft' :
+                                          isChangesRequested ? 'warning-badge' : 'out-of-stock'
+                                      }`} style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', ...(isChangesRequested ? { background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' } : {}) }}>
+                                      {isApproved ? 'Approved & Live' :
+                                        (isPending && product.adminCode) ? 'Pending Activation' :
+                                          isPending ? 'Under Review' :
+                                            isChangesRequested ? 'Changes Requested' : 'Rejected'}
+                                    </span>
+
+                                    {isPending && product.adminCode && (
+                                      <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
+                                        Code Generated!
                                       </span>
+                                    )}
 
-                                      {isPending && product.adminCode && (
-                                        <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
-                                          Code Generated!
-                                        </span>
-                                      )}
-
-                                      {isRejected && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                          {product.rejectionReason && (
-                                            <span style={{ fontSize: '0.72rem', color: '#ef4444', maxWidth: '140px', wordBreak: 'break-all' }}>
-                                              Reason: {product.rejectionReason}
-                                            </span>
-                                          )}
-                                          <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 'bold' }}>
-                                            Rejections: {product.approvalAttempts || 0} / 3
+                                    {isChangesRequested && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        {product.rejectionReason && (
+                                          <span style={{ fontSize: '0.72rem', color: '#f59e0b', maxWidth: '140px', wordBreak: 'break-all' }}>
+                                            Changes: {product.rejectionReason}
                                           </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td style={{ padding: '12px 10px' }}>
-                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                      <button
-                                        className="company-portal-btn"
-                                        style={{
-                                          height: '24px',
-                                          fontSize: '0.7rem',
-                                          padding: '0 8px',
-                                          background: 'var(--bg-secondary)',
-                                          border: '1px solid var(--border-color)',
-                                          color: 'var(--text-primary)',
-                                          cursor: 'pointer'
-                                        }}
-                                        onClick={() => setSelectedDetailedProduct(product)}
-                                      >
-                                        Details
-                                      </button>
+                                        )}
+                                      </div>
+                                    )}
 
-                                      {isPending && product.adminCode && (
-                                        <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
-                                          <input
-                                            type="text"
-                                            placeholder="Enter Code"
-                                            className="form-input"
-                                            style={{
-                                              height: '24px',
-                                              fontSize: '0.7rem',
-                                              padding: '2px 4px',
-                                              width: '85px',
-                                              borderRadius: '4px',
-                                              background: 'var(--bg-secondary)',
-                                              borderColor: 'var(--border-color)',
-                                              color: 'var(--text-primary)',
-                                              fontWeight: 'bold',
-                                              textAlign: 'center'
-                                            }}
-                                            value={verifyCodes[product.id || product._id] || ''}
-                                            onChange={(e) => setVerifyCodes(prev => ({ ...prev, [product.id || product._id]: e.target.value }))}
-                                          />
-                                          <button
-                                            className="company-portal-btn"
-                                            style={{
-                                              height: '24px',
-                                              fontSize: '0.7rem',
-                                              padding: '0 4px',
-                                              background: 'var(--color-success)',
-                                              borderColor: 'var(--color-success)',
-                                              width: '85px'
-                                            }}
-                                            onClick={() => handleVerifyProductCode(product.id || product._id)}
-                                          >
-                                            Verify Code
-                                          </button>
-                                        </div>
-                                      )}
-                                      {isPending && !product.adminCode && (
-                                        <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>Pending Admin</span>
-                                      )}
-                                      {isApproved && (
-                                        <span style={{ fontSize: '0.78rem', color: 'var(--color-success)', fontWeight: '600' }}>
-                                          ✓ Live
+                                    {isRejected && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        {product.rejectionReason && (
+                                          <span style={{ fontSize: '0.72rem', color: '#ef4444', maxWidth: '140px', wordBreak: 'break-all' }}>
+                                            Reason: {product.rejectionReason}
+                                          </span>
+                                        )}
+                                        <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 'bold' }}>
+                                          Rejections: {product.approvalAttempts || 0} / 3
                                         </span>
-                                      )}
-                                      {isRejected && (
-                                        <button className="action-btn" title="Fix and Resubmit" onClick={() => handleOpenResubmitModal(product)}>
-                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                          </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '12px 10px' }}>
+                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button
+                                      className="company-portal-btn"
+                                      style={{
+                                        height: '24px',
+                                        fontSize: '0.7rem',
+                                        padding: '0 8px',
+                                        background: 'var(--bg-secondary)',
+                                        border: '1px solid var(--border-color)',
+                                        color: 'var(--text-primary)',
+                                        cursor: 'pointer'
+                                      }}
+                                      onClick={() => setSelectedDetailedProduct(product)}
+                                    >
+                                      Details
+                                    </button>
+
+                                    {isPending && product.adminCode && (
+                                      <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
+                                        <input
+                                          type="text"
+                                          placeholder="Enter Code"
+                                          className="form-input"
+                                          style={{
+                                            height: '24px',
+                                            fontSize: '0.7rem',
+                                            padding: '2px 4px',
+                                            width: '85px',
+                                            borderRadius: '4px',
+                                            background: 'var(--bg-secondary)',
+                                            borderColor: 'var(--border-color)',
+                                            color: 'var(--text-primary)',
+                                            fontWeight: 'bold',
+                                            textAlign: 'center'
+                                          }}
+                                          value={verifyCodes[product.id || product._id] || ''}
+                                          onChange={(e) => setVerifyCodes(prev => ({ ...prev, [product.id || product._id]: e.target.value }))}
+                                        />
+                                        <button
+                                          className="company-portal-btn"
+                                          style={{
+                                            height: '24px',
+                                            fontSize: '0.7rem',
+                                            padding: '0 4px',
+                                            background: 'var(--color-success)',
+                                            borderColor: 'var(--color-success)',
+                                            width: '85px'
+                                          }}
+                                          onClick={() => handleVerifyProductCode(product.id || product._id)}
+                                        >
+                                          Verify Code
                                         </button>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                            {products.length === 0 && (
-                              <tr>
-                                <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No requests submitted yet.</td>
+                                      </div>
+                                    )}
+                                    {isPending && !product.adminCode && (
+                                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>Pending Admin</span>
+                                    )}
+                                    {isApproved && (
+                                      <span style={{ fontSize: '0.78rem', color: 'var(--color-success)', fontWeight: '600' }}>
+                                        ✓ Live
+                                      </span>
+                                    )}
+                                    {(isChangesRequested || isRejected) && (
+                                      <button className="action-btn" title="Fix and Resubmit" onClick={() => handleOpenResubmitModal(product)}>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
                               </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                            );
+                          })}
+                          {products.length === 0 && (
+                            <tr>
+                              <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No requests submitted yet.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
+                  </div>
 
                 </div>
               </div>
@@ -5549,20 +5661,20 @@ export default function EmahuProDashboard() {
               </div>
 
               {/* Filtered Orders Table */}
-              <div className="table-wrapper" style={{ marginTop: '0', borderTop: 'none', borderTopLeftRadius: '0', borderTopRightRadius: '0' }}>
+              <div className="desktop-orders-table-wrapper table-wrapper" style={{ marginTop: '0', borderTop: 'none', borderTopLeftRadius: '0', borderTopRightRadius: '0' }}>
                 <table className="pro-table">
                   <thead>
                     <tr>
-                      <th style={{ paddingLeft: '24px', minWidth: '100px' }}>Order ID</th>
-                      <th style={{ minWidth: '140px' }}>Customer</th>
-                      <th style={{ minWidth: '110px' }}>Location</th>
-                      <th style={{ minWidth: '95px' }}>Distance</th>
-                      <th style={{ minWidth: '100px' }}>Delivery Fee</th>
-                      <th style={{ minWidth: '100px' }}>Earnings</th>
-                      <th style={{ minWidth: '100px' }}>Total Paid</th>
-                      <th style={{ minWidth: '160px' }}>Status</th>
-                      <th style={{ minWidth: '105px' }}>Date</th>
-                      <th style={{ paddingRight: '24px', minWidth: '280px', width: '280px', textAlign: 'right' }}>Actions</th>
+                      <th style={{ paddingLeft: '16px', minWidth: '85px' }}>Order ID</th>
+                      <th style={{ minWidth: '100px' }}>Customer</th>
+                      <th style={{ minWidth: '85px' }}>Location</th>
+                      <th style={{ minWidth: '70px' }}>Distance</th>
+                      <th style={{ minWidth: '80px' }}>Delivery Fee</th>
+                      <th style={{ minWidth: '80px' }}>Earnings</th>
+                      <th style={{ minWidth: '85px' }}>Total Paid</th>
+                      <th style={{ minWidth: '120px' }}>Status</th>
+                      <th style={{ minWidth: '85px' }}>Date</th>
+                      <th style={{ paddingRight: '16px', minWidth: '180px', textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -5570,13 +5682,13 @@ export default function EmahuProDashboard() {
                       filteredOrdersDisplay.map((order) => (
                         <tr key={order.id}>
                           <td
-                            style={{ paddingLeft: '24px', fontWeight: 700, color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap' }}
+                            style={{ paddingLeft: '16px', fontWeight: 700, color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap' }}
                             onClick={() => setSelectedDetailedOrderId(order.id)}
                             title="Click to open Order Details"
                           >
                             #{order.id}
                           </td>
-                          <td style={{ fontWeight: 600, minWidth: '140px' }}>{order.customer}</td>
+                          <td style={{ fontWeight: 600, minWidth: '100px' }}>{order.customer}</td>
                           <td style={{ whiteSpace: 'nowrap' }}>
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                               {order.raw?.deliveryAddress?.city || order.raw?.deliveryAddress?.stateName || 'N/A'}
@@ -5622,8 +5734,8 @@ export default function EmahuProDashboard() {
                             </div>
                           </td>
                           <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{order.time}</td>
-                          <td style={{ paddingRight: '24px', minWidth: '280px', width: '280px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'nowrap', width: '100%' }}>
+                          <td style={{ paddingRight: '16px', minWidth: '180px', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', width: '100%' }}>
                               <button
                                 className="btn-secondary"
                                 style={{ height: '28px', padding: '0 9px', fontSize: '0.725rem', flexShrink: 0 }}
@@ -5785,6 +5897,231 @@ export default function EmahuProDashboard() {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Orders List */}
+              <div className="mobile-orders-list">
+                {filteredOrdersDisplay.length > 0 ? (
+                  filteredOrdersDisplay.map((order) => (
+                    <div key={`mob-${order.id}`} className="mobile-order-card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span
+                          style={{ fontWeight: 800, color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.92rem' }}
+                          onClick={() => setSelectedDetailedOrderId(order.id)}
+                        >
+                          #{order.id}
+                        </span>
+                        <span className={`status-badge ${order.status === 'COMPLETED' || order.status === 'DELIVERED' ? 'in-stock' :
+                          order.status === 'REJECTED' ? 'out-of-stock' :
+                            order.status === 'PENDING_APPROVAL' ? 'draft' : 'low-stock'
+                          }`}>
+                          {order.status === 'PENDING_APPROVAL' ? 'Pending Approval' :
+                            order.status === 'APPROVED' ? 'Approved' :
+                              order.status === 'REJECTED' ? 'Rejected' :
+                                order.status === 'DELIVERY_ASSIGNED' ? 'Delivery Assigned' :
+                                  order.status === 'LABEL_GENERATED' ? 'Label Generated' :
+                                    order.status === 'READY_FOR_PICKUP' ? 'Ready For Pickup' :
+                                      order.status === 'PICKED_UP' ? 'Picked Up' :
+                                        order.status === 'IN_TRANSIT' ? 'In Transit' :
+                                          order.status === 'OUT_FOR_DELIVERY' ? 'Out For Delivery' :
+                                            order.status === 'COMPLETED' || order.status === 'DELIVERED' ? 'Delivered' : order.status}
+                        </span>
+                      </div>
+
+                      {order.raw?.rejectionReason && order.status === 'REJECTED' && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-danger)', fontWeight: '600' }}>
+                          ↳ {order.raw.rejectionReason}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginTop: '2px' }}>
+                        <div>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Customer</span>
+                          <strong style={{ color: '#0f172a' }}>{order.customer}</strong>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Location / Date</span>
+                          <span style={{ color: '#475569' }}>{order.raw?.deliveryAddress?.city || 'N/A'} · {order.time}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: '0.78rem', color: '#475569', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        📦 {order.product}
+                      </div>
+
+                      <div className="mobile-order-metrics-grid">
+                        <div className="metric-box">
+                          <span className="metric-lbl">Distance</span>
+                          <span className="metric-val">{order.raw?.distanceKm !== undefined ? `${order.raw.distanceKm} KM` : '—'}</span>
+                        </div>
+                        <div className="metric-box">
+                          <span className="metric-lbl">Delivery Fee</span>
+                          <span className="metric-val">{order.raw?.deliveryCharge !== undefined ? `₹${order.raw.deliveryCharge}` : '—'}</span>
+                        </div>
+                        <div className="metric-box">
+                          <span className="metric-lbl">Earnings</span>
+                          <span className="metric-val green">{order.raw?.productAmount !== undefined ? `₹${order.raw.productAmount}` : '—'}</span>
+                        </div>
+                        <div className="metric-box">
+                          <span className="metric-lbl">Total Paid</span>
+                          <span className="metric-val bold">₹{order.amount.toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e2e8f0' }}>
+                        <button
+                          className="btn-secondary"
+                          style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                          onClick={() => setSelectedDetailedOrderId(order.id)}
+                          disabled={orderLoading[order.id]}
+                        >
+                          Details
+                        </button>
+
+                        {order.status === 'PENDING_APPROVAL' && (
+                          <>
+                            <button
+                              className="order-action-btn approve"
+                              style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                              onClick={() => handleApproveOrder(order.id)}
+                              disabled={orderLoading[order.id]}
+                            >
+                              {orderLoading[order.id] ? 'Processing...' : '✓ Approve'}
+                            </button>
+                            <button
+                              className="order-action-btn reject"
+                              style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                              onClick={() => {
+                                setSelectedOrderId(order.id);
+                                setRejectionReasonType('Out of Stock');
+                                setCustomRejectReason('');
+                                setIsRejectModalOpen(true);
+                              }}
+                              disabled={orderLoading[order.id]}
+                            >
+                              ✕ Reject
+                            </button>
+                          </>
+                        )}
+
+                        {order.status === 'APPROVED' && (
+                          <button
+                            className="order-action-btn carrier"
+                            style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                            onClick={() => { setSelectedOrderId(order.id); setIsDeliveryModalOpen(true); }}
+                            disabled={orderLoading[order.id]}
+                          >
+                            {orderLoading[order.id] ? 'Processing...' : '🚚 Assign Carrier'}
+                          </button>
+                        )}
+
+                        {order.status === 'DELIVERY_ASSIGNED' && (
+                          <>
+                            <button
+                              className="order-action-btn label"
+                              style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                              onClick={() => handleGenerateLabel(order.id)}
+                              disabled={orderLoading[order.id]}
+                            >
+                              {orderLoading[order.id] ? 'Processing...' : '🏷️ Gen. Label'}
+                            </button>
+                            <button
+                              className="order-action-btn carrier"
+                              onClick={() => { setSelectedOrderId(order.id); setIsDeliveryModalOpen(true); }}
+                              disabled={orderLoading[order.id]}
+                              style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', background: '#f59e0b', color: '#fff', border: 'none', flex: '1 1 auto' }}
+                              title="Reassign Courier"
+                            >
+                              🔄 Reassign
+                            </button>
+                          </>
+                        )}
+
+                        {order.status === 'LABEL_GENERATED' && (
+                          <>
+                            <button
+                              className="order-action-btn carrier"
+                              style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                              onClick={() => { setActiveLabelOrder(order.raw); setIsLabelModalOpen(true); }}
+                              disabled={orderLoading[order.id]}
+                            >
+                              🖨️ Print
+                            </button>
+                            <button
+                              className="order-action-btn approve"
+                              style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                              onClick={() => handleMarkReadyForPickup(order.id)}
+                              disabled={orderLoading[order.id]}
+                            >
+                              {orderLoading[order.id] ? 'Processing...' : '📦 Mark Ready'}
+                            </button>
+                          </>
+                        )}
+
+                        {order.status === 'READY_FOR_PICKUP' && isSelfDeliveryOrder(order) && (
+                          <button
+                            className="order-action-btn carrier"
+                            style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                            onClick={() => handleAdvanceOrderStatus(order.id, 'PICKED_UP', `🚀 Package picked up by ${order.raw?.carrier ? 'courier partner ' + order.raw.carrier : 'Seller (Self-Delivery)'}.`)}
+                            disabled={orderLoading[order.id]}
+                          >
+                            {orderLoading[order.id] ? 'Processing...' : '🚀 Dispatch'}
+                          </button>
+                        )}
+
+                        {order.status === 'PICKED_UP' && isSelfDeliveryOrder(order) && (
+                          <button
+                            className="order-action-btn carrier"
+                            style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                            onClick={() => handleAdvanceOrderStatus(order.id, 'IN_TRANSIT', '🚚 Order package is in transit.')}
+                            disabled={orderLoading[order.id]}
+                          >
+                            {orderLoading[order.id] ? 'Processing...' : '🚛 In Transit'}
+                          </button>
+                        )}
+
+                        {order.status === 'IN_TRANSIT' && isSelfDeliveryOrder(order) && (
+                          <button
+                            className="order-action-btn carrier"
+                            style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                            onClick={() => handleAdvanceOrderStatus(order.id, 'OUT_FOR_DELIVERY', '🛵 Package is out for delivery.')}
+                            disabled={orderLoading[order.id]}
+                          >
+                            {orderLoading[order.id] ? 'Processing...' : '🛵 Out For Delivery'}
+                          </button>
+                        )}
+
+                        {order.status === 'OUT_FOR_DELIVERY' && isSelfDeliveryOrder(order) && (
+                          <button
+                            className="order-action-btn approve"
+                            style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                            onClick={() => handleTriggerDeliveryOtpVerification(order.id)}
+                            disabled={orderLoading[order.id]}
+                          >
+                            {orderLoading[order.id] ? 'Processing...' : '✅ Delivered'}
+                          </button>
+                        )}
+
+                        {['LABEL_GENERATED', 'READY_FOR_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'].includes(order.status) && order.raw?.trackingId && (
+                          <button
+                            className="btn-secondary"
+                            style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem', flex: '1 1 auto' }}
+                            onClick={() => { setActiveLabelOrder(order.raw); setIsLabelModalOpen(true); }}
+                          >
+                            📄 Label
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '40px 16px', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📦</div>
+                    <p style={{ margin: 0, fontWeight: 600, color: '#475569' }}>
+                      {orderStatusFilter === 'all' ? 'No Orders Yet' : `No ${orderStatusFilter.replace(/_/g, ' ').toLowerCase()} orders`}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -6822,11 +7159,13 @@ export default function EmahuProDashboard() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
                   <span className={`status-badge ${selectedDetailedProduct.approvalStatus === 'approved' ? 'in-stock' :
                     (selectedDetailedProduct.approvalStatus === 'pending' && selectedDetailedProduct.adminCode) ? 'low-stock' :
-                      selectedDetailedProduct.approvalStatus === 'pending' ? 'draft' : 'out-of-stock'
-                    }`}>
+                      selectedDetailedProduct.approvalStatus === 'pending' ? 'draft' :
+                        selectedDetailedProduct.approvalStatus === 'changes_requested' ? 'warning-badge' : 'out-of-stock'
+                    }`} style={selectedDetailedProduct.approvalStatus === 'changes_requested' ? { background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' } : {}}>
                     {selectedDetailedProduct.approvalStatus === 'approved' ? 'Approved & Live' :
                       (selectedDetailedProduct.approvalStatus === 'pending' && selectedDetailedProduct.adminCode) ? 'Pending Activation' :
-                        selectedDetailedProduct.approvalStatus === 'pending' ? 'Under Admin Review' : 'Rejected'}
+                        selectedDetailedProduct.approvalStatus === 'pending' ? 'Under Admin Review' :
+                          selectedDetailedProduct.approvalStatus === 'changes_requested' ? 'Changes Requested' : 'Rejected'}
                   </span>
                   {selectedDetailedProduct.approvalAttempts > 0 && (
                     <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 'bold' }}>
@@ -6835,8 +7174,16 @@ export default function EmahuProDashboard() {
                   )}
                 </div>
                 {selectedDetailedProduct.rejectionReason && (
-                  <div style={{ marginTop: '10px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '10px 12px', borderRadius: '6px', color: '#ef4444', fontSize: '0.8rem' }}>
-                    <strong>Rejection Reason:</strong> {selectedDetailedProduct.rejectionReason}
+                  <div style={{
+                    marginTop: '10px',
+                    background: selectedDetailedProduct.approvalStatus === 'changes_requested' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+                    border: selectedDetailedProduct.approvalStatus === 'changes_requested' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(239, 68, 68, 0.2)',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    color: selectedDetailedProduct.approvalStatus === 'changes_requested' ? '#f59e0b' : '#ef4444',
+                    fontSize: '0.8rem'
+                  }}>
+                    <strong>{selectedDetailedProduct.approvalStatus === 'changes_requested' ? 'Requested Changes / Admin Feedback:' : 'Rejection Reason:'}</strong> {selectedDetailedProduct.rejectionReason}
                   </div>
                 )}
                 {selectedDetailedProduct.adminCode && selectedDetailedProduct.approvalStatus === 'pending' && (
@@ -6847,7 +7194,20 @@ export default function EmahuProDashboard() {
               </div>
             </div>
 
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {(selectedDetailedProduct.approvalStatus === 'changes_requested' || (selectedDetailedProduct.approvalStatus === 'rejected' && (selectedDetailedProduct.approvalAttempts || 0) < 3)) ? (
+                <button
+                  className="modal-btn primary"
+                  style={{ background: '#f59e0b', borderColor: '#f59e0b', color: '#fff', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem' }}
+                  onClick={() => {
+                    const prodToEdit = selectedDetailedProduct;
+                    setSelectedDetailedProduct(null);
+                    handleOpenResubmitModal(prodToEdit);
+                  }}
+                >
+                  ✏️ Review & Edit Listing
+                </button>
+              ) : <div />}
               <button className="modal-btn cancel" onClick={() => setSelectedDetailedProduct(null)}>Close</button>
             </div>
           </div>
@@ -7989,6 +8349,20 @@ export default function EmahuProDashboard() {
                         <span style={{ color: '#64748b' }}>Seller Earnings (Subtotal)</span>
                         <strong style={{ color: '#16a34a' }}>{selectedDetailedOrder.productAmount !== undefined ? `₹${selectedDetailedOrder.productAmount}` : '—'}</strong>
                       </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
+                        <span style={{ color: '#64748b' }}>Handling Fees (Tax + Platform Fee)</span>
+                        <strong style={{ color: '#0f172a' }}>
+                          {selectedDetailedOrder.handlingFee !== undefined
+                            ? `₹${selectedDetailedOrder.handlingFee}`
+                            : (selectedDetailedOrder.taxAmount !== undefined || selectedDetailedOrder.emahuFee !== undefined
+                              ? `₹${((selectedDetailedOrder.taxAmount || 0) + (selectedDetailedOrder.emahuFee || 0)).toFixed(2)}`
+                              : `₹${(Math.max(0, (selectedDetailedOrder.totalPaid || selectedDetailedOrder.total || 0) - ((selectedDetailedOrder.productAmount || 0) + (selectedDetailedOrder.deliveryCharge || 0)))).toFixed(2)}`)}
+                        </strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
+                        <span style={{ color: '#64748b' }}>Total Paid by Buyer</span>
+                        <strong style={{ color: '#0f172a' }}>₹{(selectedDetailedOrder.totalPaid !== undefined ? selectedDetailedOrder.totalPaid : selectedDetailedOrder.total || 0).toLocaleString('en-IN')}</strong>
+                      </div>
                       {selectedDetailedOrder.buyerLocation?.latitude !== undefined && selectedDetailedOrder.sellerLocation?.latitude !== undefined && (
                         <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px dashed #cbd5e1', paddingTop: '8px', marginTop: '4px', gap: '4px' }}>
                           <a
@@ -8187,12 +8561,12 @@ export default function EmahuProDashboard() {
 
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.01)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                             <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>COURIER CORRIDOR TRACKING PROVISIONS</span>
-                            
+
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                               <div>
                                 <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Logistics Carrier</label>
-                                <select 
-                                  className="select-filter" 
+                                <select
+                                  className="select-filter"
                                   style={{ margin: 0, height: '36px', fontSize: '0.82rem', width: '100%', padding: '0 8px', backgroundColor: '#1e1e24', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
                                   value={carrier}
                                   onChange={(e) => handleCarrierChange(e.target.value)}
@@ -8610,6 +8984,7 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
             <tbody>
               {pendingProducts.map((p) => {
                 const isRejected = p.approvalStatus === 'rejected';
+                const isChangesRequested = p.approvalStatus === 'changes_requested';
                 return (
                   <tr key={p.id || p._id}>
                     <td>
@@ -8631,7 +9006,7 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
                                 <div key={vIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0', borderBottom: vIdx < p.variants.length - 1 ? '1px dashed rgba(255,255,255,0.06)' : 'none' }}>
                                   <span>{v.name}</span>
                                   <span style={{ color: '#94a3b8' }}>
-                                    SKU: <code style={{ background: 'rgba(255,255,255,0.1)', padding: '0 4px', borderRadius: '3px', color: '#67e8f9' }}>{v.sku || `EM-VAR-${vIdx+1}`}</code> (₹{v.price || p.price})
+                                    SKU: <code style={{ background: 'rgba(255,255,255,0.1)', padding: '0 4px', borderRadius: '3px', color: '#67e8f9' }}>{v.sku || `EM-VAR-${vIdx + 1}`}</code> (₹{v.price || p.price})
                                   </span>
                                 </div>
                               ))}
@@ -8653,12 +9028,17 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
                     </td>
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span className={`status-badge ${isRejected ? 'out-of-stock' : 'low-stock'}`}>
-                          {p.approvalStatus === 'pending' ? 'Pending Admin' : 'Rejected'}
+                        <span className={`status-badge ${isChangesRequested ? 'warning-badge' : isRejected ? 'out-of-stock' : 'low-stock'}`} style={isChangesRequested ? { background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' } : {}}>
+                          {p.approvalStatus === 'pending' ? 'Pending Admin' : isChangesRequested ? 'Changes Requested' : 'Rejected'}
                         </span>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           Attempt {p.approvalAttempts || 1} of 3
                         </span>
+                        {p.rejectionReason && (
+                          <span style={{ fontSize: '0.72rem', color: isChangesRequested ? '#f59e0b' : '#ef4444', maxWidth: '140px', wordBreak: 'break-word', display: 'inline-block', marginTop: '2px' }}>
+                            {isChangesRequested ? 'Feedback:' : 'Reason:'} {p.rejectionReason}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td>
@@ -8681,6 +9061,16 @@ function AdminSimulationHub({ products, triggerToast, onRefreshProducts }) {
                           >
                             Reject Listing
                           </button>
+
+                          {(isChangesRequested || isRejected) && (
+                            <button
+                              className="company-portal-btn"
+                              style={{ background: '#f59e0b', borderColor: '#f59e0b', height: '32px', fontSize: '0.8rem', color: '#fff', cursor: 'pointer', fontWeight: '600' }}
+                              onClick={() => handleOpenResubmitModal(p)}
+                            >
+                              ✏️ Fix & Resubmit
+                            </button>
+                          )}
                         </div>
 
                         {!isRejected && p.approvalAttempts < 3 && (
@@ -8834,6 +9224,7 @@ function SellerDocumentResubmissionForm({ documents, onSuccess }) {
   const [idDocUrl, setIdDocUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [isNormsModalOpen, setIsNormsModalOpen] = useState(false);
 
   const isBusinessApproved = (documents || []).some(d => d.documentType === 'business_registration' && d.status === 'approved');
   const isIdApproved = (documents || []).some(d => d.documentType === 'id_proof' && d.status === 'approved');

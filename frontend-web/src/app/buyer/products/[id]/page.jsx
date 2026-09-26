@@ -11,6 +11,39 @@ import './product-detail.css';
 const ALL_PRODUCTS = [];
 const STATIC_RELATED = [];
 
+const REVIEWS = [
+  {
+    id: 'rev-1',
+    name: 'Aarav Sharma',
+    date: '14 Sep 2026',
+    verified: true,
+    rating: 5,
+    text: 'Outstanding quality and fast delivery via Emahu verified hub. Product arrived in pristine condition.',
+    tags: ['Verified Purchase', 'Fast Shipping', 'High Quality'],
+    color: '#4169e1'
+  },
+  {
+    id: 'rev-2',
+    name: 'Priya Patel',
+    date: '02 Aug 2026',
+    verified: true,
+    rating: 5,
+    text: '100% authentic product. Highly recommended seller!',
+    tags: ['Verified Purchase', 'Great Value'],
+    color: '#10b981'
+  },
+  {
+    id: 'rev-3',
+    name: 'Rohan Mehta',
+    date: '28 Jun 2026',
+    verified: true,
+    rating: 4,
+    text: 'Very good build quality and accurate description. Packing was top-notch.',
+    tags: ['Verified Purchase', 'Secure Packaging'],
+    color: '#8b5cf6'
+  }
+];
+
 function Stars({ rating, size = 14 }) {
   return (
     <div className="pd-stars">
@@ -1160,6 +1193,7 @@ export default function ProductDetailPage() {
             {[
               { icon: '🚚', title: 'Express Delivery', sub: 'Estimated by Tomorrow, 10 AM', tag: null },
               { icon: '✅', title: 'EMAHU Quality Checked', sub: 'Physical inspection completed. Seal verified.', tag: null },
+              { icon: '🔄', title: '5-7 Days Easy Returns', sub: 'No questions asked return policy', tag: null },
               { icon: '🔒', title: 'Secure Emahu Payment', sub: 'Money released only after you confirm receipt', tag: null },
             ].map((item, i) => (
               <div key={i} className="pd-delivery-card">
@@ -1485,3 +1519,7 @@ export default function ProductDetailPage() {
     </div>
   );
 }
+
+
+
+ 

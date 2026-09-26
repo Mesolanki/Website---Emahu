@@ -374,9 +374,13 @@
 
 /* Responsive adjustment */
 @media (max-width: 640px) {
+  .wl-container { padding: 20px 14px 60px; }
   .wl-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
   }
   .wl-header-actions {
     width: 100%;
@@ -385,6 +389,24 @@
     flex: 1;
   }
   .wl-title {
-    font-size: 1.8rem;
+    font-size: 1.7rem;
+  }
+  .wl-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .wl-card__body { padding: 10px; }
+  .wl-card__footer { padding: 0 10px 10px; }
+  .wl-card__name { font-size: 0.82rem; }
+  .wl-card__price { font-size: 0.95rem; }
+  .wl-card__add-btn { font-size: 0.75rem; padding: 8px 10px; }
+  .wl-breadcrumb { padding: 10px 14px; font-size: 0.72rem; }
+}
+
+@media (max-width: 420px) {
+  .wl-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
   }
 }
+

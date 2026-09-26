@@ -158,6 +158,7 @@ export default function CartPage() {
   const [removingId, setRemovingId] = useState(null);
   const [isClearingAll, setIsClearingAll] = useState(false);
   const [transactionCode, setTransactionCode] = useState('');
+  const [lastPaidTotal, setLastPaidTotal] = useState(0);
 
   // Delivery state
   const [deliveryCharge, setDeliveryCharge] = useState(99);
@@ -629,19 +630,22 @@ export default function CartPage() {
 
   const totalDistanceCharge = useMemo(() => {
     if (deliveryBreakdown.length > 0) {
-      return deliveryBreakdown.reduce((sum, b) => sum + (b.distanceCharge !== undefined ? b.distanceCharge : (b.distanceKm * 4)), 0);
+      const firstB = deliveryBreakdown[0];
+      return parseFloat((firstB.distanceCharge !== undefined ? firstB.distanceCharge : ((deliveryDistance || 0) * 4)).toFixed(2));
     }
     return parseFloat(((deliveryDistance || 0) * 4).toFixed(2));
   }, [deliveryBreakdown, deliveryDistance]);
 
   const totalWeightCharge = useMemo(() => {
     if (deliveryBreakdown.length > 0) {
-      return deliveryBreakdown.reduce((sum, b) => sum + (b.weightCharge !== undefined ? b.weightCharge : (b.weightKg * 60)), 0);
+      const firstB = deliveryBreakdown[0];
+      return parseFloat((firstB.weightCharge !== undefined ? firstB.weightCharge : 0).toFixed(2));
     }
-    return parseFloat(((totalWeightKg || 0) * 60).toFixed(2));
+    const excessWeight = Math.max(0, (totalWeightKg || 0) - 3);
+    return parseFloat((excessWeight * 20).toFixed(2));
   }, [deliveryBreakdown, totalWeightKg]);
 
-  const shippingFee = subtotal === 0 ? 0 : parseFloat((totalDistanceCharge + totalWeightCharge).toFixed(2));
+  const shippingFee = subtotal === 0 ? 0 : (deliveryCharge > 0 ? deliveryCharge : parseFloat((totalDistanceCharge + totalWeightCharge).toFixed(2)));
   const taxAmount = parseFloat((subtotal * 0.18).toFixed(2));
   const cgstAmount = parseFloat((subtotal * 0.09).toFixed(2));
   const sgstAmount = parseFloat((taxAmount - cgstAmount).toFixed(2));
@@ -681,9 +685,14 @@ export default function CartPage() {
           placedCodes.push(generatedCode);
 
           const itemSubtotal = item.price * item.quantity;
-          const itemShip = shippingFee / Math.max(cartItems.length, 1); // split delivery per item
-          const itemTax = Math.round(itemSubtotal * 0.18);
-          const grandTotalItem = itemSubtotal + itemShip + itemTax;
+          const itemShip = parseFloat((shippingFee / Math.max(cartItems.length, 1)).toFixed(2)); // split delivery per item
+          const itemTax = parseFloat((itemSubtotal * 0.18).toFixed(2));
+          const itemCgst = parseFloat((itemSubtotal * 0.09).toFixed(2));
+          const itemSgst = parseFloat((itemTax - itemCgst).toFixed(2));
+          const itemBase = itemSubtotal + itemShip + itemTax;
+          const itemEmahu = parseFloat((itemBase * 0.04).toFixed(2));
+          const itemHandling = parseFloat((itemTax + itemEmahu).toFixed(2));
+          const grandTotalItem = parseFloat((itemSubtotal + itemShip + itemHandling).toFixed(2));
 
           const sellerObj = item.seller || null;
           let sellerId = 'default_seller';
@@ -715,8 +724,15 @@ export default function CartPage() {
               seller: item.seller || { name: item.brand || 'Emahu Seller', email: 'support@emahu.com', phone: '+91 99999 99999' }
             }],
             total: grandTotalItem,
+            productAmount: itemSubtotal,
             distanceKm: deliveryDistance,
-            deliveryCharge: shippingFee,
+            deliveryCharge: itemShip,
+            taxAmount: itemTax,
+            cgstAmount: itemCgst,
+            sgstAmount: itemSgst,
+            emahuFee: itemEmahu,
+            handlingFee: itemHandling,
+            totalPaid: grandTotalItem,
             status: 'PENDING_APPROVAL',
             timeline: [
               { status: 'PENDING_APPROVAL', label: 'Payment Completed', desc: '⏳ Waiting for Seller Approval', date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) }
@@ -741,6 +757,7 @@ export default function CartPage() {
         console.error(err);
       }
 
+      setLastPaidTotal(grandTotal);
       setCartItems([]);
       localStorage.setItem('emahu_cart', JSON.stringify([]));
       window.dispatchEvent(new Event('storage'));
@@ -952,44 +969,33 @@ export default function CartPage() {
 
               {/* Cross-selling suggestions (shows only when 1 item in cart) */}
               {cartSuggestions.length > 0 && (
-                <div style={{ marginTop: '24px', background: '#fafafa', border: '1px dashed #cbd5e1', borderRadius: '16px', padding: '20px' }}>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '0.82rem', color: '#475569', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div className="cart-suggestions-container">
+                  <h4 className="cart-suggestions-heading">
                     🔥 Complete Your Delivery
                   </h4>
-                  <p style={{ margin: '0 0 16px 0', fontSize: '0.76rem', color: '#64748b', lineHeight: '1.4' }}>
+                  <p className="cart-suggestions-subheading">
                     Add these matching products to your cart for combined shipping!
                   </p>
                   <div className="cart-suggestions-grid">
                     {cartSuggestions.map((s, idx) => (
                       <div key={idx} className="cart-suggestion-card">
                         <div>
-                          <div style={{ width: '100%', height: '110px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', marginBottom: '10px' }}>
+                          <div className="cart-suggestion-img-wrap">
                             {isRealImage(s.img) ? (
-                              <img src={s.img} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <img src={cleanImageUrl(s.img)} alt={s.name} />
                             ) : (
-                              <span style={{ fontSize: '2.5rem' }}>{s.img || '📦'}</span>
+                              <span style={{ fontSize: '2rem' }}>{s.img || '📦'}</span>
                             )}
                           </div>
-                          <p style={{ margin: 0, fontSize: '0.74rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '750' }}>{s.brand}</p>
-                          <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', fontWeight: '700', color: '#0f172a', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', height: '38px', lineHeight: '1.2' }}>{s.name}</p>
+                          <p className="cart-suggestion-brand">{s.brand}</p>
+                          <h4 className="cart-suggestion-title">{s.name}</h4>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: '850', color: '#4169e1' }}>₹{s.price.toLocaleString('en-IN')}</span>
+                        <div className="cart-suggestion-footer">
+                          <span className="cart-suggestion-price">₹{s.price.toLocaleString('en-IN')}</span>
                           <button
                             type="button"
                             onClick={() => handleAddSuggestionToCart(s)}
-                            style={{
-                              background: '#eff6ff',
-                              color: '#2563eb',
-                              border: '1px solid #bfdbfe',
-                              borderRadius: '6px',
-                              padding: '5px 10px',
-                              fontSize: '0.72rem',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              whiteSpace: 'nowrap'
-                            }}
+                            className="cart-suggestion-add-btn"
                           >
                             + Add
                           </button>
@@ -1027,12 +1033,12 @@ export default function CartPage() {
 
                 {/* Per-seller breakdown if multiple packages */}
                 {shippingFee > 0 && deliveryBreakdown.length > 1 && (
-                  <div style={{ background: 'rgba(100,116,139,0.05)', borderRadius: '8px', padding: '10px', marginTop: '2px', marginBottom: '4px' }}>
+                  <div style={{ background: 'rgba(100,116,139,0.05)', borderRadius: '8px', padding: '10px', marginTop: '2px', marginBottom: '4px', maxWidth: '100%', boxSizing: 'border-box' }}>
                     <p style={{ fontSize: '0.71rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Seller Breakdown</p>
                     {deliveryBreakdown.map((b, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#475569', padding: '3px 0' }}>
-                        <span>{b.sellerName} — {b.distanceKm} km {b.weightKg > 0 ? `· ⚖️ ${b.weightKg} kg` : ''}</span>
-                        <span style={{ fontWeight: '600' }}>₹{b.deliveryCharge}</span>
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#475569', padding: '3px 0', flexWrap: 'wrap', gap: '4px' }}>
+                        <span style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>{b.sellerName} — {b.distanceKm} km {b.weightKg > 0 ? `· ⚖️ ${b.weightKg} kg` : ''}</span>
+                        <span style={{ fontWeight: '600', flexShrink: 0 }}>₹{b.deliveryCharge}</span>
                       </div>
                     ))}
                   </div>
@@ -1140,7 +1146,7 @@ export default function CartPage() {
                   </div>
                   <div className="receipt-row">
                     <span>Vault Guaranteed Total:</span>
-                    <strong style={{ color: '#10b981' }}>₹{grandTotal.toLocaleString('en-IN')}</strong>
+                    <strong style={{ color: '#10b981' }}>₹{(lastPaidTotal || grandTotal).toLocaleString('en-IN')}</strong>
                   </div>
                   <div className="receipt-row">
                     <span>Courier Transit:</span>

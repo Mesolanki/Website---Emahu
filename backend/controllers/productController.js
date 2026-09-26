@@ -67,13 +67,28 @@ const resolveCategoryHierarchy = async (inputCategory, inputSubcategory) => {
   const mainLower = mainCat.toLowerCase();
   const subLower = subCat.toLowerCase();
 
-  // If subcategory is empty or 'General', but main category is actually a subcategory:
-  if ((!subCat || subLower === 'general' || subCat === mainCat) && SUBCATEGORY_TO_MAIN_MAP[mainLower]) {
+  // 1. If subcategory maps directly to a main root category, prioritize the true main category!
+  if (subLower && subLower !== 'general' && SUBCATEGORY_TO_MAIN_MAP[subLower]) {
+    mainCat = SUBCATEGORY_TO_MAIN_MAP[subLower];
+  } else if (mainLower && SUBCATEGORY_TO_MAIN_MAP[mainLower]) {
     subCat = mainCat;
     mainCat = SUBCATEGORY_TO_MAIN_MAP[mainLower];
-  } else if (SUBCATEGORY_TO_MAIN_MAP[mainLower] && (!inputSubcategory || inputSubcategory === 'General')) {
-    subCat = mainCat;
-    mainCat = SUBCATEGORY_TO_MAIN_MAP[mainLower];
+  } else if (mainLower === 'electronics' || mainLower === 'tech' || mainLower === 'tech & gadgets') {
+    mainCat = 'Electronics & Tech';
+  } else if (mainLower === 'apparel' || mainLower === 'fashion') {
+    mainCat = 'Apparel & Fashion';
+  } else if (mainLower === 'shoes') {
+    mainCat = 'Shoes & Footwear';
+  } else if (mainLower === 'kitchen') {
+    mainCat = 'Kitchen & Dining';
+  } else if (mainLower === 'lifestyle' || mainLower === 'home') {
+    mainCat = 'Lifestyle & Home';
+  } else if (mainLower === 'grocery' || mainLower === 'groceries') {
+    mainCat = 'Grocery & Essentials';
+  } else if (mainLower === 'beauty' || mainLower === 'cosmetics') {
+    mainCat = 'Beauty & Cosmetics';
+  } else if (mainLower === 'books' || mainLower === 'stationery') {
+    mainCat = 'Books & Stationery';
   }
 
   // Also query DB Category collection if needed

@@ -73,7 +73,8 @@ const sendTokenResponse = async (user, statusCode, req, res) => {
         ifscCode: user.ifscCode,
         bankName: user.bankName,
         gstNumber: user.gstNumber,
-        status: user.status
+        status: user.status,
+        verificationFeedback: user.verificationFeedback || ''
       }
     });
 };
@@ -693,6 +694,7 @@ exports.getMe = async (req, res) => {
         bankName: req.user.bankName,
         gstNumber: req.user.gstNumber,
         status: req.user.status,
+        verificationFeedback: req.user.verificationFeedback || '',
         latitude: req.user.latitude,
         longitude: req.user.longitude,
         location: req.user.location,
@@ -966,7 +968,7 @@ exports.sellerDecision = async (req, res) => {
       seller.verificationFeedback = feedback || '';
     } else if (decision === 'more_info_requested') {
       seller.status = 'more_info_requested';
-      seller.verificationFeedback = feedback || '';
+      seller.verificationFeedback = feedback || 'Please provide additional details or verify your uploaded documents.';
     } else {
       return res.status(400).json({ success: false, error: 'Invalid decision type' });
     }

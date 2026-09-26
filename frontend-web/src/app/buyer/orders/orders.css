@@ -631,37 +631,49 @@
 }
 
 @media (max-width: 768px) {
+  .orders-container { padding: 20px 14px 60px; }
+  .orders-title { font-size: 1.7rem; }
+  .orders-subtitle { font-size: 0.88rem; }
+  .orders-vault-stats-card { flex-wrap: wrap; gap: 14px; padding: 14px 16px; }
   .order-card-header {
     grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-    padding: 20px 24px;
+    gap: 14px;
+    padding: 16px;
   }
 
   .order-card-footer {
     flex-direction: column;
     align-items: stretch;
-    padding: 20px 24px;
+    padding: 16px;
+    gap: 12px;
   }
 
   .order-actions {
-    margin-top: 12px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .order-actions button {
     flex: 1;
     text-align: center;
+    padding: 8px 12px;
+    font-size: 0.8rem;
   }
+  .orders-breadcrumb { padding: 10px 14px; font-size: 0.72rem; }
 }
 
 @media (max-width: 480px) {
+  .orders-vault-stats-card { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .order-card-header {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 10px;
   }
 
   .order-item-row {
     grid-template-columns: 50px 1fr;
-    gap: 12px;
+    gap: 10px;
+    padding: 10px 0;
   }
 
   .order-item-price {
@@ -672,6 +684,11 @@
 
   .order-actions {
     flex-direction: column;
+    width: 100%;
+  }
+
+  .order-actions button {
+    width: 100%;
   }
 }
 

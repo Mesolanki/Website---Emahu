@@ -1,15 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import './seller_testimonials.css';
-
-/* ─── Stat counters ─────────────────────────────────────────────── */
-const stats = [
-  { value: 12400, suffix: '+', label: 'Active Sellers', prefix: '' },
-  { value: 58, suffix: ' Cr+', label: 'Total Payouts', prefix: '₹' },
-  { value: 28000, suffix: '+', label: 'Pin Codes Served', prefix: '' },
-  { value: 99.7, suffix: '%', label: 'On-Time Payout Rate', prefix: '', decimals: 1 },
-];
 
 /* ─── Testimonial cards data ─────────────────────────────────────── */
 const testimonials = [
@@ -69,73 +60,8 @@ const testimonials = [
   },
 ];
 
-/* ─── Animated Counter Hook ─────────────────────────────────────── */
-function useCounter(target, duration = 2000, decimals = 0, start = false) {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    if (!start) return;
-    let startTime = null;
-    const step = (timestamp) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-      setCount(parseFloat((eased * target).toFixed(decimals)));
-      if (progress < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, [start, target, duration, decimals]);
-  return count;
-}
-
-function StatCard({ stat, started }) {
-  const count = useCounter(stat.value, 2200, stat.decimals || 0, started);
-  return (
-    <div className="st-stat-card">
-      <div className="st-stat-number">
-        <span className="st-stat-pre">{stat.prefix}</span>
-        <span className="st-stat-val">
-          {stat.decimals ? count.toFixed(stat.decimals) : Math.floor(count).toLocaleString('en-IN')}
-        </span>
-        <span className="st-stat-suf">{stat.suffix}</span>
-      </div>
-      <p className="st-stat-label">{stat.label}</p>
-    </div>
-  );
-}
-
 /* ─── Main Component ─────────────────────────────────────────────── */
 export default function SellerTestimonials() {
-  const statsRef = useRef(null);
-  const [statsStarted, setStatsStarted] = useState(false);
-
-  // Trigger counters when stats bar scrolls into view
-  useEffect(() => {
-    const el = statsRef.current;
-    if (!el) return;
-
-    // Safety fallback: auto-trigger after 1200ms if observer is slow
-    const timer = setTimeout(() => {
-      setStatsStarted(true);
-    }, 1200);
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setStatsStarted(true);
-          clearTimeout(timer);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.05 }
-    );
-    observer.observe(el);
-
-    return () => {
-      clearTimeout(timer);
-      observer.disconnect();
-    };
-  }, []);
-
   // Duplicate cards for seamless infinite scroll
   const doubled = [...testimonials, ...testimonials];
 
@@ -176,15 +102,6 @@ export default function SellerTestimonials() {
               <TestimonialCard key={`b-${i}`} t={t} />
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* ── Stats Bar ── */}
-      <div className="st-container">
-        <div className="st-stats-bar" ref={statsRef}>
-          {stats.map((stat, i) => (
-            <StatCard key={i} stat={stat} started={statsStarted} />
-          ))}
         </div>
       </div>
     </section>

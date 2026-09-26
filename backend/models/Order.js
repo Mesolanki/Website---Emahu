@@ -112,6 +112,21 @@ const orderSchema = new mongoose.Schema(
     productAmount: {
       type: Number
     },
+    taxAmount: {
+      type: Number
+    },
+    cgstAmount: {
+      type: Number
+    },
+    sgstAmount: {
+      type: Number
+    },
+    emahuFee: {
+      type: Number
+    },
+    handlingFee: {
+      type: Number
+    },
     totalPaid: {
       type: Number
     },
