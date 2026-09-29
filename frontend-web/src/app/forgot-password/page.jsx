@@ -114,7 +114,7 @@ export default function ForgotPassword() {
       const res = await fetchWithRetry(`${API_BASE}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase() })
+        body: JSON.stringify({ email: email.trim().toLowerCase(), role })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -188,7 +188,8 @@ export default function ForgotPassword() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
-          otp: otpCode
+          otp: otpCode,
+          role
         })
       });
       const data = await res.json();
@@ -224,7 +225,7 @@ export default function ForgotPassword() {
       const res = await fetchWithRetry(`${API_BASE}/api/auth/resend-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase() })
+        body: JSON.stringify({ email: email.trim().toLowerCase(), role })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -275,7 +276,8 @@ export default function ForgotPassword() {
           email: email.trim().toLowerCase(),
           passwordResetToken: resetToken,
           newPassword,
-          confirmPassword
+          confirmPassword,
+          role
         })
       });
       const data = await res.json();

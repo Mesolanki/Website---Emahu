@@ -1523,7 +1523,7 @@ exports.sendOtp = async (req, res) => {
 // @access  Public
 exports.verifyOtp = async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, role } = req.body;
     if (!email || !otp) {
       return res.status(400).json({ success: false, error: 'Please provide both email and OTP code' });
     }
@@ -1546,7 +1546,14 @@ exports.verifyOtp = async (req, res) => {
         ]
       };
     }
-    const user = await User.findOne(query);
+    if (role) {
+      query.role = role;
+    }
+    let user = await User.findOne(query);
+    if (!user && role) {
+      delete query.role;
+      user = await User.findOne(query);
+    }
     if (user && user.otpCode) {
       if (user.otpAttempts >= 5) {
         return res.status(400).json({ success: false, error: 'Too many failed attempts. Verification locked. Please request a new OTP.' });
@@ -1914,7 +1921,7 @@ exports.verifyPhoneOtp = async (req, res) => {
 // @access  Public
 exports.forgotPassword = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, role } = req.body;
     if (!email || !email.trim()) {
       return res.status(400).json({ success: false, error: 'Please provide an email address or mobile number' });
     }
@@ -1934,9 +1941,16 @@ exports.forgotPassword = async (req, res) => {
         ]
       };
     }
+    if (role) {
+      query.role = role;
+    }
     
     // Check if user exists
-    const user = await User.findOne(query);
+    let user = await User.findOne(query);
+    if (!user && role) {
+      delete query.role;
+      user = await User.findOne(query);
+    }
     if (!user) {
       return res.status(404).json({ success: false, error: 'No user registered with this email address or mobile number' });
     }
@@ -1981,7 +1995,7 @@ exports.forgotPassword = async (req, res) => {
 // @access  Public
 exports.resendOtp = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, role } = req.body;
     if (!email || !email.trim()) {
       return res.status(400).json({ success: false, error: 'Please provide an email address or mobile number' });
     }
@@ -2001,9 +2015,16 @@ exports.resendOtp = async (req, res) => {
         ]
       };
     }
+    if (role) {
+      query.role = role;
+    }
 
     // Check if user exists
-    const user = await User.findOne(query);
+    let user = await User.findOne(query);
+    if (!user && role) {
+      delete query.role;
+      user = await User.findOne(query);
+    }
     if (!user) {
       return res.status(404).json({ success: false, error: 'No user registered with this email address or mobile number' });
     }
@@ -2058,7 +2079,7 @@ exports.resendOtp = async (req, res) => {
 // @access  Public
 exports.resetPassword = async (req, res) => {
   try {
-    const { email, passwordResetToken, newPassword, confirmPassword } = req.body;
+    const { email, passwordResetToken, newPassword, confirmPassword, role } = req.body;
     if (!email || !passwordResetToken || !newPassword || !confirmPassword) {
       return res.status(400).json({ success: false, error: 'Please fill in all fields' });
     }
@@ -2092,9 +2113,16 @@ exports.resetPassword = async (req, res) => {
         ]
       };
     }
+    if (role) {
+      query.role = role;
+    }
 
     // Find user
-    const user = await User.findOne(query);
+    let user = await User.findOne(query);
+    if (!user && role) {
+      delete query.role;
+      user = await User.findOne(query);
+    }
     if (!user) {
       return res.status(404).json({ success: false, error: 'No user registered with this email address or mobile number' });
     }
@@ -2119,10 +2147,10 @@ exports.resetPassword = async (req, res) => {
     user.otpAttempts = 0;
     user.otpResendAttempts = 0;
 
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     // Log password reset activity
-    console.log(`[SECURITY] Password reset activity successfully completed for user: ${cleanEmail} at ${new Date().toISOString()}`);
+    console.log(`[SECURITY] Password reset activity successfully completed for user: ${user.email || cleanInput} at ${new Date().toISOString()}`);
 
     res.status(200).json({
       success: true,
