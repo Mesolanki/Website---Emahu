@@ -8,10 +8,10 @@ echo "🚀 [1/5] Pulling latest code changes from GitHub..."
 git pull origin main
 
 echo "📦 [2/5] Building Frontend Web (emahu.com)..."
-cd frontend-web && npm run build && cd ..
+cd frontend-web && rm -rf .next && npm run build && cd ..
 
 echo "📦 [3/5] Building Admin Panel (manage.emahu.com)..."
-cd admin-emahu && npm run build && cd ..
+cd admin-emahu && rm -rf .next && npm run build && cd ..
 
 echo "🌐 [4/5] Updating Nginx configuration & static headers..."
 TARGET_CONF="/etc/nginx/sites-available/emahu.conf"
@@ -38,6 +38,7 @@ else
 fi
 
 echo "🔄 [5/5] Restarting backend & frontend PM2 services..."
-pm2 restart ecosystem.config.js || pm2 restart all
+pm2 startOrReload ecosystem.config.js --update-env || pm2 restart ecosystem.config.js
+pm2 save
 
 echo "✅ === EMAHU VPS Deployment Updated Successfully! ==="
