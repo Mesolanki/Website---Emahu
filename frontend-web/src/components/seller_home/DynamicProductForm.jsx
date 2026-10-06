@@ -1826,7 +1826,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                   }}>
                     <div>
                       <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        ⚖️ Logistics Weight Surcharge (@ ₹60/KG)
+                        ⚖️ Logistics Weight Surcharge (@ ₹50/KG)
                       </div>
                       <div style={{ fontSize: '0.82rem', color: '#15803d', marginTop: '2px' }}>
                         Entered Weight: <strong>{weight} {weightUnit}</strong>
@@ -1836,7 +1836,7 @@ export default function DynamicProductForm({ isOpen, onClose, resubmitProductId,
                     <div style={{ textAlign: 'right' }}>
                       <span style={{ fontSize: '0.72rem', color: '#166534', display: 'block', fontWeight: 600 }}>Weight Delivery Cost</span>
                       <strong style={{ fontSize: '1.2rem', color: '#14532d', fontWeight: '800' }}>
-                        ₹{( (weightUnit === 'g' ? parseFloat(weight) / 1000 : parseFloat(weight)) * 60 ).toFixed(2)}
+                        ₹{( (weightUnit === 'g' ? parseFloat(weight) / 1000 : parseFloat(weight)) * 50 ).toFixed(2)}
                       </strong>
                     </div>
                   </div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
 import { logAnalyticsEvent } from '@/utils/analytics';
-import { detectLocationWithGPS } from '@/utils/location';
+import { detectLocationWithGPS, getCoordinatesForCity, calculateHaversineRoadDistance } from '@/utils/location';
 import './checkout.css';
 
 import API_BASE from '@/utils/config';
@@ -575,6 +575,7 @@ export default function CheckoutPage() {
       setAddressType('manual');
 
       // Geocode to dynamically update coordinates & recalculate delivery
+      let coordsFound = false;
       try {
         const query = [address, city, stateName, pincode, 'India'].filter(Boolean).join(', ');
         const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
@@ -583,9 +584,20 @@ export default function CheckoutPage() {
           const coords = { latitude: parseFloat(data[0].lat).toFixed(6), longitude: parseFloat(data[0].lon).toFixed(6) };
           setBuyerCoordinates(coords);
           localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
+          coordsFound = true;
         }
       } catch (err) {
         console.warn('Geocoding manual address failed:', err);
+      }
+
+      // Robust fallback if external geocoding failed
+      if (!coordsFound) {
+        const cityCoords = getCoordinatesForCity(city);
+        if (cityCoords) {
+          const coords = { latitude: cityCoords.latitude.toString(), longitude: cityCoords.longitude.toString() };
+          setBuyerCoordinates(coords);
+          localStorage.setItem('emahu_buyer_coordinates', JSON.stringify(coords));
+        }
       }
     }
   };
@@ -611,19 +623,18 @@ export default function CheckoutPage() {
 
   const totalDistanceCharge = useMemo(() => {
     if (deliveryBreakdown.length > 0) {
-      const firstB = deliveryBreakdown[0];
-      return parseFloat((firstB.distanceCharge !== undefined ? firstB.distanceCharge : ((deliveryDistance || 0) * 4)).toFixed(2));
+      const sumDistCharge = deliveryBreakdown.reduce((sum, b) => sum + (b.distanceCharge !== undefined ? b.distanceCharge : ((b.distanceKm || 0) * 4)), 0);
+      return parseFloat(sumDistCharge.toFixed(2));
     }
     return parseFloat(((deliveryDistance || 0) * 4).toFixed(2));
   }, [deliveryBreakdown, deliveryDistance]);
 
   const totalWeightCharge = useMemo(() => {
     if (deliveryBreakdown.length > 0) {
-      const firstB = deliveryBreakdown[0];
-      return parseFloat((firstB.weightCharge !== undefined ? firstB.weightCharge : 0).toFixed(2));
+      const sumWeightCharge = deliveryBreakdown.reduce((sum, b) => sum + (b.weightCharge !== undefined ? b.weightCharge : ((b.weightKg || 0) * 50)), 0);
+      return parseFloat(sumWeightCharge.toFixed(2));
     }
-    const excessWeight = Math.max(0, (totalWeightKg || 0) - 3);
-    return parseFloat((excessWeight * 20).toFixed(2));
+    return parseFloat(((totalWeightKg || 0) * 50).toFixed(2));
   }, [deliveryBreakdown, totalWeightKg]);
 
   // Dynamic delivery charge calculation
@@ -675,24 +686,84 @@ export default function CheckoutPage() {
           setDeliveryCalculationError('');
         } else {
           setDeliveryCalculationError(data.error || 'Failed to calculate delivery');
-          setDeliveryBreakdown([]);
           if (data.error && data.error.includes('exceeds')) {
             setMaxDistanceExceeded(true);
+            setDeliveryBreakdown([]);
+          } else {
+            applyDynamicFallback(lat, lon);
           }
         }
       } catch (err) {
-        console.error('Delivery calculation failed:', err);
-        const userState = (addressType === 'saved' ? (detectCityAndState(address).state || 'Gujarat') : stateName).trim();
-        const hasPartner = STATES_WITH_PARTNERS.some(s => s.toLowerCase() === userState.toLowerCase());
-
-        const standardFee = hasPartner ? 99 : 0;
-        const expressSurcharge = shippingSpeed === 'express' ? deliverySettings.expressDeliverySurcharge : 0;
-        setDeliveryCharge(standardFee + expressSurcharge);
-        setDeliveryDistance(0);
-        setDeliveryBreakdown([]);
-        setMaxDistanceExceeded(false);
+        console.warn('Delivery server calculation failed, using dynamic local calculation:', err);
+        applyDynamicFallback(lat, lon);
       } finally {
         setDeliveryCalculating(false);
+      }
+    };
+
+    // Client-side dynamic fallback using ₹4/km and ₹50/kg for live server resilience
+    const applyDynamicFallback = (bLat, bLon) => {
+      try {
+        const groups = {};
+        let maxDist = 0;
+        cartItems.forEach(item => {
+          const sellerObj = item.seller || {};
+          const sId = (sellerObj._id || sellerObj.id || item.brand || 'seller').toString();
+          let sLat = parseFloat(sellerObj.latitude);
+          let sLon = parseFloat(sellerObj.longitude);
+          if (isNaN(sLat) || isNaN(sLon)) {
+            const sCoords = getCoordinatesForCity(sellerObj.city || sellerObj.address || 'Ahmedabad');
+            sLat = sCoords ? sCoords.latitude : 23.0225;
+            sLon = sCoords ? sCoords.longitude : 72.5714;
+          }
+          if (!groups[sId]) {
+            const roadDist = calculateHaversineRoadDistance(bLat, bLon, sLat, sLon);
+            const distKm = roadDist.distanceKm;
+            if (distKm > maxDist) maxDist = distKm;
+            groups[sId] = {
+              sellerId: sId,
+              sellerName: sellerObj.storeName || sellerObj.name || item.brand || 'Emahu Seller',
+              distanceKm: distKm,
+              weightKg: 0
+            };
+          }
+          const w = (item.weightInKg !== undefined && item.weightInKg !== null && item.weightInKg > 0)
+            ? item.weightInKg
+            : (item.weight !== undefined && item.weight !== null && item.weight > 0
+                ? (item.weightUnit === 'g' ? (item.weight / 1000) : item.weight)
+                : 0.5);
+          groups[sId].weightKg += (w * (item.quantity || 1));
+        });
+
+        const fallbackBreakdown = Object.values(groups).map(g => {
+          const distCharge = parseFloat((g.distanceKm * 4).toFixed(2));
+          const weightKg = parseFloat(g.weightKg.toFixed(3));
+          const weightCharge = parseFloat((weightKg * 50).toFixed(2));
+          return {
+            sellerId: g.sellerId,
+            sellerName: g.sellerName,
+            distanceKm: g.distanceKm,
+            weightKg,
+            distanceCharge: distCharge,
+            weightCharge,
+            deliveryCharge: parseFloat((distCharge + weightCharge).toFixed(2))
+          };
+        });
+
+        let fallbackTotal = fallbackBreakdown.reduce((sum, b) => sum + b.deliveryCharge, 0);
+        if (shippingSpeed === 'express') {
+          fallbackTotal += (deliverySettings.expressDeliverySurcharge || 100);
+        }
+        setDeliveryCharge(parseFloat(fallbackTotal.toFixed(2)));
+        setDeliveryDistance(parseFloat(maxDist.toFixed(2)));
+        setDeliveryBreakdown(fallbackBreakdown);
+        setMaxDistanceExceeded(false);
+        setDeliveryCalculationError('');
+      } catch (e) {
+        console.error('Fallback delivery calc error in checkout:', e);
+        setDeliveryCharge(50);
+        setDeliveryDistance(0);
+        setDeliveryBreakdown([]);
       }
     };
 
@@ -952,13 +1023,13 @@ export default function CheckoutPage() {
   };
 
   const shippingFee = subtotal === 0 ? 0 : (deliveryCharge > 0 ? deliveryCharge : parseFloat((totalDistanceCharge + totalWeightCharge).toFixed(2)));
-  const taxAmount = parseFloat((subtotal * 0.18).toFixed(2)); // 18% Emahu Tax
-  const cgstAmount = parseFloat((subtotal * 0.09).toFixed(2));
-  const sgstAmount = parseFloat((taxAmount - cgstAmount).toFixed(2));
-  const baseBillAmount = parseFloat((subtotal + shippingFee + taxAmount).toFixed(2));
-  const emahuFee = subtotal === 0 ? 0 : parseFloat((baseBillAmount * 0.04).toFixed(2));
-  const handlingFee = parseFloat((taxAmount + emahuFee).toFixed(2));
-  const grandTotal = parseFloat((baseBillAmount + emahuFee).toFixed(2));
+  const taxAmount = useMemo(() => parseFloat(((subtotal || 0) * 0.18).toFixed(2)), [subtotal]);
+  const cgstAmount = useMemo(() => parseFloat(((subtotal || 0) * 0.09).toFixed(2)), [subtotal]);
+  const sgstAmount = useMemo(() => parseFloat((taxAmount - cgstAmount).toFixed(2)), [taxAmount, cgstAmount]);
+  const baseBillAmount = useMemo(() => parseFloat(((subtotal || 0) + (shippingFee || 0) + taxAmount).toFixed(2)), [subtotal, shippingFee, taxAmount]);
+  const emahuFee = useMemo(() => (subtotal === 0 ? 0 : parseFloat((baseBillAmount * 0.04).toFixed(2))), [subtotal, baseBillAmount]);
+  const handlingFee = useMemo(() => parseFloat((taxAmount + emahuFee).toFixed(2)), [taxAmount, emahuFee]);
+  const grandTotal = useMemo(() => parseFloat(((subtotal || 0) + (shippingFee || 0) + handlingFee).toFixed(2)), [subtotal, shippingFee, handlingFee]);
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
@@ -1061,9 +1132,7 @@ export default function CheckoutPage() {
         itemDeliveryFee = parseFloat((shippingFee * itemRatio).toFixed(2));
       }
 
-      if (subtotal > 150) {
-        itemDeliveryFee = (shippingSpeed === 'express') ? (deliverySettings.expressDeliverySurcharge || 100) : 0;
-      } else if (shippingSpeed === 'express') {
+      if (shippingSpeed === 'express') {
         itemDeliveryFee += deliverySettings.expressDeliverySurcharge || 100;
       }
 
@@ -1779,18 +1848,6 @@ export default function CheckoutPage() {
                       )}
                     </strong>
                   </div>
-
-                  {shippingFee > 0 && deliveryBreakdown.length > 1 && (
-                    <div style={{ background: 'rgba(100,116,139,0.05)', borderRadius: '8px', padding: '10px', marginTop: '2px', marginBottom: '4px' }}>
-                      <p style={{ fontSize: '0.71rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Seller Breakdown</p>
-                      {deliveryBreakdown.map((b, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#475569', padding: '3px 0' }}>
-                          <span>{b.sellerName} — {b.distanceKm} km {b.weightKg > 0 ? `· ⚖️ ${b.weightKg} kg` : ''}</span>
-                          <span style={{ fontWeight: '600' }}>₹{b.deliveryCharge}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
 
                   <div className="co-breakdown-row">
                     <span>Handling Fees</span>

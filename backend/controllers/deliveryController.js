@@ -188,12 +188,10 @@ exports.updateDeliverySettings = async (req, res) => {
   }
 };
 
-// Helper function to resolve delivery charge based on distance (₹4/KM) and weight
+// Helper function to resolve delivery charge based on distance (₹4/KM) and weight (₹50/KG)
 function resolveCharge(distance, productTotal, totalWeightKg = 0, settings) {
   const distanceCharge = parseFloat(((distance || 0) * 4).toFixed(2));
-  // Weight surcharge only applies if total shipment weight exceeds 3kg heavy threshold
-  const excessWeightKg = Math.max(0, (totalWeightKg || 0) - 3);
-  const weightCharge = parseFloat((excessWeightKg * 20).toFixed(2));
+  const weightCharge = parseFloat(((totalWeightKg || 0) * 50).toFixed(2));
   const charge = parseFloat((distanceCharge + weightCharge).toFixed(2));
   return {
     charge,
@@ -318,25 +316,27 @@ exports.calculateDeliveryCharge = async (req, res) => {
       }
     }
 
-    // Single unified shipment delivery charge
-    const overallChargeResult = resolveCharge(maxDistance, totalCartSubtotal, totalCartWeightKg, settings);
-    const totalDeliveryCharge = overallChargeResult.charge;
-
-    const numSellers = Object.keys(sellerGroups).length || 1;
-    const perSellerCharge = parseFloat((totalDeliveryCharge / numSellers).toFixed(2));
+    let totalDeliveryCharge = 0;
 
     for (const sId in sellerGroups) {
       const group = sellerGroups[sId];
       const distance = sellerDistances[sId];
+      const sDistance = parseFloat(distance.toFixed(2));
+      const sWeight = parseFloat((group.totalWeightKg || 0).toFixed(3));
+      const sDistCharge = parseFloat((sDistance * 4).toFixed(2));
+      const sWeightCharge = parseFloat((sWeight * 50).toFixed(2));
+      const sSellerCharge = parseFloat((sDistCharge + sWeightCharge).toFixed(2));
+
+      totalDeliveryCharge = parseFloat((totalDeliveryCharge + sSellerCharge).toFixed(2));
 
       results.push({
         sellerId: sId,
         sellerName: group.sellerName,
-        distanceKm: parseFloat(distance.toFixed(2)),
-        weightKg: parseFloat((group.totalWeightKg || 0).toFixed(3)),
-        distanceCharge: overallChargeResult.distanceCharge,
-        weightCharge: overallChargeResult.weightCharge,
-        deliveryCharge: perSellerCharge,
+        distanceKm: sDistance,
+        weightKg: sWeight,
+        distanceCharge: sDistCharge,
+        weightCharge: sWeightCharge,
+        deliveryCharge: sSellerCharge,
         subtotal: group.subtotal,
         items: group.items
       });

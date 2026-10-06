@@ -240,13 +240,15 @@ exports.createOrder = async (req, res) => {
     }
 
     // Recalculate financial breakdown (subtotal + deliveryCharge + handlingFee)
-    const taxAmount = parseFloat((productAmount * 0.18).toFixed(2));
-    const cgstAmount = parseFloat((productAmount * 0.09).toFixed(2));
+    const pAmt = Number(productAmount || 0);
+    const dChg = Number(deliveryCharge || 0);
+    const taxAmount = parseFloat((pAmt * 0.18).toFixed(2));
+    const cgstAmount = parseFloat((pAmt * 0.09).toFixed(2));
     const sgstAmount = parseFloat((taxAmount - cgstAmount).toFixed(2));
-    const baseBill = productAmount + deliveryCharge + taxAmount;
-    const emahuFee = parseFloat((baseBill * 0.04).toFixed(2));
+    const baseBill = pAmt + dChg + taxAmount;
+    const emahuFee = pAmt === 0 ? 0 : parseFloat((baseBill * 0.04).toFixed(2));
     const handlingFee = parseFloat((taxAmount + emahuFee).toFixed(2));
-    const calculatedTotal = parseFloat((productAmount + deliveryCharge + handlingFee).toFixed(2));
+    const calculatedTotal = parseFloat((pAmt + dChg + handlingFee).toFixed(2));
 
     orderData.taxAmount = orderData.taxAmount !== undefined ? orderData.taxAmount : taxAmount;
     orderData.cgstAmount = orderData.cgstAmount !== undefined ? orderData.cgstAmount : cgstAmount;

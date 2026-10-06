@@ -5072,7 +5072,7 @@ export default function EmahuProDashboard() {
                           }}>
                             <div>
                               <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                ⚖️ Logistics Weight Surcharge (@ ₹60/KG)
+                                ⚖️ Logistics Weight Surcharge (@ ₹50/KG)
                               </div>
                               <div style={{ fontSize: '0.78rem', color: '#15803d', marginTop: '2px' }}>
                                 {newProductWeight} {newProductWeightUnit}
@@ -5082,7 +5082,7 @@ export default function EmahuProDashboard() {
                             <div style={{ textAlign: 'right' }}>
                               <span style={{ fontSize: '0.7rem', color: '#166534', display: 'block', fontWeight: 600 }}>Weight Delivery Cost</span>
                               <div style={{ fontSize: '1.05rem', color: '#14532d', fontWeight: '800' }}>
-                                ₹{((newProductWeightUnit === 'g' ? parseFloat(newProductWeight) / 1000 : parseFloat(newProductWeight)) * 60).toFixed(2)}
+                                ₹{((newProductWeightUnit === 'g' ? parseFloat(newProductWeight) / 1000 : parseFloat(newProductWeight)) * 50).toFixed(2)}
                               </div>
                             </div>
                           </div>

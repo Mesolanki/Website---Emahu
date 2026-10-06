@@ -195,6 +195,19 @@ export default function AdminDashboard() {
   const [savingPlatformSettings, setSavingPlatformSettings] = useState(false);
 
   // Sellers and Products State
+  // Customer Inquiries States
+  const [inquiries, setInquiries] = useState([]);
+  const [loadingInquiries, setLoadingInquiries] = useState(false);
+  const [inquiriesError, setInquiriesError] = useState(false);
+  const [inquiryFilterStatus, setInquiryFilterStatus] = useState('all');
+  const [inquiryFilterRole, setInquiryFilterRole] = useState('all');
+  const [inquirySearchTerm, setInquirySearchTerm] = useState('');
+  const [selectedInquiry, setSelectedInquiry] = useState(null);
+  const [inquiryActionLoading, setInquiryActionLoading] = useState({});
+  const [inquiryAdminNotes, setInquiryAdminNotes] = useState('');
+  const [savingInquiryNotes, setSavingInquiryNotes] = useState(false);
+  const [inquiryStats, setInquiryStats] = useState({ total: 0, new: 0, in_progress: 0, resolved: 0, closed: 0 });
+
   const [sellers, setSellers] = useState([]);
   const [products, setProducts] = useState([]);
   const [loadingSellers, setLoadingSellers] = useState(false);
@@ -1069,6 +1082,172 @@ export default function AdminDashboard() {
   };
 
   // Fetch Notifications
+  // Demo Default Inquiries matching Contact Form fields
+  const DEFAULT_INQUIRIES = [
+    {
+      _id: 'inq-101',
+      name: 'Rohan Sharma',
+      email: 'rohan.sharma@example.com',
+      phone: '9876543210',
+      role: 'buyer',
+      subject: 'Order Tracking & Delivery Inquiry',
+      message: 'Hello, I wanted to inquire about standard shipping times to Ahmedabad and if express delivery is available for electronic products.',
+      status: 'new',
+      adminNotes: '',
+      createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString()
+    },
+    {
+      _id: 'inq-102',
+      name: 'Pooja Patel',
+      email: 'pooja.patel@textiles.in',
+      phone: '9081234567',
+      role: 'seller',
+      subject: 'Merchant Partnership & Catalog Onboarding',
+      message: 'Namaste EMAHU Team. We are a textile manufacturer in Surat. We want to list 150+ ethnic wear SKUs on your platform. What are the commission rates and settlement cycle?',
+      status: 'in_progress',
+      adminNotes: 'Spoke on phone, sent seller onboarding checklist.',
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString()
+    },
+    {
+      _id: 'inq-103',
+      name: 'Vikram Singh',
+      email: 'vikram.logistics@gmail.com',
+      phone: '9988776655',
+      role: 'delivery',
+      subject: 'Delivery Partner KYC Status',
+      message: 'Applied for delivery partner fleet in Gandhinagar sector. Submitted RC and Driving License. When can my KYC verification be approved?',
+      status: 'resolved',
+      adminNotes: 'Documents verified and account activated.',
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 28).toISOString()
+    },
+    {
+      _id: 'inq-104',
+      name: 'Aarav Mehta',
+      email: 'aarav.mehta@outlook.com',
+      phone: '9123456789',
+      role: 'general',
+      subject: 'Bulk Corporate Gifting',
+      message: 'Hi team, we are planning corporate Diwali gift hampers for 300 employees. Do you offer bulk discounts and customized branding?',
+      status: 'new',
+      adminNotes: '',
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
+    }
+  ];
+
+  // Fetch Customer Inquiries (Pure UI - Reads from localStorage + default sample inquiries)
+  const fetchInquiries = () => {
+    setLoadingInquiries(true);
+    setInquiriesError(false);
+    try {
+      let stored = [];
+      try {
+        const raw = localStorage.getItem('emahu_contact_inquiries');
+        if (raw) stored = JSON.parse(raw);
+      } catch (e) {}
+
+      const combined = [...stored];
+      DEFAULT_INQUIRIES.forEach(d => {
+        if (!combined.some(c => c._id === d._id)) {
+          combined.push(d);
+        }
+      });
+
+      setInquiries(combined);
+      setInquiryStats({
+        total: combined.length,
+        new: combined.filter(i => i.status === 'new').length,
+        in_progress: combined.filter(i => i.status === 'in_progress').length,
+        resolved: combined.filter(i => i.status === 'resolved').length,
+        closed: combined.filter(i => i.status === 'closed').length
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingInquiries(false);
+    }
+  };
+
+  // Update Inquiry Status and/or Admin Notes in UI
+  const handleUpdateInquiryStatus = (inquiryId, newStatus, newNotes = undefined) => {
+    setInquiries(prev => {
+      const updated = prev.map(item => {
+        if (item._id === inquiryId) {
+          return {
+            ...item,
+            ...(newStatus !== undefined ? { status: newStatus } : {}),
+            ...(newNotes !== undefined ? { adminNotes: newNotes } : {})
+          };
+        }
+        return item;
+      });
+
+      try {
+        localStorage.setItem('emahu_contact_inquiries', JSON.stringify(updated));
+      } catch (e) {}
+
+      setInquiryStats({
+        total: updated.length,
+        new: updated.filter(i => i.status === 'new').length,
+        in_progress: updated.filter(i => i.status === 'in_progress').length,
+        resolved: updated.filter(i => i.status === 'resolved').length,
+        closed: updated.filter(i => i.status === 'closed').length
+      });
+      return updated;
+    });
+
+    if (selectedInquiry && selectedInquiry._id === inquiryId) {
+      setSelectedInquiry(prev => ({
+        ...prev,
+        ...(newStatus !== undefined ? { status: newStatus } : {}),
+        ...(newNotes !== undefined ? { adminNotes: newNotes } : {})
+      }));
+    }
+    triggerToast('Inquiry Updated', `Status marked as ${newStatus || 'updated'}`, 'success');
+  };
+
+  // Save Internal Admin Notes in UI
+  const handleSaveInquiryNotes = (inquiryId) => {
+    if (!inquiryId) return;
+    setSavingInquiryNotes(true);
+    setInquiries(prev => {
+      const updated = prev.map(item => item._id === inquiryId ? { ...item, adminNotes: inquiryAdminNotes } : item);
+      try {
+        localStorage.setItem('emahu_contact_inquiries', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    if (selectedInquiry && selectedInquiry._id === inquiryId) {
+      setSelectedInquiry(prev => ({ ...prev, adminNotes: inquiryAdminNotes }));
+    }
+    setSavingInquiryNotes(false);
+    triggerToast('Note Saved', 'Admin internal note updated successfully', 'success');
+  };
+
+  // Delete Customer Inquiry from UI
+  const handleDeleteInquiry = (inquiryId) => {
+    if (!window.confirm('Are you sure you want to delete this inquiry?')) return;
+    setInquiries(prev => {
+      const updated = prev.filter(item => item._id !== inquiryId);
+      try {
+        localStorage.setItem('emahu_contact_inquiries', JSON.stringify(updated));
+      } catch (e) {}
+      setInquiryStats({
+        total: updated.length,
+        new: updated.filter(i => i.status === 'new').length,
+        in_progress: updated.filter(i => i.status === 'in_progress').length,
+        resolved: updated.filter(i => i.status === 'resolved').length,
+        closed: updated.filter(i => i.status === 'closed').length
+      });
+      return updated;
+    });
+
+    if (selectedInquiry && selectedInquiry._id === inquiryId) {
+      setSelectedInquiry(null);
+    }
+    triggerToast('Inquiry Deleted', 'The inquiry has been removed.', 'info');
+  };
+
   const fetchNotifications = async () => {
     setLoadingNotifications(true);
     setNotificationsError(false);
@@ -1504,6 +1683,7 @@ export default function AdminDashboard() {
     const refreshActiveTabData = async () => {
       try {
         fetchNotifications();
+        fetchInquiries();
         if (activeTab === 'sellers' || activeTab === 'new-sellers') {
           await fetchSellers();
         } else if (activeTab === 'products-hub') {
@@ -4763,6 +4943,189 @@ export default function AdminDashboard() {
         );
       })()}
 
+      {/* Inquiry Detail & Communication Modal */}
+      {selectedInquiry && (
+        <div className="ad-modal-overlay" onClick={() => setSelectedInquiry(null)}>
+          <div className="ad-detail-modal" style={{ width: '850px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <button className="ad-detail-close" onClick={() => setSelectedInquiry(null)}>✕</button>
+
+            <div className="ad-detail-header-block" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px' }}>
+              <div className="ad-detail-title-section">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <h3 className="ad-detail-store-name" style={{ margin: 0 }}>
+                    Inquiry from {selectedInquiry.name}
+                  </h3>
+                  <span className={`ad-inquiry-role-badge ${selectedInquiry.role || 'buyer'}`}>
+                    {selectedInquiry.role === 'buyer' && '🛍️ Customer'}
+                    {selectedInquiry.role === 'seller' && '🏪 Seller'}
+                    {selectedInquiry.role === 'delivery' && '🚚 Delivery Partner'}
+                    {(!selectedInquiry.role || selectedInquiry.role === 'general' || selectedInquiry.role === 'other') && '💬 General'}
+                  </span>
+                </div>
+                <div className="ad-detail-store-meta" style={{ marginTop: '6px' }}>
+                  <span>📅 Submitted: {new Date(selectedInquiry.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                </div>
+              </div>
+              <div>
+                <select
+                  className={`ad-inquiry-status-select ${selectedInquiry.status || 'new'}`}
+                  value={selectedInquiry.status || 'new'}
+                  disabled={inquiryActionLoading[selectedInquiry._id]}
+                  onChange={(e) => handleUpdateInquiryStatus(selectedInquiry._id, e.target.value)}
+                >
+                  <option value="new">⚡ Status: New</option>
+                  <option value="in_progress">⏳ Status: In Progress</option>
+                  <option value="resolved">✅ Status: Resolved</option>
+                  <option value="closed">🔒 Status: Closed</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginTop: '20px' }}>
+              {/* LEFT: Contact & Message Content */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Sender Information</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.9rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#94a3b8' }}>Full Name:</span>
+                      <strong style={{ color: '#fff' }}>{selectedInquiry.name}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#94a3b8' }}>Email:</span>
+                      <a href={`mailto:${selectedInquiry.email}`} style={{ color: '#38bdf8', textDecoration: 'none' }}>{selectedInquiry.email}</a>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#94a3b8' }}>Phone:</span>
+                      <strong style={{ color: selectedInquiry.phone ? '#34d399' : '#64748b' }}>{selectedInquiry.phone || 'Not provided'}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#94a3b8' }}>Subject:</span>
+                      <span style={{ color: '#cbd5e1' }}>{selectedInquiry.subject || 'General Inquiry'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Inquiry Message Box */}
+                <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#cbd5e1' }}>Inquiry Message:</h4>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard?.writeText(selectedInquiry.message || '');
+                        triggerToast('Copied', 'Message copied to clipboard', 'info');
+                      }}
+                      style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.78rem' }}
+                    >
+                      📋 Copy Text
+                    </button>
+                  </div>
+                  <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: '#f8fafc', fontSize: '0.92rem', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '200px', overflowY: 'auto' }}>
+                    {selectedInquiry.message}
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT: Quick Reply Actions & Admin Notes */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Direct Communication</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {selectedInquiry.phone && (
+                      <a
+                        href={`https://wa.me/${selectedInquiry.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${selectedInquiry.name}, this is EMAHU Hub Support regarding your inquiry.`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ad-inquiry-quick-btn whatsapp"
+                        style={{ height: '42px', fontSize: '0.88rem', justifyContent: 'center' }}
+                      >
+                        💬 Chat on WhatsApp (+{selectedInquiry.phone})
+                      </a>
+                    )}
+                    <a
+                      href={`mailto:${selectedInquiry.email}?subject=${encodeURIComponent(`Re: ${selectedInquiry.subject || 'EMAHU Inquiry'}`)}&body=${encodeURIComponent(`Hi ${selectedInquiry.name},\n\nThank you for reaching out to EMAHU Hub.\n\n`)}`}
+                      className="ad-inquiry-quick-btn email"
+                      style={{ height: '42px', fontSize: '0.88rem', justifyContent: 'center' }}
+                    >
+                      ✉️ Reply via Email ({selectedInquiry.email})
+                    </a>
+                    {selectedInquiry.phone && (
+                      <a
+                        href={`tel:${selectedInquiry.phone}`}
+                        className="ad-inquiry-quick-btn"
+                        style={{ height: '42px', fontSize: '0.88rem', justifyContent: 'center' }}
+                      >
+                        📞 Call Customer Directly
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Internal Admin Notes */}
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px' }}>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: '#94a3b8' }}>Internal Admin Notes</h4>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '0.78rem', color: '#64748b' }}>Private team notes regarding phone calls, resolution status, or customer follow-ups.</p>
+                  <textarea
+                    rows={3}
+                    placeholder="Enter internal notes (e.g. Called customer on 29 Sep, resolved product delivery query...)"
+                    value={inquiryAdminNotes}
+                    onChange={(e) => setInquiryAdminNotes(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: '#fff',
+                      fontSize: '0.85rem',
+                      fontFamily: 'inherit',
+                      resize: 'vertical',
+                      marginBottom: '10px'
+                    }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <button
+                      className="ad-btn-action approve"
+                      style={{ height: '34px', padding: '0 16px', fontSize: '0.82rem' }}
+                      disabled={savingInquiryNotes}
+                      onClick={() => handleSaveInquiryNotes(selectedInquiry._id)}
+                    >
+                      {savingInquiryNotes ? 'Saving...' : '💾 Save Notes'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Delete button */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '8px' }}>
+                  <button
+                    onClick={() => handleDeleteInquiry(selectedInquiry._id)}
+                    style={{
+                      background: 'rgba(239,68,68,0.1)',
+                      border: '1px solid rgba(239,68,68,0.25)',
+                      color: '#ef4444',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
+                  >
+                    🗑️ Delete Inquiry
+                  </button>
+                  <button
+                    className="ad-btn-sec"
+                    style={{ height: '36px', padding: '0 18px', fontSize: '0.85rem' }}
+                    onClick={() => setSelectedInquiry(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile sidebar backdrop */}
       {mobileSidebarOpen && (
         <div className="ad-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} aria-hidden="true" />
@@ -6434,6 +6797,372 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* TAB: HELP & SUPPORT INQUIRIES */}
+          {(activeTab === 'help' || activeTab === 'inquiries') && (
+            <div className="ad-inquiries-container">
+              {/* Header */}
+              <div className="ad-view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span>🆘 Help &amp; Support Inquiries</span>
+                    {inquiryStats.new > 0 && (
+                      <span style={{ fontSize: '0.75rem', background: '#38bdf8', color: '#000', fontWeight: '800', padding: '3px 10px', borderRadius: '12px' }}>
+                        {inquiryStats.new} NEW
+                      </span>
+                    )}
+                  </h3>
+                  <p>Inquiries, support requests, and contact messages submitted by users from the website Help & Contact form.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    className="ad-btn-sec"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                    onClick={() => fetchInquiries()}
+                    disabled={loadingInquiries}
+                  >
+                    <span style={{ display: 'inline-block', transform: loadingInquiries ? 'rotate(180deg)' : 'none', transition: 'transform 0.5s' }}>🔄</span>
+                    {loadingInquiries ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="ad-inquiry-stats-grid">
+                <div className="ad-inquiry-stat-card">
+                  <div className="ad-inquiry-stat-icon" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8' }}>
+                    📨
+                  </div>
+                  <div>
+                    <div className="ad-inquiry-stat-val">{inquiryStats.total}</div>
+                    <div className="ad-inquiry-stat-label">Total Inquiries</div>
+                  </div>
+                </div>
+
+                <div className="ad-inquiry-stat-card" style={{ borderColor: inquiryStats.new > 0 ? 'rgba(56, 189, 248, 0.4)' : 'rgba(255, 255, 255, 0.08)' }}>
+                  <div className="ad-inquiry-stat-icon" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                    ⚡
+                  </div>
+                  <div>
+                    <div className="ad-inquiry-stat-val" style={{ color: '#38bdf8' }}>{inquiryStats.new}</div>
+                    <div className="ad-inquiry-stat-label">New / Unanswered</div>
+                  </div>
+                </div>
+
+                <div className="ad-inquiry-stat-card">
+                  <div className="ad-inquiry-stat-icon" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>
+                    ⏳
+                  </div>
+                  <div>
+                    <div className="ad-inquiry-stat-val" style={{ color: '#fbbf24' }}>{inquiryStats.in_progress}</div>
+                    <div className="ad-inquiry-stat-label">In Progress</div>
+                  </div>
+                </div>
+
+                <div className="ad-inquiry-stat-card">
+                  <div className="ad-inquiry-stat-icon" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>
+                    ✅
+                  </div>
+                  <div>
+                    <div className="ad-inquiry-stat-val" style={{ color: '#34d399' }}>{inquiryStats.resolved}</div>
+                    <div className="ad-inquiry-stat-label">Resolved</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Toolbar */}
+              <div className="ad-inquiry-toolbar">
+                {/* Status Filter Tabs */}
+                <div className="ad-inquiry-filter-tabs">
+                  <button
+                    className={`ad-inquiry-tab-btn ${inquiryFilterStatus === 'all' ? 'active' : ''}`}
+                    onClick={() => setInquiryFilterStatus('all')}
+                  >
+                    All <span className="ad-inquiry-tab-count">{inquiryStats.total}</span>
+                  </button>
+                  <button
+                    className={`ad-inquiry-tab-btn ${inquiryFilterStatus === 'new' ? 'active' : ''}`}
+                    onClick={() => setInquiryFilterStatus('new')}
+                  >
+                    New <span className="ad-inquiry-tab-count">{inquiryStats.new}</span>
+                  </button>
+                  <button
+                    className={`ad-inquiry-tab-btn ${inquiryFilterStatus === 'in_progress' ? 'active' : ''}`}
+                    onClick={() => setInquiryFilterStatus('in_progress')}
+                  >
+                    In Progress <span className="ad-inquiry-tab-count">{inquiryStats.in_progress}</span>
+                  </button>
+                  <button
+                    className={`ad-inquiry-tab-btn ${inquiryFilterStatus === 'resolved' ? 'active' : ''}`}
+                    onClick={() => setInquiryFilterStatus('resolved')}
+                  >
+                    Resolved <span className="ad-inquiry-tab-count">{inquiryStats.resolved}</span>
+                  </button>
+                </div>
+
+                {/* Role Filter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Filter Role:</span>
+                  <select
+                    value={inquiryFilterRole}
+                    onChange={(e) => setInquiryFilterRole(e.target.value)}
+                    style={{
+                      height: '38px',
+                      padding: '0 12px',
+                      borderRadius: '8px',
+                      background: '#0a0c16',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: '#fff',
+                      fontSize: '0.85rem',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="buyer">Buyers / Customers</option>
+                    <option value="seller">Sellers / Merchants</option>
+                    <option value="delivery">Delivery Partners</option>
+                    <option value="general">General Support</option>
+                  </select>
+                </div>
+
+                {/* Search Box */}
+                <div className="ad-inquiry-search-box">
+                  <input
+                    type="text"
+                    placeholder="Search by name, email, phone, or message..."
+                    value={inquirySearchTerm}
+                    onChange={(e) => setInquirySearchTerm(e.target.value)}
+                    className="ad-inquiry-search-input"
+                  />
+                  {inquirySearchTerm && (
+                    <button
+                      onClick={() => setInquirySearchTerm('')}
+                      style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Data Table / List */}
+              {inquiriesError ? (
+                <div className="ad-error-container">
+                  <div className="ad-error-title">⚠️ Error Loading Inquiries</div>
+                  <div className="ad-error-message">Could not fetch inquiries. The backend might still be waking up.</div>
+                  <button className="ad-btn-sec" onClick={() => fetchInquiries()}>
+                    🔄 Retry Loading
+                  </button>
+                </div>
+              ) : loadingInquiries && inquiries.length === 0 ? (
+                <div className="ad-loading" style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
+                  Loading customer inquiries...
+                </div>
+              ) : (() => {
+                const filtered = inquiries.filter(inq => {
+                  if (inquiryFilterStatus !== 'all' && inq.status !== inquiryFilterStatus) return false;
+                  if (inquiryFilterRole !== 'all' && inq.role !== inquiryFilterRole) return false;
+                  if (inquirySearchTerm.trim()) {
+                    const s = inquirySearchTerm.toLowerCase();
+                    const match =
+                      (inq.name && inq.name.toLowerCase().includes(s)) ||
+                      (inq.email && inq.email.toLowerCase().includes(s)) ||
+                      (inq.phone && inq.phone.toLowerCase().includes(s)) ||
+                      (inq.subject && inq.subject.toLowerCase().includes(s)) ||
+                      (inq.message && inq.message.toLowerCase().includes(s));
+                    if (!match) return false;
+                  }
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '60px 20px', background: 'rgba(16, 19, 34, 0.5)', borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                      <div style={{ fontSize: '3rem', marginBottom: '12px' }}>📬</div>
+                      <h4 style={{ color: '#fff', fontSize: '1.2rem', margin: '0 0 8px 0' }}>No Inquiries Found</h4>
+                      <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0 }}>
+                        {inquiries.length === 0
+                          ? 'No customer inquiries submitted yet. When users submit the contact or inquiry form, they will appear here.'
+                          : 'No inquiries match the current filter or search criteria.'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="ad-table-container">
+                    <table className="ad-table">
+                      <thead>
+                        <tr>
+                          <th>Sender Details</th>
+                          <th>Role</th>
+                          <th>Message Preview</th>
+                          <th>Submitted Date</th>
+                          <th>Status</th>
+                          <th style={{ textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map(inq => (
+                          <tr key={inq._id} style={{ background: inq.status === 'new' ? 'rgba(56, 189, 248, 0.03)' : 'transparent' }}>
+                            {/* Sender Info */}
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '50%',
+                                  background: inq.role === 'seller' ? 'rgba(168, 85, 247, 0.2)' : inq.role === 'delivery' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(56, 189, 248, 0.2)',
+                                  color: inq.role === 'seller' ? '#c084fc' : inq.role === 'delivery' ? '#34d399' : '#38bdf8',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: '800',
+                                  fontSize: '0.95rem'
+                                }}>
+                                  {(inq.name || 'U').charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: '700', color: '#fff', fontSize: '0.92rem' }}>{inq.name}</div>
+                                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                                    <a href={`mailto:${inq.email}`} style={{ color: '#94a3b8', textDecoration: 'none' }}>{inq.email}</a>
+                                  </div>
+                                  {inq.phone && (
+                                    <div style={{ fontSize: '0.78rem', color: '#34d399', marginTop: '2px' }}>
+                                      📞 {inq.phone}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Role */}
+                            <td>
+                              <span className={`ad-inquiry-role-badge ${inq.role || 'buyer'}`}>
+                                {inq.role === 'buyer' && '🛍️ Buyer'}
+                                {inq.role === 'seller' && '🏪 Seller'}
+                                {inq.role === 'delivery' && '🚚 Delivery'}
+                                {(!inq.role || inq.role === 'general' || inq.role === 'other') && '💬 General'}
+                              </span>
+                            </td>
+
+                            {/* Message Preview */}
+                            <td style={{ maxWidth: '340px' }}>
+                              <div
+                                onClick={() => {
+                                  setSelectedInquiry(inq);
+                                  setInquiryAdminNotes(inq.adminNotes || '');
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                <div style={{
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  fontSize: '0.86rem',
+                                  color: '#cbd5e1',
+                                  lineHeight: 1.4
+                                }}>
+                                  {inq.message}
+                                </div>
+                                {inq.adminNotes && (
+                                  <div style={{ marginTop: '4px', fontSize: '0.72rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    📝 Has internal notes
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Date */}
+                            <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem', color: '#94a3b8' }}>
+                              <div>{new Date(inq.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                {new Date(inq.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </td>
+
+                            {/* Status Selector */}
+                            <td>
+                              <select
+                                className={`ad-inquiry-status-select ${inq.status || 'new'}`}
+                                value={inq.status || 'new'}
+                                disabled={inquiryActionLoading[inq._id]}
+                                onChange={(e) => handleUpdateInquiryStatus(inq._id, e.target.value)}
+                              >
+                                <option value="new">⚡ New</option>
+                                <option value="in_progress">⏳ In Progress</option>
+                                <option value="resolved">✅ Resolved</option>
+                                <option value="closed">🔒 Closed</option>
+                              </select>
+                            </td>
+
+                            {/* Actions */}
+                            <td style={{ textAlign: 'right' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                <button
+                                  className="ad-btn-action"
+                                  style={{
+                                    height: '32px',
+                                    padding: '0 12px',
+                                    fontSize: '0.78rem',
+                                    background: 'rgba(99, 102, 241, 0.15)',
+                                    color: '#818cf8',
+                                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontWeight: '600'
+                                  }}
+                                  onClick={() => {
+                                    setSelectedInquiry(inq);
+                                    setInquiryAdminNotes(inq.adminNotes || '');
+                                  }}
+                                >
+                                  👁️ View &amp; Reply
+                                </button>
+                                {inq.phone && (
+                                  <a
+                                    href={`https://wa.me/${inq.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${inq.name}, this is EMAHU Hub Support regarding your inquiry.`)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="ad-inquiry-quick-btn whatsapp"
+                                    title="Open WhatsApp Chat"
+                                  >
+                                    💬
+                                  </a>
+                                )}
+                                <button
+                                  onClick={() => handleDeleteInquiry(inq._id)}
+                                  disabled={inquiryActionLoading[inq._id]}
+                                  style={{
+                                    height: '32px',
+                                    width: '32px',
+                                    padding: 0,
+                                    borderRadius: '8px',
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                                    color: '#ef4444',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                  title="Delete Inquiry"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

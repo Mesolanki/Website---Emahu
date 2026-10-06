@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import BuyerHeader from '@/components/buyer_home/buyer_header';
+import BuyerLocationModal from '@/components/buyer_home/BuyerLocationModal';
+import { getCoordinatesForCity, setBuyerLocationByCity, calculateHaversineRoadDistance } from '@/utils/location';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import { wakeupServer } from '@/utils/serverWakeup';
 import API_BASE from '@/utils/config';
@@ -119,6 +121,7 @@ export default function ProductDetailPage() {
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
   const [buyerLocation, setBuyerLocation] = useState(null);
   const [roadDistance, setRoadDistance] = useState(null);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   const currentPrice = useMemo(() => {
     if (product && product.variants && product.variants[activeVariantIndex] && product.variants[activeVariantIndex].price) {
@@ -344,26 +347,48 @@ export default function ProductDetailPage() {
     };
   }, []);
 
-  // Calculate road distance to this product's seller
+  // Calculate road distance to this product's seller dynamically
   useEffect(() => {
     const calculateDistance = async () => {
       if (!product || !product.seller) return;
-      if (!buyerLocation || buyerLocation.latitude === undefined || buyerLocation.longitude === undefined) return;
 
       const sellerObj = typeof product.seller === 'object' ? product.seller : null;
       if (!sellerObj) return;
 
-      const sLat = parseFloat(sellerObj.latitude);
-      const sLon = parseFloat(sellerObj.longitude);
-      if (isNaN(sLat) || isNaN(sLon)) return;
+      // Resolve seller coordinates with city/address fallback
+      let sLat = parseFloat(sellerObj.latitude);
+      let sLon = parseFloat(sellerObj.longitude);
+      if (isNaN(sLat) || isNaN(sLon)) {
+        const sCityCoords = getCoordinatesForCity(sellerObj.city || sellerObj.address || 'Ahmedabad');
+        if (sCityCoords) {
+          sLat = sCityCoords.latitude;
+          sLon = sCityCoords.longitude;
+        } else {
+          sLat = 23.0225;
+          sLon = 72.5714;
+        }
+      }
+
+      // Resolve buyer coordinates with selectedCity fallback
+      let bLat = parseFloat(buyerLocation?.latitude);
+      let bLon = parseFloat(buyerLocation?.longitude);
+      if (isNaN(bLat) || isNaN(bLon)) {
+        const bCityCoords = getCoordinatesForCity(selectedCity || 'Ahmedabad');
+        if (bCityCoords) {
+          bLat = bCityCoords.latitude;
+          bLon = bCityCoords.longitude;
+        }
+      }
+
+      if (isNaN(bLat) || isNaN(bLon)) return;
 
       try {
         const res = await fetch(`${API_BASE}/api/location/distance`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            origin: { latitude: Number(buyerLocation.latitude), longitude: Number(buyerLocation.longitude) },
-            destination: { latitude: sLat, longitude: sLon }
+            origin: { latitude: Number(bLat), longitude: Number(bLon) },
+            destination: { latitude: Number(sLat), longitude: Number(sLon) }
           })
         });
         const data = await res.json();
@@ -372,14 +397,19 @@ export default function ProductDetailPage() {
             distanceKm: data.distanceKm,
             distanceMeters: data.distanceMeters
           });
+          return;
         }
       } catch (err) {
-        console.warn('Error calculating road distance in product detail:', err);
+        console.warn('Backend road distance fetch failed, falling back to client calc:', err);
       }
+
+      // Live client fallback for zero downtime
+      const fallback = calculateHaversineRoadDistance(bLat, bLon, sLat, sLon);
+      setRoadDistance(fallback);
     };
 
     calculateDistance();
-  }, [product, buyerLocation]);
+  }, [product, buyerLocation, selectedCity]);
 
   // Helper: check if seller serves the buyer location
   const sellerServesLocation = (seller, city) => {
@@ -941,24 +971,36 @@ export default function ProductDetailPage() {
             )}
           </p>
 
-          {/* Road Distance Badge */}
+          {/* Interactive Dynamic Road Distance Badge */}
           {roadDistance && roadDistance.distanceKm !== undefined && roadDistance.distanceKm > 0 && (
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              color: '#047857',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              padding: '3px 10px',
-              borderRadius: '16px',
-              marginBottom: '10px',
-              width: 'fit-content'
-            }}>
+            <div
+              onClick={() => setIsLocationModalOpen(true)}
+              title="Click to change your delivery location"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                color: '#047857',
+                background: 'rgba(16, 185, 129, 0.1)',
+                border: '1px solid rgba(16, 185, 129, 0.25)',
+                padding: '4px 12px',
+                borderRadius: '16px',
+                marginBottom: '10px',
+                width: 'fit-content',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                userSelect: 'none'
+              }}
+            >
               <span>📍</span>
-              <span>{roadDistance.distanceKm} km away from your location</span>
+              <span>
+                {roadDistance.distanceKm} km away from {buyerLocation?.displayArea || buyerLocation?.city || selectedCity || 'your location'}
+              </span>
+              <span style={{ fontSize: '0.72rem', textDecoration: 'underline', color: '#059669', opacity: 0.9, marginLeft: '4px' }}>
+                Change
+              </span>
             </div>
           )}
 
@@ -1516,6 +1558,16 @@ export default function ProductDetailPage() {
           ))}
         </div>
       </section>
+
+      {/* Global Buyer Location Selector Modal */}
+      <BuyerLocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        onLocationSelect={(loc) => {
+          setBuyerLocation(loc);
+          if (loc.city) setSelectedCity(loc.city);
+        }}
+      />
     </div>
   );
 }

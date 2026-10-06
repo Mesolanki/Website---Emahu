@@ -7,6 +7,7 @@ import BuyerHeader from '@/components/buyer_home/buyer_header';
 import DynamicProductForm from '@/components/seller_home/DynamicProductForm';
 import { logAnalyticsEvent } from '@/utils/analytics';
 import { wakeupServer } from '@/utils/serverWakeup';
+import { setBuyerLocationByCity } from '@/utils/location';
 import API_BASE from '@/utils/config';
 import './products.css';
 
@@ -776,8 +777,10 @@ export default function ProductsPage() {
 
   const handleCityChange = (city) => {
     setSelectedCity(city);
-    localStorage.setItem('emahu_buyer_city', city);
-    window.dispatchEvent(new Event('storage'));
+    const loc = setBuyerLocationByCity(city);
+    if (loc) {
+      setBuyerLocation(loc);
+    }
     setPage(1);
   };
 

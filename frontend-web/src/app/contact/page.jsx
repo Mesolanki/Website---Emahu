@@ -9,6 +9,22 @@ export default function ContactPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    try {
+      const stored = JSON.parse(localStorage.getItem('emahu_contact_inquiries') || '[]');
+      stored.unshift({
+        _id: 'inq-' + Date.now(),
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone || '',
+        role: formData.role || 'buyer',
+        subject: formData.role === 'seller' ? 'Seller Merchant Partnership' : formData.role === 'delivery' ? 'Delivery Logistics Partner' : 'Customer Support Inquiry',
+        message: formData.message,
+        status: 'new',
+        adminNotes: '',
+        createdAt: new Date().toISOString()
+      });
+      localStorage.setItem('emahu_contact_inquiries', JSON.stringify(stored));
+    } catch (err) {}
     setSubmitted(true);
   };
 
