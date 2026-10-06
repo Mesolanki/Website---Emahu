@@ -2099,9 +2099,10 @@ exports.resetPassword = async (req, res) => {
     }
 
     const cleanInput = email.trim();
+    const cleanEmail = cleanInput.toLowerCase();
     let query = {};
     if (cleanInput.includes('@')) {
-      query = { email: cleanInput.toLowerCase() };
+      query = { email: cleanEmail };
     } else {
       const cleanPhone = cleanInput.replace(/\D/g, '');
       const last10Digits = cleanPhone.slice(-10);
@@ -2109,7 +2110,7 @@ exports.resetPassword = async (req, res) => {
         $or: [
           { phone: last10Digits },
           { phone: cleanInput },
-          { email: cleanInput.toLowerCase() }
+          { email: cleanEmail }
         ]
       };
     }

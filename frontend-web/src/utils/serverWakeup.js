@@ -5,15 +5,16 @@
  * This pre-warms the backend so the first real API call doesn't stall.
  */
 
-const BACKEND_URL = (() => {
-  const raw = process.env.NEXT_PUBLIC_API_URL || 'https://website-emahu.onrender.com';
-  return raw
+import { getApiBase } from './config';
+
+const getPingEndpoint = () => {
+  const raw = getApiBase();
+  const cleaned = raw
     .replace(/\/api\/auth$/, '')
     .replace(/\/api$/, '')
     .replace(/\/$/, '');
-})();
-
-const PING_ENDPOINT = `${BACKEND_URL}/`;
+  return `${cleaned}/`;
+};
 
 let wakeupPromise = null; // singleton — only one ping at a time
 
@@ -33,7 +34,7 @@ export function wakeupServer() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000); // 20s max
 
-    fetch(PING_ENDPOINT, {
+    fetch(getPingEndpoint(), {
       method: 'GET',
       signal: controller.signal,
       // Bypass Next.js caching — we always want a fresh ping
