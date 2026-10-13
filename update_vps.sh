@@ -38,7 +38,7 @@ else
 fi
 
 echo "🔄 [5/5] Restarting backend & frontend PM2 services..."
-pm2 startOrReload ecosystem.config.js --update-env || pm2 restart ecosystem.config.js
+pm2 restart ecosystem.config.js --update-env || pm2 start ecosystem.config.js
 pm2 save
 
 echo "✅ === EMAHU VPS Deployment Updated Successfully! ==="

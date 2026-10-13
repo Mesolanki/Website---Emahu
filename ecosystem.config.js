@@ -26,7 +26,8 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000
+        PORT: 3000,
+        NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: 'emahu_production_server_action_encryption_secret_key'
       }
     },
     {
@@ -41,7 +42,8 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
-        PORT: 3001
+        PORT: 3001,
+        NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: 'emahu_production_server_action_encryption_secret_key'
       }
     }
   ]

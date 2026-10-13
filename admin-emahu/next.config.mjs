@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  generateBuildId: async () => {
+    return process.env.GIT_HASH || 'emahu-admin-v1';
+  },
+
   async rewrites() {
     const defaultApi = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
     const apiBase = defaultApi
